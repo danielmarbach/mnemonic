@@ -1,0 +1,51 @@
+services:
+  ollama:
+    image: ollama/ollama
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-data:/root/.ollama
+
+  ollama-init:
+    image: curlimages/curl:latest
+    entrypoint: ["/bin/sh", "-c"]
+    depends_on:
+      - ollama
+    command: >
+      "
+      echo 'Waiting for Ollama to start...' &&
+      sleep 10 &&
+      for i in 1 2 3 4 5; do
+        echo \"Pulling nomic-embed-text (attempt $i/5)...\" &&
+        if curl -sf -X POST http://ollama:11434/api/pull -d '{\"name\": \"nomic-embed-text\"}'; then
+          echo 'Model pulled successfully' && exit 0
+        fi &&
+        echo 'Not ready yet, retrying...' &&
+        sleep 10
+      done &&
+      echo 'Failed to pull model after 5 attempts' && exit 1
+      "
+
+  mnemonic:
+    build: .
+    # MCP stdio server — invoke with: docker compose run --rm mnemonic
+    stdin_open: true
+    tty: false
+    depends_on:
+      ollama-init:
+        condition: service_completed_successfully
+    volumes:
+      # The vault: a git repo on the host, mounted read-write
+      - ${VAULT_PATH:-~/mnemonic-vault}:/vault
+      # Git credentials so push/pull work inside the container
+      - ~/.gitconfig:/root/.gitconfig:ro
+      - ~/.ssh:/root/.ssh:ro
+    environment:
+      VAULT_PATH: /vault
+      OLLAMA_URL: http://ollama:11434
+      EMBED_MODEL: ${EMBED_MODEL:-nomic-embed-text}
+      DISABLE_GIT: ${DISABLE_GIT:-false}
+
+volumes:
+  ollama-data:

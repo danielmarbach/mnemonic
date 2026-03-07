@@ -28,7 +28,6 @@ When `recall` is called with a `cwd`, memories from the matching project are **b
 
 ## Prerequisites
 
-- Node.js 18+
 - [Ollama](https://ollama.com) running locally with `nomic-embed-text` pulled:
   ```bash
   ollama pull nomic-embed-text
@@ -36,10 +35,31 @@ When `recall` is called with a `cwd`, memories from the matching project are **b
 
 ## Setup
 
+### Native (Node.js 18+)
+
 ```bash
 npm install
 npm run build
 ```
+
+### Docker
+
+```bash
+docker compose build
+docker compose up ollama-init  # pulls nomic-embed-text into the ollama volume (one-time)
+```
+
+Ollama runs as a container with a named volume (`ollama-data`) so downloaded models persist across restarts. An `ollama-init` service pulls `nomic-embed-text` on first run; `mnemonic` waits for it to complete before starting.
+
+The vault directory (`~/mnemonic-vault` by default) is bind-mounted from the host, so notes and the git repo stay on your machine.
+
+Override the vault location with an environment variable:
+
+```bash
+VAULT_PATH=/path/to/your-vault docker compose run --rm mnemonic
+```
+
+Git credentials (`~/.gitconfig` and `~/.ssh`) are mounted read-only so push/pull work inside the container.
 
 ## Configuration
 
@@ -52,6 +72,7 @@ npm run build
 
 ## Claude Desktop / Cursor config
 
+**Native:**
 ```json
 {
   "mcpServers": {
@@ -65,6 +86,23 @@ npm run build
   }
 }
 ```
+
+**Docker:**
+```json
+{
+  "mcpServers": {
+    "mnemonic": {
+      "command": "docker",
+      "args": ["compose", "-f", "/path/to/mnemonic/compose.yaml", "run", "--rm", "mnemonic"],
+      "env": {
+        "VAULT_PATH": "/Users/you/mnemonic-vault"
+      }
+    }
+  }
+}
+```
+
+> Ollama must be running before the MCP client invokes mnemonic. Start it once with `docker compose up ollama -d` and it will stay up between calls.
 
 ## Tools
 
