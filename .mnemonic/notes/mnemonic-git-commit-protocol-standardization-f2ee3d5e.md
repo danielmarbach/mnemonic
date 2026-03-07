@@ -9,66 +9,60 @@ tags:
   - enhancement
   - llm
 createdAt: '2026-03-07T23:34:04.303Z'
-updatedAt: '2026-03-07T23:47:05.420Z'
+updatedAt: '2026-03-07T23:50:48.095Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
   - id: mnemonic-key-design-decisions-3f2a6273
     type: related-to
 ---
-Enhanced git commit protocol with human-readable summaries for better traceability and readability. Now includes LLM-provided summary support for optimal commit messages.
+Enhanced git commit protocol with comprehensive LLM-provided summary support across multiple tools.
 
-**Key Enhancement - LLM-Provided Summaries:**
+**Extended LLM Summary Support:**
 
-The `remember` tool now accepts an optional `summary` parameter that allows LLMs to provide concise, commit-message-style summaries directly. This is the preferred approach over automatic extraction.
+Beyond `remember`, the following tools now accept optional `summary` parameters:
 
-**How it works:**
+1. **`update` tool** - `summary` parameter:
+   - LLM explains what changed and why
+   - Example: "Clarify JWT migration timeline after security review"
+   - Fallback: "Updated title, content, tags" listing actual changes
 
-1. LLM calls `remember` with both `content` and `summary` parameters
-2. Summary appears first in git commit body (like a good commit message)
-3. Full content stored in note file as usual
-4. If no summary provided, falls back to first sentence extraction
+2. **`consolidate` tool** - `mergePlan.summary` parameter:
+   - LLM explains merge rationale
+   - Example: "Merge release workflow notes into single comprehensive guide"
+   - Fallback: "Consolidated N notes into new note"
 
-**Benefits:**
+**Benefits of LLM-provided summaries:**
 
-- LLM crafts optimal summary based on full context understanding
-- Follows conventional commit best practices (imperative mood, 50-72 chars)
-- Commit messages tell the story; note files contain full details
-- No extra AI calls needed in code (simpler, faster)
+- LLM has full context when composing operations
+- Better quality than auto-generated descriptions
+- Follows conventional commit best practices
+- No extra AI calls in code (simpler, faster)
+- Commit messages tell the story; metadata provides structure
 
-**Example:**
+**Implementation pattern:**
 
 ```typescript
-remember({
-  title: "JWT RS256 migration decision",
-  summary: "Document JWT RS256 migration for distributed auth",
-  content: "Full details about the migration..."
-})
-```
+// Tool accepts optional summary parameter
+summary: z.string().optional()
 
-**Results in commit:**
+// Use LLM-provided or fallback
+const commitSummary = summary ?? generateFallbackSummary()
 
-```text
-remember: JWT RS256 migration decision
-
-Document JWT RS256 migration for distributed auth
-
-- Note: jwt-rs256-abc123 (JWT RS256 migration decision)
-- Project: mnemonic
-- Scope: project
-- Tags: auth, security
+// Include in commit body
+formatCommitBody({ summary: commitSummary, ... })
 ```
 
 **Updated documentation:**
 
-- README.md: Added `summary` parameter guidance in system prompt
-- AGENT.md: Updated protocol with summary source guidance
+- AGENT.md: Extended tool conventions table with all summary sources
+- AGENT.md: Added comprehensive LLM summary guidance section
+- README.md: System prompt guidance for `remember` tool
 
-**Implementation:**
+**Tools with LLM summary support:**
 
-- Added optional `summary` parameter to `remember` tool schema
-- Updated `formatCommitBody()` to accept LLM-provided summary
-- Fallback to `extractSummary()` if no summary provided
-- All 26 tests passing
+- `remember` - `summary` parameter (primary use case)
+- `update` - `summary` parameter
+- `consolidate` - `mergePlan.summary` parameter
 
-This approach is cleaner than code-side AI summarization because the LLM already understands the context when composing the note.
+All 26 tests passing. Build successful. Architecture is extensible - easy to add to additional tools if needed.
