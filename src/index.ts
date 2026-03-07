@@ -167,6 +167,7 @@ function formatSyncResult(result: SyncResult, label: string): string[] {
 }
 
 type SearchScope = "project" | "global" | "all";
+type StorageScope = "project-vault" | "main-vault" | "any";
 
 type NoteEntry = {
   note: Note;
@@ -181,6 +182,7 @@ async function collectVisibleNotes(
   cwd?: string,
   scope: SearchScope = "all",
   tags?: string[],
+  storedIn: StorageScope = "any",
 ): Promise<{ project: Awaited<ReturnType<typeof resolveProject>>; entries: NoteEntry[] }> {
   const project = await resolveProject(cwd);
   const vaults = await vaultManager.searchOrder(cwd);
@@ -205,6 +207,9 @@ async function collectVisibleNotes(
         if (!tags.every((tag) => noteTags.has(tag))) {
           continue;
         }
+      }
+      if (storedIn !== "any" && storageLabel(vault) !== storedIn) {
+        continue;
       }
       seen.add(note.id);
       entries.push({ note, vault });
@@ -249,6 +254,28 @@ async function formatProjectPolicyLine(projectId?: string): Promise<string> {
     return "Policy: none (fallback write scope with cwd is project)";
   }
   return `Policy: default write scope ${policy.defaultScope} (updated ${policy.updatedAt})`;
+}
+
+async function moveNoteBetweenVaults(
+  found: { note: Note; vault: Vault },
+  targetVault: Vault,
+): Promise<void> {
+  const { note, vault: sourceVault } = found;
+  const embedding = await sourceVault.storage.readEmbedding(note.id);
+
+  await targetVault.storage.writeNote(note);
+  if (embedding) {
+    await targetVault.storage.writeEmbedding(embedding);
+  }
+
+  await sourceVault.storage.deleteNote(note.id);
+
+  await targetVault.git.commit(`move: ${note.title}`, [vaultManager.noteRelPath(targetVault, note.id)]);
+  await sourceVault.git.commit(`move: ${note.title}`, [vaultManager.noteRelPath(sourceVault, note.id)]);
+  await targetVault.git.push();
+  if (sourceVault !== targetVault) {
+    await sourceVault.git.push();
+  }
 }
 
 // ── MCP Server ────────────────────────────────────────────────────────────────
@@ -628,6 +655,11 @@ server.registerTool(
         .optional()
         .default("all")
         .describe("'project' = only this project, 'global' = only unscoped, 'all' = everything"),
+      storedIn: z
+        .enum(["project-vault", "main-vault", "any"])
+        .optional()
+        .default("any")
+        .describe("Filter by actual storage location instead of project association"),
       tags: z.array(z.string()).optional().describe("Optional tag filter"),
       includeRelations: z.boolean().optional().default(false).describe("Include related memory ids/types"),
       includePreview: z.boolean().optional().default(false).describe("Include a short content preview for each memory"),
@@ -635,8 +667,8 @@ server.registerTool(
       includeUpdated: z.boolean().optional().default(false).describe("Include the last updated timestamp for each memory"),
     }),
   },
-  async ({ cwd, scope, tags, includeRelations, includePreview, includeStorage, includeUpdated }) => {
-    const { project, entries } = await collectVisibleNotes(cwd, scope, tags);
+  async ({ cwd, scope, storedIn, tags, includeRelations, includePreview, includeStorage, includeUpdated }) => {
+    const { project, entries } = await collectVisibleNotes(cwd, scope, tags, storedIn);
 
     if (entries.length === 0) {
       return { content: [{ type: "text", text: "No memories found." }] };
@@ -650,8 +682,8 @@ server.registerTool(
     }));
 
     const header = project && scope !== "global"
-      ? `${entries.length} memories (project: ${project.name}, scope: ${scope}):`
-      : `${entries.length} memories (scope: ${scope}):`;
+      ? `${entries.length} memories (project: ${project.name}, scope: ${scope}, storedIn: ${storedIn}):`
+      : `${entries.length} memories (scope: ${scope}, storedIn: ${storedIn}):`;
 
     return { content: [{ type: "text", text: `${header}\n\n${lines.join("\n")}` }] };
   }
@@ -666,13 +698,14 @@ server.registerTool(
     inputSchema: z.object({
       cwd: projectParam,
       scope: z.enum(["project", "global", "all"]).optional().default("all"),
+      storedIn: z.enum(["project-vault", "main-vault", "any"]).optional().default("any"),
       limit: z.number().int().min(1).max(20).optional().default(5),
       includePreview: z.boolean().optional().default(true),
       includeStorage: z.boolean().optional().default(true),
     }),
   },
-  async ({ cwd, scope, limit, includePreview, includeStorage }) => {
-    const { project, entries } = await collectVisibleNotes(cwd, scope);
+  async ({ cwd, scope, storedIn, limit, includePreview, includeStorage }) => {
+    const { project, entries } = await collectVisibleNotes(cwd, scope, undefined, storedIn);
     const recent = [...entries]
       .sort((a, b) => b.note.updatedAt.localeCompare(a.note.updatedAt))
       .slice(0, limit);
@@ -702,11 +735,12 @@ server.registerTool(
     inputSchema: z.object({
       cwd: projectParam,
       scope: z.enum(["project", "global", "all"]).optional().default("all"),
+      storedIn: z.enum(["project-vault", "main-vault", "any"]).optional().default("any"),
       limit: z.number().int().min(1).max(50).optional().default(25),
     }),
   },
-  async ({ cwd, scope, limit }) => {
-    const { project, entries } = await collectVisibleNotes(cwd, scope);
+  async ({ cwd, scope, storedIn, limit }) => {
+    const { project, entries } = await collectVisibleNotes(cwd, scope, undefined, storedIn);
     if (entries.length === 0) {
       return { content: [{ type: "text", text: "No memories found." }] };
     }
@@ -772,6 +806,10 @@ server.registerTool(
     sections.push(`- memories: ${entries.length}`);
     sections.push(`- stored in project vault: ${entries.filter((entry) => entry.vault.isProject).length}`);
     sections.push(`- stored in main vault: ${entries.filter((entry) => !entry.vault.isProject).length}`);
+    const mainVaultProjectEntries = entries.filter((entry) => !entry.vault.isProject && entry.note.project === project.id);
+    if (mainVaultProjectEntries.length > 0) {
+      sections.push(`- private project memories in main vault: ${mainVaultProjectEntries.length}`);
+    }
 
     for (const theme of themeOrder) {
       const bucket = themed.get(theme);
@@ -910,6 +948,96 @@ server.registerTool(
     if (sections.length > 0) parts.push(sections.join("\n\n---\n\n"));
     if (missing.length > 0) parts.push(`Not found: ${missing.map((id) => `\`${id}\``).join(", ")}`);
     return { content: [{ type: "text", text: parts.join("\n\n") }] };
+  }
+);
+
+// ── where_is_memory ───────────────────────────────────────────────────────────
+server.registerTool(
+  "where_is_memory",
+  {
+    title: "Where Is Memory",
+    description: "Show a memory's project association and actual storage location.",
+    inputSchema: z.object({
+      id: z.string().describe("Memory id to inspect"),
+      cwd: projectParam,
+    }),
+  },
+  async ({ id, cwd }) => {
+    const found = await vaultManager.findNote(id, cwd);
+    if (!found) {
+      return { content: [{ type: "text", text: `No memory found with id '${id}'` }] };
+    }
+
+    const { note, vault } = found;
+    const lines = [
+      `Memory location for **${note.title}**:`,
+      `- id: \`${note.id}\``,
+      `- project: ${note.projectName ?? note.project ?? "global"}`,
+      `- stored: ${storageLabel(vault)}`,
+      `- updated: ${note.updatedAt}`,
+    ];
+    if (note.relatedTo && note.relatedTo.length > 0) {
+      lines.push(`- related: ${note.relatedTo.map((rel) => `${rel.id} (${rel.type})`).join(", ")}`);
+    }
+    return { content: [{ type: "text", text: lines.join("\n") }] };
+  }
+);
+
+// ── move_memory ───────────────────────────────────────────────────────────────
+server.registerTool(
+  "move_memory",
+  {
+    title: "Move Memory",
+    description:
+      "Move a memory between the main vault and the current project's vault without changing its id or project metadata.",
+    inputSchema: z.object({
+      id: z.string().describe("Memory id to move"),
+      target: z.enum(["main-vault", "project-vault"]).describe("Destination storage location"),
+      cwd: projectParam,
+    }),
+  },
+  async ({ id, target, cwd }) => {
+    const found = await vaultManager.findNote(id, cwd);
+    if (!found) {
+      return { content: [{ type: "text", text: `No memory found with id '${id}'` }] };
+    }
+
+    const currentStorage = storageLabel(found.vault);
+    if (currentStorage === target) {
+      return { content: [{ type: "text", text: `Memory '${id}' is already stored in ${target}.` }] };
+    }
+
+    let targetVault: Vault;
+    if (target === "main-vault") {
+      targetVault = vaultManager.main;
+    } else {
+      if (!cwd) {
+        return {
+          content: [{
+            type: "text",
+            text: "Moving into a project vault requires `cwd` so mnemonic can resolve the destination project.",
+          }],
+        };
+      }
+      const projectVault = await vaultManager.getOrCreateProjectVault(cwd);
+      if (!projectVault) {
+        return { content: [{ type: "text", text: `Could not resolve a project vault for: ${cwd}` }] };
+      }
+      targetVault = projectVault;
+    }
+
+    const existing = await targetVault.storage.readNote(id);
+    if (existing) {
+      return { content: [{ type: "text", text: `Cannot move '${id}' because a note with that id already exists in ${target}.` }] };
+    }
+
+    await moveNoteBetweenVaults(found, targetVault);
+    return {
+      content: [{
+        type: "text",
+        text: `Moved '${id}' from ${currentStorage} to ${target}. Project association remains ${found.note.projectName ?? found.note.project ?? "global"}.`,
+      }],
+    };
   }
 );
 

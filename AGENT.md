@@ -174,8 +174,10 @@ We switched from HS256 to RS256 because...
 | `project_memory_summary` | Summarize what mnemonic currently knows about a project          |
 | `recall`         | Semantic search with optional project boost                                    |
 | `update`         | Update note content/title/tags, always re-embeds                               |
+| `where_is_memory` | Show a note's project association and actual storage location                 |
+| `move_memory`    | Move a note between `main-vault` and `project-vault` without changing its id |
 | `forget`         | Delete note + embedding, git commit + push; cleans up dangling relationships   |
-| `list`           | List notes filtered by project scope/tags, optionally with previews/relations/storage |
+| `list`           | List notes filtered by project scope/tags/storage, optionally with previews/relations |
 | `get`            | Fetch one or more notes by exact id                                            |
 | `relate`         | Create a typed relationship between two notes (bidirectional by default)       |
 | `unrelate`       | Remove a relationship between two notes                                        |

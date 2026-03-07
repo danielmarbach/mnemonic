@@ -146,6 +146,8 @@ Git credentials (`~/.gitconfig` and `~/.ssh`) are mounted read-only so push/pull
 | `project_memory_summary` | Summarize what mnemonic knows about the current project                 |
 | `recall`         | Semantic search — project-boosted when `cwd` provided                           |
 | `update`         | Update content, title, or tags; `cwd` helps locate project notes                |
+| `where_is_memory` | Show a memory's project association and actual storage location                |
+| `move_memory`    | Move a memory between `main-vault` and `project-vault` without changing its id |
 | `forget`         | Delete a memory by id; cleans up dangling relationships automatically           |
 | `list`           | List memories — filter by project scope/tags and optionally include previews, relations, storage, and timestamps |
 | `get`            | Fetch one or more memories by exact id                                          |
@@ -206,7 +208,9 @@ To see what mnemonic currently knows about a project without stitching together 
 - `project_memory_summary` — compact overview of project memories, grouped by theme, with current write policy and recent changes
 - `recent_memories` — latest updated memories for the selected scope
 - `memory_graph` — compact relationship view for visible memories
-- `list` with `includePreview`, `includeRelations`, `includeStorage`, and `includeUpdated` for richer inspection in one call
+- `list` with `includePreview`, `includeRelations`, `includeStorage`, `includeUpdated`, and `storedIn` for richer inspection in one call
+- `where_is_memory` — answer "which project does this belong to?" and "where is it actually stored?"
+- `move_memory` — explicitly move a memory between the project vault and the main vault when the storage choice changes
 
 `detect_project` also includes the current per-project write policy when one exists.
 
