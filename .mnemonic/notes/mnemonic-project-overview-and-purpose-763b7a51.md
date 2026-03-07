@@ -6,7 +6,7 @@ tags:
   - mcp
   - typescript
 createdAt: '2026-03-07T17:58:49.005Z'
-updatedAt: '2026-03-07T19:11:55.546Z'
+updatedAt: '2026-03-07T20:51:25.039Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
@@ -15,6 +15,8 @@ relatedTo:
   - id: mnemonic-key-design-decisions-3f2a6273
     type: explains
   - id: mnemonic-docker-and-ollama-compose-setup-e58f1e98
+    type: related-to
+  - id: dynamic-project-context-loading-plan-9f2ed29c
     type: related-to
 ---
 A personal MCP memory server backed by plain markdown + JSON files, synced via git. No database, no permanent services.
