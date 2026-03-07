@@ -4,11 +4,13 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 import { randomUUID } from "crypto";
 import path from "path";
+import { promises as fs } from "fs";
 
 import { Storage, type Note, type RelationshipType } from "./storage.js";
 import { embed, cosineSimilarity, embedModel } from "./embeddings.js";
-import { GitOps, type SyncResult } from "./git.js";
+import { type SyncResult } from "./git.js";
 import { detectProject } from "./project.js";
+import { VaultManager, type Vault } from "./vault.js";
 
 // ── Config ────────────────────────────────────────────────────────────────────
 
@@ -21,14 +23,8 @@ const DEFAULT_MIN_SIMILARITY = 0.3;
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 
-const storage = new Storage(VAULT_PATH);
-const git = new GitOps(VAULT_PATH);
-
-await storage.init();
-await git.init();
-
-// Write vault .gitignore on first run to keep embeddings local
-await ensureVaultGitignore();
+const vaultManager = new VaultManager(VAULT_PATH);
+await vaultManager.initMain();
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -46,7 +42,6 @@ function makeId(title: string): string {
   return slug ? `${slug}-${suffix}` : suffix;
 }
 
-/** Shared project param used by multiple tools */
 const projectParam = z
   .string()
   .optional()
@@ -75,29 +70,8 @@ function formatNote(note: Note, score?: number): string {
   );
 }
 
-async function ensureVaultGitignore(): Promise<void> {
-  const { promises: fs } = await import("fs");
-  const ignorePath = path.join(VAULT_PATH, ".gitignore");
-  const line = "embeddings/";
-  try {
-    const existing = await fs.readFile(ignorePath, "utf-8");
-    if (!existing.includes(line)) {
-      await fs.writeFile(ignorePath, existing.trimEnd() + "\n" + line + "\n");
-    }
-  } catch {
-    await fs.writeFile(ignorePath, line + "\n");
-  }
-}
-
-// ── MCP Server ────────────────────────────────────────────────────────────────
-
-const server = new McpServer({
-  name: "mnemonic",
-  version: "0.2.0",
-});
-
-/** Embed any notes missing a local embedding file. Returns counts. */
 async function embedMissingNotes(
+  storage: Storage,
   noteIds?: string[]
 ): Promise<{ rebuilt: number; failed: string[] }> {
   const notes = noteIds
@@ -127,17 +101,34 @@ async function embedMissingNotes(
   return { rebuilt, failed };
 }
 
-/** Remove local embedding files for deleted note ids */
-async function removeStaleEmbeddings(noteIds: string[]): Promise<void> {
-  const { promises: fs } = await import("fs");
+async function removeStaleEmbeddings(storage: Storage, noteIds: string[]): Promise<void> {
   for (const id of noteIds) {
-    try {
-      await fs.unlink(storage.embeddingPath(id));
-    } catch { /* already gone */ }
+    try { await fs.unlink(storage.embeddingPath(id)); } catch { /* already gone */ }
   }
 }
 
+function formatSyncResult(result: SyncResult, label: string): string[] {
+  if (!result.hasRemote) return [`${label}: no remote configured — nothing to sync.`];
+  const lines: string[] = [];
+  lines.push(result.pushedCommits > 0
+    ? `${label}: ↑ pushed ${result.pushedCommits} commit(s).`
+    : `${label}: ↑ nothing to push.`);
+  if (result.deletedNoteIds.length > 0)
+    lines.push(`${label}: ✕ ${result.deletedNoteIds.length} note(s) deleted on remote.`);
+  lines.push(result.pulledNoteIds.length > 0
+    ? `${label}: ↓ ${result.pulledNoteIds.length} note(s) pulled.`
+    : `${label}: ↓ no new notes from remote.`);
+  return lines;
+}
 
+// ── MCP Server ────────────────────────────────────────────────────────────────
+
+const server = new McpServer({
+  name: "mnemonic",
+  version: "0.3.0",
+});
+
+// ── detect_project ────────────────────────────────────────────────────────────
 server.registerTool(
   "detect_project",
   {
@@ -153,21 +144,17 @@ server.registerTool(
   async ({ cwd }) => {
     const project = await detectProject(cwd);
     if (!project) {
-      return {
-        content: [{ type: "text", text: `Could not detect a project for: ${cwd}` }],
-      };
+      return { content: [{ type: "text", text: `Could not detect a project for: ${cwd}` }] };
     }
     return {
-      content: [
-        {
-          type: "text",
-          text:
-            `Project detected:\n` +
-            `- **id:** \`${project.id}\`\n` +
-            `- **name:** ${project.name}\n` +
-            `- **source:** ${project.source}`,
-        },
-      ],
+      content: [{
+        type: "text",
+        text:
+          `Project detected:\n` +
+          `- **id:** \`${project.id}\`\n` +
+          `- **name:** ${project.name}\n` +
+          `- **source:** ${project.source}`,
+      }],
     };
   }
 );
@@ -178,8 +165,9 @@ server.registerTool(
   {
     title: "Remember",
     description:
-      "Store a new memory. Pass `cwd` to associate with a project, or omit for a global memory. " +
-      "Writes a markdown note + local embedding, then git commits the note.",
+      "Store a new memory. When `cwd` points to a project, the note is written into " +
+      "that project's `.mnemonic/` vault (inside the project repo) so collaborators " +
+      "can see it. Omit `cwd` to write a private global memory to the main vault.",
     inputSchema: z.object({
       title: z.string().describe("Short descriptive title"),
       content: z.string().describe("The content to remember (markdown supported)"),
@@ -189,40 +177,42 @@ server.registerTool(
   },
   async ({ title, content, tags, cwd }) => {
     const project = await resolveProject(cwd);
+
+    // Route to project vault when cwd is given, fall back to main vault
+    const vault = cwd
+      ? (await vaultManager.getOrCreateProjectVault(cwd)) ?? vaultManager.main
+      : vaultManager.main;
+
     const id = makeId(title);
     const now = new Date().toISOString();
 
     const note: Note = {
-      id,
-      title,
-      content,
-      tags,
+      id, title, content, tags,
       project: project?.id,
       projectName: project?.name,
       createdAt: now,
       updatedAt: now,
     };
 
-    await storage.writeNote(note);
+    await vault.storage.writeNote(note);
 
     try {
       const vector = await embed(`${title}\n\n${content}`);
-      await storage.writeEmbedding({ id, model: embedModel, embedding: vector, updatedAt: now });
+      await vault.storage.writeEmbedding({ id, model: embedModel, embedding: vector, updatedAt: now });
     } catch (err) {
       console.error(`[embedding] Skipped for '${id}': ${err}`);
     }
 
     const scope = project ? `project '${project.name}' (${project.id})` : "global";
-    await git.commit(`remember(${scope}): ${title}`, [`notes/${id}.md`]);
-    await git.push();
+    await vault.git.commit(
+      `remember(${scope}): ${title}`,
+      [vaultManager.noteRelPath(vault, id)]
+    );
+    await vault.git.push();
 
+    const vaultLabel = vault.isProject ? " [project vault]" : " [main vault]";
     return {
-      content: [
-        {
-          type: "text",
-          text: `Remembered as \`${id}\` [${scope}]`,
-        },
-      ],
+      content: [{ type: "text", text: `Remembered as \`${id}\` [${scope}]${vaultLabel}` }],
     };
   }
 );
@@ -234,9 +224,9 @@ server.registerTool(
     title: "Recall",
     description:
       "Semantic search over memories. " +
-      "When `cwd` is provided, project memories are scored with a boost and shown first, " +
-      "followed by relevant global memories. " +
-      "Without `cwd`, searches all memories globally.",
+      "When `cwd` is provided, searches both the project vault (.mnemonic/) and the " +
+      "main vault — project memories are boosted by +0.15 and shown first. " +
+      "Without `cwd`, searches only the main vault.",
     inputSchema: z.object({
       query: z.string().describe("What to search for"),
       cwd: projectParam,
@@ -257,48 +247,39 @@ server.registerTool(
   async ({ query, cwd, limit, minSimilarity, tags, scope }) => {
     const project = await resolveProject(cwd);
     const queryVec = await embed(query);
-    const embeddings = await storage.listEmbeddings();
+    const vaults = await vaultManager.searchOrder(cwd);
 
-    // Build a map of id → note (lazy, load only what we need)
-    const noteCache = new Map<string, Note | null>();
-    async function getNote(id: string): Promise<Note | null> {
-      if (!noteCache.has(id)) {
-        noteCache.set(id, await storage.readNote(id));
+    const scored: Array<{ id: string; score: number; boosted: number; vault: Vault }> = [];
+
+    for (const vault of vaults) {
+      const embeddings = await vault.storage.listEmbeddings();
+
+      for (const rec of embeddings) {
+        const rawScore = cosineSimilarity(queryVec, rec.embedding);
+        if (rawScore < minSimilarity) continue;
+
+        const note = await vault.storage.readNote(rec.id);
+        if (!note) continue;
+
+        if (tags && tags.length > 0) {
+          const noteTags = new Set(note.tags);
+          if (!tags.every((t) => noteTags.has(t))) continue;
+        }
+
+        const isProjectNote = note.project !== undefined;
+        const isCurrentProject = project && note.project === project.id;
+
+        if (scope === "project") {
+          if (!isCurrentProject) continue;
+        } else if (scope === "global") {
+          if (isProjectNote) continue;
+        }
+
+        const boost = isCurrentProject ? 0.15 : 0;
+        scored.push({ id: rec.id, score: rawScore, boosted: rawScore + boost, vault });
       }
-      return noteCache.get(id) ?? null;
     }
 
-    // Score everything
-    const scored: Array<{ id: string; score: number; boosted: number }> = [];
-    for (const rec of embeddings) {
-      const rawScore = cosineSimilarity(queryVec, rec.embedding);
-      if (rawScore < minSimilarity) continue;
-
-      const note = await getNote(rec.id);
-      if (!note) continue;
-
-      // Tag filter
-      if (tags && tags.length > 0) {
-        const noteTags = new Set(note.tags);
-        if (!tags.every((t) => noteTags.has(t))) continue;
-      }
-
-      // Scope filter
-      const isProjectNote = note.project !== undefined;
-      const isCurrentProject = project && note.project === project.id;
-
-      if (scope === "project") {
-        if (!isCurrentProject) continue;
-      } else if (scope === "global") {
-        if (isProjectNote) continue;
-      }
-
-      // Boost: project notes get +0.15 when searching within project context
-      const boost = isCurrentProject ? 0.15 : 0;
-      scored.push({ id: rec.id, score: rawScore, boosted: rawScore + boost });
-    }
-
-    // Sort by boosted score, take top N
     scored.sort((a, b) => b.boosted - a.boosted);
     const top = scored.slice(0, limit);
 
@@ -307,8 +288,8 @@ server.registerTool(
     }
 
     const sections: string[] = [];
-    for (const { id, score } of top) {
-      const note = await getNote(id);
+    for (const { id, score, vault } of top) {
+      const note = await vault.storage.readNote(id);
       if (note) sections.push(formatNote(note, score));
     }
 
@@ -317,9 +298,7 @@ server.registerTool(
       : `Recall results (global):`;
 
     return {
-      content: [
-        { type: "text", text: `${header}\n\n${sections.join("\n\n---\n\n")}` },
-      ],
+      content: [{ type: "text", text: `${header}\n\n${sections.join("\n\n---\n\n")}` }],
     };
   }
 );
@@ -339,15 +318,15 @@ server.registerTool(
     }),
   },
   async ({ id, content, title, tags, cwd }) => {
-    const note = await storage.readNote(id);
-    if (!note) {
+    const found = await vaultManager.findNote(id, cwd);
+    if (!found) {
       return { content: [{ type: "text", text: `No memory found with id '${id}'` }] };
     }
 
-    // Allow re-scoping to a project on update
+    const { note, vault } = found;
     const project = await resolveProject(cwd);
-
     const now = new Date().toISOString();
+
     const updated: Note = {
       ...note,
       title: title ?? note.title,
@@ -358,18 +337,17 @@ server.registerTool(
       updatedAt: now,
     };
 
-    await storage.writeNote(updated);
+    await vault.storage.writeNote(updated);
 
-    // Always re-embed — even tag changes affect retrieval context
     try {
       const vector = await embed(`${updated.title}\n\n${updated.content}`);
-      await storage.writeEmbedding({ id, model: embedModel, embedding: vector, updatedAt: now });
+      await vault.storage.writeEmbedding({ id, model: embedModel, embedding: vector, updatedAt: now });
     } catch (err) {
       console.error(`[embedding] Re-embed failed for '${id}': ${err}`);
     }
 
-    await git.commit(`update: ${updated.title}`, [`notes/${id}.md`]);
-    await git.push();
+    await vault.git.commit(`update: ${updated.title}`, [vaultManager.noteRelPath(vault, id)]);
+    await vault.git.push();
 
     return { content: [{ type: "text", text: `Updated memory '${id}'` }] };
   }
@@ -380,31 +358,44 @@ server.registerTool(
   "forget",
   {
     title: "Forget",
-    description: "Delete a memory by id.",
+    description: "Delete a memory by id. Cleans up dangling relationships across all known vaults.",
     inputSchema: z.object({
       id: z.string().describe("Memory id to delete"),
     }),
   },
   async ({ id }) => {
-    const note = await storage.readNote(id);
-    if (!note) {
+    const found = await vaultManager.findNote(id);
+    if (!found) {
       return { content: [{ type: "text", text: `No memory found with id '${id}'` }] };
     }
-    await storage.deleteNote(id);
 
-    // Remove dangling references from other notes
-    const allNotes = await storage.listNotes();
-    const referencers = allNotes.filter(
-      (n) => n.relatedTo?.some((r) => r.id === id)
-    );
-    for (const ref of referencers) {
-      const updated = { ...ref, relatedTo: ref.relatedTo!.filter((r) => r.id !== id) };
-      await storage.writeNote(updated);
+    const { note, vault: noteVault } = found;
+    await noteVault.storage.deleteNote(id);
+
+    // Clean up dangling references grouped by vault so we make one commit per vault
+    const vaultChanges = new Map<Vault, string[]>();
+
+    // Always include the deleted note's path (git add on a deleted file stages the removal)
+    const noteVaultFiles = vaultChanges.get(noteVault) ?? [];
+    noteVaultFiles.push(vaultManager.noteRelPath(noteVault, id));
+    vaultChanges.set(noteVault, noteVaultFiles);
+
+    for (const v of vaultManager.allKnownVaults()) {
+      const notes = await v.storage.listNotes();
+      const referencers = notes.filter((n) => n.relatedTo?.some((r) => r.id === id));
+      for (const ref of referencers) {
+        await v.storage.writeNote({ ...ref, relatedTo: ref.relatedTo!.filter((r) => r.id !== id) });
+        const files = vaultChanges.get(v) ?? [];
+        files.push(vaultManager.noteRelPath(v, ref.id));
+        vaultChanges.set(v, files);
+      }
     }
 
-    const changedFiles = referencers.map((n) => `notes/${n.id}.md`);
-    await git.commit(`forget: ${note.title}`, changedFiles);
-    await git.push();
+    for (const [v, files] of vaultChanges) {
+      await v.git.commit(`forget: ${note.title}`, files);
+      await v.git.push();
+    }
+
     return { content: [{ type: "text", text: `Forgotten '${id}' (${note.title})` }] };
   }
 );
@@ -415,7 +406,7 @@ server.registerTool(
   {
     title: "List Memories",
     description:
-      "List stored memories. Pass `cwd` to scope to a project, or omit for all memories.",
+      "List stored memories. Pass `cwd` to include the project vault, or omit for main vault only.",
     inputSchema: z.object({
       cwd: projectParam,
       scope: z
@@ -428,17 +419,23 @@ server.registerTool(
   },
   async ({ cwd, scope, tags }) => {
     const project = await resolveProject(cwd);
+    const vaults = await vaultManager.searchOrder(cwd);
 
     let filterProject: string | null | undefined = undefined;
-    if (scope === "project" && project) {
-      filterProject = project.id;
-    } else if (scope === "global") {
-      filterProject = null;
-    }
+    if (scope === "project" && project) filterProject = project.id;
+    else if (scope === "global") filterProject = null;
 
-    let notes = await storage.listNotes(
-      filterProject !== undefined ? { project: filterProject } : undefined
-    );
+    const seen = new Set<string>();
+    let notes: Note[] = [];
+
+    for (const vault of vaults) {
+      const vaultNotes = await vault.storage.listNotes(
+        filterProject !== undefined ? { project: filterProject } : undefined
+      );
+      for (const n of vaultNotes) {
+        if (!seen.has(n.id)) { seen.add(n.id); notes.push(n); }
+      }
+    }
 
     if (tags && tags.length > 0) {
       notes = notes.filter((n) => {
@@ -447,11 +444,10 @@ server.registerTool(
       });
     }
 
-    // Sort: current project first, then other projects, then global
     notes.sort((a, b) => {
-      const aIsCurrentProject = project && a.project === project.id ? 0 : a.project ? 1 : 2;
-      const bIsCurrentProject = project && b.project === project.id ? 0 : b.project ? 1 : 2;
-      return aIsCurrentProject - bIsCurrentProject || a.title.localeCompare(b.title);
+      const aRank = project && a.project === project.id ? 0 : a.project ? 1 : 2;
+      const bRank = project && b.project === project.id ? 0 : b.project ? 1 : 2;
+      return aRank - bRank || a.title.localeCompare(b.title);
     });
 
     if (notes.length === 0) {
@@ -459,9 +455,7 @@ server.registerTool(
     }
 
     const lines = notes.map((n) => {
-      const proj = n.project
-        ? `[${n.projectName ?? n.project}]`
-        : "[global]";
+      const proj = n.project ? `[${n.projectName ?? n.project}]` : "[global]";
       const tagStr = n.tags.length > 0 ? ` — ${n.tags.join(", ")}` : "";
       return `- **${n.title}** \`${n.id}\` ${proj}${tagStr}`;
     });
@@ -470,9 +464,7 @@ server.registerTool(
       ? `${notes.length} memories (project: ${project.name}, scope: ${scope}):`
       : `${notes.length} memories (scope: ${scope}):`;
 
-    return {
-      content: [{ type: "text", text: `${header}\n\n${lines.join("\n")}` }],
-    };
+    return { content: [{ type: "text", text: `${header}\n\n${lines.join("\n")}` }] };
   }
 );
 
@@ -482,42 +474,43 @@ server.registerTool(
   {
     title: "Sync",
     description:
-      "Bidirectional sync with the git remote: pulls new notes from remote, " +
-      "pushes any local commits, then automatically re-embeds any notes that " +
-      "arrived or changed during the pull. Safe to run at any time.",
-    inputSchema: z.object({}),
+      "Bidirectional git sync. Always syncs the main vault. " +
+      "When `cwd` is provided, also syncs the project vault (.mnemonic/) " +
+      "so you pull in notes added by collaborators.",
+    inputSchema: z.object({
+      cwd: projectParam,
+    }),
   },
-  async () => {
-    const result: SyncResult = await git.sync();
-
-    if (!result.hasRemote) {
-      return {
-        content: [{ type: "text", text: "No git remote configured — nothing to sync." }],
-      };
-    }
-
+  async ({ cwd }) => {
     const lines: string[] = [];
 
-    // Report what was pushed
-    if (result.pushedCommits > 0) {
-      lines.push(`↑ Pushed ${result.pushedCommits} local commit(s) to remote.`);
-    } else {
-      lines.push("↑ Nothing to push (remote was already up to date).");
+    // Always sync main vault
+    const mainResult = await vaultManager.main.git.sync();
+    lines.push(...formatSyncResult(mainResult, "main vault"));
+    if (mainResult.pulledNoteIds.length > 0) {
+      const { rebuilt, failed } = await embedMissingNotes(vaultManager.main.storage, mainResult.pulledNoteIds);
+      lines.push(`main vault: embedded ${rebuilt} note(s).${failed.length > 0 ? ` Failed: ${failed.join(", ")}` : ""}`);
+    }
+    if (mainResult.deletedNoteIds.length > 0) {
+      await removeStaleEmbeddings(vaultManager.main.storage, mainResult.deletedNoteIds);
     }
 
-    // Handle deletions — remove stale local embeddings
-    if (result.deletedNoteIds.length > 0) {
-      await removeStaleEmbeddings(result.deletedNoteIds);
-      lines.push(`✕ ${result.deletedNoteIds.length} note(s) deleted from remote, local embeddings cleaned up.`);
-    }
-
-    // Embed notes that arrived or changed during pull
-    if (result.pulledNoteIds.length > 0) {
-      lines.push(`↓ ${result.pulledNoteIds.length} note(s) pulled from remote. Embedding...`);
-      const { rebuilt, failed } = await embedMissingNotes(result.pulledNoteIds);
-      lines.push(`  Embedded ${rebuilt} note(s).${failed.length > 0 ? ` Failed: ${failed.join(", ")}` : ""}`);
-    } else {
-      lines.push("↓ No new notes from remote.");
+    // Optionally sync project vault
+    if (cwd) {
+      const projectVault = await vaultManager.getProjectVaultIfExists(cwd);
+      if (projectVault) {
+        const projectResult = await projectVault.git.sync();
+        lines.push(...formatSyncResult(projectResult, "project vault"));
+        if (projectResult.pulledNoteIds.length > 0) {
+          const { rebuilt, failed } = await embedMissingNotes(projectVault.storage, projectResult.pulledNoteIds);
+          lines.push(`project vault: embedded ${rebuilt} note(s).${failed.length > 0 ? ` Failed: ${failed.join(", ")}` : ""}`);
+        }
+        if (projectResult.deletedNoteIds.length > 0) {
+          await removeStaleEmbeddings(projectVault.storage, projectResult.deletedNoteIds);
+        }
+      } else {
+        lines.push("project vault: no .mnemonic/ found — skipped.");
+      }
     }
 
     return { content: [{ type: "text", text: lines.join("\n") }] };
@@ -531,29 +524,37 @@ server.registerTool(
     title: "Reindex",
     description:
       "Rebuild local embeddings for notes missing an embedding file. " +
-      "Normally triggered automatically by sync — only call manually if needed.",
+      "Pass `cwd` to also reindex the project vault. `force=true` rebuilds all embeddings.",
     inputSchema: z.object({
       force: z
         .boolean()
         .optional()
         .default(false)
         .describe("Re-embed ALL notes, even those already indexed"),
+      cwd: projectParam,
     }),
   },
-  async ({ force }) => {
-    if (force) {
-      // Wipe all existing embeddings so embedMissingNotes re-creates them all
-      const { promises: fs } = await import("fs");
-      const existing = await storage.listEmbeddings();
-      for (const rec of existing) {
-        try { await fs.unlink(storage.embeddingPath(rec.id)); } catch { /* ok */ }
+  async ({ force, cwd }) => {
+    const vaults = cwd ? await vaultManager.searchOrder(cwd) : [vaultManager.main];
+
+    let totalRebuilt = 0;
+    const allFailed: string[] = [];
+
+    for (const vault of vaults) {
+      if (force) {
+        const existing = await vault.storage.listEmbeddings();
+        for (const rec of existing) {
+          try { await fs.unlink(vault.storage.embeddingPath(rec.id)); } catch { /* ok */ }
+        }
       }
+      const { rebuilt, failed } = await embedMissingNotes(vault.storage);
+      totalRebuilt += rebuilt;
+      allFailed.push(...failed);
     }
 
-    const { rebuilt, failed } = await embedMissingNotes();
     const msg =
-      `Reindexed ${rebuilt} note(s).` +
-      (failed.length > 0 ? ` Failed: ${failed.join(", ")}` : "");
+      `Reindexed ${totalRebuilt} note(s).` +
+      (allFailed.length > 0 ? ` Failed: ${allFailed.join(", ")}` : "");
     return { content: [{ type: "text", text: msg }] };
   }
 );
@@ -563,7 +564,7 @@ server.registerTool(
   "get",
   {
     title: "Get Memories by ID",
-    description: "Fetch one or more memories by their exact id. Useful for loading related notes after a recall.",
+    description: "Fetch one or more memories by their exact id. Searches all known vaults.",
     inputSchema: z.object({
       ids: z.array(z.string()).min(1).describe("One or more memory ids to fetch"),
     }),
@@ -572,9 +573,9 @@ server.registerTool(
     const sections: string[] = [];
     const missing: string[] = [];
     for (const id of ids) {
-      const note = await storage.readNote(id);
-      if (note) {
-        sections.push(formatNote(note));
+      const found = await vaultManager.findNote(id);
+      if (found) {
+        sections.push(formatNote(found.note));
       } else {
         missing.push(id);
       }
@@ -600,55 +601,56 @@ server.registerTool(
     title: "Relate Memories",
     description:
       "Create a typed relationship between two memories. " +
-      "By default adds the relationship in both directions (fromId → toId and toId → fromId). " +
-      "Relationship types: 'related-to' (generic), 'explains' (fromId explains toId), " +
-      "'example-of' (fromId is an example of toId), 'supersedes' (fromId supersedes toId).",
+      "By default adds the relationship in both directions. " +
+      "Notes may be in different vaults — each vault gets its own commit.",
     inputSchema: z.object({
       fromId: z.string().describe("The source memory id"),
       toId: z.string().describe("The target memory id"),
       type: z.enum(RELATIONSHIP_TYPES).default("related-to"),
-      bidirectional: z
-        .boolean()
-        .optional()
-        .default(true)
-        .describe("Also add the reverse edge on toId (default true)"),
+      bidirectional: z.boolean().optional().default(true),
     }),
   },
   async ({ fromId, toId, type, bidirectional }) => {
-    const [fromNote, toNote] = await Promise.all([
-      storage.readNote(fromId),
-      storage.readNote(toId),
+    const [foundFrom, foundTo] = await Promise.all([
+      vaultManager.findNote(fromId),
+      vaultManager.findNote(toId),
     ]);
-    if (!fromNote) return { content: [{ type: "text", text: `No memory found with id '${fromId}'` }] };
-    if (!toNote) return { content: [{ type: "text", text: `No memory found with id '${toId}'` }] };
+    if (!foundFrom) return { content: [{ type: "text", text: `No memory found with id '${fromId}'` }] };
+    if (!foundTo) return { content: [{ type: "text", text: `No memory found with id '${toId}'` }] };
 
+    const { note: fromNote, vault: fromVault } = foundFrom;
+    const { note: toNote, vault: toVault } = foundTo;
     const now = new Date().toISOString();
-    const changedFiles: string[] = [];
 
-    // Add fromId → toId if not already present
+    // Group changes by vault so notes in the same vault share one commit
+    const vaultChanges = new Map<Vault, string[]>();
+
     const fromRels = fromNote.relatedTo ?? [];
     if (!fromRels.some((r) => r.id === toId)) {
-      const updated = { ...fromNote, relatedTo: [...fromRels, { id: toId, type }], updatedAt: now };
-      await storage.writeNote(updated);
-      changedFiles.push(`notes/${fromId}.md`);
+      await fromVault.storage.writeNote({ ...fromNote, relatedTo: [...fromRels, { id: toId, type }], updatedAt: now });
+      const files = vaultChanges.get(fromVault) ?? [];
+      files.push(vaultManager.noteRelPath(fromVault, fromId));
+      vaultChanges.set(fromVault, files);
     }
 
-    // Add toId → fromId if bidirectional and not already present
     if (bidirectional) {
       const toRels = toNote.relatedTo ?? [];
       if (!toRels.some((r) => r.id === fromId)) {
-        const updated = { ...toNote, relatedTo: [...toRels, { id: fromId, type }], updatedAt: now };
-        await storage.writeNote(updated);
-        changedFiles.push(`notes/${toId}.md`);
+        await toVault.storage.writeNote({ ...toNote, relatedTo: [...toRels, { id: fromId, type }], updatedAt: now });
+        const files = vaultChanges.get(toVault) ?? [];
+        files.push(vaultManager.noteRelPath(toVault, toId));
+        vaultChanges.set(toVault, files);
       }
     }
 
-    if (changedFiles.length === 0) {
+    if (vaultChanges.size === 0) {
       return { content: [{ type: "text", text: `Relationship already exists between '${fromId}' and '${toId}'` }] };
     }
 
-    await git.commit(`relate(${type}): ${fromNote.title} ↔ ${toNote.title}`, changedFiles);
-    await git.push();
+    for (const [vault, files] of vaultChanges) {
+      await vault.git.commit(`relate(${type}): ${fromNote.title} ↔ ${toNote.title}`, files);
+      await vault.git.push();
+    }
 
     const dirStr = bidirectional ? "↔" : "→";
     return {
@@ -670,36 +672,45 @@ server.registerTool(
     }),
   },
   async ({ fromId, toId, bidirectional }) => {
-    const [fromNote, toNote] = await Promise.all([
-      storage.readNote(fromId),
-      storage.readNote(toId),
+    const [foundFrom, foundTo] = await Promise.all([
+      vaultManager.findNote(fromId),
+      vaultManager.findNote(toId),
     ]);
 
     const now = new Date().toISOString();
-    const changedFiles: string[] = [];
+    const vaultChanges = new Map<Vault, string[]>();
 
-    if (fromNote) {
+    if (foundFrom) {
+      const { note: fromNote, vault: fromVault } = foundFrom;
       const filtered = (fromNote.relatedTo ?? []).filter((r) => r.id !== toId);
       if (filtered.length !== (fromNote.relatedTo?.length ?? 0)) {
-        await storage.writeNote({ ...fromNote, relatedTo: filtered, updatedAt: now });
-        changedFiles.push(`notes/${fromId}.md`);
+        await fromVault.storage.writeNote({ ...fromNote, relatedTo: filtered, updatedAt: now });
+        const files = vaultChanges.get(fromVault) ?? [];
+        files.push(vaultManager.noteRelPath(fromVault, fromId));
+        vaultChanges.set(fromVault, files);
       }
     }
 
-    if (bidirectional && toNote) {
+    if (bidirectional && foundTo) {
+      const { note: toNote, vault: toVault } = foundTo;
       const filtered = (toNote.relatedTo ?? []).filter((r) => r.id !== fromId);
       if (filtered.length !== (toNote.relatedTo?.length ?? 0)) {
-        await storage.writeNote({ ...toNote, relatedTo: filtered, updatedAt: now });
-        changedFiles.push(`notes/${toId}.md`);
+        await toVault.storage.writeNote({ ...toNote, relatedTo: filtered, updatedAt: now });
+        const files = vaultChanges.get(toVault) ?? [];
+        files.push(vaultManager.noteRelPath(toVault, toId));
+        vaultChanges.set(toVault, files);
       }
     }
 
-    if (changedFiles.length === 0) {
+    if (vaultChanges.size === 0) {
       return { content: [{ type: "text", text: `No relationship found between '${fromId}' and '${toId}'` }] };
     }
 
-    await git.commit(`unrelate: ${fromId} ↔ ${toId}`, changedFiles);
-    await git.push();
+    for (const [vault, files] of vaultChanges) {
+      await vault.git.commit(`unrelate: ${fromId} ↔ ${toId}`, files);
+      await vault.git.push();
+    }
+
     return { content: [{ type: "text", text: `Removed relationship between \`${fromId}\` and \`${toId}\`` }] };
   }
 );
@@ -707,4 +718,4 @@ server.registerTool(
 // ── start ─────────────────────────────────────────────────────────────────────
 const transport = new StdioServerTransport();
 await server.connect(transport);
-console.error(`[mnemonic] Started. Vault: ${VAULT_PATH}`);
+console.error(`[mnemonic] Started. Main vault: ${VAULT_PATH}`);

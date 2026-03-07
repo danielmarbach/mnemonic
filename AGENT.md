@@ -39,18 +39,31 @@ When `recall` is called with a `cwd`, project-specific notes get a **+0.15 cosin
 - Global memories (user preferences, cross-project knowledge) are still accessible
 - The LLM gets a richer, more complete context window
 
+### Multi-vault architecture
+There are two kinds of vault:
+
+- **Main vault** (`~/mnemonic-vault` by default) — private global memories. Managed as its own git repo. Notes without a project scope live here.
+- **Project vault** (`<git-root>/.mnemonic/`) — project-specific memories committed directly into the project repo. Created on demand when `remember` is called with a `cwd`. Collaborators cloning the project repo get the vault for free.
+
+Routing rules:
+- `remember` with `cwd` → writes to the project vault (creates `.mnemonic/` if absent); without `cwd` → writes to main vault.
+- `recall`, `list`, `get`, `sync`, `reindex` — operate on the project vault first, then the main vault.
+- `relate`/`unrelate`/`forget` — find notes in any vault; commit changes per vault.
+
+The main vault's own git repo is excluded from project-vault detection (`isMainRepo()` guard) so mnemonic's own directory is never treated as a project vault.
+
 ### Bidirectional sync with auto-embedding
-`sync` does: fetch → record local HEAD → pull (rebase) → diff `notes/` to find what changed → push → embed any notes that arrived. This is a single tool call that handles the full sync cycle. Rebase is used instead of merge to keep history linear.
+`sync` does: fetch → record local HEAD → pull (rebase) → diff `notes/` to find what changed → push → embed any notes that arrived. This is a single tool call that handles the full sync cycle. Rebase is used instead of merge to keep history linear. `sync` always syncs the main vault; pass `cwd` to also sync the project vault.
 
 ## Architecture
 
 ```
-src/
-  index.ts      — MCP server, all tool registrations
-  storage.ts    — read/write notes (markdown) and embeddings (JSON)
-  embeddings.ts — Ollama HTTP client, cosine similarity
-  git.ts        — git operations via simple-git, SyncResult type
-  project.ts    — detect project from cwd via git remote URL
+index.ts      — MCP server, all tool registrations
+storage.ts    — read/write notes (markdown) and embeddings (JSON)
+embeddings.ts — Ollama HTTP client, cosine similarity
+git.ts        — git operations via simple-git, SyncResult type
+project.ts    — detect project from cwd via git remote URL
+vault.ts      — VaultManager: routing between main vault and project vaults
 ```
 
 ### Key types
@@ -95,13 +108,25 @@ interface SyncResult {
 
 ### Vault layout
 
+**Main vault** (private, `~/mnemonic-vault`):
 ```
 ~/mnemonic-vault/
   .gitignore          ← auto-written on startup, contains "embeddings/"
   notes/
-    <id>.md           ← one file per memory
+    <id>.md           ← global memories
   embeddings/
     <id>.json         ← local only, never committed
+```
+
+**Project vault** (shared, inside the project repo):
+```
+<git-root>/
+  .mnemonic/
+    .gitignore        ← auto-written, contains "embeddings/"
+    notes/
+      <id>.md         ← project memories, committed to the project repo
+    embeddings/
+      <id>.json       ← local only, never committed
 ```
 
 ### Note format
@@ -165,6 +190,9 @@ We switched from HS256 to RS256 because...
 - **Rebase on pull** — `git pull --rebase` keeps history linear. Don't switch to merge without understanding the tradeoff on a personal vault.
 - **Project id from git remote, not local path** — the normalization in `project.ts` is what makes cross-machine consistency work. Local paths differ; remote URLs don't.
 - **Similarity boost, not hard filter** — `recall` boosts project notes rather than excluding global ones. This is intentional: global memories (preferences, patterns) should remain accessible in project context.
+- **`simpleGit()` in `GitOps.init()`, not the constructor** — the vault directory is created by `Storage.init()` which runs after `GitOps` is constructed. Calling `simpleGit()` in the constructor throws `GitConstructError`.
+- **Project vault in `.mnemonic/` inside the project repo** — this makes notes shareable with collaborators via normal git. Don't move them back into the main vault.
+- **`isMainRepo()` guard in `VaultManager`** — prevents the main vault's own git repo from being treated as a project vault. Don't remove it.
 
 ## Known limitations and future work
 

@@ -4,16 +4,30 @@ A local MCP memory server backed by plain markdown + JSON files, synced via git.
 
 ## How it works
 
+There are two kinds of vault:
+
+**Main vault** — private global memories, stored in `~/mnemonic-vault` (its own git repo):
 ```
 ~/mnemonic-vault/
   .gitignore             ← auto-created, gitignores embeddings/
   notes/
-    setup-notes-a1b2c3.md          ← global memory
-    auth-bug-fix-d4e5f6.md         ← project: github-com-acme-myapp
+    setup-notes-a1b2c3.md          ← global memory (no project)
   embeddings/                      ← local only, never committed
     setup-notes-a1b2c3.json
-    auth-bug-fix-d4e5f6.json
 ```
+
+**Project vault** — project-specific memories committed directly into the project repo:
+```
+<git-root>/
+  .mnemonic/
+    .gitignore           ← auto-created, gitignores embeddings/
+    notes/
+      auth-bug-fix-d4e5f6.md       ← project memory, versioned with the project
+    embeddings/          ← local only, never committed
+      auth-bug-fix-d4e5f6.json
+```
+
+When you call `remember` with a `cwd`, the note goes into the project vault (`.mnemonic/` inside the project repo). Collaborators who clone the project get the vault automatically. Without `cwd`, the note goes into the main vault.
 
 Notes are plain markdown with YAML frontmatter — readable, diffable, mergeable.
 Embeddings stay local (gitignored) and are rebuilt on each machine with `reindex`.
@@ -24,7 +38,7 @@ Project identity is derived from the **git remote URL** of the working directory
 
 If no remote is configured, the git root folder name is used. If not in a git repo at all, the directory name is used.
 
-When `recall` is called with a `cwd`, memories from the matching project are **boosted by +0.15 similarity score** and appear first in results, followed by relevant global memories. This means you get project-specific context without losing access to cross-project knowledge.
+When `recall` is called with a `cwd`, it searches both the project vault and the main vault. Project memories are **boosted by +0.15 similarity score** and appear first in results, followed by relevant global memories. You get project-specific context without losing access to cross-project knowledge.
 
 ## Prerequisites
 
@@ -153,15 +167,21 @@ All tools that accept a `cwd` also accept a `scope` parameter:
 
 ## Multi-machine workflow
 
+**Main vault** (global memories):
 ```bash
-# Machine A: use Claude normally — auto-commits and pushes on every remember/forget
-
 # Machine B (first time):
 git clone git@github.com:you/mnemonic-vault.git ~/mnemonic-vault
-# Then ask Claude to run the `sync` tool — it will pull, push, and auto-embed in one step
+# Then ask Claude to run the `sync` tool — it pulls, pushes, and auto-embeds in one step
 ```
 
-After the first sync, just call `sync` whenever you switch machines. It handles pull, push, and embedding in one shot — no separate `reindex` needed.
+**Project vault** (project memories):
+```bash
+# Already in the project repo — just clone the project as normal.
+# The .mnemonic/ directory comes along with it.
+# Ask Claude to run `reindex` with the project cwd to build local embeddings.
+```
+
+After the first sync, just call `sync` (with `cwd` for project vaults) whenever you switch machines. It handles pull, push, and embedding in one shot — no separate `reindex` needed.
 
 ## Note format
 

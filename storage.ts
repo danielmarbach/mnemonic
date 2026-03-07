@@ -31,13 +31,15 @@ export interface EmbeddingRecord {
 }
 
 export class Storage {
+  readonly vaultPath: string;
   readonly notesDir: string;
   readonly embeddingsDir: string;
 
   constructor(vaultPath: string) {
-    this.notesDir = path.join(vaultPath, "notes");
+    this.vaultPath = path.resolve(vaultPath);
+    this.notesDir = path.join(this.vaultPath, "notes");
     // Embeddings are local-only — kept outside the synced notes tree
-    this.embeddingsDir = path.join(vaultPath, "embeddings");
+    this.embeddingsDir = path.join(this.vaultPath, "embeddings");
   }
 
   async init(): Promise<void> {
