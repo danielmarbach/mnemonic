@@ -10,6 +10,14 @@ import { Storage, type Note, type RelationshipType } from "./storage.js";
 import { embed, cosineSimilarity, embedModel } from "./embeddings.js";
 import { type SyncResult } from "./git.js";
 import { cleanMarkdown } from "./markdown.js";
+import {
+  PROJECT_POLICY_SCOPES,
+  ProjectMemoryPolicyStore,
+  WRITE_SCOPES,
+  resolveWriteScope,
+  type ProjectPolicyScope,
+  type WriteScope,
+} from "./project-memory-policy.js";
 import { detectProject } from "./project.js";
 import { VaultManager, type Vault } from "./vault.js";
 
@@ -21,12 +29,12 @@ const VAULT_PATH = process.env["VAULT_PATH"]
 
 const DEFAULT_RECALL_LIMIT = 5;
 const DEFAULT_MIN_SIMILARITY = 0.3;
-const WRITE_SCOPES = ["project", "global"] as const;
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 
 const vaultManager = new VaultManager(VAULT_PATH);
 await vaultManager.initMain();
+const projectMemoryPolicies = new ProjectMemoryPolicyStore(VAULT_PATH);
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -58,7 +66,7 @@ async function resolveProject(cwd?: string) {
   return detectProject(cwd);
 }
 
-async function resolveWriteVault(cwd: string | undefined, scope: "project" | "global"): Promise<Vault> {
+async function resolveWriteVault(cwd: string | undefined, scope: WriteScope): Promise<Vault> {
   if (scope === "project") {
     return cwd
       ? (await vaultManager.getOrCreateProjectVault(cwd)) ?? vaultManager.main
@@ -70,6 +78,16 @@ async function resolveWriteVault(cwd: string | undefined, scope: "project" | "gl
 
 function describeProject(project: Awaited<ReturnType<typeof resolveProject>>): string {
   return project ? `project '${project.name}' (${project.id})` : "global";
+}
+
+async function getProjectPolicyScope(cwd?: string): Promise<ProjectPolicyScope | undefined> {
+  const project = await resolveProject(cwd);
+  if (!project) {
+    return undefined;
+  }
+
+  const policy = await projectMemoryPolicies.get(project.id);
+  return policy?.defaultScope;
 }
 
 function formatNote(note: Note, score?: number): string {
@@ -84,6 +102,16 @@ function formatNote(note: Note, score?: number): string {
     `**tags:** ${note.tags.join(", ") || "none"} | **updated:** ${note.updatedAt}${relStr}\n\n` +
     note.content
   );
+}
+
+function formatAskForWriteScope(project: Awaited<ReturnType<typeof resolveProject>>): string {
+  const projectLabel = project ? `${project.name} (${project.id})` : "this context";
+  return [
+    `Project memory policy for ${projectLabel} is set to always ask.`,
+    "Choose where to store this memory and call `remember` again with one of:",
+    "- `scope: \"project\"` — shared project vault (`.mnemonic/`)",
+    "- `scope: \"global\"` — private main vault with project association",
+  ].join("\n");
 }
 
 async function embedMissingNotes(
@@ -181,9 +209,9 @@ server.registerTool(
   {
     title: "Remember",
     description:
-      "Store a new memory. When `cwd` points to a project, the note is written into " +
-      "that project's `.mnemonic/` vault (inside the project repo) so collaborators " +
-      "can see it. Omit `cwd` to write a private global memory to the main vault.",
+      "Store a new memory. `cwd` sets project context. `scope` picks whether the note " +
+      "is stored in the shared project vault or the private main vault. When omitted, " +
+      "the project's default policy is used before falling back to legacy behavior.",
     inputSchema: z.object({
       title: z.string().describe("Short descriptive title"),
       content: z.string().describe("The content to remember (markdown supported)"),
@@ -198,7 +226,11 @@ server.registerTool(
   async ({ title, content, tags, cwd, scope }) => {
     const project = await resolveProject(cwd);
     const cleanedContent = await cleanMarkdown(content);
-    const writeScope = scope ?? (cwd ? "project" : "global");
+    const policyScope = await getProjectPolicyScope(cwd);
+    const writeScope = resolveWriteScope(scope, policyScope, Boolean(project));
+    if (writeScope === "ask") {
+      return { content: [{ type: "text", text: formatAskForWriteScope(project) }] };
+    }
     const vault = await resolveWriteVault(cwd, writeScope);
 
     const id = makeId(title);
@@ -231,6 +263,83 @@ server.registerTool(
     const vaultLabel = vault.isProject ? " [project vault]" : " [main vault]";
     return {
       content: [{ type: "text", text: `Remembered as \`${id}\` [${projectScope}, stored=${writeScope}]${vaultLabel}` }],
+    };
+  }
+);
+
+// ── set_project_memory_policy ─────────────────────────────────────────────────
+server.registerTool(
+  "set_project_memory_policy",
+  {
+    title: "Set Project Memory Policy",
+    description:
+      "Choose the default write scope for a project. This lets agents avoid asking " +
+      "where to store project-related memories every time.",
+    inputSchema: z.object({
+      cwd: z.string().describe("Absolute path to the project working directory"),
+      defaultScope: z.enum(PROJECT_POLICY_SCOPES).describe("Default storage location for project-related memories"),
+    }),
+  },
+  async ({ cwd, defaultScope }) => {
+    const project = await resolveProject(cwd);
+    if (!project) {
+      return { content: [{ type: "text", text: `Could not detect a project for: ${cwd}` }] };
+    }
+
+    const now = new Date().toISOString();
+    await projectMemoryPolicies.set({
+      projectId: project.id,
+      projectName: project.name,
+      defaultScope,
+      updatedAt: now,
+    });
+
+    await vaultManager.main.git.commit(
+      `policy(${project.id}): default memory scope ${defaultScope}`,
+      ["project-memory-policies.json"]
+    );
+    await vaultManager.main.git.push();
+
+    return {
+      content: [{
+        type: "text",
+      text: `Project memory policy set for ${project.name}: defaultScope=${defaultScope}`,
+      }],
+    };
+  }
+);
+
+// ── get_project_memory_policy ─────────────────────────────────────────────────
+server.registerTool(
+  "get_project_memory_policy",
+  {
+    title: "Get Project Memory Policy",
+    description: "Show the current default write scope for a project, if one exists.",
+    inputSchema: z.object({
+      cwd: z.string().describe("Absolute path to the project working directory"),
+    }),
+  },
+  async ({ cwd }) => {
+    const project = await resolveProject(cwd);
+    if (!project) {
+      return { content: [{ type: "text", text: `Could not detect a project for: ${cwd}` }] };
+    }
+
+    const policy = await projectMemoryPolicies.get(project.id);
+    if (!policy) {
+      return {
+        content: [{
+          type: "text",
+          text: `No project memory policy set for ${project.name}. Default write behavior remains scope=project when cwd is present.`,
+        }],
+      };
+    }
+
+    return {
+      content: [{
+        type: "text",
+        text: `Project memory policy for ${project.name}: defaultScope=${policy.defaultScope} (updated ${policy.updatedAt})`,
+      }],
     };
   }
 );

@@ -58,6 +58,8 @@ Routing rules:
 - `cwd` identifies project context; write location is a separate choice.
 - `remember` with `cwd` and `scope: "project"` → writes to the project vault (creates `.mnemonic/` if absent).
 - `remember` with `cwd` and `scope: "global"` → writes to the main vault but keeps the project id/name in frontmatter.
+- If `scope` is omitted, a saved per-project memory policy is used first; otherwise mnemonic falls back to `project` when `cwd` is present.
+- If the policy is `ask`, do not guess. Ask one targeted question with two clear options: `Project vault` (recommended for shared project knowledge) or `Private main vault` (for personal/project-associated notes). Then call `remember` again with the chosen `scope`.
 - `remember` without `cwd` → writes to the main vault as a normal global memory.
 - `recall`, `list`, `get`, `sync`, `reindex` — operate on the project vault first, then the main vault.
 - `relate`/`unrelate`/`forget` — find notes in any vault; commit changes per vault.
@@ -167,6 +169,8 @@ We switched from HS256 to RS256 because...
 |------------------|--------------------------------------------------------------------------------|
 | `detect_project` | Resolve a `cwd` to a stable project id via git remote URL                     |
 | `remember`       | Write a note + embedding; `cwd` sets project context and `scope` picks storage |
+| `set_project_memory_policy` | Save the default write scope for a project (`project`, `global`, or `ask`) |
+| `get_project_memory_policy` | Show the saved default write scope for a project                |
 | `recall`         | Semantic search with optional project boost                                    |
 | `update`         | Update note content/title/tags, always re-embeds                               |
 | `forget`         | Delete note + embedding, git commit + push; cleans up dangling relationships   |

@@ -42,6 +42,8 @@ When you call `remember`, `cwd` determines project context and `scope` determine
 - `cwd` + `scope: "global"` -> store in the main vault while keeping the project association in frontmatter
 - no `cwd` -> store in the main vault as a normal global memory
 
+You can also set a per-project default once with `set_project_memory_policy`. After that, `remember` uses the saved default whenever `scope` is omitted. Supported defaults are `project`, `global`, and `ask`.
+
 Notes are plain markdown with YAML frontmatter — readable, diffable, mergeable.
 Memory content is markdown-linted on `remember`/`update`: fixable issues are auto-corrected before save, and non-fixable issues are rejected.
 Embeddings stay local (gitignored) and are rebuilt on each machine with `reindex`.
@@ -139,6 +141,8 @@ Git credentials (`~/.gitconfig` and `~/.ssh`) are mounted read-only so push/pull
 |------------------|---------------------------------------------------------------------------------|
 | `detect_project` | Identify the project for a given `cwd` (git remote → slug)                     |
 | `remember`       | Store a memory with project context from `cwd` and storage controlled by `scope` |
+| `set_project_memory_policy` | Set the default write scope for a project (`project`, `global`, or `ask`) |
+| `get_project_memory_policy` | Show the saved default write scope for a project                    |
 | `recall`         | Semantic search — project-boosted when `cwd` provided                           |
 | `update`         | Update content, title, or tags; `cwd` helps locate project notes                |
 | `forget`         | Delete a memory by id; cleans up dangling relationships automatically           |
@@ -184,6 +188,13 @@ Relationship types:
 
 - `"project"` — store in the shared project vault
 - `"global"` — store in the private main vault
+
+If a project memory policy exists, omitting `scope` uses that policy first.
+
+If the project policy is `ask`, `remember` returns a clear choice instead of guessing:
+
+- `scope: "project"` — shared project vault (`.mnemonic/`)
+- `scope: "global"` — private main vault with project association
 
 ## Multi-machine workflow
 
