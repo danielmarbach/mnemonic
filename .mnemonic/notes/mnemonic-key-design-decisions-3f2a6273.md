@@ -14,8 +14,6 @@ relatedTo:
     type: explains
   - id: markdown-linting-for-memory-content-259a1c85
     type: related-to
-  - id: project-context-separate-from-storage-location-6d782d47
-    type: related-to
   - id: project-memory-policy-defaults-storage-location-f563f634
     type: related-to
 ---
