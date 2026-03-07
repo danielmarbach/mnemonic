@@ -11,8 +11,6 @@ projectName: mnemonic
 relatedTo:
   - id: mnemonic-relationship-graph-implementation-386be386
     type: related-to
-  - id: project-memory-introspection-tooling-e0d71f6e
-    type: related-to
 ---
 Tools registered in `src/index.ts`:
 
