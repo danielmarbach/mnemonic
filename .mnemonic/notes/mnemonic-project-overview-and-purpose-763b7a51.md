@@ -6,7 +6,7 @@ tags:
   - mcp
   - typescript
 createdAt: '2026-03-07T17:58:49.005Z'
-updatedAt: '2026-03-07T18:00:27.672Z'
+updatedAt: '2026-03-07T18:37:17.293Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
