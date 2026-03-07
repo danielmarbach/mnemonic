@@ -6,7 +6,7 @@ tags:
   - ollama
   - deployment
 createdAt: '2026-03-07T17:59:46.933Z'
-updatedAt: '2026-03-07T18:00:27.672Z'
+updatedAt: '2026-03-07T18:37:14.203Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
@@ -26,10 +26,12 @@ relatedTo:
 **`OLLAMA_URL`** is hardcoded to `http://ollama:11434` (the service name) — no host-gateway needed.
 
 **MCP client config for Docker:**
+
 ```json
 {
   "command": "docker",
   "args": ["compose", "-f", "/path/to/mnemonic/compose.yaml", "run", "--rm", "mnemonic"]
 }
 ```
+
 Ollama container must be running before MCP client invokes mnemonic: `docker compose up ollama -d`
