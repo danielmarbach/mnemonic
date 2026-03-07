@@ -6,9 +6,12 @@ tags:
   - decisions
   - dogfooding
 createdAt: '2026-03-07T18:37:11.013Z'
-updatedAt: '2026-03-07T18:37:11.013Z'
+updatedAt: '2026-03-07T18:42:30.244Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: mnemonic-key-design-decisions-3f2a6273
+    type: related-to
 ---
 Decision: lint markdown note bodies during `remember` and `update` so recalled content stays clean and consistent.
 
