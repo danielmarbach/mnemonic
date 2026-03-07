@@ -112,10 +112,36 @@ Git credentials (`~/.gitconfig` and `~/.ssh`) are mounted read-only so push/pull
 | `remember`       | Store a memory — optionally scoped to a project via `cwd`                       |
 | `recall`         | Semantic search — project-boosted when `cwd` provided                           |
 | `update`         | Update content, title, or tags; optionally re-scope to a project                |
-| `forget`         | Delete a memory by id                                                            |
+| `forget`         | Delete a memory by id; cleans up dangling relationships automatically           |
 | `list`           | List memories — filter by project scope and/or tags                             |
+| `get`            | Fetch one or more memories by exact id                                          |
+| `relate`         | Create a typed relationship between two memories (bidirectional by default)     |
+| `unrelate`       | Remove a relationship between two memories                                      |
 | `sync`           | Bidirectional sync — pulls remote, pushes local commits, auto-embeds new notes  |
 | `reindex`        | Manually rebuild missing embeddings (sync does this automatically)              |
+
+## Relationships
+
+Memories can be linked with typed edges stored in frontmatter:
+
+```yaml
+relatedTo:
+  - id: auth-bug-fix-a1b2c3d4
+    type: related-to
+  - id: security-policy-b5c6d7e8
+    type: explains
+```
+
+Relationship types:
+
+| Type          | Meaning                                      |
+|---------------|----------------------------------------------|
+| `related-to`  | Generic association (default)                |
+| `explains`    | `fromId` explains `toId`                     |
+| `example-of`  | `fromId` is a concrete example of `toId`     |
+| `supersedes`  | `fromId` is the newer version of `toId`      |
+
+`relate` is bidirectional by default — both notes get the edge. `forget` automatically removes any edges that pointed at the deleted note.
 
 ## Recall scopes
 
@@ -194,6 +220,17 @@ When in doubt, store it. Storage is cheap; re-explaining context is expensive.
 - When a memory is fully superseded and keeping it would cause confusion.
 - Don't forget things just because they're old — outdated context can still be
   useful if clearly dated.
+
+### Working with relationships
+- After `recall`, check the `related:` line in each result. Call `get` with those ids
+  to pull in the linked context before acting — you may already have the answer.
+- Call `relate` when two memories clearly belong together:
+  - A decision and the bug that motivated it (`related-to`)
+  - An architectural note and a concrete implementation (`explains`)
+  - A pattern and a specific usage of it (`example-of`)
+  - A revised decision and the old one it replaced (`supersedes`)
+- Prefer `supersedes` over `forget` when the old memory has historical value.
+- Don't over-link. One or two meaningful edges per note is better than linking everything.
 
 ### Scoping rules
 - Pass `cwd` for anything specific to the current project.

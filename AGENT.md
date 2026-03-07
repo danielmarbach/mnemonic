@@ -56,6 +56,13 @@ src/
 ### Key types
 
 ```typescript
+type RelationshipType = "related-to" | "explains" | "example-of" | "supersedes";
+
+interface Relationship {
+  id: string;
+  type: RelationshipType;
+}
+
 // A stored memory
 interface Note {
   id: string;           // slug-uuid e.g. "auth-bug-fix-a1b2c3d4"
@@ -64,6 +71,7 @@ interface Note {
   tags: string[];
   project?: string;     // stable project id e.g. "github-com-acme-myapp"
   projectName?: string; // human-readable e.g. "myapp"
+  relatedTo?: Relationship[];
   createdAt: string;    // ISO 8601
   updatedAt: string;
 }
@@ -104,6 +112,11 @@ title: JWT RS256 migration rationale
 tags: [auth, jwt, architecture]
 project: github-com-acme-myapp
 projectName: myapp
+relatedTo:
+  - id: auth-bug-fix-a1b2c3d4
+    type: related-to
+  - id: security-policy-b5c6d7e8
+    type: explains
 createdAt: 2026-03-07T10:00:00.000Z
 updatedAt: 2026-03-07T10:00:00.000Z
 ---
@@ -119,8 +132,11 @@ We switched from HS256 to RS256 because...
 | `remember`       | Write a note + embedding, git commit + push                                    |
 | `recall`         | Semantic search with optional project boost                                    |
 | `update`         | Update note content/title/tags, always re-embeds                               |
-| `forget`         | Delete note + embedding, git commit + push                                     |
+| `forget`         | Delete note + embedding, git commit + push; cleans up dangling relationships   |
 | `list`           | List notes filtered by project scope and/or tags                               |
+| `get`            | Fetch one or more notes by exact id                                            |
+| `relate`         | Create a typed relationship between two notes (bidirectional by default)       |
+| `unrelate`       | Remove a relationship between two notes                                        |
 | `sync`           | Bidirectional git sync — pull, push, auto-embed pulled notes                   |
 | `reindex`        | Manually rebuild missing embeddings; `force=true` rebuilds all                 |
 
@@ -154,6 +170,5 @@ We switched from HS256 to RS256 because...
 
 - **Sequential embedding on reindex** — `embedMissingNotes()` embeds one note at a time. For large vaults this could be parallelized with a concurrency limit.
 - **No full-text fallback** — if Ollama is down, `recall` fails entirely. A fallback to simple keyword search over note content would improve resilience.
-- **No relationship graph** — memorizer supports linking memories together. Not implemented here; could be added via a `relatedTo` frontmatter field.
 - **Embedding model mismatch** — if you change `EMBED_MODEL`, existing embeddings are stale. `reindex --force` fixes this but there's no automatic detection. Could check `EmbeddingRecord.model` against current model and re-embed mismatches.
 - **No web UI** — memorizer has one. Out of scope for this project; the vault is just files so any markdown editor works for browsing.

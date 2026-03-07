@@ -5,7 +5,7 @@ import { z } from "zod";
 import { randomUUID } from "crypto";
 import path from "path";
 
-import { Storage, type Note } from "./storage.js";
+import { Storage, type Note, type RelationshipType } from "./storage.js";
 import { embed, cosineSimilarity, embedModel } from "./embeddings.js";
 import { GitOps, type SyncResult } from "./git.js";
 import { detectProject } from "./project.js";
@@ -64,10 +64,13 @@ async function resolveProject(cwd?: string) {
 function formatNote(note: Note, score?: number): string {
   const scoreStr = score !== undefined ? ` | similarity: ${score.toFixed(3)}` : "";
   const projectStr = note.project ? ` | project: ${note.projectName ?? note.project}` : " | global";
+  const relStr = note.relatedTo && note.relatedTo.length > 0
+    ? `\n**related:** ${note.relatedTo.map((r) => `\`${r.id}\` (${r.type})`).join(", ")}`
+    : "";
   return (
     `## ${note.title}\n` +
     `**id:** \`${note.id}\`${projectStr}${scoreStr}\n` +
-    `**tags:** ${note.tags.join(", ") || "none"} | **updated:** ${note.updatedAt}\n\n` +
+    `**tags:** ${note.tags.join(", ") || "none"} | **updated:** ${note.updatedAt}${relStr}\n\n` +
     note.content
   );
 }
@@ -388,7 +391,19 @@ server.registerTool(
       return { content: [{ type: "text", text: `No memory found with id '${id}'` }] };
     }
     await storage.deleteNote(id);
-    await git.commit(`forget: ${note.title}`, []);
+
+    // Remove dangling references from other notes
+    const allNotes = await storage.listNotes();
+    const referencers = allNotes.filter(
+      (n) => n.relatedTo?.some((r) => r.id === id)
+    );
+    for (const ref of referencers) {
+      const updated = { ...ref, relatedTo: ref.relatedTo!.filter((r) => r.id !== id) };
+      await storage.writeNote(updated);
+    }
+
+    const changedFiles = referencers.map((n) => `notes/${n.id}.md`);
+    await git.commit(`forget: ${note.title}`, changedFiles);
     await git.push();
     return { content: [{ type: "text", text: `Forgotten '${id}' (${note.title})` }] };
   }
@@ -540,6 +555,152 @@ server.registerTool(
       `Reindexed ${rebuilt} note(s).` +
       (failed.length > 0 ? ` Failed: ${failed.join(", ")}` : "");
     return { content: [{ type: "text", text: msg }] };
+  }
+);
+
+// ── get ───────────────────────────────────────────────────────────────────────
+server.registerTool(
+  "get",
+  {
+    title: "Get Memories by ID",
+    description: "Fetch one or more memories by their exact id. Useful for loading related notes after a recall.",
+    inputSchema: z.object({
+      ids: z.array(z.string()).min(1).describe("One or more memory ids to fetch"),
+    }),
+  },
+  async ({ ids }) => {
+    const sections: string[] = [];
+    const missing: string[] = [];
+    for (const id of ids) {
+      const note = await storage.readNote(id);
+      if (note) {
+        sections.push(formatNote(note));
+      } else {
+        missing.push(id);
+      }
+    }
+    const parts: string[] = [];
+    if (sections.length > 0) parts.push(sections.join("\n\n---\n\n"));
+    if (missing.length > 0) parts.push(`Not found: ${missing.map((id) => `\`${id}\``).join(", ")}`);
+    return { content: [{ type: "text", text: parts.join("\n\n") }] };
+  }
+);
+
+// ── relate ────────────────────────────────────────────────────────────────────
+const RELATIONSHIP_TYPES: [RelationshipType, ...RelationshipType[]] = [
+  "related-to",
+  "explains",
+  "example-of",
+  "supersedes",
+];
+
+server.registerTool(
+  "relate",
+  {
+    title: "Relate Memories",
+    description:
+      "Create a typed relationship between two memories. " +
+      "By default adds the relationship in both directions (fromId → toId and toId → fromId). " +
+      "Relationship types: 'related-to' (generic), 'explains' (fromId explains toId), " +
+      "'example-of' (fromId is an example of toId), 'supersedes' (fromId supersedes toId).",
+    inputSchema: z.object({
+      fromId: z.string().describe("The source memory id"),
+      toId: z.string().describe("The target memory id"),
+      type: z.enum(RELATIONSHIP_TYPES).default("related-to"),
+      bidirectional: z
+        .boolean()
+        .optional()
+        .default(true)
+        .describe("Also add the reverse edge on toId (default true)"),
+    }),
+  },
+  async ({ fromId, toId, type, bidirectional }) => {
+    const [fromNote, toNote] = await Promise.all([
+      storage.readNote(fromId),
+      storage.readNote(toId),
+    ]);
+    if (!fromNote) return { content: [{ type: "text", text: `No memory found with id '${fromId}'` }] };
+    if (!toNote) return { content: [{ type: "text", text: `No memory found with id '${toId}'` }] };
+
+    const now = new Date().toISOString();
+    const changedFiles: string[] = [];
+
+    // Add fromId → toId if not already present
+    const fromRels = fromNote.relatedTo ?? [];
+    if (!fromRels.some((r) => r.id === toId)) {
+      const updated = { ...fromNote, relatedTo: [...fromRels, { id: toId, type }], updatedAt: now };
+      await storage.writeNote(updated);
+      changedFiles.push(`notes/${fromId}.md`);
+    }
+
+    // Add toId → fromId if bidirectional and not already present
+    if (bidirectional) {
+      const toRels = toNote.relatedTo ?? [];
+      if (!toRels.some((r) => r.id === fromId)) {
+        const updated = { ...toNote, relatedTo: [...toRels, { id: fromId, type }], updatedAt: now };
+        await storage.writeNote(updated);
+        changedFiles.push(`notes/${toId}.md`);
+      }
+    }
+
+    if (changedFiles.length === 0) {
+      return { content: [{ type: "text", text: `Relationship already exists between '${fromId}' and '${toId}'` }] };
+    }
+
+    await git.commit(`relate(${type}): ${fromNote.title} ↔ ${toNote.title}`, changedFiles);
+    await git.push();
+
+    const dirStr = bidirectional ? "↔" : "→";
+    return {
+      content: [{ type: "text", text: `Linked \`${fromId}\` ${dirStr} \`${toId}\` (${type})` }],
+    };
+  }
+);
+
+// ── unrelate ──────────────────────────────────────────────────────────────────
+server.registerTool(
+  "unrelate",
+  {
+    title: "Remove Relationship",
+    description: "Remove the relationship between two memories. Removes both directions by default.",
+    inputSchema: z.object({
+      fromId: z.string().describe("The source memory id"),
+      toId: z.string().describe("The target memory id"),
+      bidirectional: z.boolean().optional().default(true),
+    }),
+  },
+  async ({ fromId, toId, bidirectional }) => {
+    const [fromNote, toNote] = await Promise.all([
+      storage.readNote(fromId),
+      storage.readNote(toId),
+    ]);
+
+    const now = new Date().toISOString();
+    const changedFiles: string[] = [];
+
+    if (fromNote) {
+      const filtered = (fromNote.relatedTo ?? []).filter((r) => r.id !== toId);
+      if (filtered.length !== (fromNote.relatedTo?.length ?? 0)) {
+        await storage.writeNote({ ...fromNote, relatedTo: filtered, updatedAt: now });
+        changedFiles.push(`notes/${fromId}.md`);
+      }
+    }
+
+    if (bidirectional && toNote) {
+      const filtered = (toNote.relatedTo ?? []).filter((r) => r.id !== fromId);
+      if (filtered.length !== (toNote.relatedTo?.length ?? 0)) {
+        await storage.writeNote({ ...toNote, relatedTo: filtered, updatedAt: now });
+        changedFiles.push(`notes/${toId}.md`);
+      }
+    }
+
+    if (changedFiles.length === 0) {
+      return { content: [{ type: "text", text: `No relationship found between '${fromId}' and '${toId}'` }] };
+    }
+
+    await git.commit(`unrelate: ${fromId} ↔ ${toId}`, changedFiles);
+    await git.push();
+    return { content: [{ type: "text", text: `Removed relationship between \`${fromId}\` and \`${toId}\`` }] };
   }
 );
 

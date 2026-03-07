@@ -2,6 +2,13 @@ import fs from "fs/promises";
 import path from "path";
 import matter from "gray-matter";
 
+export type RelationshipType = "related-to" | "explains" | "example-of" | "supersedes";
+
+export interface Relationship {
+  id: string;
+  type: RelationshipType;
+}
+
 export interface Note {
   id: string;
   title: string;
@@ -11,6 +18,7 @@ export interface Note {
   project?: string;
   /** Human-readable project name for display */
   projectName?: string;
+  relatedTo?: Relationship[];
   createdAt: string;
   updatedAt: string;
 }
@@ -49,6 +57,9 @@ export class Storage {
     if (note.project) {
       frontmatter["project"] = note.project;
       if (note.projectName) frontmatter["projectName"] = note.projectName;
+    }
+    if (note.relatedTo && note.relatedTo.length > 0) {
+      frontmatter["relatedTo"] = note.relatedTo;
     }
     const fileContent = matter.stringify(note.content, frontmatter);
     await fs.writeFile(this.notePath(note.id), fileContent, "utf-8");
@@ -158,6 +169,7 @@ export class Storage {
       tags: parsed.data["tags"] ?? [],
       project: parsed.data["project"] as string | undefined,
       projectName: parsed.data["projectName"] as string | undefined,
+      relatedTo: parsed.data["relatedTo"] as Relationship[] | undefined,
       createdAt: parsed.data["createdAt"] ?? new Date().toISOString(),
       updatedAt: parsed.data["updatedAt"] ?? new Date().toISOString(),
     };
