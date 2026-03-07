@@ -118,19 +118,19 @@ Create an `.npmrc` in the consuming project (or in your home directory) with you
 Then install the latest staging build with:
 
 ```bash
-npm install @danielmarbach/mnemonic@staging
+npm install @danielmarbach/mnemonic-mcp@staging
 ```
 
 For a specific prerelease, install the full version instead, for example:
 
 ```bash
-npm install @danielmarbach/mnemonic@0.1.0-staging.12
+npm install @danielmarbach/mnemonic-mcp@0.1.0-staging.12
 ```
 
 Stable releases are published from git tags like `v0.1.0` and can be installed by exact version:
 
 ```bash
-npm install @danielmarbach/mnemonic@0.1.0
+npm install @danielmarbach/mnemonic-mcp@0.1.0
 ```
 
 ## Running the MCP from an installed package
@@ -139,7 +139,7 @@ After installing the package, the MCP server can be launched through the publish
 
 **With `npx`:**
 ```bash
-npx @danielmarbach/mnemonic@staging
+npx @danielmarbach/mnemonic-mcp@staging
 ```
 
 **With a project-local install:**
@@ -148,7 +148,7 @@ npx @danielmarbach/mnemonic@staging
   "mcpServers": {
     "mnemonic": {
       "command": "npx",
-      "args": ["@danielmarbach/mnemonic@staging"],
+      "args": ["@danielmarbach/mnemonic-mcp@staging"],
       "env": {
         "VAULT_PATH": "/Users/you/mnemonic-vault"
       }
