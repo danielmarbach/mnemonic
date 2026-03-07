@@ -12,6 +12,7 @@ Inspired by [petabridge/memorizer](https://github.com/petabridge/memorizer) but 
 
 When implementing a new feature or behavior in mnemonic itself, dogfood the local MCP server as part of the work:
 - Rebuild first (`npm run build`) so the stdio server uses the latest code.
+- Prefer the repo-local helper (`npm run mcp:local` or `scripts/mcp-local.sh`) when wiring a local MCP client to mnemonic during development.
 - Use the project-scoped `mnemonic` MCP server for real operations whenever the feature touches memory behavior, note formatting, retrieval, relationships, sync, or indexing.
 - Prefer exercising the feature through MCP tools (`remember`, `update`, `get`, `relate`, `recall`, etc.) instead of writing `.mnemonic/` files directly.
 - Mnemoize important implementation decisions, tradeoffs, and debugging findings through the MCP server so future agents can recall them.

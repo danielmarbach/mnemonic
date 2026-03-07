@@ -75,6 +75,14 @@ npm run build
 npm test
 ```
 
+For local dogfooding, start the built MCP server with:
+
+```bash
+npm run mcp:local
+```
+
+That helper rebuilds first, then launches `build/index.js`, so local MCP clients can always point at the latest project code.
+
 ### Docker
 
 ```bash
@@ -180,8 +188,7 @@ If you prefer a fixed installed version, point your MCP client at the local bina
 {
   "mcpServers": {
     "mnemonic": {
-      "command": "node",
-      "args": ["/path/to/mnemonic/build/index.js"],
+      "command": "/path/to/mnemonic/scripts/mcp-local.sh",
       "env": {
         "VAULT_PATH": "/Users/you/mnemonic-vault"
       }
