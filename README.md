@@ -2,6 +2,14 @@
 
 A local MCP memory server backed by plain markdown + JSON files, synced via git. No database. Project-scoped memory with semantic search.
 
+## Repository layout
+
+```text
+src/       TypeScript runtime code
+build/     Compiled JavaScript output
+.mnemonic/ Project-scoped memories for this repo
+```
+
 ## How it works
 
 There are two kinds of vault:

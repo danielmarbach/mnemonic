@@ -67,12 +67,12 @@ The main vault's own git repo is excluded from project-vault detection (`isMainR
 ## Architecture
 
 ```
-index.ts      — MCP server, all tool registrations
-storage.ts    — read/write notes (markdown) and embeddings (JSON)
-embeddings.ts — Ollama HTTP client, cosine similarity
-git.ts        — git operations via simple-git, SyncResult type
-project.ts    — detect project from cwd via git remote URL
-vault.ts      — VaultManager: routing between main vault and project vaults
+src/index.ts      — MCP server, all tool registrations
+src/storage.ts    — read/write notes (markdown) and embeddings (JSON)
+src/embeddings.ts — Ollama HTTP client, cosine similarity
+src/git.ts        — git operations via simple-git, SyncResult type
+src/project.ts    — detect project from cwd via git remote URL
+src/vault.ts      — VaultManager: routing between main vault and project vaults
 ```
 
 ### Key types
@@ -197,7 +197,7 @@ We switched from HS256 to RS256 because...
 - **One file per note** — critical for git conflict isolation. Don't aggregate notes into a single file.
 - **Embeddings gitignored** — deliberate. Don't start committing them unless reindex time becomes a real problem and you've added `.gitattributes merge=ours`.
 - **Rebase on pull** — `git pull --rebase` keeps history linear. Don't switch to merge without understanding the tradeoff on a personal vault.
-- **Project id from git remote, not local path** — the normalization in `project.ts` is what makes cross-machine consistency work. Local paths differ; remote URLs don't.
+- **Project id from git remote, not local path** — the normalization in `src/project.ts` is what makes cross-machine consistency work. Local paths differ; remote URLs don't.
 - **Similarity boost, not hard filter** — `recall` boosts project notes rather than excluding global ones. This is intentional: global memories (preferences, patterns) should remain accessible in project context.
 - **`simpleGit()` in `GitOps.init()`, not the constructor** — the vault directory is created by `Storage.init()` which runs after `GitOps` is constructed. Calling `simpleGit()` in the constructor throws `GitConstructError`.
 - **Project vault in `.mnemonic/` inside the project repo** — this makes notes shareable with collaborators via normal git. Don't move them back into the main vault.
