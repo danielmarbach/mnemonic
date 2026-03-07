@@ -31,6 +31,15 @@ const VAULT_PATH = process.env["VAULT_PATH"]
 const DEFAULT_RECALL_LIMIT = 5;
 const DEFAULT_MIN_SIMILARITY = 0.3;
 
+async function readPackageVersion(): Promise<string> {
+  const packageJsonPath = path.resolve(import.meta.dirname, "../package.json");
+  const packageJson = JSON.parse(await fs.readFile(packageJsonPath, "utf8")) as {
+    version?: string;
+  };
+
+  return packageJson.version ?? "0.1.0";
+}
+
 // ── Init ──────────────────────────────────────────────────────────────────────
 
 const vaultManager = new VaultManager(VAULT_PATH);
@@ -299,7 +308,7 @@ async function moveNoteBetweenVaults(
 
 const server = new McpServer({
   name: "mnemonic",
-  version: "0.3.0",
+  version: await readPackageVersion(),
 });
 
 // ── detect_project ────────────────────────────────────────────────────────────

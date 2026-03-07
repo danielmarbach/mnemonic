@@ -94,6 +94,76 @@ VAULT_PATH=/path/to/your-vault docker compose run --rm mnemonic
 
 Git credentials (`~/.gitconfig` and `~/.ssh`) are mounted read-only so push/pull work inside the container.
 
+## Installing from GitHub Packages
+
+Staging builds are published to GitHub Packages under the `staging` dist-tag.
+
+To install from GitHub Packages outside GitHub Actions, use a GitHub token with at least the `read:packages` scope.
+
+Create an `.npmrc` in the consuming project (or in your home directory) with your GitHub username scope and a token that can read packages:
+
+```ini
+@danielmarbach:registry=https://npm.pkg.github.com
+//npm.pkg.github.com/:_authToken=YOUR_GITHUB_TOKEN
+```
+
+Then install the latest staging build with:
+
+```bash
+npm install @danielmarbach/mnemonic@staging
+```
+
+For a specific prerelease, install the full version instead, for example:
+
+```bash
+npm install @danielmarbach/mnemonic@0.1.0-staging.12
+```
+
+Stable releases are published from git tags like `v0.1.0` and can be installed by exact version:
+
+```bash
+npm install @danielmarbach/mnemonic@0.1.0
+```
+
+## Running the MCP from an installed package
+
+After installing the package, the MCP server can be launched through the published CLI binary.
+
+**With `npx`:**
+```bash
+npx @danielmarbach/mnemonic@staging
+```
+
+**With a project-local install:**
+```json
+{
+  "mcpServers": {
+    "mnemonic": {
+      "command": "npx",
+      "args": ["@danielmarbach/mnemonic@staging"],
+      "env": {
+        "VAULT_PATH": "/Users/you/mnemonic-vault"
+      }
+    }
+  }
+}
+```
+
+If you prefer a fixed installed version, point your MCP client at the local binary instead:
+
+```json
+{
+  "mcpServers": {
+    "mnemonic": {
+      "command": "/path/to/your/project/node_modules/.bin/mnemonic",
+      "env": {
+        "VAULT_PATH": "/Users/you/mnemonic-vault"
+      }
+    }
+  }
+}
+```
+
 ## Configuration
 
 | Variable      | Default                  | Description                        |
