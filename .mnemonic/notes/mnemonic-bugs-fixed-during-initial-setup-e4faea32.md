@@ -6,32 +6,16 @@ tags:
   - typescript
   - simple-git
 createdAt: '2026-03-07T17:59:35.844Z'
-updatedAt: '2026-03-07T18:37:12.971Z'
+updatedAt: '2026-03-07T19:41:09.084Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
   - id: mnemonic-source-file-layout-4d11294d
     type: related-to
 ---
-Two bugs found and fixed when first running the server:
+Early setup exposed a few enduring implementation constraints:
 
-**1. `simpleGit` called before vault directory exists**
-
-- `GitOps` constructor called `simpleGit(vaultPath)` immediately
-- `Storage.init()` creates the vault directory, but runs *after* `GitOps` is constructed
-- `simple-git` throws `GitConstructError` if the directory doesn't exist
-- Fix: store `vaultPath` in constructor, call `simpleGit(this.vaultPath)` inside `GitOps.init()` instead
-
-**2. `simple-git` import style wrong under Node16 module resolution**
-
-- `import simpleGit from "simple-git"` → TS2349: not callable
-- Fix: `import { simpleGit } from "simple-git"` (named export, not default)
-
-**3. Missing `tsconfig.json`**
-
-- Project had no `tsconfig.json` — `tsc` printed help instead of compiling
-- Created with ES2022 target, Node16 module resolution, `esModuleInterop: true`, `outDir: build`
-
-**4. Missing `.gitignore`**
-
-- Added: `node_modules/`, `build/`, sourcemap files
+- `simpleGit()` must be created in `GitOps.init()`, not the constructor, because the vault directory does not exist until `Storage.init()` runs.
+- Under Node16 module resolution, `simple-git` must be imported as `import { simpleGit } from "simple-git"`.
+- The project needs an explicit `tsconfig.json` with Node16 module resolution and a `build/` output directory.
+- Basic repo hygiene matters: ignore `node_modules/`, `build/`, and sourcemaps from the start.
