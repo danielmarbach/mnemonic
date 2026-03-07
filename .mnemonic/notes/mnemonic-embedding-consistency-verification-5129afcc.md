@@ -7,7 +7,7 @@ tags:
   - quality
   - architecture
 createdAt: '2026-03-07T23:26:43.327Z'
-updatedAt: '2026-03-07T23:26:57.701Z'
+updatedAt: '2026-03-07T23:28:07.953Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
@@ -36,11 +36,16 @@ Comprehensive verification of embedding handling across all mutating MCP command
 - Cross-vault operations preserve embeddings through `readEmbedding()` + `writeEmbedding()`
 - All embedding operations are best-effort: failures are logged to stderr but don't block the operation
 
-**Test Gap Identified:**
-No existing tests verify embedding consistency across mutating operations. Should add comprehensive test suite covering:
+**Test Coverage Added:**
+File: `tests/embeddings.test.ts` (9 tests, 26 total)
 
-- Embedding creation on remember/update
-- Embedding cleanup on forget/prune
-- Embedding preservation during moves
-- Embedding skip on relationship changes
-- Embedding lifecycle in consolidation workflows
+- Note creation without embedding requirement
+- Embedding storage and retrieval
+- `deleteNote()` cleans both note + embedding
+- Delete gracefully handles missing embeddings
+- Separate listing of notes vs embeddings
+- Independent embedding updates
+- Consistency through update cycles
+- Cross-vault move operations
+
+All 26 tests passing.
