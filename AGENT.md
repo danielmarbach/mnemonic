@@ -46,6 +46,8 @@ All MCP tools that modify memory state must follow a standardized git commit for
 ```
 tool(action): Brief description (50 chars max recommended)
 
+Human-readable summary explaining the change (like a good commit message).
+
 - Note: <id> (<title>)
 - Notes: <count> notes affected
   - <id-1>
@@ -62,6 +64,7 @@ tool(action): Brief description (50 chars max recommended)
 
 | Field | When to use | Example |
 |-------|-------------|---------|
+| `Summary` | Always - human-readable first line | First sentence of note content or change description |
 | `Note` | Single note operation | `- Note: abc-123 (My Note Title)` |
 | `Notes` | Multiple notes affected | `- Notes: 3 notes affected` |
 | `Project` | Project-scoped operation | `- Project: mnemonic` |
@@ -69,20 +72,23 @@ tool(action): Brief description (50 chars max recommended)
 | `Tags` | When relevant | `- Tags: design, architecture` |
 | `Relationship` | Relate/unrelate operations | `- Relationship: abc-123 explains def-456` |
 | `Mode` | Consolidation mode | `- Mode: supersedes` |
-| `Description` | Additional context | `- Description: Moved from main-vault to project-vault` |
+| `Description` | Additional context (optional) | `- Description: Additional technical details` |
 
 ### Implementation
 
 Use `formatCommitBody()` helper in `src/index.ts`:
 
 ```typescript
+// For remember: extract summary from note content
+const summary = extractSummary(cleanedContent);
+
 const commitBody = formatCommitBody({
+  summary,
   noteId: id,
   noteTitle: title,
   projectName: project?.name,
   scope: writeScope,
   tags: tags,
-  description: "Optional additional context",
 });
 
 await vault.git.commit(`remember: ${title}`, [files], commitBody);
@@ -90,17 +96,34 @@ await vault.git.commit(`remember: ${title}`, [files], commitBody);
 
 ### Tool-specific conventions
 
-| Tool | Subject format | Required body fields |
-|------|----------------|---------------------|
-| `remember` | `remember: <title>` | Note, Project, Scope, Tags |
-| `update` | `update: <title>` | Note, Project, Tags |
-| `forget` | `forget: <title>` | Note, Project, Description (with cleanup count) |
-| `move` | `move: <title>` | Note, Project, Description (source→target vault) |
-| `relate` | `relate: <title1> ↔ <title2>` | Note, Project, Relationship |
-| `unrelate` | `unrelate: <id1> ↔ <id2>` | Note, Project |
-| `consolidate` | `consolidate(<mode>): <title>` | Note(s), Project, Mode, Description (with source count) |
-| `prune` | `prune: removed N superseded note(s)` | Note(s), Description (with pruned list) |
-| `policy` | `policy: <project> default scope <scope>` | Project, Description (with mode if set) |
+| Tool | Subject format | Summary source | Required body fields |
+|------|----------------|----------------|---------------------|
+| `remember` | `remember: <title>` | `summary` parameter (LLM-provided), fallback to first sentence | Summary, Note, Project, Scope, Tags |
+| `update` | `update: <title>` | `summary` parameter (LLM-provided), fallback to "Updated X, Y, Z" | Summary, Note, Project, Tags |
+| `forget` | `forget: <title>` | "Deleted note and cleaned up N reference(s)" | Summary, Note, Project |
+| `move` | `move: <title>` | "Moved from X-vault to Y-vault" | Summary, Note, Project |
+| `relate` | `relate: <title1> ↔ <title2>` | Context of relationship | Summary, Note, Project, Relationship |
+| `unrelate` | `unrelate: <id1> ↔ <id2>` | Context of relationship removal | Summary, Note, Project |
+| `consolidate` | `consolidate(<mode>): <title>` | `mergePlan.summary` (LLM-provided), fallback to "Consolidated N notes" | Summary, Note(s), Project, Mode |
+| `prune` | `prune: removed N superseded note(s)` | "Pruned N superseded notes" | Summary, Note(s) |
+| `policy` | `policy: <project> default scope <scope>` | "Set default scope to X" | Summary, Project |
+
+**LLM-provided summary guidance:**
+Tools marked with "LLM-provided" support optional `summary` parameters:
+- `remember`: `summary` parameter
+- `update`: `summary` parameter  
+- `consolidate`: `mergePlan.summary` parameter
+
+When provided, LLM should write commit-message-style summaries:
+- Imperative mood ("Add", "Fix", "Update", not "Added", "Fixed")
+- 50-72 characters recommended
+- Explain the "why", not just the "what"
+- Examples:
+  - "Document JWT RS256 migration for distributed auth"
+  - "Clarify consolidation rationale for release workflow notes"
+  - "Fix outdated references to legacy package name"
+
+When not provided, tools fall back to auto-generated descriptions.
 
 **All new tools must follow this protocol.** Review existing implementations as templates.
 

@@ -386,6 +386,13 @@ Store a memory whenever you learn something useful to know in a future session:
 
 When in doubt, store it. Storage is cheap; re-explaining context is expensive.
 
+**Writing good `remember` calls:**
+- Use the `summary` parameter: provide a brief, commit-message-style summary (50-72 chars recommended)
+  - Good: "Add JWT RS256 migration decision for distributed auth"
+  - Bad: "stuff about auth" or "as discussed"
+- The summary appears in git commits for traceability, but isn't stored in the note
+- First sentence of content is used as fallback if no summary provided
+
 ### After every `remember` — check for relationships immediately
 You have full session context right now. That advantage is gone next session.
 Before moving on, ask yourself:
