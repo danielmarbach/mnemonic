@@ -6,6 +6,7 @@ A local MCP memory server backed by plain markdown + JSON files, synced via git.
 
 ```text
 src/       TypeScript runtime code
+tests/     Vitest test files
 build/     Compiled JavaScript output
 .mnemonic/ Project-scoped memories for this repo
 ```
@@ -63,6 +64,7 @@ When `recall` is called with a `cwd`, it searches both the project vault and the
 ```bash
 npm install
 npm run build
+npm test
 ```
 
 ### Docker
