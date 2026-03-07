@@ -11,15 +11,19 @@ export interface SyncResult {
 }
 
 export class GitOps {
-  private git: SimpleGit;
+  private git!: SimpleGit;
+  private readonly vaultPath: string;
   private enabled: boolean;
 
   constructor(vaultPath: string) {
-    this.git = simpleGit(vaultPath);
+    this.vaultPath = vaultPath;
     this.enabled = process.env["DISABLE_GIT"] !== "true";
   }
 
   async init(): Promise<void> {
+    // Defer simpleGit construction until here — the vault directory is
+    // created by Storage.init() before GitOps.init() is called.
+    this.git = simpleGit(this.vaultPath);
     if (!this.enabled) return;
     const isRepo = await this.git.checkIsRepo().catch(() => false);
     if (!isRepo) {
