@@ -18,6 +18,7 @@ describe("MnemonicConfigStore", () => {
 
     const store = new MnemonicConfigStore(dir);
     await expect(store.load()).resolves.toEqual({
+      schemaVersion: "1.0",
       reindexEmbedConcurrency: 4,
       projectMemoryPolicies: {},
     });
