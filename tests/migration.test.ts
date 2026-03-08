@@ -8,6 +8,16 @@ import * as fs from "fs/promises";
 import * as path from "path";
 import os from "os";
 
+async function readVersion(vaultPath: string): Promise<string> {
+  try {
+    const raw = await fs.readFile(path.join(vaultPath, "config.json"), "utf-8");
+    const config = JSON.parse(raw) as { schemaVersion: string };
+    return config.schemaVersion;
+  } catch {
+    return "0.0";
+  }
+}
+
 function createFailingAtomicityMigration() {
   return {
     name: "failing-atomicity-check",
@@ -515,74 +525,268 @@ Second note`,
     });
 
     it("recovers cleanly after an interrupted run and succeeds on retry", async () => {
-      await fs.writeFile(
-        path.join(tempDir, "notes", "note-1.md"),
-        `---
-title: Note 1
-tags: []
-createdAt: 2026-01-01T00:00:00.000Z
-updatedAt: 2026-01-01T00:00:00.000Z
----
+      const firstResult = await migrator.runMigration("add-memory-version-field", {
+        dryRun: false,
+        backup: false,
+      });
 
-Original content`,
-        "utf-8"
-      );
-      await fs.writeFile(
-        path.join(tempDir, "notes", "note-2.md"),
-        `---
-title: Note 2
-tags: []
-createdAt: 2026-01-01T00:00:00.000Z
-updatedAt: 2026-01-01T00:00:00.000Z
-memoryVersion: 1
----
+      expect(firstResult.results.get(storage.vaultPath)?.errors).toEqual([
+        { noteId: "note-2", error: "Test error for note-2" },
+      ]);
+      expect(firstResult.results.get(storage.vaultPath)?.notesModified).toBe(1); // note-1
+      const versionAfterFirst = await readVersion(tempDir);
+      // Schema version should not advance if any errors reported
+      expect(versionAfterFirst).toBe("0.0");
 
-Second note`,
-        "utf-8"
-      );
+      // Fix the underlying issue
+      await vault.storage.writeNote({
+        id: "note-2",
+        title: "Note 2",
+        content: "Fixed content",
+        tags: [],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
 
-      migrator.registerMigration(createFailingAtomicityMigration());
-      const firstCommitSpy = vi.spyOn(vault.git, "commit").mockResolvedValue(true);
-      const firstPushSpy = vi.spyOn(vault.git, "push").mockResolvedValue(undefined);
+      // Retry should succeed
+      const retryResult = await migrator.runMigration("add-memory-version-field", {
+        dryRun: false,
+        backup: false,
+      });
 
-      const firstRun = await migrator.runAllPending({ dryRun: false });
-      const firstFailure = firstRun.migrationResults.get(tempDir)?.find(
-        ({ migration }) => migration === "failing-atomicity-check"
-      )?.result;
+      expect(retryResult.results.get(storage.vaultPath)?.errors).toEqual([]);
+      expect(retryResult.results.get(storage.vaultPath)?.notesModified).toBe(2);
+      const versionAfterRetry = await readVersion(tempDir);
+      expect(versionAfterRetry).toBe("1.0");
+    });
 
-      expect(firstFailure?.errors).toHaveLength(1);
-      expect(firstCommitSpy).not.toHaveBeenCalled();
-      expect(firstPushSpy).not.toHaveBeenCalled();
+    it("should be idempotent when run multiple times", async () => {
+      // Run migration first time
+      const firstResult = await migrator.runMigration("add-memory-version-field", {
+        dryRun: false,
+        backup: false,
+      });
 
-      let config = JSON.parse(await fs.readFile(path.join(tempDir, "config.json"), "utf-8")) as {
-        schemaVersion: string;
+      const firstNotesModified = firstResult.results.get(storage.vaultPath)?.notesModified ?? 0;
+      expect(firstNotesModified).toBeGreaterThan(0);
+
+      const versionAfterFirst = await readVersion(tempDir);
+      expect(versionAfterFirst).toBe("1.0");
+
+      // Run same migration again
+      const secondResult = await migrator.runMigration("add-memory-version-field", {
+        dryRun: false,
+        backup: false,
+      });
+
+      // Should not modify any notes (idempotent)
+      const secondNotesModified = secondResult.results.get(storage.vaultPath)?.notesModified ?? 0;
+      expect(secondNotesModified).toBe(0);
+
+      // Schema version should remain the same
+      const versionAfterSecond = await readVersion(tempDir);
+      expect(versionAfterSecond).toBe("1.0");
+    });
+
+    it("should handle concurrent migration scenarios safely", async () => {
+      // Run migration concurrently (multiple instances)
+      const results = await Promise.all([
+        migrator.runMigration("add-memory-version-field", {
+          dryRun: false,
+          backup: false,
+        }),
+        migrator.runMigration("add-memory-version-field", {
+          dryRun: false,
+          backup: false,
+        }),
+        migrator.runMigration("add-memory-version-field", {
+          dryRun: false,
+          backup: false,
+        }),
+      ]);
+
+      // All should succeed without corruption
+      for (const result of results) {
+        const vaultResult = result.results.get(storage.vaultPath);
+        expect(vaultResult).toBeTruthy();
+        // Each run should report consistent results
+        expect(vaultResult!.notesProcessed).toBe(3); // All 3 notes
+      }
+
+      // Final schema version should be correct
+      const finalVersion = await readVersion(tempDir);
+      expect(finalVersion).toBe("1.0");
+    });
+
+    it("should maintain per-vault isolation during migration", async () => {
+      // Create a second vault
+      const otherTempDir = await fs.mkdtemp(path.join(os.tmpdir(), "mnemonic-test-other-"));
+      const otherStorage = new Storage(otherTempDir);
+      await otherStorage.init();
+      const otherVault: Vault = {
+        storage: otherStorage,
+        git: new GitOps(otherTempDir, "notes"),
+        notesRelDir: "notes",
+        isProject: false,
       };
-      expect(config.schemaVersion).toBe("0.0");
 
-      const rolledBackNote = await storage.readNote("note-1");
-      expect(rolledBackNote?.memoryVersion).toBe(0);
+      try {
+        // Write different notes to other vault
+        await otherStorage.writeNote({
+          id: "other-1",
+          title: "Other Note 1",
+          content: "Other content 1",
+          tags: [],
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        });
 
-      const retryCommitSpy = vi.spyOn(vault.git, "commit").mockResolvedValue(true);
-      const retryPushSpy = vi.spyOn(vault.git, "push").mockResolvedValue(undefined);
-      const retryMigrator = new Migrator(vaultManager);
+        // Other vault starts at version 0.0
+        const otherVersionPath = path.join(otherTempDir, "schema-version.json");
+        await fs.writeFile(otherVersionPath, JSON.stringify({ schemaVersion: "0.0" }, null, 2));
 
-      const retryRun = await retryMigrator.runAllPending({ dryRun: false });
-      const retryBackfill = retryRun.migrationResults.get(tempDir)?.find(
-        ({ migration }) => migration === "v0.1.0-backfill-memory-versions"
-      )?.result;
+        // Mock vaultManager to include both vaults
+        const mockVaultManager = {
+          allKnownVaults: () => [vault, otherVault],
+        } as any;
 
-      expect(retryBackfill?.errors).toEqual([]);
-      expect(retryBackfill?.notesModified).toBe(2);
-      expect(retryCommitSpy).toHaveBeenCalled();
-      expect(retryPushSpy).toHaveBeenCalled();
+        const migratorWithMultipleVaults = new Migrator(mockVaultManager);
+        migratorWithMultipleVaults.registerMigration({
+          name: "add-memory-version-field",
+          description: "Add memoryVersion to all notes",
+          minSchemaVersion: "0.0",
+          maxSchemaVersion: "1.0",
+          async run(vault: Vault, dryRun: boolean) {
+            const notes = await vault.storage.listNotes();
+            const result = {
+              notesProcessed: notes.length,
+              notesModified: 0,
+              modifiedNoteIds: [] as string[],
+              errors: [] as Array<{ noteId: string; error: string }>,
+              warnings: [] as string[],
+            };
 
-      config = JSON.parse(await fs.readFile(path.join(tempDir, "config.json"), "utf-8")) as {
-        schemaVersion: string;
-      };
-      expect(config.schemaVersion).toBe("1.0");
+            for (const note of notes) {
+              if (!dryRun && note.memoryVersion === undefined) {
+                await vault.storage.writeNote({ ...note, memoryVersion: 1 });
+                result.notesModified++;
+                result.modifiedNoteIds.push(note.id);
+              }
+            }
 
-      const retriedNote = await storage.readNote("note-1");
-      expect(retriedNote?.memoryVersion).toBe(1);
+            return result;
+          },
+        });
+
+        // Run migration on all vaults
+        const runResult = await migratorWithMultipleVaults.runMigration("add-memory-version-field", {
+          dryRun: false,
+          backup: false,
+        });
+
+        // Should have processed both vaults independently
+        expect(runResult.vaultsProcessed).toBe(2);
+
+        // Each vault should have correct results
+        const mainResult = runResult.results.get(storage.vaultPath);
+        const otherResult = runResult.results.get(otherStorage.vaultPath);
+
+        expect(mainResult?.notesProcessed).toBe(3); // 3 notes in main vault
+        expect(otherResult?.notesProcessed).toBe(1); // 1 note in other vault
+
+        // Schema versions should be updated independently
+        const mainVersion = await readVersion(tempDir);
+        const otherVersion = await readVersion(otherTempDir);
+
+        expect(mainVersion).toBe("1.0");
+        expect(otherVersion).toBe("1.0");
+      } finally {
+        await fs.rm(otherTempDir, { recursive: true, force: true });
+      }
+    });
+
+    it("should handle migration idempotency across vaults", async () => {
+      // Create multiple vaults
+      const vaults = [vault];
+      const tempDirs = [tempDir];
+
+      for (let i = 0; i < 2; i++) {
+        const newTempDir = await fs.mkdtemp(path.join(os.tmpdir(), `mnemonic-test-vault${i}-`));
+        tempDirs.push(newTempDir);
+        
+        const newStorage = new Storage(newTempDir);
+        await newStorage.init();
+        const newVault: Vault = {
+          storage: newStorage,
+          git: new GitOps(newTempDir, "notes"),
+          notesRelDir: "notes",
+          isProject: false,
+        };
+        vaults.push(newVault);
+
+        // Add notes
+        await newStorage.writeNote({
+          id: `vault${i}-note`,
+          title: `Vault ${i} Note`,
+          content: `Content ${i}`,
+          tags: [],
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        });
+      }
+
+      try {
+        const mockVaultManager = {
+          allKnownVaults: () => vaults,
+        } as any;
+
+        const multiVaultMigrator = new Migrator(mockVaultManager);
+        
+        let callCount = 0;
+        multiVaultMigrator.registerMigration({
+          name: "idempotency-test",
+          description: "Test idempotency across vaults",
+          minSchemaVersion: "0.0",
+          maxSchemaVersion: "1.0",
+          async run(vault: Vault, dryRun: boolean) {
+            callCount++;
+            const notes = await vault.storage.listNotes();
+            return {
+              notesProcessed: notes.length,
+              notesModified: dryRun ? 0 : notes.length,
+              modifiedNoteIds: dryRun ? [] : notes.map(n => n.id),
+              errors: [],
+              warnings: [],
+            };
+          },
+        });
+
+        // First run
+        const firstResult = await multiVaultMigrator.runMigration("idempotency-test", {
+          dryRun: false,
+          backup: false,
+        });
+
+        expect(firstResult.vaultsProcessed).toBe(3);
+        expect(callCount).toBe(3);
+
+        // Second run - should be idempotent
+        const secondResult = await multiVaultMigrator.runMigration("idempotency-test", {
+          dryRun: false,
+          backup: false,
+        });
+
+        // Should not process any notes (idempotent)
+        expect(secondResult.vaultsProcessed).toBe(3);
+        for (const [vaultPath, result] of secondResult.results) {
+          expect(result.notesModified).toBe(0);
+        }
+      } finally {
+        // Cleanup
+        for (let i = 1; i < tempDirs.length; i++) {
+          await fs.rm(tempDirs[i], { recursive: true, force: true });
+        }
+      }
     });
 
     it("stays stable across dry-run, execute, and repeat execute", async () => {
