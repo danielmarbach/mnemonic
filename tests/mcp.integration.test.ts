@@ -41,7 +41,7 @@ describe("local MCP script", () => {
     } finally {
       await embeddingServer.close();
     }
-  });
+  }, 15000);
 });
 
 async function callLocalMcp(

@@ -38,6 +38,31 @@ Error: spawn ./scripts/mcp-local.sh ENOENT
     expect(summary.lesson).toContain("machine-specific script paths");
   });
 
+  it("provides a specific lesson for timeout failures", () => {
+    const output = `
+ FAIL  tests/mcp.integration.test.ts > local MCP script > supports global remember and forget with git disabled
+Error: Test timed out in 5000ms.
+`;
+
+    const summary = summarizeVitestFailure(output, {
+      command: "npm test",
+      workflow: "CI",
+      job: "build-and-test",
+      event: "push",
+      ref: "refs/heads/main",
+      sha: "abcdef1234567",
+      runId: "1234",
+      runUrl: "https://github.com/example/repo/actions/runs/1234",
+      runnerOs: "Linux",
+      nodeVersion: "20",
+    });
+
+    expect(summary.failure_signature).toBe(
+      "vitest|tests/mcp.integration.test.ts|error-test-timed-out-in-5000ms"
+    );
+    expect(summary.lesson).toContain("Increase the explicit test timeout");
+  });
+
   it("renders a readable markdown artifact", () => {
     const markdown = renderMarkdown({
       workflow: "CI",

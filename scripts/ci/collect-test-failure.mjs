@@ -156,6 +156,10 @@ function inferLesson(primaryError, failedTests) {
     return "Keep CI tests hermetic. Prefer a fake local embeddings endpoint or graceful best-effort embedding behavior over requiring a live Ollama daemon in CI.";
   }
 
+  if (lowered.includes("timed out")) {
+    return "This failure looks like a slow-but-valid integration path on CI. Increase the explicit test timeout or reduce process startup overhead so the test remains reliable on shared runners.";
+  }
+
   if (primaryTestFile) {
     return `Review ${primaryTestFile} for assumptions that depend on local machine state, transient environment details, or missing test isolation.`;
   }
