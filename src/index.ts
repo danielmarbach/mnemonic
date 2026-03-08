@@ -408,7 +408,7 @@ async function embedMissingNotes(
       }
 
       const existing = await storage.readEmbedding(note.id);
-      if (existing) {
+      if (existing?.model === embedModel) {
         continue;
       }
 
@@ -857,7 +857,7 @@ server.registerTool(
       "the project's default policy is used before falling back to legacy behavior.",
     inputSchema: z.object({
       title: z.string().describe("Short descriptive title"),
-      content: z.string().describe("The content to remember (markdown supported)"),
+      content: z.string().describe("The content to remember (markdown supported; write summary-first with the key fact or decision near the top)"),
       tags: z.array(z.string()).optional().default([]).describe("Optional tags"),
       summary: z.string().optional().describe("Brief summary for git commit message (like a good commit message, describing the change). Not stored in the note."),
       cwd: projectParam,
@@ -1448,7 +1448,7 @@ server.registerTool(
     title: "Reindex",
     description:
       "Rebuild local embeddings for notes missing an embedding file. " +
-      "Pass `cwd` to also reindex the project vault. `force=true` rebuilds all embeddings.",
+      "Pass `cwd` to also reindex the project vault. Embeddings from older models are refreshed automatically; `force=true` rebuilds all embeddings.",
     inputSchema: z.object({
       force: z
         .boolean()

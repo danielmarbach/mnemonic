@@ -58,7 +58,7 @@ flowchart LR
     Storage --> Embeddings[embeddings/*.json\n gitignored]
 
     Server --> Embeds[src/embeddings.ts\nOllama HTTP client]
-    Embeds --> Ollama[Ollama\n/api/embeddings]
+    Embeds --> Ollama[Ollama\n/api/embed]
 
     Server --> Git[src/git.ts\nGitOps]
     Git --> GitRepo[git repositories\nmain vault or project repo]

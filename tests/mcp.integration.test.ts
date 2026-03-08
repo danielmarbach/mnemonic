@@ -158,13 +158,13 @@ function extractRememberedId(text: string): string {
 
 async function startFakeEmbeddingServer(): Promise<{ url: string; close: () => Promise<void> }> {
   const server = http.createServer((req, res) => {
-    if (req.method !== "POST" || req.url !== "/api/embeddings") {
+    if (req.method !== "POST" || req.url !== "/api/embed") {
       res.writeHead(404).end();
       return;
     }
 
     res.writeHead(200, { "Content-Type": "application/json" });
-    res.end(JSON.stringify({ embedding: [0.1, 0.2, 0.3] }));
+    res.end(JSON.stringify({ embeddings: [[0.1, 0.2, 0.3]] }));
   });
 
   await new Promise<void>((resolve, reject) => {

@@ -24,6 +24,7 @@ Before doing any substantive work:
 Before calling `remember`:
 1. `recall` first — if a related note exists, call `update` instead to avoid fragmentation.
 2. If you've made several closely-related captures in this session, consider `consolidate` before wrapping up.
+3. Write the note summary-first: put the main fact, decision, or outcome in the opening sentences, then follow with supporting detail.
 
 ### Capture triggers
 
@@ -232,7 +233,7 @@ Keep these high-level anchors in mind:
 |----------|---------|-------------|
 | `VAULT_PATH` | `~/mnemonic-vault` | Vault location |
 | `OLLAMA_URL` | `http://localhost:11434` | Ollama server |
-| `EMBED_MODEL` | `nomic-embed-text` | Embedding model |
+| `EMBED_MODEL` | `nomic-embed-text-v2-moe` | Embedding model |
 | `DISABLE_GIT` | `false` | Skip git ops if `"true"` |
 
 ## Stack
@@ -242,7 +243,7 @@ Keep these high-level anchors in mind:
 - **simple-git** — git operations
 - **gray-matter** — markdown frontmatter parsing
 - **zod** — schema validation
-- **Ollama** (HTTP) — `nomic-embed-text` embeddings
+- **Ollama** (HTTP) — `nomic-embed-text-v2-moe` embeddings via `/api/embed` with truncation enabled
 
 ## TypeScript patterns
 

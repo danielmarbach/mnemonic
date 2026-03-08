@@ -1,11 +1,11 @@
 const OLLAMA_URL = process.env["OLLAMA_URL"] ?? "http://localhost:11434";
-const EMBED_MODEL = process.env["EMBED_MODEL"] ?? "nomic-embed-text";
+const EMBED_MODEL = process.env["EMBED_MODEL"] ?? "nomic-embed-text-v2-moe";
 
 export async function embed(text: string): Promise<number[]> {
-  const res = await fetch(`${OLLAMA_URL}/api/embeddings`, {
+  const res = await fetch(`${OLLAMA_URL}/api/embed`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ model: EMBED_MODEL, prompt: text }),
+    body: JSON.stringify({ model: EMBED_MODEL, input: text, truncate: true }),
   });
 
   if (!res.ok) {
@@ -15,8 +15,13 @@ export async function embed(text: string): Promise<number[]> {
     );
   }
 
-  const data = (await res.json()) as { embedding: number[] };
-  return data.embedding;
+  const data = (await res.json()) as { embeddings?: number[][] };
+  const embedding = data.embeddings?.[0];
+  if (!embedding) {
+    throw new Error(`Ollama embedding response did not include an embedding for model '${EMBED_MODEL}'`);
+  }
+
+  return embedding;
 }
 
 export function cosineSimilarity(a: number[], b: number[]): number {

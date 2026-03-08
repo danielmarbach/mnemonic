@@ -82,6 +82,7 @@ You can also set a per-project default once with `set_project_memory_policy`. Af
 Notes are plain markdown with YAML frontmatter — readable, diffable, mergeable.
 Memory content is markdown-linted on `remember`/`update`: fixable issues are auto-corrected before save, and non-fixable issues are rejected.
 Embeddings stay local (gitignored) and are rebuilt on each machine with `reindex`.
+Mnemonic uses Ollama's `/api/embed` endpoint with truncation enabled so longer notes still embed safely with `nomic-embed-text-v2-moe`.
 
 Each vault has its own `config.json` with a `schemaVersion`, so main and project vaults can migrate independently. The main vault config in `~/mnemonic-vault/config.json` also holds machine-local runtime tuning, per-project memory policies, and optional project-identity remote overrides for fork workflows. Today it includes `reindexEmbedConcurrency`, which defaults to `4` and is clamped to the range `1..16`.
 
@@ -107,10 +108,10 @@ When `recall` is called with a `cwd`, it searches both the project vault and the
 
 ## Prerequisites
 
-- [Ollama](https://ollama.com) running locally with `nomic-embed-text` pulled:
-  ```bash
-  ollama pull nomic-embed-text
-  ```
+- [Ollama](https://ollama.com) running locally with `nomic-embed-text-v2-moe` pulled:
+```bash
+ollama pull nomic-embed-text-v2-moe
+```
 
 ## Setup
 
@@ -134,10 +135,10 @@ That helper rebuilds first, then launches `build/index.js`, so local MCP clients
 
 ```bash
 docker compose build
-docker compose up ollama-init  # pulls nomic-embed-text into the ollama volume (one-time)
+docker compose up ollama-init  # pulls nomic-embed-text-v2-moe into the ollama volume (one-time)
 ```
 
-Ollama runs as a container with a named volume (`ollama-data`) so downloaded models persist across restarts. An `ollama-init` service pulls `nomic-embed-text` on first run; `mnemonic` waits for it to complete before starting.
+Ollama runs as a container with a named volume (`ollama-data`) so downloaded models persist across restarts. An `ollama-init` service pulls `nomic-embed-text-v2-moe` on first run; `mnemonic` waits for it to complete before starting.
 
 The vault directory (`~/mnemonic-vault` by default) is bind-mounted from the host, so notes and the git repo stay on your machine.
 
@@ -225,7 +226,7 @@ If you prefer a fixed installed version, point your MCP client at the local bina
 |---------------|--------------------------|------------------------------------|
 | `VAULT_PATH`  | `~/mnemonic-vault`       | Path to your markdown vault        |
 | `OLLAMA_URL`  | `http://localhost:11434` | Ollama server URL                  |
-| `EMBED_MODEL` | `nomic-embed-text`       | Ollama embedding model             |
+| `EMBED_MODEL` | `nomic-embed-text-v2-moe` | Ollama embedding model            |
 | `DISABLE_GIT` | `false`                  | Set `true` to skip all git ops     |
 
 ## Claude Desktop / Cursor config
@@ -426,6 +427,8 @@ When in doubt, store it. Storage is cheap; re-explaining context is expensive.
   - Bad: "stuff about auth" or "as discussed"
 - The summary appears in git commits for traceability, but isn't stored in the note
 - First sentence of content is used as fallback if no summary provided
+- Write memory content summary-first: put the main fact, decision, or outcome in the opening sentences, then follow with supporting detail
+- Avoid burying the key point deep in long notes; embeddings may truncate later sections
 
 ### After every `remember` — check for relationships immediately
 You have full session context right now. That advantage is gone next session.

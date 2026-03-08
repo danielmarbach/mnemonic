@@ -17,8 +17,8 @@ services:
       echo 'Waiting for Ollama to start...' &&
       sleep 10 &&
       for i in 1 2 3 4 5; do
-        echo \"Pulling nomic-embed-text (attempt $i/5)...\" &&
-        if curl -sf -X POST http://ollama:11434/api/pull -d '{\"name\": \"nomic-embed-text\"}'; then
+        echo \"Pulling nomic-embed-text-v2-moe (attempt $i/5)...\" &&
+        if curl -sf -X POST http://ollama:11434/api/pull -d '{\"name\": \"nomic-embed-text-v2-moe\"}'; then
           echo 'Model pulled successfully' && exit 0
         fi &&
         echo 'Not ready yet, retrying...' &&
@@ -44,7 +44,7 @@ services:
     environment:
       VAULT_PATH: /vault
       OLLAMA_URL: http://ollama:11434
-      EMBED_MODEL: ${EMBED_MODEL:-nomic-embed-text}
+      EMBED_MODEL: ${EMBED_MODEL:-nomic-embed-text-v2-moe}
       DISABLE_GIT: ${DISABLE_GIT:-false}
 
 volumes:

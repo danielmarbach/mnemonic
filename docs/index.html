@@ -1382,7 +1382,7 @@
             <span class="code-label">bash</span>
             <button class="copy-btn" onclick="copyCode(this)">copy</button>
           </div>
-          <pre><span class="cmd">ollama pull nomic-embed-text</span></pre>
+          <pre><span class="cmd">ollama pull nomic-embed-text-v2-moe</span></pre>
         </div>
 
         <h3>2 &mdash; Install &amp; build</h3>
@@ -1469,7 +1469,7 @@
           </tr>
           <tr>
             <td><code>EMBED_MODEL</code></td>
-            <td class="default">nomic-embed-text</td>
+            <td class="default">nomic-embed-text-v2-moe</td>
             <td>Ollama embedding model</td>
           </tr>
           <tr>
@@ -1505,7 +1505,9 @@ Use it proactively — don't wait to be asked.
 <span class="cmt">### Before calling `remember`</span>
 Do a quick `recall` first. If a related note exists, call `update` instead — this avoids
 accumulating fragmented notes on the same topic. When several related captures pile up,
-use `consolidate` to merge them into one authoritative note.
+use `consolidate` to merge them into one authoritative note. Write the note summary-first:
+put the main fact, decision, or outcome in the opening sentences, then follow with
+supporting detail.
 
 <span class="cmt">### When to call `remember`</span>
 Store a memory whenever you learn something useful to know in a future session:
@@ -1526,6 +1528,8 @@ When in doubt, store it. Storage is cheap; re-explaining context is expensive.
   - Bad: "stuff about auth" or "as discussed"
 - The summary appears in git commits for traceability, but isn't stored in the note
 - First sentence of content is used as fallback if no summary provided
+- Write memory content summary-first: put the main fact, decision, or outcome in the opening sentences, then follow with supporting detail
+- Avoid burying the key point deep in long notes; embeddings may truncate later sections
 
 <span class="cmt">### After every `remember` — check for relationships immediately</span>
 You have full session context right now. That advantage is gone next session.
