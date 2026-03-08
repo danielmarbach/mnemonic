@@ -4,6 +4,9 @@ import os from "os";
 import path from "path";
 import { spawn } from "child_process";
 import http from "http";
+import { fileURLToPath } from "url";
+
+const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 const tempDirs: string[] = [];
 
@@ -71,7 +74,7 @@ async function callLocalMcp(
 
   const stdout = await new Promise<string>((resolve, reject) => {
     const child = spawn("./scripts/mcp-local.sh", {
-      cwd: "/Users/danielmarbach/Projects/mnemonic",
+      cwd: repoRoot,
       env: {
         ...process.env,
         DISABLE_GIT: "true",
