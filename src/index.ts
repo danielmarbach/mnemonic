@@ -49,6 +49,7 @@ import type {
   ProjectIdentityResult,
   MigrationListResult,
   MigrationExecuteResult,
+  ConsolidateResult,
 } from "./structured-content.js";
 
 // ── CLI Migration Command ─────────────────────────────────────────────────────
@@ -2152,13 +2153,14 @@ async function detectDuplicates(
   entries: NoteEntry[],
   threshold: number,
   project: Awaited<ReturnType<typeof resolveProject>>,
-): Promise<{ content: Array<{ type: "text"; text: string }> }> {
+): Promise<{ content: Array<{ type: "text"; text: string }>; structuredContent: ConsolidateResult }> {
   const lines: string[] = [];
   lines.push(`Duplicate detection for ${project?.name ?? "global"} (similarity > ${threshold}):`);
   lines.push("");
 
   const checked = new Set<string>();
   let foundCount = 0;
+  const duplicates: Array<{ noteA: { id: string; title: string }; noteB: { id: string; title: string }; similarity: number }> = [];
 
   for (let i = 0; i < entries.length; i++) {
     const entryA = entries[i]!;
@@ -2183,6 +2185,12 @@ async function detectDuplicates(
         lines.push("");
         checked.add(entryA.note.id);
         checked.add(entryB.note.id);
+        
+        duplicates.push({
+          noteA: { id: entryA.note.id, title: entryA.note.title },
+          noteB: { id: entryB.note.id, title: entryB.note.title },
+          similarity,
+        });
       }
     }
   }
@@ -2194,13 +2202,22 @@ async function detectDuplicates(
     lines.push("Use 'suggest-merges' strategy for actionable recommendations.");
   }
 
-  return { content: [{ type: "text", text: lines.join("\n") }] };
+  const structuredContent: ConsolidateResult = {
+    action: "consolidated",
+    strategy: "detect-duplicates",
+    project: project?.id,
+    projectName: project?.name,
+    notesProcessed: entries.length,
+    notesModified: 0,
+  };
+
+  return { content: [{ type: "text", text: lines.join("\n") }], structuredContent };
 }
 
 function findClusters(
   entries: NoteEntry[],
   project: Awaited<ReturnType<typeof resolveProject>>,
-): { content: Array<{ type: "text"; text: string }> } {
+): { content: Array<{ type: "text"; text: string }>; structuredContent: ConsolidateResult } {
   const lines: string[] = [];
   lines.push(`Cluster analysis for ${project?.name ?? "global"}:`);
   lines.push("");
@@ -2246,20 +2263,24 @@ function findClusters(
   }
 
   // Output theme groups
+  const themeGroups: Array<{ name: string; count: number; examples: string[] }> = [];
   lines.push("By Theme:");
   for (const [theme, bucket] of themed) {
     if (bucket.length > 1) {
       lines.push(`  ${titleCaseTheme(theme)} (${bucket.length} notes)`);
+      const examples = bucket.slice(0, 3).map((entry) => entry.note.title);
       for (const entry of bucket.slice(0, 3)) {
         lines.push(`    - ${entry.note.title}`);
       }
       if (bucket.length > 3) {
         lines.push(`    ... and ${bucket.length - 3} more`);
       }
+      themeGroups.push({ name: theme, count: bucket.length, examples });
     }
   }
 
   // Output relationship clusters
+  const relationshipClusters: Array<{ hub: { id: string; title: string }; notes: { id: string; title: string }[] }> = [];
   if (clusters.length > 0) {
     lines.push("");
     lines.push("Connected Clusters (via relationships):");
@@ -2270,15 +2291,30 @@ function findClusters(
         (e.note.relatedTo?.length ?? 0) > (max.note.relatedTo?.length ?? 0) ? e : max
       );
       lines.push(`    Hub: ${hub.note.title}`);
+      const clusterNotes: { id: string; title: string }[] = [];
       for (const entry of cluster) {
         if (entry.note.id !== hub.note.id) {
           lines.push(`    - ${entry.note.title}`);
+          clusterNotes.push({ id: entry.note.id, title: entry.note.title });
         }
       }
+      relationshipClusters.push({
+        hub: { id: hub.note.id, title: hub.note.title },
+        notes: clusterNotes,
+      });
     }
   }
 
-  return { content: [{ type: "text", text: lines.join("\n") }] };
+  const structuredContent: ConsolidateResult = {
+    action: "consolidated",
+    strategy: "find-clusters",
+    project: project?.id,
+    projectName: project?.name,
+    notesProcessed: entries.length,
+    notesModified: 0,
+  };
+
+  return { content: [{ type: "text", text: lines.join("\n") }], structuredContent };
 }
 
 async function suggestMerges(
@@ -2286,13 +2322,18 @@ async function suggestMerges(
   threshold: number,
   consolidationMode: ConsolidationMode,
   project: Awaited<ReturnType<typeof resolveProject>>,
-): Promise<{ content: Array<{ type: "text"; text: string }> }> {
+): Promise<{ content: Array<{ type: "text"; text: string }>; structuredContent: ConsolidateResult }> {
   const lines: string[] = [];
   lines.push(`Merge suggestions for ${project?.name ?? "global"} (mode: ${consolidationMode}):`);
   lines.push("");
 
   const checked = new Set<string>();
   let suggestionCount = 0;
+  const suggestions: Array<{
+    targetTitle: string;
+    sourceIds: string[];
+    similarities: Array<{ id: string; similarity: number }>;
+  }> = [];
 
   for (let i = 0; i < entries.length; i++) {
     const entryA = entries[i]!;
@@ -2348,6 +2389,12 @@ async function suggestMerges(
       lines.push(`     }})`);
       lines.push("");
 
+      suggestions.push({
+        targetTitle: `${entryA.note.title} (consolidated)`,
+        sourceIds: sources.map((s) => s.note.id),
+        similarities: similar.map((s) => ({ id: s.entry.note.id, similarity: s.similarity })),
+      });
+
       checked.add(entryA.note.id);
       for (const s of similar) checked.add(s.entry.note.id);
     }
@@ -2359,7 +2406,16 @@ async function suggestMerges(
     lines.push(`Generated ${suggestionCount} merge suggestion(s). Review carefully before executing.`);
   }
 
-  return { content: [{ type: "text", text: lines.join("\n") }] };
+  const structuredContent: ConsolidateResult = {
+    action: "consolidated",
+    strategy: "suggest-merges",
+    project: project?.id,
+    projectName: project?.name,
+    notesProcessed: entries.length,
+    notesModified: 0,
+  };
+
+  return { content: [{ type: "text", text: lines.join("\n") }], structuredContent };
 }
 
 async function executeMerge(
@@ -2368,17 +2424,35 @@ async function executeMerge(
   consolidationMode: ConsolidationMode,
   project: Awaited<ReturnType<typeof resolveProject>>,
   cwd?: string,
-): Promise<{ content: Array<{ type: "text"; text: string }> }> {
+): Promise<{ content: Array<{ type: "text"; text: string }>; structuredContent: ConsolidateResult }> {
   const sourceIds = normalizeMergePlanSourceIds(mergePlan.sourceIds);
   const targetTitle = mergePlan.targetTitle.trim();
   const { description, summary, tags } = mergePlan;
 
   if (sourceIds.length < 2) {
-    return { content: [{ type: "text", text: "execute-merge requires at least two distinct sourceIds." }] };
+    const structuredContent: ConsolidateResult = {
+      action: "consolidated",
+      strategy: "execute-merge",
+      project: project?.id,
+      projectName: project?.name,
+      notesProcessed: entries.length,
+      notesModified: 0,
+      warnings: ["execute-merge requires at least two distinct sourceIds."],
+    };
+    return { content: [{ type: "text", text: "execute-merge requires at least two distinct sourceIds." }], structuredContent };
   }
 
   if (!targetTitle) {
-    return { content: [{ type: "text", text: "execute-merge requires a non-empty targetTitle." }] };
+    const structuredContent: ConsolidateResult = {
+      action: "consolidated",
+      strategy: "execute-merge",
+      project: project?.id,
+      projectName: project?.name,
+      notesProcessed: entries.length,
+      notesModified: 0,
+      warnings: ["execute-merge requires a non-empty targetTitle."],
+    };
+    return { content: [{ type: "text", text: "execute-merge requires a non-empty targetTitle." }], structuredContent };
   }
 
   // Find all source entries
@@ -2386,7 +2460,16 @@ async function executeMerge(
   for (const id of sourceIds) {
     const entry = entries.find((e) => e.note.id === id);
     if (!entry) {
-      return { content: [{ type: "text", text: `Source note '${id}' not found.` }] };
+      const structuredContent: ConsolidateResult = {
+        action: "consolidated",
+        strategy: "execute-merge",
+        project: project?.id,
+        projectName: project?.name,
+        notesProcessed: entries.length,
+        notesModified: 0,
+        warnings: [`Source note '${id}' not found.`],
+      };
+      return { content: [{ type: "text", text: `Source note '${id}' not found.` }], structuredContent };
     }
     sourceEntries.push(entry);
   }
@@ -2552,20 +2635,39 @@ async function executeMerge(
     }
   }
 
-  return { content: [{ type: "text", text: lines.join("\n") }] };
+  const structuredContent: ConsolidateResult = {
+    action: "consolidated",
+    strategy: "execute-merge",
+    project: project?.id,
+    projectName: project?.name,
+    notesProcessed: entries.length,
+    notesModified: vaultChanges.size,
+  };
+
+  return { content: [{ type: "text", text: lines.join("\n") }], structuredContent };
 }
 
 async function pruneSuperseded(
   entries: NoteEntry[],
   consolidationMode: ConsolidationMode,
   project: Awaited<ReturnType<typeof resolveProject>>,
-): Promise<{ content: Array<{ type: "text"; text: string }> }> {
+): Promise<{ content: Array<{ type: "text"; text: string }>; structuredContent: ConsolidateResult }> {
   if (consolidationMode !== "delete") {
+    const structuredContent: ConsolidateResult = {
+      action: "consolidated",
+      strategy: "prune-superseded",
+      project: project?.id,
+      projectName: project?.name,
+      notesProcessed: entries.length,
+      notesModified: 0,
+      warnings: [`prune-superseded requires consolidationMode="delete". Current mode: ${consolidationMode}.`],
+    };
     return {
       content: [{
         type: "text",
         text: `prune-superseded requires consolidationMode="delete". Current mode: ${consolidationMode}.\nSet mode explicitly or update project policy.`,
       }],
+      structuredContent,
     };
   }
 
@@ -2588,7 +2690,15 @@ async function pruneSuperseded(
 
   if (supersededIds.size === 0) {
     lines.push("No superseded notes found.");
-    return { content: [{ type: "text", text: lines.join("\n") }] };
+    const structuredContent: ConsolidateResult = {
+      action: "consolidated",
+      strategy: "prune-superseded",
+      project: project?.id,
+      projectName: project?.name,
+      notesProcessed: entries.length,
+      notesModified: 0,
+    };
+    return { content: [{ type: "text", text: lines.join("\n") }], structuredContent };
   }
 
   lines.push(`Found ${supersededIds.size} superseded note(s) to prune:`);
@@ -2626,7 +2736,16 @@ async function pruneSuperseded(
   lines.push("");
   lines.push(`Pruned ${supersededIds.size} note(s).`);
 
-  return { content: [{ type: "text", text: lines.join("\n") }] };
+  const structuredContent: ConsolidateResult = {
+    action: "consolidated",
+    strategy: "prune-superseded",
+    project: project?.id,
+    projectName: project?.name,
+    notesProcessed: entries.length,
+    notesModified: vaultChanges.size,
+  };
+
+  return { content: [{ type: "text", text: lines.join("\n") }], structuredContent };
 }
 
 async function dryRunAll(
@@ -2634,7 +2753,7 @@ async function dryRunAll(
   threshold: number,
   consolidationMode: ConsolidationMode,
   project: Awaited<ReturnType<typeof resolveProject>>,
-): Promise<{ content: Array<{ type: "text"; text: string }> }> {
+): Promise<{ content: Array<{ type: "text"; text: string }>; structuredContent: ConsolidateResult }> {
   const lines: string[] = [];
   lines.push(`Consolidation analysis for ${project?.name ?? "global"}:`);
   lines.push(`Mode: ${consolidationMode} | Threshold: ${threshold}`);
@@ -2655,7 +2774,16 @@ async function dryRunAll(
   lines.push("=== MERGE SUGGESTIONS ===");
   lines.push(merges.content[0]?.text ?? "No output");
 
-  return { content: [{ type: "text", text: lines.join("\n") }] };
+  const structuredContent: ConsolidateResult = {
+    action: "consolidated",
+    strategy: "dry-run",
+    project: project?.id,
+    projectName: project?.name,
+    notesProcessed: entries.length,
+    notesModified: 0,
+  };
+
+  return { content: [{ type: "text", text: lines.join("\n") }], structuredContent };
 }
 
 async function warnAboutPendingMigrationsOnStartup(): Promise<void> {
