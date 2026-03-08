@@ -28,6 +28,13 @@ import { classifyTheme, summarizePreview, titleCaseTheme } from "./project-intro
 import { detectProject, resolveProjectIdentity, type ProjectIdentityResolution } from "./project.js";
 import { VaultManager, type Vault } from "./vault.js";
 import { Migrator } from "./migration.js";
+import type {
+  StructuredResponse,
+  RememberResult,
+  RecallResult,
+  ListResult,
+  GetResult,
+} from "./structured-content.js";
 
 // ── CLI Migration Command ─────────────────────────────────────────────────────
 
@@ -916,8 +923,22 @@ server.registerTool(
     await vault.git.push();
 
     const vaultLabel = vault.isProject ? " [project vault]" : " [main vault]";
+    const textContent = `Remembered as \`${id}\` [${projectScope}, stored=${writeScope}]${vaultLabel}`;
+    
+    const structuredContent: RememberResult = {
+      action: "remembered",
+      id,
+      title,
+      project: project ? { id: project.id, name: project.name } : undefined,
+      scope: writeScope,
+      vault: vault.isProject ? "project-vault" : "main-vault",
+      tags: tags || [],
+      timestamp: now,
+    };
+    
     return {
-      content: [{ type: "text", text: `Remembered as \`${id}\` [${projectScope}, stored=${writeScope}]${vaultLabel}` }],
+      content: [{ type: "text", text: textContent }],
+      structuredContent,
     };
   }
 );
@@ -1089,8 +1110,47 @@ server.registerTool(
       ? `Recall results for project **${project.name}** (scope: ${scope}):`
       : `Recall results (global):`;
 
+    const textContent = `${header}\n\n${sections.join("\n\n---\n\n")}`;
+    
+    // Build structured results array
+    const structuredResults: Array<{
+      id: string;
+      title: string;
+      score: number;
+      boosted: number;
+      project?: string;
+      projectName?: string;
+      vault: "project-vault" | "main-vault";
+      tags: string[];
+      updatedAt: string;
+    }> = [];
+    for (const { id, score, vault, boosted } of top) {
+      const note = await vault.storage.readNote(id);
+      if (note) {
+        structuredResults.push({
+          id,
+          title: note.title,
+          score,
+          boosted,
+          project: note.project,
+          projectName: note.projectName,
+          vault: vault.isProject ? "project-vault" : "main-vault",
+          tags: note.tags,
+          updatedAt: note.updatedAt,
+        });
+      }
+    }
+    
+    const structuredContent: RecallResult = {
+      action: "recalled",
+      query,
+      scope: scope || "all",
+      results: structuredResults,
+    };
+
     return {
-      content: [{ type: "text", text: `${header}\n\n${sections.join("\n\n---\n\n")}` }],
+      content: [{ type: "text", text: textContent }],
+      structuredContent,
     };
   }
 );
@@ -1246,7 +1306,44 @@ server.registerTool(
       ? `${entries.length} memories (project: ${project.name}, scope: ${scope}, storedIn: ${storedIn}):`
       : `${entries.length} memories (scope: ${scope}, storedIn: ${storedIn}):`;
 
-    return { content: [{ type: "text", text: `${header}\n\n${lines.join("\n")}` }] };
+    const textContent = `${header}\n\n${lines.join("\n")}`;
+    
+    const structuredNotes: Array<{
+      id: string;
+      title: string;
+      project?: string;
+      projectName?: string;
+      tags: string[];
+      vault: "project-vault" | "main-vault";
+      updatedAt: string;
+      hasRelated?: boolean;
+    }> = entries.map(({ note, vault }) => ({
+      id: note.id,
+      title: note.title,
+      project: note.project,
+      projectName: note.projectName,
+      tags: note.tags,
+      vault: vault.isProject ? "project-vault" : "main-vault",
+      updatedAt: note.updatedAt,
+      hasRelated: note.relatedTo && note.relatedTo.length > 0,
+    }));
+    
+    const structuredContent: ListResult = {
+      action: "listed",
+      count: entries.length,
+      scope: scope || "all",
+      storedIn: storedIn || "any",
+      project: project ? { id: project.id, name: project.name } : undefined,
+      notes: structuredNotes,
+      options: {
+        includeRelations,
+        includePreview,
+        includeStorage,
+        includeUpdated,
+      },
+    };
+
+    return { content: [{ type: "text", text: textContent }], structuredContent };
   }
 );
 
