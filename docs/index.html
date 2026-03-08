@@ -1402,8 +1402,10 @@
             <button class="copy-btn" onclick="copyCode(this)">copy</button>
           </div>
           <pre><span class="cmd">npm install</span>
+<span class="cmd">npm run typecheck</span>
 <span class="cmd">npm run build</span></pre>
         </div>
+        <p><code>npm run build</code> already runs typecheck first. Running it explicitly just gives you a faster feedback loop while developing.</p>
 
         <h3>3 &mdash; Or install from GitHub Packages</h3>
         <div class="code-block">
@@ -1413,6 +1415,7 @@
           </div>
           <pre><span class="cmd">npm install @danielmarbach/mnemonic-mcp@staging</span></pre>
         </div>
+        <p>Stable releases are published from tags like <code>v0.1.0</code>. Use an exact version when you want a fixed release instead of the latest staging build.</p>
       </div>
 
       <div class="qs-col fade-up">

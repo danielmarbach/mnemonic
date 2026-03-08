@@ -2,7 +2,7 @@
 
 A local MCP memory server backed by plain markdown + JSON files, synced via git. No database. Project-scoped memory with semantic search.
 
-If you want the higher-level system map, see [`ARCHITECTURE.md`](ARCHITECTURE.md).
+If you want the higher-level system map, see [`ARCHITECTURE.md`](ARCHITECTURE.md). For release notes and migration-facing changes, see [`CHANGELOG.md`](CHANGELOG.md).
 
 ## Why you might care
 
@@ -127,9 +127,12 @@ No code changes are required; set `EMBED_MODEL=qwen3-embedding:0.6b` in your env
 
 ```bash
 npm install
+npm run typecheck
 npm run build
 npm test
 ```
+
+`npm run build` already runs `typecheck`, but calling it explicitly first gives a faster failure loop when you're working on the codebase.
 
 For local dogfooding, start the built MCP server with:
 
