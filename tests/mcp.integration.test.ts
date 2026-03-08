@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { mkdtemp, readFile, rm, stat } from "fs/promises";
 import os from "os";
 import path from "path";
@@ -10,12 +10,17 @@ import { execFile } from "child_process";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const execFileAsync = promisify(execFile);
+const builtEntryPoint = path.join(repoRoot, "build", "index.js");
 
 const tempDirs: string[] = [];
 
 afterEach(async () => {
   await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })));
 });
+
+beforeAll(async () => {
+  await execFileAsync("npm", ["run", "build"], { cwd: repoRoot });
+}, 120000);
 
 describe("local MCP script", () => {
   it("supports global remember and forget with git disabled", async () => {
@@ -275,7 +280,7 @@ async function callLocalMcp(
   ];
 
   const stdout = await new Promise<string>((resolve, reject) => {
-    const child = spawn("./scripts/mcp-local.sh", {
+    const child = spawn("node", [builtEntryPoint], {
       cwd: repoRoot,
       env: {
         ...process.env,

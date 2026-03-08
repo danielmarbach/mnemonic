@@ -157,7 +157,7 @@ function inferLesson(primaryError, failedTests) {
   }
 
   if (lowered.includes("timed out")) {
-    return "This failure looks like a slow-but-valid integration path on CI. Increase the explicit test timeout or reduce process startup overhead so the test remains reliable on shared runners.";
+    return "Treat the timeout as a symptom, not the diagnosis. Check for repeated build/process startup inside the test, unnecessary git work, real network dependencies, or missing isolation before increasing the timeout.";
   }
 
   if (primaryTestFile) {

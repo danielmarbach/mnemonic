@@ -11,8 +11,11 @@ describe("VaultManager", () => {
   let tempDir: string;
   let mainVaultPath: string;
   let vaultManager: VaultManager;
+  let originalDisableGit: string | undefined;
 
   beforeEach(async () => {
+    originalDisableGit = process.env.DISABLE_GIT;
+    process.env.DISABLE_GIT = "true";
     tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "mnemonic-vault-test-"));
     mainVaultPath = path.join(tempDir, "main-vault");
     await fs.mkdir(mainVaultPath, { recursive: true });
@@ -23,6 +26,11 @@ describe("VaultManager", () => {
 
   afterEach(async () => {
     await fs.rm(tempDir, { recursive: true, force: true });
+    if (originalDisableGit === undefined) {
+      delete process.env.DISABLE_GIT;
+    } else {
+      process.env.DISABLE_GIT = originalDisableGit;
+    }
   });
 
   describe("Main Vault Initialization", () => {
@@ -56,12 +64,7 @@ describe("VaultManager", () => {
       const projectDir = path.join(tempDir, "project-a");
       await fs.mkdir(projectDir, { recursive: true });
       
-      // Initialize git repo
-      const git = simpleGit(projectDir);
-      await git.init();
-      await fs.writeFile(path.join(projectDir, "README.md"), "# Project A");
-      await git.add("*.md");
-      await git.commit("Initial commit");
+      await initGitRepo(projectDir, "# Project A");
       
       // Should not detect vault yet (no .mnemonic)
       const vaultBefore = await vaultManager.getProjectVaultIfExists(projectDir);
@@ -82,12 +85,7 @@ describe("VaultManager", () => {
       const projectDir = path.join(tempDir, "project-b");
       await fs.mkdir(projectDir, { recursive: true });
       
-      // Initialize git repo
-      const git = simpleGit(projectDir);
-      await git.init();
-      await fs.writeFile(path.join(projectDir, "README.md"), "# Project B");
-      await git.add("*.md");
-      await git.commit("Initial commit");
+      await initGitRepo(projectDir, "# Project B");
       
       // Vault doesn't exist yet
       const existsBefore = await vaultManager.getProjectVaultIfExists(projectDir);
@@ -123,11 +121,7 @@ describe("VaultManager", () => {
       const projectDir = path.join(tempDir, "project-c");
       await fs.mkdir(projectDir, { recursive: true });
       
-      const git = simpleGit(projectDir);
-      await git.init();
-      await fs.writeFile(path.join(projectDir, "README.md"), "# Project C");
-      await git.add("*.md");
-      await git.commit("Initial commit");
+      await initGitRepo(projectDir, "# Project C");
       
       const vault1 = await vaultManager.getOrCreateProjectVault(projectDir);
       const vault2 = await vaultManager.getOrCreateProjectVault(projectDir);
@@ -141,11 +135,7 @@ describe("VaultManager", () => {
       const projectDir = path.join(tempDir, "project-d");
       await fs.mkdir(projectDir, { recursive: true });
       
-      const git = simpleGit(projectDir);
-      await git.init();
-      await fs.writeFile(path.join(projectDir, "README.md"), "# Project D");
-      await git.add("*.md");
-      await git.commit("Initial commit");
+      await initGitRepo(projectDir, "# Project D");
       
       const projectVault = await vaultManager.getOrCreateProjectVault(projectDir);
       expect(projectVault).toBeTruthy();
@@ -172,11 +162,7 @@ describe("VaultManager", () => {
       const projectDir = path.join(tempDir, "project-e");
       await fs.mkdir(projectDir, { recursive: true });
       
-      const git = simpleGit(projectDir);
-      await git.init();
-      await fs.writeFile(path.join(projectDir, "README.md"), "# Project E");
-      await git.add("*.md");
-      await git.commit("Initial commit");
+      await initGitRepo(projectDir, "# Project E");
       
       // Create project vault but don't write note there
       await vaultManager.getOrCreateProjectVault(projectDir);
@@ -225,11 +211,7 @@ describe("VaultManager", () => {
       const projectDir = path.join(tempDir, "project-f");
       await fs.mkdir(projectDir, { recursive: true });
       
-      const git = simpleGit(projectDir);
-      await git.init();
-      await fs.writeFile(path.join(projectDir, "README.md"), "# Project F");
-      await git.add("*.md");
-      await git.commit("Initial commit");
+      await initGitRepo(projectDir, "# Project F");
       
       const projectVault = await vaultManager.getOrCreateProjectVault(projectDir);
       
@@ -267,11 +249,7 @@ describe("VaultManager", () => {
         const projectDir = path.join(tempDir, `project-${i}`);
         await fs.mkdir(projectDir, { recursive: true });
         
-        const git = simpleGit(projectDir);
-        await git.init();
-        await fs.writeFile(path.join(projectDir, "README.md"), `# Project ${i}`);
-        await git.add("*.md");
-        await git.commit("Initial commit");
+        await initGitRepo(projectDir, `# Project ${i}`);
         
         await vaultManager.getOrCreateProjectVault(projectDir);
       }
@@ -294,11 +272,7 @@ describe("VaultManager", () => {
       const projectDir = path.join(tempDir, "project-g");
       await fs.mkdir(projectDir, { recursive: true });
       
-      const git = simpleGit(projectDir);
-      await git.init();
-      await fs.writeFile(path.join(projectDir, "README.md"), "# Project G");
-      await git.add("*.md");
-      await git.commit("Initial commit");
+      await initGitRepo(projectDir, "# Project G");
       
       const projectVault = await vaultManager.getOrCreateProjectVault(projectDir);
       const relPath = vaultManager.noteRelPath(projectVault!, "test-note");
@@ -318,11 +292,7 @@ describe("VaultManager", () => {
       const projectDir = path.join(tempDir, "project-h");
       await fs.mkdir(projectDir, { recursive: true });
       
-      const git = simpleGit(projectDir);
-      await git.init();
-      await fs.writeFile(path.join(projectDir, "README.md"), "# Project H");
-      await git.add("*.md");
-      await git.commit("Initial commit");
+      await initGitRepo(projectDir, "# Project H");
       
       const projectVault = await vaultManager.getOrCreateProjectVault(projectDir);
       const order = await vaultManager.searchOrder(projectDir);
@@ -336,11 +306,7 @@ describe("VaultManager", () => {
       const projectDir = path.join(tempDir, "project-i");
       await fs.mkdir(projectDir, { recursive: true });
       
-      const git = simpleGit(projectDir);
-      await git.init();
-      await fs.writeFile(path.join(projectDir, "README.md"), "# Project I");
-      await git.add("*.md");
-      await git.commit("Initial commit");
+      await initGitRepo(projectDir, "# Project I");
       
       const projectVault = await vaultManager.getOrCreateProjectVault(projectDir);
       
@@ -353,3 +319,9 @@ describe("VaultManager", () => {
     });
   });
 });
+
+async function initGitRepo(projectDir: string, readmeContent: string): Promise<void> {
+  const git = simpleGit(projectDir);
+  await git.init();
+  await fs.writeFile(path.join(projectDir, "README.md"), readmeContent);
+}

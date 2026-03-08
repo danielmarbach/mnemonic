@@ -60,7 +60,8 @@ Error: Test timed out in 5000ms.
     expect(summary.failure_signature).toBe(
       "vitest|tests/mcp.integration.test.ts|error-test-timed-out-in-5000ms"
     );
-    expect(summary.lesson).toContain("Increase the explicit test timeout");
+    expect(summary.lesson).toContain("symptom, not the diagnosis");
+    expect(summary.lesson).toContain("repeated build/process startup");
   });
 
   it("renders a readable markdown artifact", () => {
