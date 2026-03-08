@@ -111,6 +111,7 @@ Human-readable summary.
 | `move` | `move: <title>` | "Moved from X-vault to Y-vault" | Summary, Note, Project |
 | `relate` | `relate: <title1> ↔ <title2>` | Context of relationship | Summary, Note, Project, Relationship |
 | `unrelate` | `unrelate: <id1> ↔ <id2>` | Context of removal | Summary, Note, Project |
+| `identity` | `identity: <project> use remote <remote>` | "Use X as canonical project identity" | Summary, Project |
 | `consolidate` | `consolidate(<mode>): <title>` | `mergePlan.summary` or "Consolidated N notes" | Summary, Note(s), Project, Mode |
 | `consolidate` (prune-superseded) | `prune: removed N superseded note(s)` | "Pruned N superseded notes" | Summary, Note(s) |
 | `policy` | `policy: <project> default scope <scope>` | "Set default scope to X" | Summary, Project |
@@ -132,7 +133,7 @@ Human-readable summary.
 git@github.com:acme/myapp.git → github-com-acme-myapp
 https://github.com/acme/myapp → github-com-acme-myapp
 ```
-Ensures consistency across machines. Fallback: git remote → git root folder → directory name.
+Ensures consistency across machines. Default remote is `origin`; for forks, `set_project_identity` can switch identity resolution to another remote such as `upstream`. Fallback: git remote → git root folder → directory name.
 
 ### Project-boosted recall
 When `recall` called with `cwd`, project notes get **+0.15 cosine similarity boost** (not hard filter). Keeps global memories accessible while prioritizing project context.
@@ -153,7 +154,7 @@ When `recall` called with `cwd`, project notes get **+0.15 cosine similarity boo
 - Main vault's own git repo excluded from detection (`isMainRepo()` guard)
 
 ### Main vault config
-Machine-local settings in `~/mnemonic-vault/config.json`. Survives sessions without becoming memory notes. Includes `reindexEmbedConcurrency`, per-project policy defaults.
+Machine-local settings in `~/mnemonic-vault/config.json`. Survives sessions without becoming memory notes. Includes `reindexEmbedConcurrency`, per-project policy defaults, and optional project-identity remote overrides for fork workflows.
 
 ### Bidirectional sync
 `sync` does: fetch → record HEAD → pull (rebase) → diff notes/ → push → embed arrivals. Single call, linear history. Syncs main vault; pass `cwd` for project vault too.
@@ -206,6 +207,7 @@ Keep these high-level anchors in mind:
 | `execute_migration` | Execute a named migration (supports dry-run) |
 | `forget` | Delete note + embedding, git commit + push, cleanup relationships |
 | `get` | Fetch one or more notes by exact id |
+| `get_project_identity` | Show effective project identity and remote override |
 | `get_project_memory_policy` | Show saved default write scope |
 | `list` | List notes filtered by scope/tags/storage |
 | `list_migrations` | List available migrations and pending count |
@@ -217,6 +219,7 @@ Keep these high-level anchors in mind:
 | `reindex` | Rebuild missing embeddings; `force=true` rebuilds all |
 | `remember` | Write note + embedding; `cwd` sets context, `scope` picks storage |
 | `relate` | Create typed relationship between notes (bidirectional) |
+| `set_project_identity` | Save which git remote defines project identity |
 | `set_project_memory_policy` | Save default write scope for project (`project`, `global`, `ask`) |
 | `sync` | Bidirectional git sync, pull, push, auto-embed pulled notes |
 | `unrelate` | Remove relationship between notes |

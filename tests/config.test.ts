@@ -21,6 +21,7 @@ describe("MnemonicConfigStore", () => {
       schemaVersion: "1.0",
       reindexEmbedConcurrency: 4,
       projectMemoryPolicies: {},
+      projectIdentityOverrides: {},
     });
   });
 
@@ -39,6 +40,7 @@ describe("MnemonicConfigStore", () => {
       schemaVersion: "1.0",
       reindexEmbedConcurrency: 16,
       projectMemoryPolicies: {},
+      projectIdentityOverrides: {},
     });
   });
 
@@ -57,6 +59,23 @@ describe("MnemonicConfigStore", () => {
       schemaVersion: "1.0",
       reindexEmbedConcurrency: 4,
       projectMemoryPolicies: {},
+      projectIdentityOverrides: {},
+    });
+  });
+
+  it("stores and loads project identity overrides", async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "mnemonic-config-"));
+    tempDirs.push(dir);
+
+    const store = new MnemonicConfigStore(dir);
+    await store.setProjectIdentityOverride("github-com-user-fork", {
+      remoteName: "upstream",
+      updatedAt: "2026-03-08T12:00:00.000Z",
+    });
+
+    await expect(store.getProjectIdentityOverride("github-com-user-fork")).resolves.toEqual({
+      remoteName: "upstream",
+      updatedAt: "2026-03-08T12:00:00.000Z",
     });
   });
 

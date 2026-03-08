@@ -4,13 +4,33 @@ import path from "path";
 
 const execFileAsync = promisify(execFile);
 
+export type ProjectSource = "git-remote" | "git-remote-override" | "git-folder" | "folder";
+
 export interface ProjectInfo {
   /** Stable identifier: normalized git remote URL or folder name */
   id: string;
   /** Human-readable name (last path segment of remote, or folder name) */
   name: string;
   /** How the project was detected */
-  source: "git-remote" | "git-folder" | "folder";
+  source: ProjectSource;
+  /** Which remote produced this identity when remote-based detection is used. */
+  remoteName?: string;
+}
+
+export interface ProjectIdentityOverride {
+  remoteName: string;
+  updatedAt: string;
+}
+
+export interface ProjectDetectionOptions {
+  getProjectIdentityOverride?: (projectId: string) => Promise<ProjectIdentityOverride | undefined>;
+}
+
+export interface ProjectIdentityResolution {
+  project: ProjectInfo;
+  defaultProject: ProjectInfo;
+  identityOverride?: ProjectIdentityOverride;
+  identityOverrideApplied: boolean;
 }
 
 /**
@@ -18,24 +38,69 @@ export interface ProjectInfo {
  * Uses the git remote URL when available so the same project is recognized
  * across machines regardless of local clone path.
  */
-export async function detectProject(cwd: string): Promise<ProjectInfo | null> {
+export async function detectProject(cwd: string, options: ProjectDetectionOptions = {}): Promise<ProjectInfo | null> {
+  const resolved = await resolveProjectIdentity(cwd, options);
+  return resolved?.project ?? null;
+}
+
+export async function resolveProjectIdentity(
+  cwd: string,
+  options: ProjectDetectionOptions = {},
+): Promise<ProjectIdentityResolution | null> {
+  if (!cwd) return null;
+
+  const defaultProject = await detectDefaultProject(cwd);
+  if (!defaultProject) return null;
+
+  if (defaultProject.source !== "git-remote") {
+    return {
+      project: defaultProject,
+      defaultProject,
+      identityOverrideApplied: false,
+    };
+  }
+
+  const identityOverride = await options.getProjectIdentityOverride?.(defaultProject.id);
+  if (!identityOverride) {
+    return {
+      project: defaultProject,
+      defaultProject,
+      identityOverrideApplied: false,
+    };
+  }
+
+  const overrideRemote = await getGitRemoteUrl(cwd, identityOverride.remoteName);
+  if (!overrideRemote) {
+    return {
+      project: defaultProject,
+      defaultProject,
+      identityOverride,
+      identityOverrideApplied: false,
+    };
+  }
+
+  return {
+    project: {
+      id: normalizeRemote(overrideRemote),
+      name: extractRepoName(overrideRemote),
+      source: "git-remote-override",
+      remoteName: identityOverride.remoteName,
+    },
+    defaultProject,
+    identityOverride,
+    identityOverrideApplied: true,
+  };
+}
+
+async function detectDefaultProject(cwd: string): Promise<ProjectInfo | null> {
   if (!cwd) return null;
 
   // Try git remote first
-  try {
-    const { stdout: remoteOut } = await execFileAsync(
-      "git",
-      ["remote", "get-url", "origin"],
-      { cwd }
-    );
-    const remote = remoteOut.trim();
-    if (remote) {
-      const id = normalizeRemote(remote);
-      const name = extractRepoName(remote);
-      return { id, name, source: "git-remote" };
-    }
-  } catch {
-    // not a git repo with a remote — fall through
+  const remote = await getGitRemoteUrl(cwd, "origin");
+  if (remote) {
+    const id = normalizeRemote(remote);
+    const name = extractRepoName(remote);
+    return { id, name, source: "git-remote", remoteName: "origin" };
   }
 
   // Try git root folder name (repo without remote)
@@ -61,6 +126,20 @@ export async function detectProject(cwd: string): Promise<ProjectInfo | null> {
   }
 
   return null;
+}
+
+async function getGitRemoteUrl(cwd: string, remoteName: string): Promise<string | null> {
+  try {
+    const { stdout: remoteOut } = await execFileAsync(
+      "git",
+      ["remote", "get-url", remoteName],
+      { cwd }
+    );
+    const remote = remoteOut.trim();
+    return remote || null;
+  } catch {
+    return null;
+  }
 }
 
 /**

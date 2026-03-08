@@ -25,7 +25,7 @@ import {
   type WriteScope,
 } from "./project-memory-policy.js";
 import { classifyTheme, summarizePreview, titleCaseTheme } from "./project-introspection.js";
-import { detectProject } from "./project.js";
+import { detectProject, resolveProjectIdentity, type ProjectIdentityResolution } from "./project.js";
 import { VaultManager, type Vault } from "./vault.js";
 import { Migrator } from "./migration.js";
 
@@ -207,7 +207,17 @@ const projectParam = z
 
 async function resolveProject(cwd?: string) {
   if (!cwd) return undefined;
-  return detectProject(cwd);
+  return detectProject(cwd, {
+    getProjectIdentityOverride: async (projectId) => configStore.getProjectIdentityOverride(projectId),
+  });
+}
+
+async function resolveProjectIdentityForCwd(cwd?: string): Promise<ProjectIdentityResolution | undefined> {
+  if (!cwd) return undefined;
+  const identity = await resolveProjectIdentity(cwd, {
+    getProjectIdentityOverride: async (projectId) => configStore.getProjectIdentityOverride(projectId),
+  });
+  return identity ?? undefined;
 }
 
 async function resolveWriteVault(cwd: string | undefined, scope: WriteScope): Promise<Vault> {
@@ -222,6 +232,28 @@ async function resolveWriteVault(cwd: string | undefined, scope: WriteScope): Pr
 
 function describeProject(project: Awaited<ReturnType<typeof resolveProject>>): string {
   return project ? `project '${project.name}' (${project.id})` : "global";
+}
+
+function formatProjectIdentityText(identity: ProjectIdentityResolution): string {
+  const lines = [
+    `Project identity:`,
+    `- **id:** \`${identity.project.id}\``,
+    `- **name:** ${identity.project.name}`,
+    `- **source:** ${identity.project.source}`,
+  ];
+
+  if (identity.project.remoteName) {
+    lines.push(`- **remote:** ${identity.project.remoteName}`);
+  }
+
+  if (identity.identityOverride) {
+    const defaultRemote = identity.defaultProject.remoteName ?? "none";
+    const status = identity.identityOverrideApplied ? "applied" : "configured, remote unavailable";
+    lines.push(`- **identity override:** ${identity.identityOverride.remoteName} (${status}; default remote: ${defaultRemote})`);
+    lines.push(`- **default id:** \`${identity.defaultProject.id}\``);
+  }
+
+  return lines.join("\n");
 }
 
 async function getProjectPolicyScope(cwd?: string): Promise<ProjectPolicyScope | undefined> {
@@ -601,8 +633,9 @@ server.registerTool(
     }),
   },
   async ({ cwd }) => {
-    const project = await detectProject(cwd);
-    if (!project) {
+    const identity = await resolveProjectIdentityForCwd(cwd);
+    const project = identity?.project;
+    if (!project || !identity) {
       return { content: [{ type: "text", text: `Could not detect a project for: ${cwd}` }] };
     }
     const policyLine = await formatProjectPolicyLine(project.id);
@@ -610,11 +643,104 @@ server.registerTool(
       content: [{
         type: "text",
         text:
-          `Project detected:\n` +
-          `- **id:** \`${project.id}\`\n` +
-          `- **name:** ${project.name}\n` +
-          `- **source:** ${project.source}\n` +
+          `${formatProjectIdentityText(identity)}\n` +
           `- **${policyLine}**`,
+      }],
+    };
+  }
+);
+
+// ── get_project_identity ───────────────────────────────────────────────────────
+server.registerTool(
+  "get_project_identity",
+  {
+    title: "Get Project Identity",
+    description:
+      "Show the effective project identity for a working directory, including any configured remote override.",
+    inputSchema: z.object({
+      cwd: z.string().describe("Absolute path to the project working directory"),
+    }),
+  },
+  async ({ cwd }) => {
+    const identity = await resolveProjectIdentityForCwd(cwd);
+    if (!identity) {
+      return { content: [{ type: "text", text: `Could not detect a project for: ${cwd}` }] };
+    }
+
+    return {
+      content: [{
+        type: "text",
+        text: formatProjectIdentityText(identity),
+      }],
+    };
+  }
+);
+
+// ── set_project_identity ───────────────────────────────────────────────────────
+server.registerTool(
+  "set_project_identity",
+  {
+    title: "Set Project Identity",
+    description:
+      "Override which git remote defines project identity for a repo. Useful for forks that should follow `upstream` instead of `origin`.",
+    inputSchema: z.object({
+      cwd: z.string().describe("Absolute path to the project working directory"),
+      remoteName: z.string().min(1).describe("Git remote name to use as the canonical project identity, such as `upstream`")
+    }),
+  },
+  async ({ cwd, remoteName }) => {
+    const defaultIdentity = await resolveProjectIdentity(cwd);
+    if (!defaultIdentity) {
+      return { content: [{ type: "text", text: `Could not detect a project for: ${cwd}` }] };
+    }
+
+    const defaultProject = defaultIdentity.project;
+    if (defaultProject.source !== "git-remote") {
+      return {
+        content: [{
+          type: "text",
+          text: `Project identity override requires a git remote. Current source: ${defaultProject.source}`,
+        }],
+      };
+    }
+
+    const now = new Date().toISOString();
+    const candidateIdentity = await resolveProjectIdentity(cwd, {
+      getProjectIdentityOverride: async () => ({ remoteName, updatedAt: now }),
+    });
+
+    if (!candidateIdentity || !candidateIdentity.identityOverrideApplied) {
+      return {
+        content: [{
+          type: "text",
+          text: `Could not resolve git remote '${remoteName}' for ${defaultProject.name}.`,
+        }],
+      };
+    }
+
+    await configStore.setProjectIdentityOverride(defaultProject.id, { remoteName, updatedAt: now });
+
+    const commitBody = formatCommitBody({
+      summary: `Use ${remoteName} as canonical project identity`,
+      projectName: defaultProject.name,
+      description:
+        `Default identity: ${defaultProject.id}\n` +
+        `Resolved identity: ${candidateIdentity.project.id}\n` +
+        `Remote: ${remoteName}`,
+    });
+    await vaultManager.main.git.commit(
+      `identity: ${defaultProject.name} use remote ${remoteName}`,
+      ["config.json"],
+      commitBody
+    );
+    await vaultManager.main.git.push();
+
+    return {
+      content: [{
+        type: "text",
+        text:
+          `Project identity override set for ${defaultProject.name}: ` +
+          `default=\`${defaultProject.id}\`, effective=\`${candidateIdentity.project.id}\`, remote=${remoteName}`,
       }],
     };
   }

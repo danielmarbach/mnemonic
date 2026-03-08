@@ -5,8 +5,11 @@ import path from "path";
 import { spawn } from "child_process";
 import http from "http";
 import { fileURLToPath } from "url";
+import { promisify } from "util";
+import { execFile } from "child_process";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const execFileAsync = promisify(execFile);
 
 const tempDirs: string[] = [];
 
@@ -42,13 +45,39 @@ describe("local MCP script", () => {
       await embeddingServer.close();
     }
   }, 15000);
+
+  it("supports overriding project identity to use upstream", async () => {
+    const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-vault-"));
+    const repoDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-project-"));
+    tempDirs.push(vaultDir, repoDir);
+
+    await execFileAsync("git", ["init"], { cwd: repoDir });
+    await execFileAsync("git", ["remote", "add", "origin", "git@github.com:user/myapp-fork.git"], { cwd: repoDir });
+    await execFileAsync("git", ["remote", "add", "upstream", "git@github.com:acme/myapp.git"], { cwd: repoDir });
+
+    const before = await callLocalMcp(vaultDir, "get_project_identity", { cwd: repoDir });
+    expect(before).toContain("`github-com-user-myapp-fork`");
+    expect(before).toContain("**remote:** origin");
+
+    const setResult = await callLocalMcp(vaultDir, "set_project_identity", {
+      cwd: repoDir,
+      remoteName: "upstream",
+    });
+    expect(setResult).toContain("default=`github-com-user-myapp-fork`");
+    expect(setResult).toContain("effective=`github-com-acme-myapp`");
+
+    const after = await callLocalMcp(vaultDir, "get_project_identity", { cwd: repoDir });
+    expect(after).toContain("`github-com-acme-myapp`");
+    expect(after).toContain("**remote:** upstream");
+    expect(after).toContain("**default id:** `github-com-user-myapp-fork`");
+  }, 15000);
 });
 
 async function callLocalMcp(
   vaultDir: string,
   toolName: string,
   arguments_: Record<string, unknown>,
-  ollamaUrl: string,
+   ollamaUrl?: string,
 ): Promise<string> {
   const messages = [
     {
@@ -79,7 +108,7 @@ async function callLocalMcp(
         ...process.env,
         DISABLE_GIT: "true",
         VAULT_PATH: vaultDir,
-        OLLAMA_URL: ollamaUrl,
+        ...(ollamaUrl ? { OLLAMA_URL: ollamaUrl } : {}),
       },
       stdio: ["pipe", "pipe", "pipe"],
     });

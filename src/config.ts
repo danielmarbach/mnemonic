@@ -2,11 +2,13 @@ import fs from "fs/promises";
 import path from "path";
 
 import type { ProjectMemoryPolicy } from "./project-memory-policy.js";
+import type { ProjectIdentityOverride } from "./project.js";
 
 export interface MnemonicConfig {
   schemaVersion: string;
   reindexEmbedConcurrency: number;
   projectMemoryPolicies: Record<string, ProjectMemoryPolicy>;
+  projectIdentityOverrides: Record<string, ProjectIdentityOverride>;
 }
 
 const defaultConfig: MnemonicConfig = {
@@ -16,6 +18,7 @@ const defaultConfig: MnemonicConfig = {
   schemaVersion: "1.0",
   reindexEmbedConcurrency: 4,
   projectMemoryPolicies: {},
+  projectIdentityOverrides: {},
 };
 
 function normalizeSchemaVersion(value: unknown): string {
@@ -33,6 +36,32 @@ function normalizeConcurrency(value: unknown): number {
   }
 
   return Math.min(16, Math.max(1, Math.floor(value)));
+}
+
+function normalizeProjectIdentityOverrides(value: unknown): Record<string, ProjectIdentityOverride> {
+  if (!value || typeof value !== "object") {
+    return {};
+  }
+
+  const normalized: Record<string, ProjectIdentityOverride> = {};
+  for (const [projectId, override] of Object.entries(value)) {
+    if (!override || typeof override !== "object") {
+      continue;
+    }
+
+    const remoteName = (override as { remoteName?: unknown }).remoteName;
+    if (typeof remoteName !== "string" || remoteName.trim().length === 0) {
+      continue;
+    }
+
+    const updatedAt = (override as { updatedAt?: unknown }).updatedAt;
+    normalized[projectId] = {
+      remoteName: remoteName.trim(),
+      updatedAt: typeof updatedAt === "string" ? updatedAt : "",
+    };
+  }
+
+  return normalized;
 }
 
 /**
@@ -84,9 +113,20 @@ export class MnemonicConfigStore {
     return config.projectMemoryPolicies[projectId];
   }
 
+  async getProjectIdentityOverride(projectId: string): Promise<ProjectIdentityOverride | undefined> {
+    const config = await this.readAll();
+    return config.projectIdentityOverrides[projectId];
+  }
+
   async setProjectPolicy(policy: ProjectMemoryPolicy): Promise<void> {
     const config = await this.readAll();
     config.projectMemoryPolicies[policy.projectId] = policy;
+    await this.writeAll(config);
+  }
+
+  async setProjectIdentityOverride(projectId: string, override: ProjectIdentityOverride): Promise<void> {
+    const config = await this.readAll();
+    config.projectIdentityOverrides[projectId] = override;
     await this.writeAll(config);
   }
 
@@ -104,6 +144,7 @@ export class MnemonicConfigStore {
         schemaVersion: normalizeSchemaVersion(parsed.schemaVersion),
         reindexEmbedConcurrency: normalizeConcurrency(parsed.reindexEmbedConcurrency),
         projectMemoryPolicies: parsed.projectMemoryPolicies ?? {},
+        projectIdentityOverrides: normalizeProjectIdentityOverrides(parsed.projectIdentityOverrides),
       };
     } catch {
       return { ...defaultConfig };

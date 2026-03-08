@@ -5,7 +5,7 @@ import path from "path";
 import { promisify } from "util";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { detectProject } from "../src/project.js";
+import { detectProject, resolveProjectIdentity } from "../src/project.js";
 
 const execFileAsync = promisify(execFile);
 const tempDirs: string[] = [];
@@ -30,6 +30,7 @@ describe("detectProject", () => {
       id: "github-com-acme-myapp",
       name: "myapp",
       source: "git-remote",
+      remoteName: "origin",
     });
   });
 
@@ -55,6 +56,52 @@ describe("detectProject", () => {
       id: "plain-folder",
       name: "Plain Folder",
       source: "folder",
+    });
+  });
+
+  it("can use a configured remote override for forked repos", async () => {
+    const dir = await makeTempDir("mnemonic-project-fork-");
+    await execFileAsync("git", ["init"], { cwd: dir });
+    await execFileAsync("git", ["remote", "add", "origin", "git@github.com:user/myapp-fork.git"], { cwd: dir });
+    await execFileAsync("git", ["remote", "add", "upstream", "git@github.com:acme/myapp.git"], { cwd: dir });
+
+    const resolved = await resolveProjectIdentity(dir, {
+      getProjectIdentityOverride: async () => ({
+        remoteName: "upstream",
+        updatedAt: "2026-03-08T12:00:00.000Z",
+      }),
+    });
+
+    expect(resolved).toEqual({
+      project: {
+        id: "github-com-acme-myapp",
+        name: "myapp",
+        source: "git-remote-override",
+        remoteName: "upstream",
+      },
+      defaultProject: {
+        id: "github-com-user-myapp-fork",
+        name: "myapp-fork",
+        source: "git-remote",
+        remoteName: "origin",
+      },
+      identityOverride: {
+        remoteName: "upstream",
+        updatedAt: "2026-03-08T12:00:00.000Z",
+      },
+      identityOverrideApplied: true,
+    });
+
+    await expect(detectProject(dir, {
+      getProjectIdentityOverride: async () => ({
+        remoteName: "upstream",
+        updatedAt: "2026-03-08T12:00:00.000Z",
+      }),
+    })).resolves.toEqual({
+      id: "github-com-acme-myapp",
+      name: "myapp",
+      source: "git-remote-override",
+      remoteName: "upstream",
     });
   });
 });

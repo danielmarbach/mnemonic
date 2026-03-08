@@ -83,7 +83,7 @@ Notes are plain markdown with YAML frontmatter — readable, diffable, mergeable
 Memory content is markdown-linted on `remember`/`update`: fixable issues are auto-corrected before save, and non-fixable issues are rejected.
 Embeddings stay local (gitignored) and are rebuilt on each machine with `reindex`.
 
-Each vault has its own `config.json` with a `schemaVersion`, so main and project vaults can migrate independently. The main vault config in `~/mnemonic-vault/config.json` also holds machine-local runtime tuning and per-project memory policies. Today it includes `reindexEmbedConcurrency`, which defaults to `4` and is clamped to the range `1..16`.
+Each vault has its own `config.json` with a `schemaVersion`, so main and project vaults can migrate independently. The main vault config in `~/mnemonic-vault/config.json` also holds machine-local runtime tuning, per-project memory policies, and optional project-identity remote overrides for fork workflows. Today it includes `reindexEmbedConcurrency`, which defaults to `4` and is clamped to the range `1..16`.
 
 ## Migration behavior
 
@@ -98,6 +98,8 @@ If you maintain mnemonic itself and add a new latest-schema migration, bump `def
 ## Project scoping
 
 Project identity is derived from the **git remote URL** of the working directory, normalized to a stable slug (e.g. `github-com-acme-myapp`). This means the same project is recognized consistently across machines, regardless of local clone paths.
+
+By default mnemonic uses the `origin` remote. If you are working in a fork and want mnemonic to follow the upstream project identity instead, use `set_project_identity` with `remoteName: "upstream"`. `get_project_identity` shows the effective identity and whether an override is active.
 
 If no remote is configured, the git root folder name is used. If not in a git repo at all, the directory name is used.
 
@@ -267,10 +269,11 @@ For local development against this repository's current source tree, use `npm ru
 | Tool             | Description                                                                     |
 |------------------|---------------------------------------------------------------------------------|
 | `consolidate`    | Analyze and consolidate memories — detect duplicates, suggest merges, execute with `supersedes` (default) or `delete` mode |
-| `detect_project` | Identify the project for a given `cwd` (git remote → slug)                     |
+| `detect_project` | Identify the project for a given `cwd` (`origin` by default, overrideable)     |
 | `execute_migration` | Execute a named migration on vault notes (supports dry-run)                 |
 | `forget`         | Delete a memory by id; cleans up dangling relationships automatically           |
 | `get`            | Fetch one or more memories by exact id                                          |
+| `get_project_identity` | Show the effective project identity and any remote override            |
 | `get_project_memory_policy` | Show the saved default write scope for a project                    |
 | `list`           | List memories — filter by project scope/tags and optionally include previews, relations, storage, and timestamps |
 | `list_migrations` | List available migrations and show which ones are pending                   |
@@ -282,6 +285,7 @@ For local development against this repository's current source tree, use `npm ru
 | `reindex`        | Manually rebuild missing embeddings (sync does this automatically)              |
 | `relate`         | Create a typed relationship between two memories (bidirectional by default)     |
 | `remember`       | Store a memory with project context from `cwd` and storage controlled by `scope` |
+| `set_project_identity` | Override which git remote defines project identity for a repo       |
 | `set_project_memory_policy` | Set the default write scope and consolidation mode for a project |
 | `sync`           | Bidirectional sync — pulls remote, pushes local commits, auto-embeds new notes  |
 | `unrelate`       | Remove a relationship between two memories                                      |
@@ -336,13 +340,14 @@ If the project policy is `ask`, `remember` returns a clear choice instead of gue
 To see what mnemonic currently knows about a project without stitching together multiple calls:
 
 - `project_memory_summary` — compact overview of project memories, grouped by theme, with current write policy and recent changes
+- `get_project_identity` — show the effective project id and any fork/upstream remote override
 - `recent_memories` — latest updated memories for the selected scope
 - `memory_graph` — compact relationship view for visible memories
 - `list` with `includePreview`, `includeRelations`, `includeStorage`, `includeUpdated`, and `storedIn` for richer inspection in one call
 - `where_is_memory` — answer "which project does this belong to?" and "where is it actually stored?"
 - `move_memory` — explicitly move a memory between the project vault and the main vault when the storage choice changes
 
-`detect_project` also includes the current per-project write policy when one exists.
+`detect_project` also includes the current per-project write policy and any active project-identity override when one exists.
 
 ## Multi-machine workflow
 

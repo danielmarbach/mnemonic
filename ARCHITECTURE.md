@@ -26,7 +26,8 @@
 
 ### Project identity
 
-- Project identity comes from the git remote URL when available.
+- Project identity comes from the `origin` git remote URL when available.
+- Forked repos can opt into a different canonical remote such as `upstream` via a saved identity override.
 - This produces a stable slug that survives different local clone paths across machines.
 - If no remote exists, mnemonic falls back to the git root folder, then finally the directory name.
 
@@ -161,6 +162,7 @@ Main-vault `config.json` stores machine-local operational settings rather than m
 - `schemaVersion`: current vault schema.
 - `reindexEmbedConcurrency`: bounded concurrency for rebuilding embeddings.
 - `projectMemoryPolicies`: saved per-project defaults for write scope and consolidation mode.
+- `projectIdentityOverrides`: saved per-project remote overrides for fork-aware project identity resolution.
 
 ## Important architectural rules
 
