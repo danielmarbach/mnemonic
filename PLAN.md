@@ -61,7 +61,7 @@ Idea: add runtime support for loading and unloading active project context so mn
 
 ## CI failure learning capture
 
-**Status: Ready to execute**
+**Status: Implemented**
 
 Goal: capture useful CI failure learnings without letting CI write noisy or conflicting memory notes automatically.
 
@@ -71,6 +71,21 @@ Goal: capture useful CI failure learnings without letting CI write noisy or conf
 - Add manual promotion into mnemonic via `workflow_dispatch`
 - Do not use a fixed note; create one note per promoted incident or failure pattern
 - Do not require a real Ollama daemon in CI for v1
+
+### Implemented scope
+
+- `.github/workflows/ci.yml` now captures test output, summarizes failed runs deterministically, and uploads a `ci-learning` artifact
+- `scripts/ci/collect-test-failure.mjs` emits both `ci-failure-raw.json` and `ci-learning.md`
+- `.github/workflows/promote-ci-learning.yml` supports manual `workflow_dispatch` promotion from a selected run id
+- `scripts/ci/promote-learning.mjs` promotes artifacts through the real MCP entrypoint using a fake local embeddings endpoint instead of requiring live Ollama in CI
+- `AGENT.md` documents the artifact-first/manual-promotion workflow
+- The MCP integration smoke test now uses an explicit 15s timeout to stay reliable on shared CI runners
+
+### Outcome
+
+- CI failure learnings are captured without automatic noisy repo writes
+- Promotion into mnemonic stays intentional and reviewable
+- The implementation remains CI-safe and does not require a real Ollama daemon
 
 ### Phase 1 — artifact-only failure capture
 
@@ -131,9 +146,9 @@ Goal: capture useful CI failure learnings without letting CI write noisy or conf
 
 ### Implementation checklist
 
-- [ ] Create deterministic CI failure summarizer
-- [ ] Capture test output in CI and upload failure artifacts
-- [ ] Add manual promotion workflow with `workflow_dispatch`
-- [ ] Promote artifacts through MCP with repo context
-- [ ] Document the workflow and rationale in `AGENT.md`
-- [ ] Validate local and GitHub Actions paths end-to-end
+- [x] Create deterministic CI failure summarizer
+- [x] Capture test output in CI and upload failure artifacts
+- [x] Add manual promotion workflow with `workflow_dispatch`
+- [x] Promote artifacts through MCP with repo context
+- [x] Document the workflow and rationale in `AGENT.md`
+- [x] Validate local and GitHub Actions paths end-to-end

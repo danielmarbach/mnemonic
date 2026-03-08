@@ -348,17 +348,12 @@ npm test -- <file>          # specific test file
 npm test -- --reporter=verbose  # detailed output
 ```
 
-**Integration test environment**:
-- `tests/mcp.integration.test.ts` must stay CI-safe: it runs the real `scripts/mcp-local.sh` entrypoint with `DISABLE_GIT=true`
-- Do not require a real Ollama daemon in CI for that test; it injects a fake local embeddings endpoint via `OLLAMA_URL`
-- Keep the test isolated to a temp `VAULT_PATH` so it never mutates the developer's real vault or repository state
-- If you add more MCP integration tests, prefer the same pattern unless you explicitly need end-to-end Ollama verification
-
-**CI failure learning workflow**:
-- CI failure learnings are artifact-first: a failing run should produce a normalized artifact before anything is promoted into memory
+**CI-safe MCP testing and learning**:
+- `tests/mcp.integration.test.ts` should remain CI-safe: use the real `scripts/mcp-local.sh` entrypoint, `DISABLE_GIT=true`, a temp `VAULT_PATH`, and a fake local `OLLAMA_URL` endpoint
+- If you add more MCP integration tests, prefer the same hermetic pattern unless you explicitly need end-to-end Ollama verification
+- CI failure learnings are artifact-first: a failing run should produce normalized artifacts before anything is promoted into memory
 - Promotion into mnemonic is manual via `workflow_dispatch`, not automatic on every failed run
-- Avoid fixed notes for CI learnings; prefer one note per promoted incident or failure pattern
-- Promoted CI learnings should include a stable `failure_signature` so repeated issues can be recognized later
+- Avoid fixed notes for CI learnings; prefer one note per promoted incident or failure pattern with a stable `failure_signature`
 - Do not make CI failure learning depend on a real Ollama daemon unless semantic clustering becomes a proven need
 
 **Coverage expectations**:
