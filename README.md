@@ -22,6 +22,12 @@ If you want the higher-level system map, see [`ARCHITECTURE.md`](ARCHITECTURE.md
 - ⚙️ Generated embeddings are separate from source memories, so the repo only tracks the human-meaningful content.
 - 🧩 The storage model is boring on purpose: one note per file, easy scripting, easy backup, easy migration.
 
+## Early stage — storage format may change
+
+mnemonic is at the inception stage. The storage format (note frontmatter schema, vault layout, config structure) is still stabilizing and **may change in breaking ways** between releases. Migrations are provided when possible, but you should treat your vault as something you can afford to rebuild or re-migrate during this period.
+
+If you adopt it now, keep an eye on the changelog and run `list_migrations` after each update.
+
 ## Important caveat
 
 This is optimized for simplicity, portability, and personal or small-team memory - not for huge-scale knowledge bases.
