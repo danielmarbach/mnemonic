@@ -9,9 +9,12 @@ tags:
   - documentation
   - workflow
 createdAt: '2026-03-08T09:52:09.787Z'
-updatedAt: '2026-03-08T09:52:09.787Z'
+updatedAt: '2026-03-08T09:52:21.423Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: documentation-split-for-readme-architecture-and-agent-4e20a50b
+    type: related-to
 memoryVersion: 1
 ---
 Added three missing workflow patterns to the agent instructions in `AGENT.md`, `README.md`, and `docs/index.html`.

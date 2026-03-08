@@ -6,9 +6,12 @@ tags:
   - agent
   - decision
 createdAt: '2026-03-08T09:22:05.553Z'
-updatedAt: '2026-03-08T09:22:05.553Z'
+updatedAt: '2026-03-08T09:52:21.423Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: agent-instruction-improvements-session-start-recall-first-an-ecd402c3
+    type: related-to
 memoryVersion: 1
 ---
 Established the documentation split for mnemonic.
