@@ -1384,6 +1384,15 @@
           </div>
           <pre><span class="cmd">ollama pull nomic-embed-text-v2-moe</span></pre>
         </div>
+        <p><code>qwen3-embedding:0.6b</code> is also a viable alternative for longer-context notes:</p>
+        <div class="code-block">
+          <div class="code-block-header">
+            <span class="code-label">bash</span>
+            <button class="copy-btn" onclick="copyCode(this)">copy</button>
+          </div>
+          <pre><span class="cmd">ollama pull qwen3-embedding:0.6b</span></pre>
+        </div>
+        <p>No code changes are required; set <code>EMBED_MODEL=qwen3-embedding:0.6b</code>.</p>
 
         <h3>2 &mdash; Install &amp; build</h3>
         <div class="code-block">
@@ -1480,6 +1489,7 @@
         </tbody>
       </table>
     </div>
+    <p>The runtime is compatible with other Ollama embedding models that support <code>/api/embed</code>. For example, <code>qwen3-embedding:0.6b</code> works as a drop-in <code>EMBED_MODEL</code> override and may be preferable for longer-context notes.</p>
 
     <div class="agent-snippet fade-up">
       <h3>Add to your AGENT.md or system prompt</h3>

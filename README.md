@@ -113,6 +113,12 @@ When `recall` is called with a `cwd`, it searches both the project vault and the
 ollama pull nomic-embed-text-v2-moe
 ```
 
+`qwen3-embedding:0.6b` is also a viable alternative if you want a larger context window for longer notes:
+```bash
+ollama pull qwen3-embedding:0.6b
+```
+No code changes are required; set `EMBED_MODEL=qwen3-embedding:0.6b` in your environment or MCP config.
+
 ## Setup
 
 ### Native (Node.js 18+)
@@ -228,6 +234,8 @@ If you prefer a fixed installed version, point your MCP client at the local bina
 | `OLLAMA_URL`  | `http://localhost:11434` | Ollama server URL                  |
 | `EMBED_MODEL` | `nomic-embed-text-v2-moe` | Ollama embedding model            |
 | `DISABLE_GIT` | `false`                  | Set `true` to skip all git ops     |
+
+The runtime is compatible with other Ollama embedding models that support `/api/embed`. For example, `qwen3-embedding:0.6b` works as a drop-in `EMBED_MODEL` override and may be preferable for longer-context notes.
 
 ## Claude Desktop / Cursor config
 
