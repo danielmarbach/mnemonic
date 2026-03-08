@@ -998,21 +998,25 @@
         <div class="terminal-dot red"></div>
         <div class="terminal-dot yellow"></div>
         <div class="terminal-dot green"></div>
-        <div class="terminal-title">mcp &mdash; mnemonic</div>
+        <div class="terminal-title">claude code &mdash; mnemonic project</div>
       </div>
       <div class="terminal-body">
-        <span class="t-line"><span class="t-prompt">&#x276f;</span> <span class="t-cmt"># From mnemonic's own decision log</span></span>
+        <span class="t-line"><span class="t-prompt">&#x276f;</span> <span class="t-cmt"># New session. Claude surfaces context before you type a word.</span></span>
         <span class="t-line">&nbsp;</span>
-        <span class="t-line"><span class="t-prompt">&#x276f;</span> <span class="t-cmd">recall "why project recall uses a boost instead of a hard filter"</span></span>
+        <span class="t-line"><span class="t-prompt">&#x276f;</span> <span class="t-cmd">recall "project architecture and key decisions"</span></span>
         <span class="t-line">&nbsp;</span>
-        <span class="t-line"><span class="t-ok">&#x2713;</span> <span class="t-key">mnemonic-key-design-decisions-3f2a6273</span></span>
-        <span class="t-line">  <span class="t-cmt">Similarity boost, not hard filter: recall gives project notes</span></span>
-        <span class="t-line">  <span class="t-cmt">+0.15 cosine similarity boost rather than excluding global notes.</span></span>
-        <span class="t-line">  <span class="t-cmt">Global memories (user prefs, cross-project patterns) remain</span></span>
-        <span class="t-line">  <span class="t-cmt">accessible in project context.</span></span>
+        <span class="t-line"><span class="t-ok">&#x2713;</span> <span class="t-key">mnemonic-project-overview-and-purpose</span> &nbsp; <span class="t-val">score: 0.96</span></span>
+        <span class="t-line">  <span class="t-cmt">MCP memory server backed by plain markdown + JSON, synced via git.</span></span>
+        <span class="t-line">  <span class="t-cmt">No database, no permanent services. Notes are .md files with YAML</span></span>
+        <span class="t-line">  <span class="t-cmt">frontmatter; embeddings via Ollama, gitignored and recomputed</span></span>
+        <span class="t-line">  <span class="t-cmt">locally. Server spawns on demand over stdio — nothing runs in background.</span></span>
+        <span class="t-line">  <span class="t-val">tags:</span> architecture, mcp, overview</span>
         <span class="t-line">&nbsp;</span>
-        <span class="t-line">  <span class="t-val">project:</span> mnemonic &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <span class="t-val">score:</span> 0.91</span>
-        <span class="t-line">  <span class="t-val">stored:</span>  project-vault (.mnemonic/) &nbsp; <span class="t-val">tags:</span>  design, decisions, architecture</span>
+        <span class="t-line"><span class="t-ok">&#x2713;</span> <span class="t-key">mnemonic-key-design-decisions</span> &nbsp; <span class="t-val">score: 0.88</span></span>
+        <span class="t-line">  <span class="t-cmt">One file per note for git conflict isolation. Embeddings gitignored</span></span>
+        <span class="t-line">  <span class="t-cmt">because float arrays can't be merged. Project ID derived from git</span></span>
+        <span class="t-line">  <span class="t-cmt">remote URL, not local path — stays stable across machines.</span></span>
+        <span class="t-line">  <span class="t-val">tags:</span> design, decisions, architecture</span>
       </div>
     </div>
   </div>
