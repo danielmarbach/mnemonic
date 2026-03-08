@@ -66,6 +66,7 @@ Use `consolidate` strategy `supersedes` to preserve source history (sources rema
   - Tools table in the **Tools** section must reflect the current tool inventory (same as README.md and AGENT.md)
   - The **Dogfooding** section shows real notes from `.mnemonic/notes/` — refresh card content if those notes are updated or replaced
   - Configuration table (`VAULT_PATH`, `OLLAMA_URL`, `EMBED_MODEL`, `DISABLE_GIT`) must match env vars in code and README.md
+  - The setup snippets and the `AGENT.md` / system prompt snippet must stay in sync with the copy-paste versions in `README.md`
   - The hero terminal shows a real `recall` result — update if the note it references changes significantly
 
 **Troubleshooting:** Complex JSON payloads may fail via stdio due to shell escaping. Write to temp file first:

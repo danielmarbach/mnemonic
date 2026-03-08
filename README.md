@@ -233,7 +233,8 @@ If you prefer a fixed installed version, point your MCP client at the local bina
 {
   "mcpServers": {
     "mnemonic": {
-      "command": "/path/to/mnemonic/scripts/mcp-local.sh",
+      "command": "npx",
+      "args": ["@danielmarbach/mnemonic-mcp@staging"],
       "env": {
         "VAULT_PATH": "/Users/you/mnemonic-vault"
       }
@@ -241,6 +242,8 @@ If you prefer a fixed installed version, point your MCP client at the local bina
   }
 }
 ```
+
+For local development against this repository's current source tree, use `npm run mcp:local` or point your MCP client at `scripts/mcp-local.sh` instead.
 
 **Docker:**
 ```json
