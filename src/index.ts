@@ -45,6 +45,10 @@ import type {
   ProjectSummaryResult,
   SyncResult as StructuredSyncResult,
   ReindexResult as StructuredReindexResult,
+  PolicyResult,
+  ProjectIdentityResult,
+  MigrationListResult,
+  MigrationExecuteResult,
 } from "./structured-content.js";
 
 // ── CLI Migration Command ─────────────────────────────────────────────────────
@@ -657,6 +661,23 @@ server.registerTool(
       return { content: [{ type: "text", text: `Could not detect a project for: ${cwd}` }] };
     }
     const policyLine = await formatProjectPolicyLine(project.id);
+    
+    const structuredContent: ProjectIdentityResult = {
+      action: "project_identity_detected",
+      project: {
+        id: project.id,
+        name: project.name,
+        source: project.source,
+        remoteName: project.remoteName,
+      },
+      defaultProject: identity.defaultProject ? {
+        id: identity.defaultProject.id,
+        name: identity.defaultProject.name,
+        remoteName: identity.defaultProject.remoteName,
+      } : undefined,
+      identityOverride: identity.identityOverride,
+    };
+    
     return {
       content: [{
         type: "text",
@@ -664,6 +685,7 @@ server.registerTool(
           `${formatProjectIdentityText(identity)}\n` +
           `- **${policyLine}**`,
       }],
+      structuredContent,
     };
   }
 );
@@ -685,11 +707,28 @@ server.registerTool(
       return { content: [{ type: "text", text: `Could not detect a project for: ${cwd}` }] };
     }
 
+    const structuredContent: ProjectIdentityResult = {
+      action: "project_identity_shown",
+      project: {
+        id: identity.project.id,
+        name: identity.project.name,
+        source: identity.project.source,
+        remoteName: identity.project.remoteName,
+      },
+      defaultProject: identity.defaultProject ? {
+        id: identity.defaultProject.id,
+        name: identity.defaultProject.name,
+        remoteName: identity.defaultProject.remoteName,
+      } : undefined,
+      identityOverride: identity.identityOverride,
+    };
+
     return {
       content: [{
         type: "text",
         text: formatProjectIdentityText(identity),
       }],
+      structuredContent,
     };
   }
 );
@@ -753,6 +792,25 @@ server.registerTool(
     );
     await vaultManager.main.git.push();
 
+    const structuredContent: ProjectIdentityResult = {
+      action: "project_identity_set",
+      project: {
+        id: candidateIdentity.project.id,
+        name: candidateIdentity.project.name,
+        source: candidateIdentity.project.source,
+        remoteName: candidateIdentity.project.remoteName,
+      },
+      defaultProject: {
+        id: defaultProject.id,
+        name: defaultProject.name,
+        remoteName: defaultProject.remoteName,
+      },
+      identityOverride: {
+        remoteName,
+        updatedAt: now,
+      },
+    };
+
     return {
       content: [{
         type: "text",
@@ -760,6 +818,7 @@ server.registerTool(
           `Project identity override set for ${defaultProject.name}: ` +
           `default=\`${defaultProject.id}\`, effective=\`${candidateIdentity.project.id}\`, remote=${remoteName}`,
       }],
+      structuredContent,
     };
   }
 );
@@ -778,12 +837,19 @@ server.registerTool(
 
     lines.push("Vault schema versions:");
     let totalPending = 0;
+    const vaultsInfo: MigrationListResult["vaults"] = [];
     for (const vault of vaultManager.allKnownVaults()) {
       const version = await readVaultSchemaVersion(vault.storage.vaultPath);
       const pending = await migrator.getPendingMigrations(version);
       totalPending += pending.length;
       const label = vault.isProject ? "project" : "main";
       lines.push(`  ${label} (${vault.storage.vaultPath}): ${version} — ${pending.length} pending`);
+      vaultsInfo.push({
+        path: vault.storage.vaultPath,
+        type: vault.isProject ? "project" : "main",
+        version,
+        pending: pending.length,
+      });
     }
 
     lines.push("");
@@ -798,7 +864,14 @@ server.registerTool(
       lines.push("Run migration with: mnemonic migrate (CLI) or execute_migration (MCP)");
     }
 
-    return { content: [{ type: "text", text: lines.join("\n") }] };
+    const structuredContent: MigrationListResult = {
+      action: "migration_list",
+      vaults: vaultsInfo,
+      available: available.map(m => ({ name: m.name, description: m.description })),
+      totalPending,
+    };
+
+    return { content: [{ type: "text", text: lines.join("\n") }], structuredContent };
   }
 );
 
@@ -829,20 +902,34 @@ server.registerTool(
       lines.push(`Vaults processed: ${vaultsProcessed}`);
       lines.push("")
       
+      const vaultResults: Array<{ path: string; notesProcessed: number; notesModified: number; errors: Array<{ noteId: string; error: string }>; warnings: string[] }> = [];
       for (const [vaultPath, result] of results) {
         lines.push(`Vault: ${vaultPath}`);
         lines.push(`  Notes processed: ${result.notesProcessed}`);
         lines.push(`  Notes modified: ${result.notesModified}`);
         
+        const vaultResultErrors: Array<{ noteId: string; error: string }> = [];
+        const vaultResultWarnings: string[] = [];
+        
         if (result.errors.length > 0) {
           lines.push(`  Errors: ${result.errors.length}`);
           result.errors.forEach(e => lines.push(`    - ${e.noteId}: ${e.error}`));
+          vaultResultErrors.push(...result.errors.map(e => ({ noteId: e.noteId, error: e.error })));
         }
         
         if (result.warnings.length > 0) {
           lines.push(`  Warnings: ${result.warnings.length}`);
           result.warnings.forEach(w => lines.push(`    - ${w}`));
+          vaultResultWarnings.push(...result.warnings);
         }
+        
+        vaultResults.push({
+          path: vaultPath,
+          notesProcessed: result.notesProcessed,
+          notesModified: result.notesModified,
+          errors: vaultResultErrors,
+          warnings: vaultResultWarnings,
+        });
         lines.push("");
       }
       
@@ -852,7 +939,15 @@ server.registerTool(
         lines.push("✓ Dry-run completed - no changes made");
       }
       
-      return { content: [{ type: "text", text: lines.join("\n") }] };
+      const structuredContent: MigrationExecuteResult = {
+        action: "migration_executed",
+        migration: migrationName,
+        dryRun,
+        vaultsProcessed,
+        vaultResults,
+      };
+      
+      return { content: [{ type: "text", text: lines.join("\n") }], structuredContent };
     } catch (err) {
       return {
         content: [{
@@ -998,11 +1093,20 @@ server.registerTool(
     );
     await vaultManager.main.git.push();
 
+    const structuredContent: PolicyResult = {
+      action: "policy_set",
+      project: { id: project.id, name: project.name },
+      defaultScope,
+      consolidationMode,
+      timestamp: now,
+    };
+
     return {
       content: [{
         type: "text",
         text: `Project memory policy set for ${project.name}: defaultScope=${defaultScope}${modeStr}`,
       }],
+      structuredContent,
     };
   }
 );
@@ -1025,19 +1129,33 @@ server.registerTool(
 
     const policy = await configStore.getProjectPolicy(project.id);
     if (!policy) {
+      const structuredContent: PolicyResult = {
+        action: "policy_shown",
+        project: { id: project.id, name: project.name },
+      };
       return {
         content: [{
           type: "text",
           text: `No project memory policy set for ${project.name}. Default write behavior remains scope=project when cwd is present.`,
         }],
+        structuredContent,
       };
     }
+
+    const structuredContent: PolicyResult = {
+      action: "policy_shown",
+      project: { id: project.id, name: project.name },
+      defaultScope: policy.defaultScope,
+      consolidationMode: policy.consolidationMode,
+      updatedAt: policy.updatedAt,
+    };
 
     return {
       content: [{
         type: "text",
         text: `Project memory policy for ${project.name}: defaultScope=${policy.defaultScope} (updated ${policy.updatedAt})`,
       }],
+      structuredContent,
     };
   }
 );
@@ -1560,6 +1678,7 @@ server.registerTool(
       sections.push(`- private project memories: ${mainVaultProjectEntries.length}`);
     }
 
+    const themes: Array<{ name: string; count: number; examples: string[] }> = [];
     for (const theme of themeOrder) {
       const bucket = themed.get(theme);
       if (!bucket || bucket.length === 0) {
@@ -1568,6 +1687,12 @@ server.registerTool(
       const top = bucket.slice(0, maxPerTheme);
       sections.push(`\n${titleCaseTheme(theme)}:`);
       sections.push(...top.map((entry) => `- ${entry.note.title} (\`${entry.note.id}\`)`));
+      
+      themes.push({
+        name: theme,
+        count: bucket.length,
+        examples: top.map((entry) => entry.note.title),
+      });
     }
 
     const recent = [...entries]
@@ -1576,7 +1701,29 @@ server.registerTool(
     sections.push(`\nRecent:`);
     sections.push(...recent.map((entry) => `- ${entry.note.updatedAt} — ${entry.note.title}`));
 
-    return { content: [{ type: "text", text: sections.join("\n") }] };
+    const themeCounts: Record<string, number> = {};
+    for (const theme of themes) {
+      themeCounts[theme.name] = theme.count;
+    }
+
+    const structuredContent: ProjectSummaryResult = {
+      action: "project_summary_shown",
+      project: { id: project.id, name: project.name },
+      notes: {
+        total: entries.length,
+        projectVault: projectVaultCount,
+        mainVault: mainVaultCount,
+        privateProject: mainVaultProjectEntries.length,
+      },
+      themes: themeCounts,
+      recent: recent.map((entry) => ({
+        id: entry.note.id,
+        title: entry.note.title,
+        updatedAt: entry.note.updatedAt,
+      })),
+    };
+
+    return { content: [{ type: "text", text: sections.join("\n") }], structuredContent };
   }
 );
 
