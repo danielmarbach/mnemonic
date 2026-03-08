@@ -6,9 +6,12 @@ tags:
   - git
   - design
 createdAt: '2026-03-08T12:36:52.818Z'
-updatedAt: '2026-03-08T12:36:52.818Z'
+updatedAt: '2026-03-08T12:36:56.668Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: mnemonic-key-design-decisions-3f2a6273
+    type: related-to
 memoryVersion: 1
 ---
 Added fork-aware project identity overrides.

@@ -6,7 +6,7 @@ tags:
   - architecture
   - rationale
 createdAt: '2026-03-07T17:59:12.124Z'
-updatedAt: '2026-03-07T23:34:22.406Z'
+updatedAt: '2026-03-08T12:36:56.668Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
@@ -21,6 +21,8 @@ relatedTo:
   - id: mnemonic-consolidate-tool-design-b9cbac6a
     type: related-to
   - id: mnemonic-git-commit-protocol-standardization-f2ee3d5e
+    type: related-to
+  - id: project-identity-remote-override-for-forked-repos-8203a311
     type: related-to
 memoryVersion: 1
 ---
