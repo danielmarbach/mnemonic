@@ -6,7 +6,7 @@ tags:
   - mcp-tool
   - architecture
 createdAt: '2026-03-07T23:15:43.251Z'
-updatedAt: '2026-03-07T23:26:57.701Z'
+updatedAt: '2026-03-08T09:52:24.892Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
@@ -16,6 +16,8 @@ relatedTo:
     type: explains
   - id: mnemonic-embedding-consistency-verification-5129afcc
     type: related-to
+  - id: agent-instruction-improvements-session-start-recall-first-an-ecd402c3
+    type: example-of
 memoryVersion: 1
 ---
 New MCP tool `consolidate` for memory consolidation with cross-vault support.
