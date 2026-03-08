@@ -24,8 +24,6 @@ relatedTo:
     type: related-to
   - id: project-identity-remote-override-for-forked-repos-8203a311
     type: related-to
-  - id: qwen-embedding-alternative-benchmark-against-v2-moe-972393f7
-    type: related-to
 memoryVersion: 1
 ---
 **One file per note:** Critical for git conflict isolation. Never aggregate notes into a single file.
