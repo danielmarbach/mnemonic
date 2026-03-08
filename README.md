@@ -2,6 +2,8 @@
 
 A local MCP memory server backed by plain markdown + JSON files, synced via git. No database. Project-scoped memory with semantic search.
 
+If you want the higher-level system map, see [`ARCHITECTURE.md`](ARCHITECTURE.md).
+
 ## Why you might care
 
 - 🧠 Your MCP client remembers decisions, fixes, and context across sessions instead of making you re-explain the same project over and over.

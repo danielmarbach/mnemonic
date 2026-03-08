@@ -36,6 +36,12 @@ Before finishing substantial work on mnemonic, quickly check:
 
 If the answer to any of these is yes, capture it through MCP before wrapping up.
 
+### Documentation upkeep
+
+- `ARCHITECTURE.md` is the canonical high-level map of the system; update it whenever control flow, source layout, vault behavior, data model, CI/MCP operational patterns, or major architectural decisions change
+- Keep `ARCHITECTURE.md`, `AGENT.md`, and `README.md` aligned: architecture detail in `ARCHITECTURE.md`, agent workflow rules in `AGENT.md`, and reader-facing overview links in `README.md`
+- When a new concept is easier to understand visually, add or refresh a Mermaid diagram in `ARCHITECTURE.md`
+
 **Troubleshooting:** Complex JSON payloads may fail via stdio due to shell escaping. Write to temp file first:
 ```bash
 cat > /tmp/request.json << 'JSON'
@@ -151,93 +157,16 @@ Optimized for LLM consumption:
 
 ## Architecture
 
-```
-src/index.ts      — MCP server, tool registrations
-src/storage.ts    — read/write notes (markdown) and embeddings (JSON)
-src/embeddings.ts — Ollama client, cosine similarity
-src/git.ts        — git operations via simple-git
-src/project.ts    — detect project from git remote URL
-src/vault.ts      — VaultManager: routing between vaults
-```
+`ARCHITECTURE.md` is the canonical system map. Read it before making structural changes.
 
-### Key types
+Keep these high-level anchors in mind:
 
-```typescript
-type RelationshipType = "related-to" | "explains" | "example-of" | "supersedes";
-
-interface Relationship {
-  id: string;
-  type: RelationshipType;
-}
-
-interface Note {
-  id: string;           // slug-uuid
-  title: string;
-  content: string;      // markdown body
-  tags: string[];
-  project?: string;     // stable project id
-  projectName?: string; // human-readable
-  relatedTo?: Relationship[];
-  createdAt: string;    // ISO 8601
-  updatedAt: string;
-}
-
-interface EmbeddingRecord {
-  id: string;
-  model: string;
-  embedding: number[];  // 768-dim for nomic-embed-text
-  updatedAt: string;
-}
-
-interface SyncResult {
-  hasRemote: boolean;
-  pulledNoteIds: string[];
-  deletedNoteIds: string[];
-  pushedCommits: number;
-}
-```
-
-### Vault layout
-
-**Main vault** (`~/mnemonic-vault`):
-```
-~/mnemonic-vault/
-  .gitignore          ← auto-written, contains "embeddings/"
-  notes/              ← global memories
-    <id>.md
-  embeddings/         ← local only, never committed
-    <id>.json
-```
-
-**Project vault** (`<git-root>/.mnemonic/`):
-```
-<git-root>/
-  .mnemonic/
-    .gitignore        ← auto-written, contains "embeddings/"
-    notes/            ← project memories (committed)
-      <id>.md
-    embeddings/       ← local only, never committed
-      <id>.json
-```
-
-**Note format:**
-```markdown
----
-title: JWT RS256 migration rationale
-tags: [auth, jwt, architecture]
-project: github-com-acme-myapp
-projectName: myapp
-relatedTo:
-  - id: auth-bug-fix-a1b2c3d4
-    type: related-to
-  - id: security-policy-b5c6d7e8
-    type: explains
-createdAt: 2026-03-07T10:00:00.000Z
-updatedAt: 2026-03-07T10:00:00.000Z
----
-
-Note content...
-```
+- `src/index.ts` is the MCP entry point and orchestration layer
+- `src/vault.ts` routes between the main vault and project vaults
+- `src/storage.ts` owns markdown notes and embedding JSON persistence
+- `src/git.ts` makes git part of normal mutating behavior
+- `src/migration.ts` owns schema evolution and dry-run-first migration flow
+- `src/recall.ts` and `src/consolidate.ts` hold behavior that intentionally stays lightweight instead of introducing heavier runtime state
 
 ## Tools
 
