@@ -9,6 +9,7 @@ import { promises as fs } from "fs";
 import { Storage, type Note, type Relationship, type RelationshipType } from "./storage.js";
 import { embed, cosineSimilarity, embedModel } from "./embeddings.js";
 import { type SyncResult } from "./git.js";
+
 import { filterRelationships, mergeRelationshipsFromNotes, normalizeMergePlanSourceIds } from "./consolidate.js";
 import { selectRecallResults } from "./recall.js";
 import { cleanMarkdown } from "./markdown.js";
@@ -38,6 +39,12 @@ import type {
   ForgetResult,
   MoveResult,
   RelateResult,
+  RecentResult,
+  WhereIsResult,
+  MemoryGraphResult,
+  ProjectSummaryResult,
+  SyncResult as StructuredSyncResult,
+  ReindexResult as StructuredReindexResult,
 } from "./structured-content.js";
 
 // ── CLI Migration Command ─────────────────────────────────────────────────────
@@ -1404,7 +1411,39 @@ server.registerTool(
       includeStorage,
       includeUpdated: true,
     }));
-    return { content: [{ type: "text", text: `${header}\n\n${lines.join("\n")}` }] };
+    
+    const textContent = `${header}\n\n${lines.join("\n")}`;
+    
+    const structuredNotes = recent.map(({ note, vault }) => ({
+      id: note.id,
+      title: note.title,
+      project: note.project,
+      projectName: note.projectName,
+      tags: note.tags,
+      vault: vault.isProject ? "project-vault" : "main-vault",
+      updatedAt: note.updatedAt,
+      preview: includePreview && note.content ? note.content.substring(0, 100) + (note.content.length > 100 ? "..." : "") : undefined,
+    }));
+    
+    const structuredContent: RecentResult = {
+      action: "recent_shown",
+      project: project?.id,
+      projectName: project?.name,
+      count: recent.length,
+      limit: limit || 5,
+      notes: structuredNotes as Array<{
+        id: string;
+        title: string;
+        project?: string;
+        projectName?: string;
+        tags: string[];
+        vault: "project-vault" | "main-vault";
+        updatedAt: string;
+        preview?: string;
+      }>,
+    };
+    
+    return { content: [{ type: "text", text: textContent }], structuredContent };
   }
 );
 
@@ -1446,7 +1485,35 @@ server.registerTool(
     const header = project && scope !== "global"
       ? `Memory graph for ${project.name}:`
       : "Memory graph:";
-    return { content: [{ type: "text", text: `${header}\n\n${lines.join("\n")}` }] };
+    
+    const textContent = `${header}\n\n${lines.join("\n")}`;
+    
+    // Build structured graph
+    const structuredNodes = entries
+      .filter((entry: NoteEntry) => (entry.note.relatedTo?.length ?? 0) > 0)
+      .slice(0, limit)
+      .map((entry: NoteEntry) => {
+        const edges = (entry.note.relatedTo ?? [])
+          .filter((rel: { id: string; type: RelationshipType }) => visibleIds.has(rel.id))
+          .map((rel: { id: string; type: RelationshipType }) => ({ toId: rel.id, type: rel.type }));
+        return {
+          id: entry.note.id,
+          title: entry.note.title,
+          edges: edges.length > 0 ? edges : [],
+        };
+      })
+      .filter((node: { edges: any[] }) => node.edges.length > 0);
+    
+    const structuredContent: MemoryGraphResult = {
+      action: "graph_shown",
+      project: project?.id,
+      projectName: project?.name,
+      nodes: structuredNodes,
+      limit,
+      truncated: structuredNodes.length < entries.filter(e => (e.note.relatedTo?.length ?? 0) > 0).length,
+    };
+    
+    return { content: [{ type: "text", text: textContent }], structuredContent };
   }
 );
 
@@ -1528,17 +1595,31 @@ server.registerTool(
   },
   async ({ cwd }) => {
     const lines: string[] = [];
+    const vaultResults: Array<{ vault: "main" | "project"; hasRemote: boolean; pulled: number; deleted: number; pushed: number; embedded: number; failed: string[] }> = [];
 
     // Always sync main vault
     const mainResult = await vaultManager.main.git.sync();
     lines.push(...formatSyncResult(mainResult, "main vault"));
+    let mainEmbedded = 0;
+    let mainFailed: string[] = [];
     if (mainResult.pulledNoteIds.length > 0) {
       const { rebuilt, failed } = await embedMissingNotes(vaultManager.main.storage, mainResult.pulledNoteIds);
+      mainEmbedded = rebuilt;
+      mainFailed = failed;
       lines.push(`main vault: embedded ${rebuilt} note(s).${failed.length > 0 ? ` Failed: ${failed.join(", ")}` : ""}`);
     }
     if (mainResult.deletedNoteIds.length > 0) {
       await removeStaleEmbeddings(vaultManager.main.storage, mainResult.deletedNoteIds);
     }
+    vaultResults.push({
+      vault: "main",
+      hasRemote: mainResult.hasRemote,
+      pulled: mainResult.pulledNoteIds.length,
+      deleted: mainResult.deletedNoteIds.length,
+      pushed: mainResult.pushedCommits,
+      embedded: mainEmbedded,
+      failed: mainFailed,
+    });
 
     // Optionally sync project vault
     if (cwd) {
@@ -1546,155 +1627,37 @@ server.registerTool(
       if (projectVault) {
         const projectResult = await projectVault.git.sync();
         lines.push(...formatSyncResult(projectResult, "project vault"));
+        let projEmbedded = 0;
+        let projFailed: string[] = [];
         if (projectResult.pulledNoteIds.length > 0) {
           const { rebuilt, failed } = await embedMissingNotes(projectVault.storage, projectResult.pulledNoteIds);
+          projEmbedded = rebuilt;
+          projFailed = failed;
           lines.push(`project vault: embedded ${rebuilt} note(s).${failed.length > 0 ? ` Failed: ${failed.join(", ")}` : ""}`);
         }
         if (projectResult.deletedNoteIds.length > 0) {
           await removeStaleEmbeddings(projectVault.storage, projectResult.deletedNoteIds);
         }
+        vaultResults.push({
+          vault: "project",
+          hasRemote: projectResult.hasRemote,
+          pulled: projectResult.pulledNoteIds.length,
+          deleted: projectResult.deletedNoteIds.length,
+          pushed: projectResult.pushedCommits,
+          embedded: projEmbedded,
+          failed: projFailed,
+        });
       } else {
         lines.push("project vault: no .mnemonic/ found — skipped.");
       }
     }
 
-    return { content: [{ type: "text", text: lines.join("\n") }] };
-  }
-);
-
-// ── reindex ───────────────────────────────────────────────────────────────────
-server.registerTool(
-  "reindex",
-  {
-    title: "Reindex",
-    description:
-      "Rebuild local embeddings for notes missing an embedding file. " +
-      "Pass `cwd` to also reindex the project vault. Embeddings from older models are refreshed automatically; `force=true` rebuilds all embeddings.",
-    inputSchema: z.object({
-      force: z
-        .boolean()
-        .optional()
-        .default(false)
-        .describe("Re-embed ALL notes, even those already indexed"),
-      cwd: projectParam,
-    }),
-  },
-  async ({ force, cwd }) => {
-    const vaults = cwd ? await vaultManager.searchOrder(cwd) : [vaultManager.main];
-
-    let totalRebuilt = 0;
-    const allFailed: string[] = [];
-
-    for (const vault of vaults) {
-      if (force) {
-        const existing = await vault.storage.listEmbeddings();
-        for (const rec of existing) {
-          try { await fs.unlink(vault.storage.embeddingPath(rec.id)); } catch { /* ok */ }
-        }
-      }
-      const { rebuilt, failed } = await embedMissingNotes(vault.storage);
-      totalRebuilt += rebuilt;
-      allFailed.push(...failed);
-    }
-
-    const msg =
-      `Reindexed ${totalRebuilt} note(s).` +
-      (allFailed.length > 0 ? ` Failed: ${allFailed.join(", ")}` : "");
-    return { content: [{ type: "text", text: msg }] };
-  }
-);
-
-// ── get ───────────────────────────────────────────────────────────────────────
-server.registerTool(
-  "get",
-  {
-    title: "Get Memories by ID",
-    description: "Fetch one or more memories by their exact id. Pass `cwd` to include the current project vault.",
-    inputSchema: z.object({
-      ids: z.array(z.string()).min(1).describe("One or more memory ids to fetch"),
-      cwd: projectParam,
-    }),
-  },
-  async ({ ids, cwd }) => {
-    const sections: string[] = [];
-    const missing: string[] = [];
-    const foundNotes: Array<{
-      id: string;
-      title: string;
-      content: string;
-      project?: string;
-      projectName?: string;
-      tags: string[];
-      relatedTo?: Array<{ id: string; type: RelationshipType }>;
-      createdAt: string;
-      updatedAt: string;
-      vault: "project-vault" | "main-vault";
-    }> = [];
-    
-    for (const id of ids) {
-      const found = await vaultManager.findNote(id, cwd);
-      if (found) {
-        sections.push(formatNote(found.note));
-        foundNotes.push({
-          id: found.note.id,
-          title: found.note.title,
-          content: found.note.content,
-          project: found.note.project,
-          projectName: found.note.projectName,
-          tags: found.note.tags,
-          relatedTo: found.note.relatedTo,
-          createdAt: found.note.createdAt,
-          updatedAt: found.note.updatedAt,
-          vault: found.vault.isProject ? "project-vault" : "main-vault",
-        });
-      } else {
-        missing.push(id);
-      }
-    }
-    const parts: string[] = [];
-    if (sections.length > 0) parts.push(sections.join("\n\n---\n\n"));
-    if (missing.length > 0) parts.push(`Not found: ${missing.map((id) => `\`${id}\``).join(", ")}`);
-    
-    const structuredContent: GetResult = {
-      action: "got",
-      count: foundNotes.length,
-      notes: foundNotes,
-      notFound: missing,
+    const structuredContent: StructuredSyncResult = {
+      action: "synced",
+      vaults: vaultResults,
     };
     
-    return { content: [{ type: "text", text: parts.join("\n\n") }], structuredContent };
-  }
-);
-
-// ── where_is_memory ───────────────────────────────────────────────────────────
-server.registerTool(
-  "where_is_memory",
-  {
-    title: "Where Is Memory",
-    description: "Show a memory's project association and actual storage location.",
-    inputSchema: z.object({
-      id: z.string().describe("Memory id to inspect"),
-      cwd: projectParam,
-    }),
-  },
-  async ({ id, cwd }) => {
-    const found = await vaultManager.findNote(id, cwd);
-    if (!found) {
-      return { content: [{ type: "text", text: `No memory found with id '${id}'` }] };
-    }
-
-    const { note, vault } = found;
-    const lines = [
-      `Memory location for **${note.title}**:`,
-      `- id: \`${note.id}\``,
-      `- project: ${note.projectName ?? note.project ?? "global"}`,
-      `- stored: ${storageLabel(vault)}`,
-      `- updated: ${note.updatedAt}`,
-    ];
-    if (note.relatedTo && note.relatedTo.length > 0) {
-      lines.push(`- related: ${note.relatedTo.map((rel) => `${rel.id} (${rel.type})`).join(", ")}`);
-    }
-    return { content: [{ type: "text", text: lines.join("\n") }] };
+    return { content: [{ type: "text", text: lines.join("\n") }], structuredContent };
   }
 );
 
