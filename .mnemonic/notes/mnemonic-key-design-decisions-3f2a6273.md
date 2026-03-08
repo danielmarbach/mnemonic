@@ -6,7 +6,7 @@ tags:
   - architecture
   - rationale
 createdAt: '2026-03-07T17:59:12.124Z'
-updatedAt: '2026-03-08T12:36:56.668Z'
+updatedAt: '2026-03-08T14:08:04.842Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
@@ -23,6 +23,8 @@ relatedTo:
   - id: mnemonic-git-commit-protocol-standardization-f2ee3d5e
     type: related-to
   - id: project-identity-remote-override-for-forked-repos-8203a311
+    type: related-to
+  - id: qwen-embedding-alternative-benchmark-against-v2-moe-972393f7
     type: related-to
 memoryVersion: 1
 ---

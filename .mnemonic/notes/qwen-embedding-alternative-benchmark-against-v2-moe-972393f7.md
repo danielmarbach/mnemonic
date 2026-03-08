@@ -7,9 +7,12 @@ tags:
   - ollama
   - retrieval
 createdAt: '2026-03-08T14:08:00.922Z'
-updatedAt: '2026-03-08T14:08:00.922Z'
+updatedAt: '2026-03-08T14:08:04.842Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: mnemonic-key-design-decisions-3f2a6273
+    type: related-to
 memoryVersion: 1
 ---
 Benchmarked `qwen3-embedding:0.6b` against `nomic-embed-text-v2-moe` through Ollama's `/api/embed` endpoint on the current mnemonic note corpus.
