@@ -23,10 +23,25 @@ memoryVersion: 1
 **Rationale**: Even though mnemonic is pre-release (v0.1.0), we implemented explicit schema versioning and migration infrastructure immediately. This forces us to dogfood the migration process before users adopt it widely.
 
 **Key aspects**:
-- Schema version starts at "0.1" (not "0.0" or "1.0")
-- Notes get `memoryVersion: 1` field in frontmatter
-- Config tracks `schemaVersion` at vault level
+- Schema version starts at "1.0" (vault-level migration system version)
+- Notes get `memoryVersion: 1` field in frontmatter (note format version)
+- Config tracks `schemaVersion` in config.json
 - Both project vaults and main vault participate in migrations
+
+## Versioning scheme clarification
+
+Two separate but related version numbers:
+
+**`schemaVersion` (in config.json)**: Semver string (1.0, 1.1, 2.0)
+- Tracks the migration system and overall vault schema
+- Updated when new migration infrastructure is added
+- Example: Adding `list_migrations` tool → bump to "1.1"
+
+**`memoryVersion` (in note frontmatter)**: Integer (0, 1, 2)
+- Tracks individual note format changes
+- Updated when note structure changes (new fields, renamed fields)
+- Notes can have different versions in the same vault (mixed-version support)
+- Example: Adding `priority` field → new notes get `memoryVersion: 2`
 
 ## Migration strategies implemented
 
@@ -94,6 +109,50 @@ memoryVersion: 1
 - Verified all 18 notes updated correctly
 - Validated migration is idempotent (re-running doesn't change already-migrated notes)
 
+## Dry-run workflow (strongly encouraged)
+
+**Safety net: automatic git commits**
+- Migrations auto-commit modified notes
+- Changes are pushed after commit
+- Users can `git revert` if something goes wrong
+
+**Why dry-run is still strongly recommended**:
+- Shows exactly what will change before committing
+- Builds confidence in the migration process
+- Easier to review than reading git diff
+- No risk of accidentally running migration
+
+**CLI encourages dry-run first**:
+```bash
+# Step 1: Preview (shows counts and specific files)
+mnemonic migrate --dry-run
+
+# Step 2: Execute (auto-commits and pushes)
+mnemonic migrate
+```
+
+**Even with auto-commit, always use --dry-run first**
+- Auto-commit is a safety net, not a replacement for preview
+- Two-step workflow prevents accidents
+- Help text explicitly warns users
+
+## Auto-commit behavior
+
+**What gets committed:**
+- Only files modified by the migration (tracked via `modifiedNoteIds`)
+- Does NOT commit unrelated uncommitted changes in the vault
+- Commit message includes migration name, count of modified/processed notes
+
+**What does NOT get committed:**
+- Unrelated markdown changes in notes directory
+- Changes to config.json (unless migration specifically modifies it)
+- Changes to embeddings (gitignored anyway)
+
+**Failure handling:**
+- Commit failures are warnings, not errors
+- Migration succeeds even if commit fails
+- Users can manually commit if auto-commit fails
+
 ## Future migration patterns
 
 The infrastructure supports:
@@ -112,18 +171,23 @@ Each migration should:
 ## Commands used
 
 ```bash
+# Get help (shows dry-run workflow)
+node build/index.js migrate --help
+
 # List available migrations
 node build/index.js migrate --list
 
-# Dry-run migration
+# Step 1: Preview what would change
+node build/index.js migrate --dry-run
 node build/index.js migrate --dry-run --cwd=/path/to/project
 
-# Execute migration
+# Step 2: Execute migration (only after reviewing dry-run output)
+node build/index.js migrate
 node build/index.js migrate --cwd=/path/to/project
 
 # Or via MCP:
 # - list_migrations: show pending migrations
-# - execute_migration: run a specific migration
+# - execute_migration: run a specific migration (supports dryRun param)
 ```
 
 ## Next steps
