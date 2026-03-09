@@ -1043,6 +1043,7 @@
       <li><a href="#how">How it works</a></li>
       <li><a href="#tools">Tools</a></li>
       <li><a href="#setup">Setup</a></li>
+      <li><a href="#cli">CLI</a></li>
       <li><a href="#dogfooding">Dogfooding</a></li>
       <li><a href="#agent-snippet">System prompt</a></li>
       <li>
@@ -1656,49 +1657,6 @@
     </div>
     <p>The runtime is compatible with other Ollama embedding models that support <code>/api/embed</code>. For example, <code>qwen3-embedding:0.6b</code> works as a drop-in <code>EMBED_MODEL</code> override and may be preferable for longer-context notes.</p>
 
-    <div class="fade-up" style="margin-top:48px">
-      <h3 style="font-size:1.15rem;font-weight:600;margin-bottom:16px">CLI utilities</h3>
-      <p style="color:var(--text-dim);margin-bottom:24px">mnemonic ships two CLI commands alongside the MCP server.</p>
-      <div class="quickstart-grid" style="gap:24px">
-        <div>
-          <h4 style="font-size:0.9rem;font-weight:600;color:var(--primary-lt);margin-bottom:10px">mnemonic migrate</h4>
-          <p style="color:var(--text-dim);font-size:0.9rem;margin-bottom:12px">Apply pending schema migrations to your vaults. Always preview with <code>--dry-run</code> first.</p>
-          <div class="code-block">
-            <div class="code-block-header">
-              <span class="code-label">bash</span>
-              <button class="copy-btn" onclick="copyCode(this)">copy</button>
-            </div>
-            <pre><span class="cmt"># Preview changes</span>
-<span class="cmd">mnemonic migrate --dry-run</span>
-
-<span class="cmt"># Apply and auto-commit</span>
-<span class="cmd">mnemonic migrate</span>
-
-<span class="cmt"># List pending migrations</span>
-<span class="cmd">mnemonic migrate --list</span></pre>
-          </div>
-        </div>
-        <div>
-          <h4 style="font-size:0.9rem;font-weight:600;color:var(--cyan-lt);margin-bottom:10px">mnemonic import-claude-memory</h4>
-          <p style="color:var(--text-dim);font-size:0.9rem;margin-bottom:12px">Import Claude Code auto-memory into your vault. Each <code>##</code> heading in <code>~/.claude/projects/&lt;project&gt;/memory/*.md</code> becomes a separate mnemonic note. Duplicate titles are skipped — safe to re-run.</p>
-          <div class="code-block">
-            <div class="code-block-header">
-              <span class="code-label">bash</span>
-              <button class="copy-btn" onclick="copyCode(this)">copy</button>
-            </div>
-            <pre><span class="cmt"># Preview what would be imported</span>
-<span class="cmd">mnemonic import-claude-memory --dry-run</span>
-
-<span class="cmt"># Import from current project's Claude memory</span>
-<span class="cmd">mnemonic import-claude-memory</span>
-
-<span class="cmt"># Specific project path</span>
-<span class="cmd">mnemonic import-claude-memory --cwd=/path/to/project</span></pre>
-          </div>
-        </div>
-      </div>
-    </div>
-
     <div id="agent-snippet" class="agent-snippet fade-up">
       <h3>Add to your AGENT.md or system prompt</h3>
       <p>Drop this snippet into your <code style="font-family:JetBrains Mono,monospace;font-size:0.85em;color:var(--cyan-lt)">AGENT.md</code>, Cursor rules, or Claude system prompt to activate proactive memory behavior.</p>
@@ -1849,6 +1807,114 @@ Guidelines:
 - Be specific about dates and versions when they matter:
   "as of March 2026, using Prisma 5.x"</pre>
       </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── CLI ── -->
+<div class="divider"></div>
+<section id="cli">
+  <svg class="section-art" width="480" height="480" viewBox="0 0 480 480" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <defs>
+      <marker id="cli-arr-g" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto">
+        <polyline points="0,1.5 8,5 0,8.5" stroke="#4ade80" stroke-width="1.5" fill="none"/>
+      </marker>
+      <marker id="cli-arr-c" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto">
+        <polyline points="0,1.5 8,5 0,8.5" stroke="#06b6d4" stroke-width="1.5" fill="none"/>
+      </marker>
+    </defs>
+    <!-- Source file (MEMORY.md) -->
+    <rect x="52" y="148" width="128" height="184" rx="5" stroke="#4ade80" stroke-width="1.2" fill="none"/>
+    <!-- Folded corner detail -->
+    <polyline points="148,148 180,148 180,172 148,172 148,148" stroke="#4ade80" stroke-width="0.8" fill="none"/>
+    <line x1="148" y1="148" x2="180" y2="172" stroke="#4ade80" stroke-width="0.8"/>
+    <!-- ## Section heading lines (bold = H2, thin = body) -->
+    <line x1="70" y1="190" x2="160" y2="190" stroke="#4ade80" stroke-width="1.6"/>
+    <line x1="70" y1="205" x2="148" y2="205" stroke="#4ade80" stroke-width="0.5"/>
+    <line x1="70" y1="215" x2="153" y2="215" stroke="#4ade80" stroke-width="0.5"/>
+    <line x1="70" y1="237" x2="160" y2="237" stroke="#4ade80" stroke-width="1.6"/>
+    <line x1="70" y1="252" x2="143" y2="252" stroke="#4ade80" stroke-width="0.5"/>
+    <line x1="70" y1="262" x2="150" y2="262" stroke="#4ade80" stroke-width="0.5"/>
+    <line x1="70" y1="284" x2="160" y2="284" stroke="#4ade80" stroke-width="1.6"/>
+    <line x1="70" y1="299" x2="140" y2="299" stroke="#4ade80" stroke-width="0.5"/>
+    <line x1="70" y1="309" x2="147" y2="309" stroke="#4ade80" stroke-width="0.5"/>
+    <!-- Branch stem from file right edge to hub -->
+    <line x1="180" y1="240" x2="248" y2="240" stroke="#06b6d4" stroke-width="1.2"/>
+    <!-- Three branch lines from hub to notes -->
+    <path d="M 248,240 L 248,175 L 308,175" stroke="#06b6d4" stroke-width="1" fill="none" marker-end="url(#cli-arr-c)"/>
+    <line x1="248" y1="240" x2="308" y2="240" stroke="#06b6d4" stroke-width="1" marker-end="url(#cli-arr-c)"/>
+    <path d="M 248,240 L 248,305 L 308,305" stroke="#06b6d4" stroke-width="1" fill="none" marker-end="url(#cli-arr-c)"/>
+    <!-- Note card 1 -->
+    <rect x="318" y="148" width="110" height="54" rx="4" stroke="#4ade80" stroke-width="1.1" fill="none"/>
+    <line x1="332" y1="165" x2="414" y2="165" stroke="#4ade80" stroke-width="1.4"/>
+    <line x1="332" y1="178" x2="404" y2="178" stroke="#4ade80" stroke-width="0.5"/>
+    <line x1="332" y1="188" x2="408" y2="188" stroke="#4ade80" stroke-width="0.5"/>
+    <!-- Note card 2 -->
+    <rect x="318" y="213" width="110" height="54" rx="4" stroke="#06b6d4" stroke-width="1.1" fill="none"/>
+    <line x1="332" y1="230" x2="414" y2="230" stroke="#06b6d4" stroke-width="1.4"/>
+    <line x1="332" y1="243" x2="400" y2="243" stroke="#06b6d4" stroke-width="0.5"/>
+    <line x1="332" y1="253" x2="406" y2="253" stroke="#06b6d4" stroke-width="0.5"/>
+    <!-- Note card 3 -->
+    <rect x="318" y="278" width="110" height="54" rx="4" stroke="#4ade80" stroke-width="1.1" fill="none"/>
+    <line x1="332" y1="295" x2="414" y2="295" stroke="#4ade80" stroke-width="1.4"/>
+    <line x1="332" y1="308" x2="398" y2="308" stroke="#4ade80" stroke-width="0.5"/>
+    <line x1="332" y1="318" x2="404" y2="318" stroke="#4ade80" stroke-width="0.5"/>
+    <!-- Faint hub dot -->
+    <circle cx="248" cy="240" r="3" stroke="#06b6d4" stroke-width="1" fill="none"/>
+    <!-- Faint label line under file: MEMORY.md -->
+    <line x1="86" y1="346" x2="146" y2="346" stroke="#4ade80" stroke-width="0.5"/>
+  </svg>
+  <div class="container">
+    <div class="section-label">CLI</div>
+    <h2 class="section-title">Commands for your terminal.</h2>
+    <p class="section-desc">Vault maintenance and onboarding without an MCP client. Run them directly from the shell.</p>
+
+    <div class="quickstart-grid fade-up" style="margin-top:48px;gap:40px">
+
+      <div class="qs-col">
+        <h3>mnemonic migrate</h3>
+        <p style="color:var(--text-dim);font-size:0.9rem;margin-bottom:16px">Apply pending schema migrations to your vaults. Always preview with <code>--dry-run</code> first — failed runs roll staged writes back automatically.</p>
+        <div class="code-block">
+          <div class="code-block-header">
+            <span class="code-label">bash</span>
+            <button class="copy-btn" onclick="copyCode(this)">copy</button>
+          </div>
+          <pre><span class="cmt"># Preview what would change</span>
+<span class="cmd">mnemonic migrate --dry-run</span>
+
+<span class="cmt"># Apply and auto-commit</span>
+<span class="cmd">mnemonic migrate</span>
+
+<span class="cmt"># List available migrations</span>
+<span class="cmd">mnemonic migrate --list</span>
+
+<span class="cmt"># Limit to one project vault</span>
+<span class="cmd">mnemonic migrate --cwd=/path/to/project</span></pre>
+        </div>
+      </div>
+
+      <div class="qs-col">
+        <h3>mnemonic import-claude-memory</h3>
+        <p style="color:var(--text-dim);font-size:0.9rem;margin-bottom:16px">Import <a href="https://docs.anthropic.com/en/docs/claude-code/memory" style="color:var(--cyan-lt);text-decoration:none" target="_blank" rel="noopener">Claude Code auto-memory</a> into your vault. Each <code>##</code> heading in <code>~/.claude/projects/&lt;project&gt;/memory/*.md</code> becomes a separate mnemonic note — independently searchable via <code>recall</code>. Duplicate titles are skipped, so it's safe to re-run.</p>
+        <div class="code-block">
+          <div class="code-block-header">
+            <span class="code-label">bash</span>
+            <button class="copy-btn" onclick="copyCode(this)">copy</button>
+          </div>
+          <pre><span class="cmt"># Preview what would be imported</span>
+<span class="cmd">mnemonic import-claude-memory --dry-run</span>
+
+<span class="cmt"># Import for the current project</span>
+<span class="cmd">mnemonic import-claude-memory</span>
+
+<span class="cmt"># Specific project path</span>
+<span class="cmd">mnemonic import-claude-memory --cwd=/path/to/project</span>
+
+<span class="cmt"># Then embed and push</span>
+<span class="cmd">mnemonic sync</span></pre>
+        </div>
+      </div>
+
     </div>
   </div>
 </section>
