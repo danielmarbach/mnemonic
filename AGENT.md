@@ -82,13 +82,13 @@ When calling `update`:
 ### Documentation upkeep
 
 - `ARCHITECTURE.md` is the canonical high-level map of the system; update it whenever control flow, source layout, vault behavior, data model, CI/MCP operational patterns, or major architectural decisions change
-- Keep `ARCHITECTURE.md`, `AGENT.md`, and `README.md` aligned: architecture detail in `ARCHITECTURE.md`, agent workflow rules in `AGENT.md`, and reader-facing overview links in `README.md`
+- Keep `ARCHITECTURE.md`, `AGENT.md`, `README.md`, and `SYSTEM_PROMPT.md` aligned: architecture detail in `ARCHITECTURE.md`, agent workflow rules in `AGENT.md`, reader-facing overview links in `README.md`, and the agent system prompt in `SYSTEM_PROMPT.md`
 - When a new concept is easier to understand visually, add or refresh a Mermaid diagram in `ARCHITECTURE.md`
 - `docs/index.html` is the GitHub Pages landing page; keep it current whenever tools, features, or the dogfooding notes change:
   - Tools table in the **Tools** section must reflect the current tool inventory (same as README.md and AGENT.md)
   - The **Dogfooding** section shows real notes from `.mnemonic/notes/` — refresh card content if those notes are updated or replaced
   - Configuration table (`VAULT_PATH`, `OLLAMA_URL`, `EMBED_MODEL`, `DISABLE_GIT`) must match env vars in code and README.md
-  - The setup snippets and the `AGENT.md` / system prompt snippet must stay in sync with the copy-paste versions in `README.md`
+  - The setup snippets must stay in sync with README.md
   - The hero terminal shows a real `recall` result — update if the note it references changes significantly
 
 **Troubleshooting:** Complex JSON payloads may fail via stdio due to shell escaping. Write to temp file first:
@@ -363,7 +363,7 @@ All new MCP tools MUST be documented in both AGENT.md and README.md:
 - Update example usage in README.md if applicable
 - Run `npm test` to ensure no regressions
 
-**Keep README.md and AGENT.md in sync** - they serve different audiences (README.md for users, AGENT.md for agents/developers).
+**Keep README.md, AGENT.md, and SYSTEM_PROMPT.md in sync** - they serve different audiences (README.md for users, AGENT.md for agents/developers, SYSTEM_PROMPT.md for LLM system prompts).
 
 ## Critical constraints
 
