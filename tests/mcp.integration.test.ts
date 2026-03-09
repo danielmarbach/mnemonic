@@ -51,6 +51,59 @@ describe("local MCP script", () => {
     }
   }, 15000);
 
+  it("returns structured persistence details for remember without extra verification calls", async () => {
+    const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-vault-"));
+    tempDirs.push(vaultDir);
+    const embeddingServer = await startFakeEmbeddingServer();
+
+    try {
+      const response = await callLocalMcpResponse(vaultDir, "remember", {
+        title: "Persistence status remember test",
+        content: "Verify remember returns persistence metadata.",
+        tags: ["integration"],
+        scope: "global",
+        summary: "Create note and inspect persistence result",
+      }, embeddingServer.url);
+
+      const noteId = extractRememberedId(response.text);
+      const structured = response.structuredContent;
+      expect(structured?.["action"]).toBe("remembered");
+      const persistence = structured?.["persistence"] as Record<string, unknown>;
+      expect(persistence?.["notePath"]).toBe(path.join(vaultDir, "notes", `${noteId}.md`));
+      expect(persistence?.["embeddingPath"]).toBe(path.join(vaultDir, "embeddings", `${noteId}.json`));
+      expect((persistence?.["embedding"] as Record<string, unknown>)?.["status"]).toBe("written");
+      const git = persistence?.["git"] as Record<string, unknown>;
+      expect(git?.["commit"]).toBe("skipped");
+      expect(git?.["push"]).toBe("skipped");
+      expect(git?.["commitMessage"]).toBe("remember: Persistence status remember test");
+      expect(String(git?.["commitBody"] ?? "")).toContain("Create note and inspect persistence result");
+      expect(persistence?.["durability"]).toBe("local-only");
+    } finally {
+      await embeddingServer.close();
+    }
+  }, 15000);
+
+  it("reports embedding skip reasons in structured persistence when Ollama is unavailable", async () => {
+    const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-vault-"));
+    tempDirs.push(vaultDir);
+
+    const response = await callLocalMcpResponse(vaultDir, "remember", {
+      title: "Persistence status embedding failure",
+      content: "This note should survive even if embedding fails.",
+      tags: ["integration"],
+      scope: "global",
+      summary: "Create note with embedding failure",
+    }, { ollamaUrl: "http://127.0.0.1:9" });
+
+    const structured = response.structuredContent;
+    expect(structured?.["action"]).toBe("remembered");
+    const persistence = structured?.["persistence"] as Record<string, unknown>;
+    const embedding = persistence?.["embedding"] as Record<string, unknown>;
+    expect(embedding?.["status"]).toBe("skipped");
+    expect(String(embedding?.["reason"] ?? "")).not.toBe("");
+    expect(persistence?.["durability"]).toBe("local-only");
+  }, 15000);
+
   it("supports overriding project identity to use upstream", async () => {
     const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-vault-"));
     const repoDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-project-"));
@@ -408,6 +461,16 @@ async function callLocalMcp(
   arguments_: Record<string, unknown>,
   options?: string | { ollamaUrl?: string; disableGit?: boolean },
 ): Promise<string> {
+  const response = await callLocalMcpResponse(vaultDir, toolName, arguments_, options);
+  return response.text;
+}
+
+async function callLocalMcpResponse(
+  vaultDir: string,
+  toolName: string,
+  arguments_: Record<string, unknown>,
+  options?: string | { ollamaUrl?: string; disableGit?: boolean },
+): Promise<{ text: string; structuredContent?: Record<string, unknown> }> {
   const resolvedOptions = typeof options === "string" ? { ollamaUrl: options } : options;
   const messages = [
     {
@@ -466,7 +529,7 @@ async function callLocalMcp(
 
   const lines = stdout.trim().split("\n").filter(Boolean).map((line) => JSON.parse(line) as {
     id?: number;
-    result?: { content?: Array<{ text?: string }> };
+    result?: { content?: Array<{ text?: string }>; structuredContent?: Record<string, unknown> };
   });
   const response = lines.find((line) => line.id === 1);
   const text = response?.result?.content?.[0]?.text;
@@ -474,7 +537,7 @@ async function callLocalMcp(
     throw new Error(`Missing tool response for ${toolName}`);
   }
 
-  return text;
+  return { text, structuredContent: response?.result?.structuredContent };
 }
 
 function extractRememberedId(text: string): string {

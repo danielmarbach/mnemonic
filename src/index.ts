@@ -8,7 +8,7 @@ import { promises as fs } from "fs";
 
 import { NOTE_LIFECYCLES, Storage, type Note, type NoteLifecycle, type Relationship, type RelationshipType } from "./storage.js";
 import { embed, cosineSimilarity, embedModel } from "./embeddings.js";
-import { type SyncResult } from "./git.js";
+import { type CommitResult, type PushResult, type SyncResult } from "./git.js";
 
 import {
   filterRelationships,
@@ -55,6 +55,7 @@ import type {
   MigrationListResult,
   MigrationExecuteResult,
   ConsolidateResult,
+  PersistenceStatus,
 } from "./structured-content.js";
 
 // ── CLI Migration Command ─────────────────────────────────────────────────────
@@ -502,6 +503,60 @@ function formatSyncResult(result: SyncResult, label: string): string[] {
   return lines;
 }
 
+function resolveDurability(commit: CommitResult, push: PushResult): PersistenceStatus["durability"] {
+  if (push.status === "pushed") {
+    return "pushed";
+  }
+
+  if (commit.status === "committed") {
+    return "committed";
+  }
+
+  return "local-only";
+}
+
+function buildPersistenceStatus(args: {
+  storage: Storage;
+  id: string;
+  embedding: { status: "written" | "skipped"; reason?: string };
+  commit: CommitResult;
+  push: PushResult;
+  commitMessage?: string;
+  commitBody?: string;
+}): PersistenceStatus {
+  return {
+    notePath: args.storage.notePath(args.id),
+    embeddingPath: args.storage.embeddingPath(args.id),
+    embedding: {
+      status: args.embedding.status,
+      model: embedModel,
+      reason: args.embedding.reason,
+    },
+    git: {
+      commit: args.commit.status,
+      push: args.push.status,
+      commitMessage: args.commitMessage,
+      commitBody: args.commitBody,
+      commitReason: args.commit.reason,
+      pushReason: args.push.reason,
+    },
+    durability: resolveDurability(args.commit, args.push),
+  };
+}
+
+function formatPersistenceSummary(persistence: PersistenceStatus): string {
+  const parts = [
+    `Persistence: embedding ${persistence.embedding.status}`,
+    `git ${persistence.durability}`,
+  ];
+
+  if (persistence.embedding.reason) {
+    parts.push(`embedding reason=${persistence.embedding.reason}`);
+  }
+
+  return parts.join(" | ");
+}
+
 type SearchScope = "project" | "global" | "all";
 type StorageScope = "project-vault" | "main-vault" | "any";
 
@@ -597,7 +652,7 @@ async function moveNoteBetweenVaults(
   found: { note: Note; vault: Vault },
   targetVault: Vault,
   noteToWrite?: Note,
-): Promise<Note> {
+): Promise<{ note: Note; persistence: PersistenceStatus }> {
   const { note, vault: sourceVault } = found;
   const finalNote = noteToWrite ?? note;
   const embedding = await sourceVault.storage.readEmbedding(note.id);
@@ -618,7 +673,7 @@ async function moveNoteBetweenVaults(
     noteTitle: finalNote.title,
     projectName: finalNote.projectName,
   });
-  await targetVault.git.commit(`move: ${finalNote.title}`, [vaultManager.noteRelPath(targetVault, finalNote.id)], targetCommitBody);
+  const targetCommit = await targetVault.git.commitWithStatus(`move: ${finalNote.title}`, [vaultManager.noteRelPath(targetVault, finalNote.id)], targetCommitBody);
 
   const sourceCommitBody = formatCommitBody({
     summary: `Moved to ${targetVaultLabel}`,
@@ -626,13 +681,24 @@ async function moveNoteBetweenVaults(
     noteTitle: finalNote.title,
     projectName: finalNote.projectName,
   });
-  await sourceVault.git.commit(`move: ${finalNote.title}`, [vaultManager.noteRelPath(sourceVault, finalNote.id)], sourceCommitBody);
-  await targetVault.git.push();
+  await sourceVault.git.commitWithStatus(`move: ${finalNote.title}`, [vaultManager.noteRelPath(sourceVault, finalNote.id)], sourceCommitBody);
+  const targetPush = await targetVault.git.pushWithStatus();
   if (sourceVault !== targetVault) {
-    await sourceVault.git.push();
+    await sourceVault.git.pushWithStatus();
   }
 
-  return finalNote;
+  return {
+    note: finalNote,
+    persistence: buildPersistenceStatus({
+      storage: targetVault.storage,
+      id: finalNote.id,
+      embedding: embedding ? { status: "written" } : { status: "skipped", reason: "no-source-embedding" },
+      commit: targetCommit,
+      push: targetPush,
+      commitMessage: `move: ${finalNote.title}`,
+      commitBody: targetCommitBody,
+    }),
+  };
 }
 
 async function removeRelationshipsToNoteIds(noteIds: string[]): Promise<Map<Vault, string[]>> {
@@ -1040,10 +1106,13 @@ server.registerTool(
 
     await vault.storage.writeNote(note);
 
+    let embeddingStatus: { status: "written" | "skipped"; reason?: string } = { status: "written" };
+
     try {
       const vector = await embed(`${title}\n\n${cleanedContent}`);
       await vault.storage.writeEmbedding({ id, model: embedModel, embedding: vector, updatedAt: now });
     } catch (err) {
+      embeddingStatus = { status: "skipped", reason: err instanceof Error ? err.message : String(err) };
       console.error(`[embedding] Skipped for '${id}': ${err}`);
     }
 
@@ -1057,15 +1126,24 @@ server.registerTool(
       scope: writeScope,
       tags: tags,
     });
-    await vault.git.commit(
+    const commitStatus = await vault.git.commitWithStatus(
       `remember: ${title}`,
       [vaultManager.noteRelPath(vault, id)],
       commitBody
     );
-    await vault.git.push();
+    const pushStatus = await vault.git.pushWithStatus();
+    const persistence = buildPersistenceStatus({
+      storage: vault.storage,
+      id,
+      embedding: embeddingStatus,
+      commit: commitStatus,
+      push: pushStatus,
+      commitMessage: `remember: ${title}`,
+      commitBody,
+    });
 
     const vaultLabel = vault.isProject ? " [project vault]" : " [main vault]";
-    const textContent = `Remembered as \`${id}\` [${projectScope}, stored=${writeScope}]${vaultLabel}`;
+    const textContent = `Remembered as \`${id}\` [${projectScope}, stored=${writeScope}]${vaultLabel}\n${formatPersistenceSummary(persistence)}`;
     
     const structuredContent: RememberResult = {
       action: "remembered",
@@ -1077,6 +1155,7 @@ server.registerTool(
       tags: tags || [],
       lifecycle: note.lifecycle,
       timestamp: now,
+      persistence,
     };
     
     return {
@@ -1363,10 +1442,13 @@ server.registerTool(
 
     await vault.storage.writeNote(updated);
 
+    let embeddingStatus: { status: "written" | "skipped"; reason?: string } = { status: "written" };
+
     try {
       const vector = await embed(`${updated.title}\n\n${updated.content}`);
       await vault.storage.writeEmbedding({ id, model: embedModel, embedding: vector, updatedAt: now });
     } catch (err) {
+      embeddingStatus = { status: "skipped", reason: err instanceof Error ? err.message : String(err) };
       console.error(`[embedding] Re-embed failed for '${id}': ${err}`);
     }
 
@@ -1386,8 +1468,17 @@ server.registerTool(
       projectName: updated.projectName,
       tags: updated.tags,
     });
-    await vault.git.commit(`update: ${updated.title}`, [vaultManager.noteRelPath(vault, id)], commitBody);
-    await vault.git.push();
+    const commitStatus = await vault.git.commitWithStatus(`update: ${updated.title}`, [vaultManager.noteRelPath(vault, id)], commitBody);
+    const pushStatus = await vault.git.pushWithStatus();
+    const persistence = buildPersistenceStatus({
+      storage: vault.storage,
+      id,
+      embedding: embeddingStatus,
+      commit: commitStatus,
+      push: pushStatus,
+      commitMessage: `update: ${updated.title}`,
+      commitBody,
+    });
 
     const structuredContent: UpdateResult = {
       action: "updated",
@@ -1398,9 +1489,10 @@ server.registerTool(
       project: updated.project,
       projectName: updated.projectName,
       lifecycle: updated.lifecycle,
+      persistence,
     };
     
-    return { content: [{ type: "text", text: `Updated memory '${id}'` }], structuredContent };
+    return { content: [{ type: "text", text: `Updated memory '${id}'\n${formatPersistenceSummary(persistence)}` }], structuredContent };
   }
 );
 
@@ -1923,7 +2015,8 @@ server.registerTool(
       };
     }
 
-    const movedNote = await moveNoteBetweenVaults(found, targetVault, noteToWrite);
+    const moveResult = await moveNoteBetweenVaults(found, targetVault, noteToWrite);
+    const movedNote = moveResult.note;
     const associationValue = movedNote.projectName && movedNote.project
       ? `${movedNote.projectName} (${movedNote.project})`
       : movedNote.projectName ?? movedNote.project ?? "global";
@@ -1936,6 +2029,7 @@ server.registerTool(
       projectAssociation: associationValue,
       title: movedNote.title,
       metadataRewritten,
+      persistence: moveResult.persistence,
     };
 
     const associationText = metadataRewritten
@@ -1945,7 +2039,7 @@ server.registerTool(
     return {
       content: [{
         type: "text",
-        text: `Moved '${id}' from ${currentStorage} to ${target}. ${associationText}`,
+        text: `Moved '${id}' from ${currentStorage} to ${target}. ${associationText}\n${formatPersistenceSummary(moveResult.persistence)}`,
       }],
       structuredContent,
     };
@@ -2607,6 +2701,8 @@ async function executeMerge(
   // Write consolidated note
   await targetVault.storage.writeNote(consolidatedNote);
 
+  let embeddingStatus: { status: "written" | "skipped"; reason?: string } = { status: "written" };
+
   // Generate embedding for consolidated note
   try {
     const vector = await embed(`${targetTitle}\n\n${consolidatedNote.content}`);
@@ -2617,6 +2713,7 @@ async function executeMerge(
       updatedAt: now,
     });
   } catch (err) {
+    embeddingStatus = { status: "skipped", reason: err instanceof Error ? err.message : String(err) };
     console.error(`[embedding] Failed for consolidated note '${targetId}': ${err}`);
   }
 
@@ -2665,6 +2762,10 @@ async function executeMerge(
   addVaultChange(vaultChanges, targetVault, vaultManager.noteRelPath(targetVault, targetId));
 
   // Commit changes per vault
+  let targetCommitStatus: CommitResult = { status: "skipped", reason: "no-changes" };
+  let targetPushStatus: PushResult = { status: "skipped", reason: "no-remote" };
+  let targetCommitBody: string | undefined;
+  let targetCommitMessage: string | undefined;
   for (const [vault, files] of vaultChanges) {
     const isTargetVault = vault === targetVault;
 
@@ -2702,14 +2803,32 @@ async function executeMerge(
           summary: commitSummary,
           noteIds: files.map((f) => f.replace(/\.mnemonic\/notes\/(.+)\.md$/, "$1").replace(/notes\/(.+)\.md$/, "$1")),
         });
-    await vault.git.commit(`${action}: ${targetTitle}`, files, commitBody);
-    await vault.git.push();
+    const commitMessage = `${action}: ${targetTitle}`;
+    const commitStatus = await vault.git.commitWithStatus(commitMessage, files, commitBody);
+    const pushStatus = await vault.git.pushWithStatus();
+    if (isTargetVault) {
+      targetCommitStatus = commitStatus;
+      targetPushStatus = pushStatus;
+      targetCommitBody = commitBody;
+      targetCommitMessage = commitMessage;
+    }
   }
+
+  const persistence = buildPersistenceStatus({
+    storage: targetVault.storage,
+    id: targetId,
+    embedding: embeddingStatus,
+    commit: targetCommitStatus,
+    push: targetPushStatus,
+    commitMessage: targetCommitMessage,
+    commitBody: targetCommitBody,
+  });
 
   const lines: string[] = [];
   lines.push(`Consolidated ${sourceIds.length} notes into '${targetId}'`);
   lines.push(`Mode: ${consolidationMode}`);
   lines.push(`Stored in: ${targetVault.isProject ? "project-vault" : "main-vault"}`);
+  lines.push(formatPersistenceSummary(persistence));
 
   switch (consolidationMode) {
     case "supersedes":
@@ -2732,6 +2851,7 @@ async function executeMerge(
     projectName: project?.name,
     notesProcessed: entries.length,
     notesModified: vaultChanges.size,
+    persistence,
   };
 
   return { content: [{ type: "text", text: lines.join("\n") }], structuredContent };

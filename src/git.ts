@@ -18,6 +18,16 @@ export interface SyncResult {
   pushedCommits: number;
 }
 
+export interface CommitResult {
+  status: "committed" | "skipped";
+  reason?: "git-disabled" | "no-changes";
+}
+
+export interface PushResult {
+  status: "pushed" | "skipped";
+  reason?: "git-disabled" | "no-remote";
+}
+
 export class GitOps {
   private git!: SimpleGit;
   private readonly gitRoot: string;
@@ -66,7 +76,12 @@ export class GitOps {
    * - Files: <file1>, <file2>
    */
   async commit(message: string, files: string[], body?: string): Promise<boolean> {
-    if (!this.enabled) return false;
+    const result = await this.commitWithStatus(message, files, body);
+    return result.status === "committed";
+  }
+
+  async commitWithStatus(message: string, files: string[], body?: string): Promise<CommitResult> {
+    if (!this.enabled) return { status: "skipped", reason: "git-disabled" };
     try {
       if (files.length > 0) {
         await this.git.add(files);
@@ -74,7 +89,7 @@ export class GitOps {
         await this.git.add(`${this.notesRelDir}/`);
       }
       const status = await this.git.status();
-      if (status.staged.length === 0) return false;
+      if (status.staged.length === 0) return { status: "skipped", reason: "no-changes" };
 
       // Build commit message with optional body
       const fullMessage = body ? `${message}\n\n${body}` : message;
@@ -82,7 +97,7 @@ export class GitOps {
 
       const displayMessage = body ? `${message} [...]` : message;
       console.error(`[git] Committed: ${displayMessage}`);
-      return true;
+      return { status: "committed" };
     } catch (err) {
       console.error(`[git] Commit failed: ${err}`);
       throw new GitOperationError("commit", err);
@@ -125,12 +140,17 @@ export class GitOps {
 
   /** Push only — used after individual remember/update/forget commits */
   async push(): Promise<void> {
-    if (!this.enabled) return;
+    await this.pushWithStatus();
+  }
+
+  async pushWithStatus(): Promise<PushResult> {
+    if (!this.enabled) return { status: "skipped", reason: "git-disabled" };
     try {
       const remotes = await this.git.getRemotes();
-      if (remotes.length === 0) return;
+      if (remotes.length === 0) return { status: "skipped", reason: "no-remote" };
       await this.git.push();
       console.error("[git] Pushed");
+      return { status: "pushed" };
     } catch (err) {
       console.error(`[git] Push failed: ${err}`);
       throw new GitOperationError("push", err);

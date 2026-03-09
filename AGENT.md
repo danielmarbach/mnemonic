@@ -28,6 +28,7 @@ Before calling `remember`:
 3. Write the note summary-first: put the main fact, decision, or outcome in the opening sentences, then follow with supporting detail.
 4. Pass `cwd` for anything about the current repo, even if you intend to store it in the main vault with `scope: "global"`.
 5. Omit `cwd` only for truly cross-project or personal memories; missing `cwd` makes the note global and unassociated.
+6. After `remember`, `update`, `move_memory`, or consolidation writes, inspect the returned structured persistence status before doing extra verification calls. It tells you the note path, embedding path, embedding outcome, and git commit/push outcome.
 
 ### Choosing note lifecycle
 

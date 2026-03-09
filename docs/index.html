@@ -1691,6 +1691,8 @@ supporting detail.
 Pass `cwd` for anything about the current repo, even if you plan to store it with
 `scope: "global"`. `cwd` sets project association; omitting it creates a truly global note.
 
+After `remember`, `update`, `move_memory`, or a consolidation write, inspect the returned structured persistence status before doing extra verification calls. It reports the canonical note path, embedding path, embedding outcome, and git commit/push outcome.
+
 <span class="cmt">### Choosing note lifecycle</span>
 When calling `remember`, set lifecycle based on whether the note is temporary working state or durable knowledge:
 
@@ -1746,6 +1748,7 @@ If nothing comes to mind within a few seconds, skip it — don't force links.
 - When you recall something and notice it's stale or partially wrong.
 - Don't create a new memory for something that already exists — update the old one.
 - Preserve the existing lifecycle unless you are intentionally changing it.
+- Use the returned persistence status to decide whether you need any follow-up; don't automatically re-check a write that already reports a healthy persisted result.
 
 <span class="cmt">### When to call `forget`</span>
 - When a memory is fully superseded and keeping it would cause confusion.

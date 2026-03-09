@@ -1,6 +1,25 @@
 import type { Vault } from "./vault.js";
 import type { Note, NoteLifecycle, RelationshipType } from "./storage.js";
 
+export interface PersistenceStatus {
+  notePath: string;
+  embeddingPath: string;
+  embedding: {
+    status: "written" | "skipped";
+    model: string;
+    reason?: string;
+  };
+  git: {
+    commit: "committed" | "skipped";
+    push: "pushed" | "skipped";
+    commitMessage?: string;
+    commitBody?: string;
+    commitReason?: string;
+    pushReason?: string;
+  };
+  durability: "local-only" | "committed" | "pushed";
+}
+
 export interface StructuredResponse {
   content: Array<{ type: "text"; text: string }>;
   structuredContent?: Record<string, unknown>;
@@ -16,6 +35,7 @@ export interface RememberResult extends Record<string, unknown> {
   tags: string[];
   lifecycle: NoteLifecycle;
   timestamp: string;
+  persistence: PersistenceStatus;
 }
 
 export interface RecallResult extends Record<string, unknown> {
@@ -97,6 +117,7 @@ export interface MoveResult extends Record<string, unknown> {
   projectAssociation: string;
   title: string;
   metadataRewritten?: boolean;
+  persistence: PersistenceStatus;
 }
 
 export interface UpdateResult extends Record<string, unknown> {
@@ -108,6 +129,7 @@ export interface UpdateResult extends Record<string, unknown> {
   project?: string;
   projectName?: string;
   lifecycle: NoteLifecycle;
+  persistence: PersistenceStatus;
 }
 
 export interface ForgetResult extends Record<string, unknown> {
@@ -150,6 +172,7 @@ export interface ConsolidateResult extends Record<string, unknown> {
   notesProcessed: number;
   notesModified: number;
   warnings?: string[];
+  persistence?: PersistenceStatus;
 }
 
 export interface ProjectIdentityResult extends Record<string, unknown> {
