@@ -3093,7 +3093,7 @@ async function shutdown() {
 }
 process.on("SIGINT", shutdown);
 process.on("SIGTERM", shutdown);
-transport.onclose = () => process.exit(0);
+transport.onclose = async () => { await server.close(); };
 
 await server.connect(transport);
 console.error(`[mnemonic] Started. Main vault: ${VAULT_PATH}`);
