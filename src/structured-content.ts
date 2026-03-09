@@ -470,6 +470,36 @@ export const ReindexResultSchema = z.object({
   })),
 });
 
+export const GetResultSchema = z.object({
+  action: z.literal("got"),
+  count: z.number(),
+  notes: z.array(z.object({
+    id: z.string(),
+    title: z.string(),
+    content: z.string(),
+    project: z.string().optional(),
+    projectName: z.string().optional(),
+    tags: z.array(z.string()),
+    lifecycle: _NoteLifecycle,
+    relatedTo: z.array(z.object({ id: z.string(), type: _RelationshipType })).optional(),
+    createdAt: z.string(),
+    updatedAt: z.string(),
+    vault: _VaultLabel,
+  })),
+  notFound: z.array(z.string()),
+});
+
+export const WhereIsResultSchema = z.object({
+  action: z.literal("located"),
+  id: z.string(),
+  title: z.string(),
+  project: z.string().optional(),
+  projectName: z.string().optional(),
+  vault: _VaultLabel,
+  updatedAt: z.string(),
+  relatedCount: z.number(),
+});
+
 export const ConsolidateResultSchema = z.object({
   action: z.literal("consolidated"),
   strategy: z.string(),

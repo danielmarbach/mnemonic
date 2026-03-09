@@ -456,11 +456,28 @@ describe("local MCP script", () => {
     tempDirs.push(vaultDir, repoDir);
 
     await execFileAsync("git", ["init"], { cwd: repoDir });
+    const embeddingServer = await startFakeEmbeddingServer();
 
-    const syncText = await callLocalMcp(vaultDir, "sync", { cwd: repoDir });
+    try {
+      const rememberText = await callLocalMcp(vaultDir, "remember", {
+        title: "Sync no remote note",
+        content: "Created in main vault with embedding unavailable so sync can backfill it.",
+        scope: "global",
+        summary: "Seed main-vault note without embedding for sync test",
+      }, { ollamaUrl: "http://127.0.0.1:9" });
 
-    expect(syncText).toContain("main vault: no remote configured");
-    expect(syncText).toContain("project vault: no .mnemonic/ found — skipped.");
+      const noteId = extractRememberedId(rememberText);
+      await expect(stat(path.join(vaultDir, "embeddings", `${noteId}.json`))).rejects.toThrow();
+
+      const syncText = await callLocalMcp(vaultDir, "sync", { cwd: repoDir }, embeddingServer.url);
+
+      expect(syncText).toContain("main vault: no remote configured — git sync skipped.");
+      expect(syncText).toContain("main vault: embedded 1 note(s) (including any missing local embeddings).");
+      expect(syncText).toContain("project vault: no .mnemonic/ found — skipped.");
+      await expect(stat(path.join(vaultDir, "embeddings", `${noteId}.json`))).resolves.toBeDefined();
+    } finally {
+      await embeddingServer.close();
+    }
   }, 15000);
 
   it("backfills missing project embeddings during sync on a fresh clone", async () => {
@@ -512,6 +529,128 @@ describe("local MCP script", () => {
       await embeddingServer.close();
     }
   }, 20000);
+
+  it("fetches full note content via get by exact id", async () => {
+    const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-vault-"));
+    tempDirs.push(vaultDir);
+    const embeddingServer = await startFakeEmbeddingServer();
+
+    try {
+      const rememberText = await callLocalMcp(vaultDir, "remember", {
+        title: "Get tool test note",
+        content: "Content only accessible via get.",
+        tags: ["get-test"],
+        scope: "global",
+        summary: "Seed note for get tool test",
+      }, embeddingServer.url);
+
+      const noteId = extractRememberedId(rememberText);
+
+      const response = await callLocalMcpResponse(vaultDir, "get", {
+        ids: [noteId],
+      }, embeddingServer.url);
+
+      expect(response.text).toContain("Get tool test note");
+      expect(response.text).toContain("Content only accessible via get.");
+
+      const structured = response.structuredContent;
+      expect(structured?.["action"]).toBe("got");
+      expect(structured?.["count"]).toBe(1);
+      const notes = structured?.["notes"] as Array<Record<string, unknown>>;
+      expect(notes).toHaveLength(1);
+      expect(notes[0]?.["id"]).toBe(noteId);
+      expect(notes[0]?.["title"]).toBe("Get tool test note");
+      expect(notes[0]?.["content"]).toContain("Content only accessible via get.");
+      expect(notes[0]?.["vault"]).toBe("main-vault");
+      expect(structured?.["notFound"]).toEqual([]);
+    } finally {
+      await embeddingServer.close();
+    }
+  }, 15000);
+
+  it("reports not found ids from get", async () => {
+    const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-vault-"));
+    tempDirs.push(vaultDir);
+
+    const response = await callLocalMcpResponse(vaultDir, "get", {
+      ids: ["nonexistent-id-abc123"],
+    });
+
+    const structured = response.structuredContent;
+    expect(structured?.["action"]).toBe("got");
+    expect(structured?.["count"]).toBe(0);
+    expect(structured?.["notFound"]).toEqual(["nonexistent-id-abc123"]);
+  }, 15000);
+
+  it("locates a memory via where_is_memory", async () => {
+    const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-vault-"));
+    tempDirs.push(vaultDir);
+    const embeddingServer = await startFakeEmbeddingServer();
+
+    try {
+      const rememberText = await callLocalMcp(vaultDir, "remember", {
+        title: "Where is memory test",
+        content: "A note to locate.",
+        scope: "global",
+        summary: "Seed note for where_is_memory test",
+      }, embeddingServer.url);
+
+      const noteId = extractRememberedId(rememberText);
+
+      const response = await callLocalMcpResponse(vaultDir, "where_is_memory", {
+        id: noteId,
+      }, embeddingServer.url);
+
+      expect(response.text).toContain("Where is memory test");
+      expect(response.text).toContain("main-vault");
+
+      const structured = response.structuredContent;
+      expect(structured?.["action"]).toBe("located");
+      expect(structured?.["id"]).toBe(noteId);
+      expect(structured?.["title"]).toBe("Where is memory test");
+      expect(structured?.["vault"]).toBe("main-vault");
+      expect(structured?.["relatedCount"]).toBe(0);
+    } finally {
+      await embeddingServer.close();
+    }
+  }, 15000);
+
+  it("rebuilds all embeddings during sync when force=true", async () => {
+    const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-vault-"));
+    tempDirs.push(vaultDir);
+    const embeddingServer = await startFakeEmbeddingServer();
+
+    try {
+      const rememberText = await callLocalMcp(vaultDir, "remember", {
+        title: "Sync force rebuild note",
+        content: "This note will have its embedding rebuilt by sync force mode.",
+        scope: "global",
+        summary: "Seed note for sync force rebuild test",
+      }, embeddingServer.url);
+
+      const noteId = extractRememberedId(rememberText);
+      const embeddingPath = path.join(vaultDir, "embeddings", `${noteId}.json`);
+      const before = await readFile(embeddingPath, "utf-8");
+
+      const response = await callLocalMcpResponse(vaultDir, "sync", { force: true }, embeddingServer.url);
+
+      expect(response.text).toContain("main vault: no remote configured — git sync skipped.");
+      expect(response.text).toContain("main vault: embedded 1 note(s) (force rebuild).");
+      const structured = response.structuredContent;
+      expect(structured?.["action"]).toBe("synced");
+      const vaults = structured?.["vaults"] as Array<Record<string, unknown>>;
+      expect(vaults).toHaveLength(1);
+      expect(vaults[0]?.["vault"]).toBe("main");
+      expect(vaults[0]?.["embedded"]).toBe(1);
+      expect(vaults[0]?.["failed"]).toEqual([]);
+      await expect(stat(embeddingPath)).resolves.toBeDefined();
+      const after = await readFile(embeddingPath, "utf-8");
+      expect(after).not.toBe("");
+      expect(before).not.toBe("");
+    } finally {
+      await embeddingServer.close();
+    }
+  }, 15000);
 });
 
 async function callLocalMcp(

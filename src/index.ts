@@ -49,7 +49,6 @@ import type {
   MemoryGraphResult,
   ProjectSummaryResult,
   SyncResult as StructuredSyncResult,
-  ReindexResult as StructuredReindexResult,
   PolicyResult,
   ProjectIdentityResult,
   MigrationListResult,
@@ -61,6 +60,7 @@ import {
   RememberResultSchema,
   RecallResultSchema,
   ListResultSchema,
+  GetResultSchema,
   UpdateResultSchema,
   ForgetResultSchema,
   MoveResultSchema,
@@ -69,6 +69,7 @@ import {
   MemoryGraphResultSchema,
   ProjectSummaryResultSchema,
   SyncResultSchema,
+  WhereIsResultSchema,
   ConsolidateResultSchema,
   ProjectIdentityResultSchema,
   MigrationListResultSchema,
@@ -440,7 +441,8 @@ function formatAskForWriteScope(project: Awaited<ReturnType<typeof resolveProjec
 
 async function embedMissingNotes(
   storage: Storage,
-  noteIds?: string[]
+  noteIds?: string[],
+  force = false
 ): Promise<{ rebuilt: number; failed: string[] }> {
   const notes = noteIds
     ? (await Promise.all(noteIds.map((id) => storage.readNote(id)))).filter(Boolean) as Note[]
@@ -458,9 +460,11 @@ async function embedMissingNotes(
         return;
       }
 
-      const existing = await storage.readEmbedding(note.id);
-      if (existing?.model === embedModel) {
-        continue;
+      if (!force) {
+        const existing = await storage.readEmbedding(note.id);
+        if (existing?.model === embedModel) {
+          continue;
+        }
       }
 
       try {
@@ -489,11 +493,12 @@ async function backfillEmbeddingsAfterSync(
   storage: Storage,
   label: string,
   lines: string[],
+  force = false,
 ): Promise<{ embedded: number; failed: string[] }> {
-  const { rebuilt, failed } = await embedMissingNotes(storage);
+  const { rebuilt, failed } = await embedMissingNotes(storage, undefined, force);
   if (rebuilt > 0 || failed.length > 0) {
     lines.push(
-      `${label}: embedded ${rebuilt} note(s) (including any missing local embeddings).` +
+      `${label}: embedded ${rebuilt} note(s)${force ? " (force rebuild)." : " (including any missing local embeddings)."}` +
       `${failed.length > 0 ? ` Failed: ${failed.join(", ")}` : ""}`,
     );
   }
@@ -508,7 +513,7 @@ async function removeStaleEmbeddings(storage: Storage, noteIds: string[]): Promi
 }
 
 function formatSyncResult(result: SyncResult, label: string): string[] {
-  if (!result.hasRemote) return [`${label}: no remote configured — nothing to sync.`];
+  if (!result.hasRemote) return [`${label}: no remote configured — git sync skipped.`];
   const lines: string[] = [];
   lines.push(result.pushedCommits > 0
     ? `${label}: ↑ pushed ${result.pushedCommits} commit(s).`
@@ -583,7 +588,7 @@ type NoteEntry = {
   vault: Vault;
 };
 
-function storageLabel(vault: Vault): string {
+function storageLabel(vault: Vault): "project-vault" | "main-vault" {
   return vault.isProject ? "project-vault" : "main-vault";
 }
 
@@ -1579,6 +1584,119 @@ server.registerTool(
   }
 );
 
+// ── get ───────────────────────────────────────────────────────────────────────
+server.registerTool(
+  "get",
+  {
+    title: "Get Memory",
+    description:
+      "Fetch one or more notes by exact id. Returns full note content, metadata, and relationships. " +
+      "Pass `cwd` to search the project vault when looking up project notes.",
+    inputSchema: z.object({
+      ids: z.array(z.string()).min(1).describe("One or more memory ids to fetch"),
+      cwd: projectParam,
+    }),
+    outputSchema: GetResultSchema,
+  },
+  async ({ ids, cwd }) => {
+    const found: GetResult["notes"] = [];
+    const notFound: string[] = [];
+
+    for (const id of ids) {
+      const result = await vaultManager.findNote(id, cwd);
+      if (!result) {
+        notFound.push(id);
+        continue;
+      }
+      const { note, vault } = result;
+      found.push({
+        id: note.id,
+        title: note.title,
+        content: note.content,
+        project: note.project,
+        projectName: note.projectName,
+        tags: note.tags,
+        lifecycle: note.lifecycle,
+        relatedTo: note.relatedTo,
+        createdAt: note.createdAt,
+        updatedAt: note.updatedAt,
+        vault: storageLabel(vault),
+      });
+    }
+
+    const lines: string[] = [];
+    for (const note of found) {
+      lines.push(`## ${note.title} (${note.id})`);
+      lines.push(`project: ${note.projectName ?? note.project ?? "global"} | stored: ${note.vault} | lifecycle: ${note.lifecycle}`);
+      if (note.tags.length > 0) lines.push(`tags: ${note.tags.join(", ")}`);
+      lines.push("");
+      lines.push(note.content);
+      lines.push("");
+    }
+    if (notFound.length > 0) {
+      lines.push(`Not found: ${notFound.join(", ")}`);
+    }
+
+    const structuredContent: GetResult = {
+      action: "got",
+      count: found.length,
+      notes: found,
+      notFound,
+    };
+
+    return { content: [{ type: "text", text: lines.join("\n").trim() }], structuredContent };
+  }
+);
+
+// ── where_is_memory ───────────────────────────────────────────────────────────
+server.registerTool(
+  "where_is_memory",
+  {
+    title: "Where Is Memory",
+    description:
+      "Show a memory's project association and actual storage location (main vault or project vault). " +
+      "Lightweight alternative to `get` when you only need location metadata, not content. " +
+      "Pass `cwd` to include the project vault when searching.",
+    inputSchema: z.object({
+      id: z.string().describe("Memory id to locate"),
+      cwd: projectParam,
+    }),
+    outputSchema: WhereIsResultSchema,
+  },
+  async ({ id, cwd }) => {
+    const found = await vaultManager.findNote(id, cwd);
+    if (!found) {
+      return { content: [{ type: "text", text: `No memory found with id '${id}'` }], isError: true };
+    }
+
+    const { note, vault } = found;
+    const vaultLabel = storageLabel(vault);
+    const projectDisplay = note.projectName && note.project
+      ? `${note.projectName} (${note.project})`
+      : note.projectName ?? note.project ?? "global";
+    const relatedCount = note.relatedTo?.length ?? 0;
+
+    const structuredContent: WhereIsResult = {
+      action: "located",
+      id: note.id,
+      title: note.title,
+      project: note.project,
+      projectName: note.projectName,
+      vault: vaultLabel,
+      updatedAt: note.updatedAt,
+      relatedCount,
+    };
+
+    return {
+      content: [{
+        type: "text",
+        text: `'${note.title}' (${id})\nproject: ${projectDisplay} | stored: ${vaultLabel} | updated: ${note.updatedAt} | related: ${relatedCount}`,
+      }],
+      structuredContent,
+    };
+  }
+);
+
 // ── list ──────────────────────────────────────────────────────────────────────
 server.registerTool(
   "list",
@@ -1914,15 +2032,18 @@ server.registerTool(
   {
     title: "Sync",
     description:
-      "Bidirectional git sync. Always syncs the main vault. " +
+      "Bring the vault to a fully operational state: git sync when a remote exists, " +
+      "plus embedding backfill always. Use `force=true` to rebuild all embeddings. " +
+      "Always syncs the main vault. " +
       "When `cwd` is provided, also syncs the project vault (.mnemonic/) " +
       "so you pull in notes added by collaborators.",
     inputSchema: z.object({
       cwd: projectParam,
+      force: z.boolean().optional().default(false).describe("Rebuild all embeddings even if current model already has them"),
     }),
     outputSchema: SyncResultSchema,
   },
-  async ({ cwd }) => {
+  async ({ cwd, force }) => {
     const lines: string[] = [];
     const vaultResults: Array<{ vault: "main" | "project"; hasRemote: boolean; pulled: number; deleted: number; pushed: number; embedded: number; failed: string[] }> = [];
 
@@ -1931,11 +2052,9 @@ server.registerTool(
     lines.push(...formatSyncResult(mainResult, "main vault"));
     let mainEmbedded = 0;
     let mainFailed: string[] = [];
-    if (mainResult.hasRemote) {
-      const result = await backfillEmbeddingsAfterSync(vaultManager.main.storage, "main vault", lines);
-      mainEmbedded = result.embedded;
-      mainFailed = result.failed;
-    }
+    const mainBackfill = await backfillEmbeddingsAfterSync(vaultManager.main.storage, "main vault", lines, force);
+    mainEmbedded = mainBackfill.embedded;
+    mainFailed = mainBackfill.failed;
     if (mainResult.deletedNoteIds.length > 0) {
       await removeStaleEmbeddings(vaultManager.main.storage, mainResult.deletedNoteIds);
     }
@@ -1957,11 +2076,9 @@ server.registerTool(
         lines.push(...formatSyncResult(projectResult, "project vault"));
         let projEmbedded = 0;
         let projFailed: string[] = [];
-        if (projectResult.hasRemote) {
-          const result = await backfillEmbeddingsAfterSync(projectVault.storage, "project vault", lines);
-          projEmbedded = result.embedded;
-          projFailed = result.failed;
-        }
+        const projectBackfill = await backfillEmbeddingsAfterSync(projectVault.storage, "project vault", lines, force);
+        projEmbedded = projectBackfill.embedded;
+        projFailed = projectBackfill.failed;
         if (projectResult.deletedNoteIds.length > 0) {
           await removeStaleEmbeddings(projectVault.storage, projectResult.deletedNoteIds);
         }
