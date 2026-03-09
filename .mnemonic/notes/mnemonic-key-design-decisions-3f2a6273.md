@@ -7,7 +7,7 @@ tags:
   - rationale
 lifecycle: permanent
 createdAt: '2026-03-07T17:59:12.124Z'
-updatedAt: '2026-03-08T14:08:04.842Z'
+updatedAt: '2026-03-09T10:07:28.474Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
@@ -29,7 +29,7 @@ memoryVersion: 1
 ---
 **One file per note:** Critical for git conflict isolation. Never aggregate notes into a single file.
 
-**Embeddings gitignored:** Derived data, always recomputable. Committing them causes unresolvable merge conflicts (can't merge float arrays). `sync` auto-embeds notes that arrive from remote.
+**Embeddings gitignored:** Derived data, always recomputable. Committing them causes unresolvable merge conflicts (can't merge float arrays). `sync` now backfills missing local embeddings for each synced vault, even when no notes were newly pulled, so fresh clones heal automatically once Ollama is available.
 
 **Rebase on pull:** `git pull --rebase` keeps history linear. Don't switch to merge.
 
@@ -38,3 +38,5 @@ memoryVersion: 1
 **Similarity boost, not hard filter:** `recall` gives project notes +0.15 cosine similarity boost rather than excluding global notes. Global memories (user prefs, cross-project patterns) remain accessible in project context.
 
 **No auto-relationship via LLM:** Decided against using a local Qwen model to auto-build relationships. Small models lack session context, produce spurious edges, and corrupt the graph silently. Instead: agent instructions prompt `relate` immediately after `remember` while session context is warm.
+
+**Metadata-only changes don't re-embed:** Lifecycle migrations and other metadata-only edits do not recompute embeddings. Embeddings refresh when note title/content changes, during sync backfill, or via explicit `reindex`.

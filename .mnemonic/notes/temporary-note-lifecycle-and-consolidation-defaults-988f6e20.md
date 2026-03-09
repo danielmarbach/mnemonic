@@ -8,7 +8,7 @@ tags:
   - plans
 lifecycle: permanent
 createdAt: '2026-03-09T09:07:22.778Z'
-updatedAt: '2026-03-09T10:04:29.614Z'
+updatedAt: '2026-03-09T10:07:28.462Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 memoryVersion: 1
@@ -26,7 +26,5 @@ Key decisions from the design discussion:
 - A consolidated note created from temporary notes should become `permanent` by default because it represents the durable outcome after the scaffolding has served its purpose.
 - The lifecycle decision rubric should be documented in `AGENT.md`, the README system prompt snippet, and the mirrored `docs/index.html` prompt snippet so MCP clients know when to choose temporary vs permanent.
 - Metadata-only lifecycle migrations do not recompute embeddings. Embeddings remain derived from note title/content and are only refreshed when semantic content changes or when `reindex` is run explicitly.
-- Fresh-machine recovery should happen through `sync`, not manual `reindex`: after git sync, each synced vault should backfill any missing local embeddings even when no notes were newly pulled, so clones with existing `.mnemonic/notes` heal automatically once Ollama is available.
-- Sync output should say that embeddings may include missing local backfill work, not only newly pulled notes.
 
-Intent: temporary notes exist to support active work and should disappear cleanly once consolidated into a durable note, without overloading tags or introducing a larger storage-layout refactor. Fresh-machine bootstrap should be consistent with normal multi-machine usage, so `sync` is the primary recovery path for missing local embeddings.
+Intent: temporary notes exist to support active work and should disappear cleanly once consolidated into a durable note, without overloading tags or introducing a larger storage-layout refactor.
