@@ -456,11 +456,28 @@ describe("local MCP script", () => {
     tempDirs.push(vaultDir, repoDir);
 
     await execFileAsync("git", ["init"], { cwd: repoDir });
+    const embeddingServer = await startFakeEmbeddingServer();
 
-    const syncText = await callLocalMcp(vaultDir, "sync", { cwd: repoDir });
+    try {
+      const rememberText = await callLocalMcp(vaultDir, "remember", {
+        title: "Sync no remote note",
+        content: "Created in main vault with embedding unavailable so sync can backfill it.",
+        scope: "global",
+        summary: "Seed main-vault note without embedding for sync test",
+      }, { ollamaUrl: "http://127.0.0.1:9" });
 
-    expect(syncText).toContain("main vault: no remote configured");
-    expect(syncText).toContain("project vault: no .mnemonic/ found — skipped.");
+      const noteId = extractRememberedId(rememberText);
+      await expect(stat(path.join(vaultDir, "embeddings", `${noteId}.json`))).rejects.toThrow();
+
+      const syncText = await callLocalMcp(vaultDir, "sync", { cwd: repoDir }, embeddingServer.url);
+
+      expect(syncText).toContain("main vault: no remote configured — git sync skipped.");
+      expect(syncText).toContain("main vault: embedded 1 note(s) (including any missing local embeddings).");
+      expect(syncText).toContain("project vault: no .mnemonic/ found — skipped.");
+      await expect(stat(path.join(vaultDir, "embeddings", `${noteId}.json`))).resolves.toBeDefined();
+    } finally {
+      await embeddingServer.close();
+    }
   }, 15000);
 
   it("backfills missing project embeddings during sync on a fresh clone", async () => {
@@ -598,38 +615,38 @@ describe("local MCP script", () => {
     }
   }, 15000);
 
-  it("reindexes missing embeddings without git operations", async () => {
+  it("rebuilds all embeddings during sync when force=true", async () => {
     const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-vault-"));
     tempDirs.push(vaultDir);
     const embeddingServer = await startFakeEmbeddingServer();
 
     try {
-      // Remember with Ollama down — embedding will be skipped
       const rememberText = await callLocalMcp(vaultDir, "remember", {
-        title: "Reindex test note",
-        content: "This note has no embedding yet.",
+        title: "Sync force rebuild note",
+        content: "This note will have its embedding rebuilt by sync force mode.",
         scope: "global",
-        summary: "Seed note with no embedding",
-      }, { ollamaUrl: "http://127.0.0.1:9" });
+        summary: "Seed note for sync force rebuild test",
+      }, embeddingServer.url);
 
       const noteId = extractRememberedId(rememberText);
       const embeddingPath = path.join(vaultDir, "embeddings", `${noteId}.json`);
-      await expect(stat(embeddingPath)).rejects.toThrow(); // no embedding written
+      const before = await readFile(embeddingPath, "utf-8");
 
-      // Reindex with Ollama available
-      const response = await callLocalMcpResponse(vaultDir, "reindex", {}, embeddingServer.url);
+      const response = await callLocalMcpResponse(vaultDir, "sync", { force: true }, embeddingServer.url);
 
-      expect(response.text).toContain("main vault: rebuilt 1 embedding(s)");
-
+      expect(response.text).toContain("main vault: no remote configured — git sync skipped.");
+      expect(response.text).toContain("main vault: embedded 1 note(s) (force rebuild).");
       const structured = response.structuredContent;
-      expect(structured?.["action"]).toBe("reindexed");
+      expect(structured?.["action"]).toBe("synced");
       const vaults = structured?.["vaults"] as Array<Record<string, unknown>>;
       expect(vaults).toHaveLength(1);
       expect(vaults[0]?.["vault"]).toBe("main");
-      expect(vaults[0]?.["rebuilt"]).toBe(1);
+      expect(vaults[0]?.["embedded"]).toBe(1);
       expect(vaults[0]?.["failed"]).toEqual([]);
-
       await expect(stat(embeddingPath)).resolves.toBeDefined();
+      const after = await readFile(embeddingPath, "utf-8");
+      expect(after).not.toBe("");
+      expect(before).not.toBe("");
     } finally {
       await embeddingServer.close();
     }

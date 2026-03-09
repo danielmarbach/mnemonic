@@ -84,7 +84,7 @@ You can also set a per-project default once with `set_project_memory_policy`. Af
 Notes are plain markdown with YAML frontmatter — readable, diffable, mergeable.
 Each note also carries a `lifecycle` of `temporary` or `permanent`: use `temporary` for working-state scaffolding such as plans and WIP checkpoints, and `permanent` for durable knowledge you want future sessions to keep.
 Memory content is markdown-linted on `remember`/`update`: fixable issues are auto-corrected before save, and non-fixable issues are rejected.
-Embeddings stay local (gitignored) and are rebuilt on each machine with `reindex`.
+Embeddings stay local (gitignored). `sync` backfills missing local embeddings on every run, and `sync { force: true }` rebuilds all embeddings when needed.
 Mnemonic uses Ollama's `/api/embed` endpoint with truncation enabled so longer notes still embed safely with `nomic-embed-text-v2-moe`.
 
 Each vault has its own `config.json` with a `schemaVersion`, so main and project vaults can migrate independently. The main vault config in `~/mnemonic-vault/config.json` also holds machine-local runtime tuning, per-project memory policies, and optional project-identity remote overrides for fork workflows. Today it includes `reindexEmbedConcurrency`, which defaults to `4` and is clamped to the range `1..16`.
@@ -96,7 +96,7 @@ Each vault has its own `config.json` with a `schemaVersion`, so main and project
 - `execute_migration` and `mnemonic migrate --dry-run` let you preview changes before applying them.
 - Non-dry-run migrations update a vault's schema only after the full vault run succeeds.
 - Failed migration runs roll staged note writes back instead of leaving partial note edits in the working tree.
-- Metadata-only migrations do not re-embed notes automatically; embeddings are only recomputed when title/content changes or when you run `reindex`.
+- Metadata-only migrations do not re-embed notes automatically; embeddings are only recomputed when title/content changes or during `sync` backfill.
 
 If you maintain mnemonic itself and add a new latest-schema migration, bump `defaultConfig.schemaVersion` in `src/config.ts` in the same change so fresh installs start at the current schema.
 
@@ -298,12 +298,11 @@ For local development against this repository's current source tree, use `npm ru
 | `project_memory_summary` | Summarize what mnemonic knows about the current project                 |
 | `recall`         | Semantic search — project-boosted when `cwd` provided                           |
 | `recent_memories` | Show the most recently updated memories for a scope                            |
-| `reindex`        | Manually rebuild missing embeddings (sync does this automatically)              |
 | `relate`         | Create a typed relationship between two memories (bidirectional by default)     |
 | `remember`       | Store a memory with project context from `cwd`, storage controlled by `scope`, and retention controlled by `lifecycle` |
 | `set_project_identity` | Override which git remote defines project identity for a repo       |
 | `set_project_memory_policy` | Set the default write scope and consolidation mode for a project |
-| `sync`           | Bidirectional sync — pulls remote, pushes local commits, auto-embeds new notes  |
+| `sync`           | Git sync when remote exists, plus embedding backfill always; `force=true` rebuilds all embeddings |
 | `unrelate`       | Remove a relationship between two memories                                      |
 | `update`         | Update content, title, tags, or lifecycle; `cwd` helps locate project notes     |
 | `where_is_memory` | Show a memory's project association and actual storage location                |

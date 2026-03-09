@@ -49,7 +49,6 @@ import type {
   MemoryGraphResult,
   ProjectSummaryResult,
   SyncResult as StructuredSyncResult,
-  ReindexResult as StructuredReindexResult,
   PolicyResult,
   ProjectIdentityResult,
   MigrationListResult,
@@ -70,7 +69,6 @@ import {
   MemoryGraphResultSchema,
   ProjectSummaryResultSchema,
   SyncResultSchema,
-  ReindexResultSchema,
   WhereIsResultSchema,
   ConsolidateResultSchema,
   ProjectIdentityResultSchema,
@@ -495,11 +493,12 @@ async function backfillEmbeddingsAfterSync(
   storage: Storage,
   label: string,
   lines: string[],
+  force = false,
 ): Promise<{ embedded: number; failed: string[] }> {
-  const { rebuilt, failed } = await embedMissingNotes(storage);
+  const { rebuilt, failed } = await embedMissingNotes(storage, undefined, force);
   if (rebuilt > 0 || failed.length > 0) {
     lines.push(
-      `${label}: embedded ${rebuilt} note(s) (including any missing local embeddings).` +
+      `${label}: embedded ${rebuilt} note(s)${force ? " (force rebuild)." : " (including any missing local embeddings)."}` +
       `${failed.length > 0 ? ` Failed: ${failed.join(", ")}` : ""}`,
     );
   }
@@ -514,7 +513,7 @@ async function removeStaleEmbeddings(storage: Storage, noteIds: string[]): Promi
 }
 
 function formatSyncResult(result: SyncResult, label: string): string[] {
-  if (!result.hasRemote) return [`${label}: no remote configured — nothing to sync.`];
+  if (!result.hasRemote) return [`${label}: no remote configured — git sync skipped.`];
   const lines: string[] = [];
   lines.push(result.pushedCommits > 0
     ? `${label}: ↑ pushed ${result.pushedCommits} commit(s).`
@@ -1698,53 +1697,6 @@ server.registerTool(
   }
 );
 
-// ── reindex ───────────────────────────────────────────────────────────────────
-server.registerTool(
-  "reindex",
-  {
-    title: "Reindex",
-    description:
-      "Rebuild embeddings for notes that are missing them or have a stale model. " +
-      "Use `force=true` to rebuild all embeddings regardless of model. " +
-      "Useful on a fresh clone (embeddings are gitignored), after switching embedding models, " +
-      "or when Ollama was unavailable during earlier writes. " +
-      "Always reindexes the main vault. Pass `cwd` to also reindex the project vault.",
-    inputSchema: z.object({
-      cwd: projectParam,
-      force: z.boolean().optional().default(false).describe("Rebuild all embeddings even if current model already has them"),
-    }),
-    outputSchema: ReindexResultSchema,
-  },
-  async ({ cwd, force }) => {
-    const lines: string[] = [];
-    const vaultResults: Array<{ vault: "main" | "project"; rebuilt: number; failed: string[] }> = [];
-
-    // Always reindex main vault
-    const { rebuilt: mainRebuilt, failed: mainFailed } = await embedMissingNotes(vaultManager.main.storage, undefined, force);
-    lines.push(`main vault: rebuilt ${mainRebuilt} embedding(s)${mainFailed.length > 0 ? `, failed: ${mainFailed.join(", ")}` : ""}.`);
-    vaultResults.push({ vault: "main", rebuilt: mainRebuilt, failed: mainFailed });
-
-    // Optionally reindex project vault
-    if (cwd) {
-      const projectVault = await vaultManager.getProjectVaultIfExists(cwd);
-      if (projectVault) {
-        const { rebuilt: projRebuilt, failed: projFailed } = await embedMissingNotes(projectVault.storage, undefined, force);
-        lines.push(`project vault: rebuilt ${projRebuilt} embedding(s)${projFailed.length > 0 ? `, failed: ${projFailed.join(", ")}` : ""}.`);
-        vaultResults.push({ vault: "project", rebuilt: projRebuilt, failed: projFailed });
-      } else {
-        lines.push("project vault: no .mnemonic/ found — skipped.");
-      }
-    }
-
-    const structuredContent: StructuredReindexResult = {
-      action: "reindexed",
-      vaults: vaultResults,
-    };
-
-    return { content: [{ type: "text", text: lines.join("\n") }], structuredContent };
-  }
-);
-
 // ── list ──────────────────────────────────────────────────────────────────────
 server.registerTool(
   "list",
@@ -2080,15 +2032,18 @@ server.registerTool(
   {
     title: "Sync",
     description:
-      "Bidirectional git sync. Always syncs the main vault. " +
+      "Bring the vault to a fully operational state: git sync when a remote exists, " +
+      "plus embedding backfill always. Use `force=true` to rebuild all embeddings. " +
+      "Always syncs the main vault. " +
       "When `cwd` is provided, also syncs the project vault (.mnemonic/) " +
       "so you pull in notes added by collaborators.",
     inputSchema: z.object({
       cwd: projectParam,
+      force: z.boolean().optional().default(false).describe("Rebuild all embeddings even if current model already has them"),
     }),
     outputSchema: SyncResultSchema,
   },
-  async ({ cwd }) => {
+  async ({ cwd, force }) => {
     const lines: string[] = [];
     const vaultResults: Array<{ vault: "main" | "project"; hasRemote: boolean; pulled: number; deleted: number; pushed: number; embedded: number; failed: string[] }> = [];
 
@@ -2097,11 +2052,9 @@ server.registerTool(
     lines.push(...formatSyncResult(mainResult, "main vault"));
     let mainEmbedded = 0;
     let mainFailed: string[] = [];
-    if (mainResult.hasRemote) {
-      const result = await backfillEmbeddingsAfterSync(vaultManager.main.storage, "main vault", lines);
-      mainEmbedded = result.embedded;
-      mainFailed = result.failed;
-    }
+    const mainBackfill = await backfillEmbeddingsAfterSync(vaultManager.main.storage, "main vault", lines, force);
+    mainEmbedded = mainBackfill.embedded;
+    mainFailed = mainBackfill.failed;
     if (mainResult.deletedNoteIds.length > 0) {
       await removeStaleEmbeddings(vaultManager.main.storage, mainResult.deletedNoteIds);
     }
@@ -2123,11 +2076,9 @@ server.registerTool(
         lines.push(...formatSyncResult(projectResult, "project vault"));
         let projEmbedded = 0;
         let projFailed: string[] = [];
-        if (projectResult.hasRemote) {
-          const result = await backfillEmbeddingsAfterSync(projectVault.storage, "project vault", lines);
-          projEmbedded = result.embedded;
-          projFailed = result.failed;
-        }
+        const projectBackfill = await backfillEmbeddingsAfterSync(projectVault.storage, "project vault", lines, force);
+        projEmbedded = projectBackfill.embedded;
+        projFailed = projectBackfill.failed;
         if (projectResult.deletedNoteIds.length > 0) {
           await removeStaleEmbeddings(projectVault.storage, projectResult.deletedNoteIds);
         }

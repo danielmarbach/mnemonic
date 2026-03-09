@@ -23,7 +23,7 @@
 - Notes live in `notes/<id>.md` with YAML frontmatter and markdown body.
 - Embeddings live in `embeddings/<id>.json` and are gitignored.
 - A note can be global or project-associated, and can hold typed relationships to other notes.
-- Metadata-only note changes such as lifecycle migrations do not require re-embedding; embeddings are refreshed when title/content changes or via explicit reindexing.
+- Metadata-only note changes such as lifecycle migrations do not require re-embedding; embeddings are refreshed when title/content changes or during sync backfill.
 
 ### Project identity
 
@@ -117,6 +117,7 @@ flowchart TD
 ### Sync and migration flow
 
 - `GitOps.sync()` performs `fetch -> count unpushed commits -> pull --rebase -> diff note changes -> push` and returns note ids that need re-embedding.
+- The MCP `sync` tool always runs embedding backfill after git handling, even when no remote exists, and `force=true` rebuilds all embeddings.
 - `Migrator` applies schema-aware note migrations across loaded vaults and updates each vault's `config.json` schema version only after successful non-dry-run execution for that vault.
 
 #### Migration invariants

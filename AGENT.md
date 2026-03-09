@@ -147,8 +147,8 @@ Human-readable summary.
 
 ### Embeddings gitignored
 - Derived data, recomputable; avoids binary merge conflicts
-- Reindex on new machine is fast at personal scale
-- `sync` auto-embeds pulled notes
+- `sync` backfills missing local embeddings on every run
+- `sync { force: true }` rebuilds all embeddings when needed
 
 ### Project scoping via git remote URL
 ```
@@ -166,7 +166,7 @@ When `recall` called with `cwd`, project notes get **+0.15 cosine similarity boo
 
 ### Routing rules
 - `cwd` identifies project context (separate from write location)
-- Treat `cwd` as mandatory for project-specific `remember`, `recall`, `update`, `move_memory`, `get`, `list`, `sync`, and `reindex` calls
+- Treat `cwd` as mandatory for project-specific `remember`, `recall`, `update`, `move_memory`, `get`, `list`, and `sync` calls
 - `remember` + `scope: "project"` → project vault (creates `.mnemonic/`)
 - `remember` + `scope: "global"` → main vault (keeps project in frontmatter)
 - `scope` omitted → use saved policy or fallback to `project` with `cwd`
@@ -174,7 +174,7 @@ When `recall` called with `cwd`, project notes get **+0.15 cosine similarity boo
 - `remember` without `cwd` → main vault
 - `move_memory` main-vault → project-vault rewrites `project` / `projectName` from `cwd`
 - `move_memory` project-vault → main-vault preserves project association while changing storage
-- `recall`, `list`, `get`, `sync`, `reindex` → project vault first, then main
+- `recall`, `list`, `get`, `sync` → project vault first, then main
 - `relate`/`unrelate`/`forget` → any vault, commit per vault
 - Main vault's own git repo excluded from detection (`isMainRepo()` guard)
 
@@ -182,7 +182,7 @@ When `recall` called with `cwd`, project notes get **+0.15 cosine similarity boo
 Machine-local settings in `~/mnemonic-vault/config.json`. Survives sessions without becoming memory notes. Includes `reindexEmbedConcurrency`, per-project policy defaults, and optional project-identity remote overrides for fork workflows.
 
 ### Bidirectional sync
-`sync` does: fetch → record HEAD → pull (rebase) → diff notes/ → push → embed arrivals. Single call, linear history. Syncs main vault; pass `cwd` for project vault too.
+`sync` does: fetch/pull/push when a remote exists, plus embedding backfill on every run. `sync { force: true }` rebuilds all embeddings. Single call, linear history. Syncs main vault; pass `cwd` for project vault too.
 
 ### MCP output style
 Optimized for LLM consumption:
@@ -241,12 +241,11 @@ Keep these high-level anchors in mind:
 | `project_memory_summary` | Summarize what mnemonic knows about a project |
 | `recall` | Semantic search with optional project boost |
 | `recent_memories` | Show most recently updated notes for scope |
-| `reindex` | Rebuild missing embeddings; `force=true` rebuilds all |
 | `remember` | Write note + embedding; `cwd` sets context, `scope` picks storage, `lifecycle` picks temporary vs permanent |
 | `relate` | Create typed relationship between notes (bidirectional) |
 | `set_project_identity` | Save which git remote defines project identity |
 | `set_project_memory_policy` | Save default write scope for project (`project`, `global`, `ask`) |
-| `sync` | Bidirectional git sync, pull, push, auto-embed pulled notes |
+| `sync` | Git sync when remote exists plus embedding backfill always; `force=true` rebuilds all embeddings |
 | `unrelate` | Remove relationship between notes |
 | `update` | Update note content/title/tags/lifecycle, re-embeds always |
 | `where_is_memory` | Show note's project association and storage location |
@@ -368,7 +367,7 @@ All new MCP tools MUST be documented in both AGENT.md and README.md:
 ## Critical constraints
 
 - **One file per note** — git conflict isolation
-- **Embeddings gitignored** — avoid binary merge conflicts; reindex if needed
+- **Embeddings gitignored** — avoid binary merge conflicts; sync backfills them locally as needed
 - **Rebase on pull** — linear history
 - **Project id from git remote URL** — cross-machine consistency
 - **Similarity boost (not hard filter)** — keep global memories accessible
@@ -378,7 +377,7 @@ All new MCP tools MUST be documented in both AGENT.md and README.md:
 
 ## Known limitations
 
-- **Bounded parallel embedding** — small concurrency limit during reindex
+- **Bounded parallel embedding** — small concurrency limit during sync embedding backfill
 - **No full-text fallback** — fails if Ollama down (could add keyword search)
-- **Embedding model mismatch** — `reindex --force` fixes; no auto-detection
+- **Embedding model mismatch** — `sync --force` fixes; no auto-detection
 - **No web UI** — vault is just files; use any markdown editor
