@@ -202,6 +202,194 @@ Examples:
   await new Promise(() => {});
 }
 
+// ── CLI: import-claude-memory ─────────────────────────────────────────────────
+
+if (process.argv[2] === "import-claude-memory") {
+  const VAULT_PATH = process.env["VAULT_PATH"]
+    ? path.resolve(process.env["VAULT_PATH"])
+    : path.join(process.env["HOME"] ?? "~", "mnemonic-vault");
+
+  const CLAUDE_HOME = process.env["CLAUDE_HOME"]
+    ? path.resolve(process.env["CLAUDE_HOME"])
+    : path.join(process.env["HOME"] ?? "~", ".claude");
+
+  function parseMemorySections(content: string): Array<{ title: string; content: string }> {
+    const lines = content.split("\n");
+    const sections: Array<{ title: string; content: string }> = [];
+    let currentTitle = "";
+    let currentLines: string[] = [];
+
+    for (const line of lines) {
+      if (line.startsWith("## ")) {
+        if (currentTitle) {
+          sections.push({ title: currentTitle, content: currentLines.join("\n").trim() });
+        }
+        currentTitle = line.slice(3).trim();
+        currentLines = [];
+      } else if (currentTitle) {
+        currentLines.push(line);
+      }
+    }
+
+    if (currentTitle) {
+      sections.push({ title: currentTitle, content: currentLines.join("\n").trim() });
+    }
+
+    return sections.filter(s => s.content.length > 0);
+  }
+
+  function makeImportNoteId(title: string): string {
+    const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60);
+    const suffix = randomUUID().split("-")[0]!;
+    return slug ? `${slug}-${suffix}` : suffix;
+  }
+
+  async function runImportCli() {
+    const argv = process.argv.slice(3);
+
+    if (argv.includes("--help") || argv.includes("-h")) {
+      console.log(`
+Mnemonic: Import Claude Code Auto-Memory
+
+Usage:
+  mnemonic import-claude-memory [options]
+
+Options:
+  --dry-run         Show what would be imported without writing anything
+  --cwd=<path>      Project path to resolve Claude memory for (default: cwd)
+  --claude-home=<p> Claude home directory (default: ~/.claude, or $CLAUDE_HOME)
+  --help            Show this help message
+
+How it works:
+  Claude Code stores per-project auto-memory in:
+    ~/.claude/projects/<encoded-path>/memory/*.md
+
+  Each ## heading in those files becomes a separate mnemonic note
+  tagged with "claude-memory" and "imported". Notes with duplicate
+  titles are skipped.
+
+Examples:
+  mnemonic import-claude-memory --dry-run
+  mnemonic import-claude-memory
+  mnemonic import-claude-memory --cwd=/path/to/project
+`);
+      process.exit(0);
+    }
+
+    const dryRun = argv.includes("--dry-run");
+    const cwdOption = argv.find(arg => arg.startsWith("--cwd="));
+    const targetCwd = cwdOption ? path.resolve(cwdOption.split("=")[1]!) : process.cwd();
+    const claudeHomeOption = argv.find(arg => arg.startsWith("--claude-home="));
+    const claudeHome = claudeHomeOption ? path.resolve(claudeHomeOption.split("=")[1]!) : CLAUDE_HOME;
+
+    // Encode the project path the same way Claude Code does:
+    // /Users/foo/Projects/bar → -Users-foo-Projects-bar
+    const projectDirName = targetCwd.replace(/\//g, "-");
+    const memoryDir = path.join(claudeHome, "projects", projectDirName, "memory");
+
+    try {
+      await fs.access(memoryDir);
+    } catch {
+      console.log(`No Claude memory found for this project.`);
+      console.log(`Expected: ${memoryDir}`);
+      process.exit(0);
+    }
+
+    const files = (await fs.readdir(memoryDir)).filter(f => f.endsWith(".md")).sort();
+    if (files.length === 0) {
+      console.log("No markdown files found in Claude memory directory.");
+      process.exit(0);
+    }
+
+    console.log(`Found ${files.length} file(s) in ${memoryDir}`);
+
+    const vaultManager = new VaultManager(VAULT_PATH);
+    await vaultManager.initMain();
+    const vault = vaultManager.main;
+
+    const existingNotes = await vault.storage.listNotes();
+    const existingTitles = new Set(existingNotes.map(n => n.title.toLowerCase()));
+
+    const now = new Date().toISOString();
+    const notesToWrite: import("./storage.js").Note[] = [];
+    const skipped: string[] = [];
+
+    for (const file of files) {
+      const raw = await fs.readFile(path.join(memoryDir, file), "utf-8");
+      const sections = parseMemorySections(raw);
+      const sourceTag = file.replace(/\.md$/i, "").toLowerCase().replace(/[^a-z0-9]+/g, "-");
+
+      for (const section of sections) {
+        if (existingTitles.has(section.title.toLowerCase())) {
+          skipped.push(section.title);
+          continue;
+        }
+
+        notesToWrite.push({
+          id: makeImportNoteId(section.title),
+          title: section.title,
+          content: section.content,
+          tags: ["claude-memory", "imported", sourceTag],
+          lifecycle: "permanent",
+          createdAt: now,
+          updatedAt: now,
+          memoryVersion: 1,
+        });
+      }
+    }
+
+    if (skipped.length > 0) {
+      console.log(`\nSkipped (title already exists in vault):`);
+      skipped.forEach(t => console.log(`  ~ ${t}`));
+    }
+
+    if (notesToWrite.length === 0) {
+      console.log("\nNothing new to import.");
+      process.exit(0);
+    }
+
+    console.log(`\nSections to import (${notesToWrite.length}):`);
+    notesToWrite.forEach(n => console.log(`  + ${n.title}`));
+
+    if (dryRun) {
+      console.log("\n✓ Dry-run complete — no changes written");
+      process.exit(0);
+    }
+
+    const filesToCommit: string[] = [];
+    for (const note of notesToWrite) {
+      await vault.storage.writeNote(note);
+      filesToCommit.push(`notes/${note.id}.md`);
+    }
+
+    const commitMessage = [
+      `import: claude-memory (${notesToWrite.length} note${notesToWrite.length === 1 ? "" : "s"})`,
+      "",
+      `- Notes: ${notesToWrite.length}`,
+      `- Source: ${memoryDir}`,
+      `- Skipped: ${skipped.length} (already exist)`,
+    ].join("\n");
+
+    try {
+      await vault.git.commit(commitMessage, filesToCommit);
+      await vault.git.push();
+    } catch (err) {
+      console.error(`\nNotes written but git operation failed: ${err}`);
+    }
+
+    console.log(`\n✓ Imported ${notesToWrite.length} note${notesToWrite.length === 1 ? "" : "s"} into main vault`);
+    process.exit(0);
+  }
+
+  runImportCli().catch(err => {
+    console.error("Import failed:", err);
+    process.exit(1);
+  });
+
+  // Wait for async operations to complete
+  await new Promise(() => {});
+}
+
 // ── Config ────────────────────────────────────────────────────────────────────
 
 const VAULT_PATH = process.env["VAULT_PATH"]
