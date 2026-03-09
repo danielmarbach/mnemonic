@@ -10,7 +10,7 @@ createdAt: '2026-03-08T17:33:40.111Z'
 updatedAt: '2026-03-08T17:33:40.111Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
-memoryVersion: 0
+memoryVersion: 1
 ---
 Consolidated the brief duplicate note with the detailed project-scoped implementation record to keep a single canonical memory for the test work.
 

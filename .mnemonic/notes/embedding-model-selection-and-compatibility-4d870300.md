@@ -16,7 +16,7 @@ relatedTo:
     type: related-to
   - id: mnemonic-key-design-decisions-3f2a6273
     type: related-to
-memoryVersion: 0
+memoryVersion: 1
 ---
 Authoritative note for mnemonic embedding behavior, model-default rationale, compatibility, and benchmarked alternatives.
 
