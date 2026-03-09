@@ -1,3 +1,7 @@
+import fs from "fs/promises";
+import path from "path";
+import matter from "gray-matter";
+
 import type { Vault, VaultManager } from "./vault.js";
 import type { Note } from "./storage.js";
 import { readVaultSchemaVersion, writeVaultSchemaVersion } from "./config.js";
@@ -262,6 +266,7 @@ export class Migrator {
 
   private registerBuiltInMigrations(): void {
     this.registerMigration(createV010BackfillMemoryVersionMigration());
+    this.registerMigration(createV011BackfillLifecycleMigration());
   }
 
   private parseVersion(version: string): number[] {
@@ -380,6 +385,55 @@ function createV010BackfillMemoryVersionMigration(): Migration {
               };
               await vault.storage.writeNote(updatedNote);
             }
+          }
+        } catch (err) {
+          result.errors.push({
+            noteId: note.id,
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
+      }
+
+      return result;
+    },
+  };
+}
+
+function createV011BackfillLifecycleMigration(): Migration {
+  return {
+    name: "v0.1.1-backfill-note-lifecycle",
+    description: "Adds lifecycle: permanent to notes that lack a lifecycle marker",
+    minSchemaVersion: "1.0",
+    maxSchemaVersion: "1.1",
+    async run(vault, dryRun): Promise<MigrationResult> {
+      const result: MigrationResult = {
+        notesProcessed: 0,
+        notesModified: 0,
+        modifiedNoteIds: [],
+        errors: [],
+        warnings: [],
+      };
+
+      const notes = await vault.storage.listNotes();
+      result.notesProcessed = notes.length;
+
+      for (const note of notes) {
+        try {
+          const notePath = path.join(vault.storage.notesDir, `${note.id}.md`);
+          const raw = await fs.readFile(notePath, "utf-8");
+          const parsed = matter(raw);
+          if (parsed.data["lifecycle"] === "temporary" || parsed.data["lifecycle"] === "permanent") {
+            continue;
+          }
+
+          result.notesModified++;
+          result.modifiedNoteIds.push(note.id);
+
+          if (!dryRun) {
+            await vault.storage.writeNote({
+              ...note,
+              lifecycle: "permanent",
+            });
           }
         } catch (err) {
           result.errors.push({

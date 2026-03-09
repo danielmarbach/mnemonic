@@ -1509,7 +1509,7 @@ You have access to a long-term memory system via the `mnemonic` MCP server.
 Use it proactively — don't wait to be asked.
 
 <span class="cmt">### On every session start (in a project)</span>
-<span class="num">1.</span> Call `detect_project` with the working directory to identify project context.
+<span class="num">1.</span> Call `detect_project` with the working directory and keep that absolute `cwd` for all project-specific memory operations.
 <span class="num">2.</span> Call `project_memory_summary` with `cwd` for a rich overview of what's known, or
    `recall` with a broad query like "project overview architecture decisions" — to
    surface relevant prior context before doing any work.
@@ -1522,6 +1522,17 @@ accumulating fragmented notes on the same topic. When several related captures p
 use `consolidate` to merge them into one authoritative note. Write the note summary-first:
 put the main fact, decision, or outcome in the opening sentences, then follow with
 supporting detail.
+
+Pass `cwd` for anything about the current repo, even if you plan to store it with
+`scope: "global"`. `cwd` sets project association; omitting it creates a truly global note.
+
+<span class="cmt">### Choosing note lifecycle</span>
+When calling `remember`, set lifecycle based on whether the note is temporary working state or durable knowledge:
+
+- `temporary`: planning or WIP notes that mainly support the current implementation and will likely be obsolete once the work is complete
+- `permanent`: decisions, constraints, fixes, lessons, and other knowledge worth keeping for future sessions
+- If unsure, choose `permanent`
+- Tags like `plan`, `wip`, and `completed` are descriptive only; lifecycle controls retention behavior
 
 <span class="cmt">### When to call `remember`</span>
 Store a memory whenever you learn something useful to know in a future session:
@@ -1569,6 +1580,7 @@ If nothing comes to mind within a few seconds, skip it — don't force links.
   upgraded, a pattern changed.
 - When you recall something and notice it's stale or partially wrong.
 - Don't create a new memory for something that already exists — update the old one.
+- Preserve the existing lifecycle unless you are intentionally changing it.
 
 <span class="cmt">### When to call `forget`</span>
 - When a memory is fully superseded and keeping it would cause confusion.
@@ -1583,6 +1595,8 @@ If nothing comes to mind within a few seconds, skip it — don't force links.
 <strong>Consolidation modes:</strong>
 - `supersedes` (default) — Creates a new consolidated note and marks sources with `supersedes` relationship. Preserves history, allows pruning later with `prune-superseded`.
 - `delete` — Creates a new consolidated note and deletes sources. Clean and immediate.
+- When all source notes are `temporary`, consolidation should normally use delete behavior so the temporary scaffolding is removed after the durable note is created.
+- The consolidated note should be `permanent` by default.
 
 <strong>Workflow:</strong>
 <span class="num">1.</span> Run `consolidate` with `strategy: "dry-run"` to see analysis
@@ -1603,10 +1617,10 @@ If nothing comes to mind within a few seconds, skip it — don't force links.
 
 <span class="cmt">### Scoping rules</span>
 - Pass `cwd` for anything specific to the current project.
+- Pass `cwd` even when storing privately with `scope: "global"`; `cwd` controls project association, `scope` controls storage.
+- Omit `cwd` only for truly cross-project or personal memories.
 - Omit `cwd` for things that apply across all projects (user preferences,
   cross-project patterns, general facts about the user).
-- When recalling, always pass `cwd` if you're in a project — the boost ensures
-  project context surfaces first without losing global knowledge.
 
 <span class="cmt">## MCP output style</span>
 

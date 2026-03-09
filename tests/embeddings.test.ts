@@ -26,6 +26,7 @@ function createTestNote(id: string, title: string, content: string): Note {
     title,
     content,
     tags: ["test"],
+    lifecycle: "permanent",
     createdAt: now,
     updatedAt: now,
   };

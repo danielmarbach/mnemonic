@@ -191,6 +191,49 @@ describe("local MCP script", () => {
     }
   }, 15000);
 
+  it("preserves lifecycle on update unless explicitly changed", async () => {
+    const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-vault-"));
+    tempDirs.push(vaultDir);
+    const embeddingServer = await startFakeEmbeddingServer();
+
+    try {
+      const rememberText = await callLocalMcp(vaultDir, "remember", {
+        title: "Temporary integration lifecycle note",
+        content: "Initial temporary plan note.",
+        tags: ["integration", "plan"],
+        lifecycle: "temporary",
+        summary: "Create temporary note for lifecycle update test",
+        scope: "global",
+      }, embeddingServer.url);
+
+      const noteId = extractRememberedId(rememberText);
+      const notePath = path.join(vaultDir, "notes", `${noteId}.md`);
+
+      let noteContents = await readFile(notePath, "utf-8");
+      expect(noteContents).toContain("lifecycle: temporary");
+
+      await callLocalMcp(vaultDir, "update", {
+        id: noteId,
+        content: "Still temporary after a regular update.",
+        summary: "Verify lifecycle is preserved when omitted",
+      }, embeddingServer.url);
+
+      noteContents = await readFile(notePath, "utf-8");
+      expect(noteContents).toContain("lifecycle: temporary");
+
+      await callLocalMcp(vaultDir, "update", {
+        id: noteId,
+        lifecycle: "permanent",
+        summary: "Promote lifecycle to permanent explicitly",
+      }, embeddingServer.url);
+
+      noteContents = await readFile(notePath, "utf-8");
+      expect(noteContents).toContain("lifecycle: permanent");
+    } finally {
+      await embeddingServer.close();
+    }
+  }, 15000);
+
   it("cleans related notes when forgetting a linked memory", async () => {
     const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-vault-"));
     tempDirs.push(vaultDir);
@@ -232,6 +275,64 @@ describe("local MCP script", () => {
       const survivor = await readFile(path.join(vaultDir, "notes", `${secondId}.md`), "utf-8");
       expect(survivor).not.toContain(firstId);
       expect(survivor).toContain("Second linked note");
+    } finally {
+      await embeddingServer.close();
+    }
+  }, 15000);
+
+  it("deletes temporary source notes and creates a permanent target on consolidation", async () => {
+    const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-vault-"));
+    const repoDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-project-"));
+    tempDirs.push(vaultDir, repoDir);
+
+    await execFileAsync("git", ["init"], { cwd: repoDir });
+
+    const embeddingServer = await startFakeEmbeddingServer();
+
+    try {
+      const firstRemember = await callLocalMcp(vaultDir, "remember", {
+        title: "Temporary plan A",
+        content: "Temporary implementation plan A.",
+        tags: ["integration", "plan"],
+        lifecycle: "temporary",
+        summary: "Create first temporary plan note",
+        cwd: repoDir,
+        scope: "project",
+      }, embeddingServer.url);
+      const secondRemember = await callLocalMcp(vaultDir, "remember", {
+        title: "Temporary plan B",
+        content: "Temporary implementation plan B.",
+        tags: ["integration", "plan"],
+        lifecycle: "temporary",
+        summary: "Create second temporary plan note",
+        cwd: repoDir,
+        scope: "project",
+      }, embeddingServer.url);
+
+      const firstId = extractRememberedId(firstRemember);
+      const secondId = extractRememberedId(secondRemember);
+
+      const consolidateText = await callLocalMcp(vaultDir, "consolidate", {
+        cwd: repoDir,
+        strategy: "execute-merge",
+        mergePlan: {
+          sourceIds: [firstId, secondId],
+          targetTitle: "Consolidated implementation plan",
+        },
+      }, embeddingServer.url);
+
+      expect(consolidateText).toContain("Mode: delete");
+      expect(consolidateText).toContain("Source notes deleted.");
+
+      await expect(stat(path.join(repoDir, ".mnemonic", "notes", `${firstId}.md`))).rejects.toThrow();
+      await expect(stat(path.join(repoDir, ".mnemonic", "notes", `${secondId}.md`))).rejects.toThrow();
+
+      const consolidatedIdMatch = consolidateText.match(/Consolidated \d+ notes into '([^']+)'/);
+      expect(consolidatedIdMatch).toBeTruthy();
+      const consolidatedId = consolidatedIdMatch![1]!;
+      const consolidatedPath = path.join(repoDir, ".mnemonic", "notes", `${consolidatedId}.md`);
+      const consolidatedContents = await readFile(consolidatedPath, "utf-8");
+      expect(consolidatedContents).toContain("lifecycle: permanent");
     } finally {
       await embeddingServer.close();
     }

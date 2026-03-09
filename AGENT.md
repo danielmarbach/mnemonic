@@ -29,6 +29,15 @@ Before calling `remember`:
 4. Pass `cwd` for anything about the current repo, even if you intend to store it in the main vault with `scope: "global"`.
 5. Omit `cwd` only for truly cross-project or personal memories; missing `cwd` makes the note global and unassociated.
 
+### Choosing note lifecycle
+
+When storing a memory, choose the lifecycle intentionally:
+
+- Use `lifecycle: "temporary"` for working-state notes that mainly help during active execution and will likely lose value once the work is complete. Examples: accepted implementation plans, WIP checkpoints, temporary investigation state, draft next steps.
+- Use `lifecycle: "permanent"` for durable knowledge that future sessions should keep even after the current task is done. Examples: decisions and rationale, discovered constraints, bug causes, workarounds, architecture notes, reusable lessons.
+- If unsure, prefer `permanent`.
+- Tags like `plan`, `wip`, and `completed` are descriptive only. They do not control cleanup behavior.
+
 ### Capture triggers
 
 Default to capturing important context through MCP without waiting to be reminded. In particular, capture when any of the following happens:
@@ -60,6 +69,14 @@ Consolidate when:
 - `memory_graph` shows a dense cluster of tightly-related nodes
 
 Use `consolidate` strategy `supersedes` to preserve source history (sources remain with `supersedes` relationship, cleanable later via `prune-superseded`); use `delete` to remove sources immediately.
+
+When consolidating:
+- If all source notes are `temporary`, prefer delete behavior so the temporary scaffolding disappears once the durable note exists.
+- Consolidated notes should be `permanent` by default.
+
+When calling `update`:
+- Preserve the existing lifecycle unless you are intentionally changing it.
+- Do not switch a note between `temporary` and `permanent` implicitly.
 
 ### Documentation upkeep
 
@@ -224,13 +241,13 @@ Keep these high-level anchors in mind:
 | `recall` | Semantic search with optional project boost |
 | `recent_memories` | Show most recently updated notes for scope |
 | `reindex` | Rebuild missing embeddings; `force=true` rebuilds all |
-| `remember` | Write note + embedding; `cwd` sets context, `scope` picks storage |
+| `remember` | Write note + embedding; `cwd` sets context, `scope` picks storage, `lifecycle` picks temporary vs permanent |
 | `relate` | Create typed relationship between notes (bidirectional) |
 | `set_project_identity` | Save which git remote defines project identity |
 | `set_project_memory_policy` | Save default write scope for project (`project`, `global`, `ask`) |
 | `sync` | Bidirectional git sync, pull, push, auto-embed pulled notes |
 | `unrelate` | Remove relationship between notes |
-| `update` | Update note content/title/tags, re-embeds always |
+| `update` | Update note content/title/tags/lifecycle, re-embeds always |
 | `where_is_memory` | Show note's project association and storage location |
 
 ## Environment variables

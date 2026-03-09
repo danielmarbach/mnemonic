@@ -4,6 +4,8 @@ import { randomUUID } from "crypto";
 import matter from "gray-matter";
 
 export type RelationshipType = "related-to" | "explains" | "example-of" | "supersedes";
+export type NoteLifecycle = "temporary" | "permanent";
+export const NOTE_LIFECYCLES = ["temporary", "permanent"] as const satisfies readonly NoteLifecycle[];
 
 export interface Relationship {
   id: string;
@@ -15,6 +17,7 @@ export interface Note {
   title: string;
   content: string;
   tags: string[];
+  lifecycle: NoteLifecycle;
   /** Stable project identifier, or undefined for global memories */
   project?: string;
   /** Human-readable project name for display */
@@ -180,6 +183,7 @@ export class Storage {
     const frontmatter: Record<string, unknown> = {
       title: note.title,
       tags: note.tags,
+      lifecycle: note.lifecycle,
       createdAt: note.createdAt,
       updatedAt: note.updatedAt,
     };
@@ -303,6 +307,7 @@ export class Storage {
       title: parsed.data["title"] ?? id,
       content: parsed.content.trim(),
       tags: parsed.data["tags"] ?? [],
+      lifecycle: normalizeLifecycle(parsed.data["lifecycle"]),
       project: parsed.data["project"] as string | undefined,
       projectName: parsed.data["projectName"] as string | undefined,
       relatedTo: parsed.data["relatedTo"] as Relationship[] | undefined,
@@ -319,4 +324,8 @@ function normalizeMemoryVersion(value: unknown): number {
   }
 
   return 0;
+}
+
+function normalizeLifecycle(value: unknown): NoteLifecycle {
+  return value === "temporary" ? "temporary" : "permanent";
 }

@@ -23,6 +23,7 @@
 - Notes live in `notes/<id>.md` with YAML frontmatter and markdown body.
 - Embeddings live in `embeddings/<id>.json` and are gitignored.
 - A note can be global or project-associated, and can hold typed relationships to other notes.
+- Metadata-only note changes such as lifecycle migrations do not require re-embedding; embeddings are refreshed when title/content changes or via explicit reindexing.
 
 ### Project identity
 
@@ -150,6 +151,7 @@ flowchart TD
 
 - `id`: stable slug + suffix used as the filename stem.
 - `title`, `content`, `tags`: user-facing memory content.
+- `lifecycle`: `temporary` for working-state scaffolding, `permanent` for durable knowledge.
 - `project`, `projectName`: project association without forcing storage into the project vault.
 - `relatedTo`: typed edges (`related-to`, `explains`, `example-of`, `supersedes`).
 - `createdAt`, `updatedAt`: ISO timestamps.
@@ -169,9 +171,11 @@ Main-vault `config.json` stores machine-local operational settings rather than m
 - **One note per file**: keeps git conflicts isolated and manual inspection simple.
 - **Embeddings are derived**: never treat them as source-of-truth or something that must be committed.
 - **Project context and storage are separate**: a note can belong to a project while living in the main vault.
+- **Lifecycle is retention semantics, not taxonomy**: tags like `plan` or `wip` stay descriptive, while `lifecycle` controls temporary-vs-permanent behavior.
 - **Git is part of the product behavior**: most mutating operations commit and push, so error handling must treat git failures as real failures.
 - **Project recall is biased, not exclusive**: project memory should be preferred without making global memory disappear.
 - **Migrations are explicit**: schema changes should go through `src/migration.ts`, tests, and dry-run-first workflows.
+- **Temporary-only consolidation defaults to cleanup**: when every source note is `temporary`, consolidation prefers `delete`, and the merged note becomes `permanent`.
 
 ## Operational and testing conventions
 

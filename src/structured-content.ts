@@ -1,5 +1,5 @@
 import type { Vault } from "./vault.js";
-import type { Note, RelationshipType } from "./storage.js";
+import type { Note, NoteLifecycle, RelationshipType } from "./storage.js";
 
 export interface StructuredResponse {
   content: Array<{ type: "text"; text: string }>;
@@ -14,6 +14,7 @@ export interface RememberResult extends Record<string, unknown> {
   scope: "project" | "global";
   vault: "project-vault" | "main-vault";
   tags: string[];
+  lifecycle: NoteLifecycle;
   timestamp: string;
 }
 
@@ -30,6 +31,7 @@ export interface RecallResult extends Record<string, unknown> {
     projectName?: string;
     vault: "project-vault" | "main-vault";
     tags: string[];
+    lifecycle: NoteLifecycle;
     updatedAt: string;
   }>;
 }
@@ -46,6 +48,7 @@ export interface ListResult extends Record<string, unknown> {
     project?: string;
     projectName?: string;
     tags: string[];
+    lifecycle: NoteLifecycle;
     vault: "project-vault" | "main-vault";
     updatedAt: string;
     hasRelated?: boolean;
@@ -68,6 +71,7 @@ export interface GetResult extends Record<string, unknown> {
     project?: string;
     projectName?: string;
     tags: string[];
+    lifecycle: NoteLifecycle;
     relatedTo?: Array<{ id: string; type: RelationshipType }>;
     createdAt: string;
     updatedAt: string;
@@ -103,6 +107,7 @@ export interface UpdateResult extends Record<string, unknown> {
   timestamp: string;
   project?: string;
   projectName?: string;
+  lifecycle: NoteLifecycle;
 }
 
 export interface ForgetResult extends Record<string, unknown> {
@@ -223,6 +228,7 @@ export interface RecentResult extends Record<string, unknown> {
     project?: string;
     projectName?: string;
     tags: string[];
+    lifecycle: NoteLifecycle;
     vault: "project-vault" | "main-vault";
     updatedAt: string;
     preview?: string;

@@ -4,6 +4,7 @@ import {
   filterRelationships,
   mergeRelationshipsFromNotes,
   normalizeMergePlanSourceIds,
+  resolveEffectiveConsolidationMode,
 } from "../src/consolidate.js";
 
 describe("consolidate helpers", () => {
@@ -40,5 +41,33 @@ describe("consolidate helpers", () => {
   it("returns the original relationship array when nothing changes", () => {
     const original = [{ id: "keep", type: "related-to" as const }];
     expect(filterRelationships(original, ["other"])).toBe(original);
+  });
+
+  it("uses delete mode for all-temporary source notes when no explicit mode is given", () => {
+    expect(
+      resolveEffectiveConsolidationMode(
+        [{ lifecycle: "temporary" }, { lifecycle: "temporary" }],
+        "supersedes",
+      ),
+    ).toBe("delete");
+  });
+
+  it("falls back to the project/default mode for mixed lifecycle merges", () => {
+    expect(
+      resolveEffectiveConsolidationMode(
+        [{ lifecycle: "temporary" }, { lifecycle: "permanent" }],
+        "supersedes",
+      ),
+    ).toBe("supersedes");
+  });
+
+  it("lets an explicit mode override lifecycle-derived defaults", () => {
+    expect(
+      resolveEffectiveConsolidationMode(
+        [{ lifecycle: "temporary" }, { lifecycle: "temporary" }],
+        "supersedes",
+        "supersedes",
+      ),
+    ).toBe("supersedes");
   });
 });

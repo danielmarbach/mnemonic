@@ -6,11 +6,16 @@ import { randomUUID } from "crypto";
 import path from "path";
 import { promises as fs } from "fs";
 
-import { Storage, type Note, type Relationship, type RelationshipType } from "./storage.js";
+import { NOTE_LIFECYCLES, Storage, type Note, type NoteLifecycle, type Relationship, type RelationshipType } from "./storage.js";
 import { embed, cosineSimilarity, embedModel } from "./embeddings.js";
 import { type SyncResult } from "./git.js";
 
-import { filterRelationships, mergeRelationshipsFromNotes, normalizeMergePlanSourceIds } from "./consolidate.js";
+import {
+  filterRelationships,
+  mergeRelationshipsFromNotes,
+  normalizeMergePlanSourceIds,
+  resolveEffectiveConsolidationMode,
+} from "./consolidate.js";
 import { selectRecallResults } from "./recall.js";
 import { cleanMarkdown } from "./markdown.js";
 import { MnemonicConfigStore, readVaultSchemaVersion } from "./config.js";
@@ -289,6 +294,10 @@ async function getProjectPolicyScope(cwd?: string): Promise<ProjectPolicyScope |
   return policy?.defaultScope;
 }
 
+function describeLifecycle(lifecycle: NoteLifecycle): string {
+  return `lifecycle: ${lifecycle}`;
+}
+
 function formatNote(note: Note, score?: number): string {
   const scoreStr = score !== undefined ? ` | similarity: ${score.toFixed(3)}` : "";
   const projectStr = note.project ? ` | project: ${note.projectName ?? note.project}` : " | global";
@@ -298,7 +307,7 @@ function formatNote(note: Note, score?: number): string {
   return (
     `## ${note.title}\n` +
     `**id:** \`${note.id}\`${projectStr}${scoreStr}\n` +
-    `**tags:** ${note.tags.join(", ") || "none"} | **updated:** ${note.updatedAt}${relStr}\n\n` +
+    `**tags:** ${note.tags.join(", ") || "none"} | **${describeLifecycle(note.lifecycle)}** | **updated:** ${note.updatedAt}${relStr}\n\n` +
     note.content
   );
 }
@@ -544,6 +553,7 @@ function formatListEntry(
   const proj = note.project ? `[${note.projectName ?? note.project}]` : "[global]";
   const extras: string[] = [];
   if (note.tags.length > 0) extras.push(note.tags.join(", "));
+  extras.push(`lifecycle=${note.lifecycle}`);
   if (options.includeStorage) extras.push(`stored=${storageLabel(vault)}`);
   if (options.includeUpdated) extras.push(`updated=${note.updatedAt}`);
   const lines = [`- **${note.title}** \`${note.id}\` ${proj}${extras.length > 0 ? ` — ${extras.join(" | ")}` : ""}`];
@@ -977,6 +987,10 @@ server.registerTool(
       title: z.string().describe("Short descriptive title"),
       content: z.string().describe("The content to remember (markdown supported; write summary-first with the key fact or decision near the top)"),
       tags: z.array(z.string()).optional().default([]).describe("Optional tags"),
+      lifecycle: z
+        .enum(NOTE_LIFECYCLES)
+        .optional()
+        .describe("Whether the note is temporary working-state scaffolding or durable permanent knowledge"),
       summary: z.string().optional().describe("Brief summary for git commit message (like a good commit message, describing the change). Not stored in the note."),
       cwd: projectParam,
       scope: z
@@ -985,7 +999,7 @@ server.registerTool(
         .describe("Where to store the memory: project vault or private global vault"),
     }),
   },
-  async ({ title, content, tags, summary, cwd, scope }) => {
+  async ({ title, content, tags, lifecycle, summary, cwd, scope }) => {
     const project = await resolveProject(cwd);
     const cleanedContent = await cleanMarkdown(content);
     const policyScope = await getProjectPolicyScope(cwd);
@@ -1000,6 +1014,7 @@ server.registerTool(
 
     const note: Note = {
       id, title, content: cleanedContent, tags,
+      lifecycle: lifecycle ?? "permanent",
       project: project?.id,
       projectName: project?.name,
       createdAt: now,
@@ -1044,6 +1059,7 @@ server.registerTool(
       scope: writeScope,
       vault: vault.isProject ? "project-vault" : "main-vault",
       tags: tags || [],
+      lifecycle: note.lifecycle,
       timestamp: now,
     };
     
@@ -1247,17 +1263,18 @@ server.registerTool(
     const textContent = `${header}\n\n${sections.join("\n\n---\n\n")}`;
     
     // Build structured results array
-    const structuredResults: Array<{
-      id: string;
-      title: string;
-      score: number;
-      boosted: number;
-      project?: string;
-      projectName?: string;
-      vault: "project-vault" | "main-vault";
-      tags: string[];
-      updatedAt: string;
-    }> = [];
+      const structuredResults: Array<{
+        id: string;
+        title: string;
+        score: number;
+        boosted: number;
+        project?: string;
+        projectName?: string;
+        vault: "project-vault" | "main-vault";
+        tags: string[];
+        lifecycle: NoteLifecycle;
+        updatedAt: string;
+      }> = [];
     for (const { id, score, vault, boosted } of top) {
       const note = await vault.storage.readNote(id);
       if (note) {
@@ -1270,6 +1287,7 @@ server.registerTool(
           projectName: note.projectName,
           vault: vault.isProject ? "project-vault" : "main-vault",
           tags: note.tags,
+          lifecycle: note.lifecycle,
           updatedAt: note.updatedAt,
         });
       }
@@ -1300,11 +1318,15 @@ server.registerTool(
       content: z.string().optional(),
       title: z.string().optional(),
       tags: z.array(z.string()).optional(),
+      lifecycle: z
+        .enum(NOTE_LIFECYCLES)
+        .optional()
+        .describe("Set to temporary for working-state notes or permanent for durable knowledge"),
       summary: z.string().optional().describe("Brief summary of what changed and why (for git commit message). Not stored in the note."),
       cwd: projectParam,
     }),
   },
-  async ({ id, content, title, tags, summary, cwd }) => {
+  async ({ id, content, title, tags, lifecycle, summary, cwd }) => {
     const found = await vaultManager.findNote(id, cwd);
     if (!found) {
       return { content: [{ type: "text", text: `No memory found with id '${id}'` }] };
@@ -1319,6 +1341,7 @@ server.registerTool(
       title: title ?? note.title,
       content: cleanedContent ?? note.content,
       tags: tags ?? note.tags,
+      lifecycle: lifecycle ?? note.lifecycle,
       updatedAt: now,
     };
 
@@ -1336,6 +1359,7 @@ server.registerTool(
     if (title !== undefined && title !== note.title) changes.push("title");
     if (content !== undefined) changes.push("content");
     if (tags !== undefined) changes.push("tags");
+    if (lifecycle !== undefined && lifecycle !== note.lifecycle) changes.push("lifecycle");
     const changeDesc = changes.length > 0 ? `Updated ${changes.join(", ")}` : "No changes";
     const commitSummary = summary ?? changeDesc;
 
@@ -1357,6 +1381,7 @@ server.registerTool(
       timestamp: now,
       project: updated.project,
       projectName: updated.projectName,
+      lifecycle: updated.lifecycle,
     };
     
     return { content: [{ type: "text", text: `Updated memory '${id}'` }], structuredContent };
@@ -1468,6 +1493,7 @@ server.registerTool(
       project?: string;
       projectName?: string;
       tags: string[];
+      lifecycle: NoteLifecycle;
       vault: "project-vault" | "main-vault";
       updatedAt: string;
       hasRelated?: boolean;
@@ -1477,6 +1503,7 @@ server.registerTool(
       project: note.project,
       projectName: note.projectName,
       tags: note.tags,
+      lifecycle: note.lifecycle,
       vault: vault.isProject ? "project-vault" : "main-vault",
       updatedAt: note.updatedAt,
       hasRelated: note.relatedTo && note.relatedTo.length > 0,
@@ -1537,15 +1564,16 @@ server.registerTool(
     
     const textContent = `${header}\n\n${lines.join("\n")}`;
     
-    const structuredNotes = recent.map(({ note, vault }) => ({
-      id: note.id,
-      title: note.title,
-      project: note.project,
-      projectName: note.projectName,
-      tags: note.tags,
-      vault: vault.isProject ? "project-vault" : "main-vault",
-      updatedAt: note.updatedAt,
-      preview: includePreview && note.content ? note.content.substring(0, 100) + (note.content.length > 100 ? "..." : "") : undefined,
+      const structuredNotes = recent.map(({ note, vault }) => ({
+        id: note.id,
+        title: note.title,
+        project: note.project,
+        projectName: note.projectName,
+        tags: note.tags,
+        lifecycle: note.lifecycle,
+        vault: vault.isProject ? "project-vault" : "main-vault",
+        updatedAt: note.updatedAt,
+        preview: includePreview && note.content ? note.content.substring(0, 100) + (note.content.length > 100 ? "..." : "") : undefined,
     }));
     
     const structuredContent: RecentResult = {
@@ -1556,13 +1584,14 @@ server.registerTool(
       limit: limit || 5,
       notes: structuredNotes as Array<{
         id: string;
-        title: string;
-        project?: string;
-        projectName?: string;
-        tags: string[];
-        vault: "project-vault" | "main-vault";
-        updatedAt: string;
-        preview?: string;
+          title: string;
+          project?: string;
+          projectName?: string;
+          tags: string[];
+          lifecycle: NoteLifecycle;
+          vault: "project-vault" | "main-vault";
+          updatedAt: string;
+          preview?: string;
       }>,
     };
     
@@ -2147,9 +2176,10 @@ server.registerTool(
       return { content: [{ type: "text", text: "No memories found to consolidate." }] };
     }
 
-    // Resolve consolidation mode
+    // Resolve project/default consolidation mode. Temporary-only merges may still
+    // resolve to delete later when a specific source set is known.
     const policy = project ? await configStore.getProjectPolicy(project.id) : undefined;
-    const consolidationMode = mode ?? resolveConsolidationMode(policy);
+    const defaultConsolidationMode = resolveConsolidationMode(policy);
 
     switch (strategy) {
       case "detect-duplicates":
@@ -2159,19 +2189,19 @@ server.registerTool(
         return findClusters(projectNotes, project);
 
       case "suggest-merges":
-        return suggestMerges(projectNotes, threshold, consolidationMode, project);
+        return suggestMerges(projectNotes, threshold, defaultConsolidationMode, project, mode);
 
       case "execute-merge":
         if (!mergePlan) {
           return { content: [{ type: "text", text: "execute-merge strategy requires a mergePlan with sourceIds and targetTitle." }] };
         }
-        return executeMerge(projectNotes, mergePlan, consolidationMode, project, cwd);
+        return executeMerge(projectNotes, mergePlan, defaultConsolidationMode, project, cwd, mode);
 
       case "prune-superseded":
-        return pruneSuperseded(projectNotes, consolidationMode, project);
+        return pruneSuperseded(projectNotes, mode ?? defaultConsolidationMode, project);
 
       case "dry-run":
-        return dryRunAll(projectNotes, threshold, consolidationMode, project);
+        return dryRunAll(projectNotes, threshold, defaultConsolidationMode, project, mode);
 
       default:
         return { content: [{ type: "text", text: `Unknown strategy: ${strategy}` }] };
@@ -2351,11 +2381,13 @@ function findClusters(
 async function suggestMerges(
   entries: NoteEntry[],
   threshold: number,
-  consolidationMode: ConsolidationMode,
+  defaultConsolidationMode: ConsolidationMode,
   project: Awaited<ReturnType<typeof resolveProject>>,
+  explicitMode?: ConsolidationMode,
 ): Promise<{ content: Array<{ type: "text"; text: string }>; structuredContent: ConsolidateResult }> {
   const lines: string[] = [];
-  lines.push(`Merge suggestions for ${project?.name ?? "global"} (mode: ${consolidationMode}):`);
+  const modeLabel = explicitMode ?? `${defaultConsolidationMode} (project/default; all-temporary merges auto-delete)`;
+  lines.push(`Merge suggestions for ${project?.name ?? "global"} (mode: ${modeLabel}):`);
   lines.push("");
 
   const checked = new Set<string>();
@@ -2392,6 +2424,11 @@ async function suggestMerges(
       suggestionCount++;
       similar.sort((a, b) => b.similarity - a.similarity);
       const sources = [entryA, ...similar.map((s) => s.entry)];
+      const effectiveMode = resolveEffectiveConsolidationMode(
+        sources.map((source) => source.note),
+        defaultConsolidationMode,
+        explicitMode,
+      );
 
       lines.push(`${suggestionCount}. MERGE ${sources.length} NOTES`);
       lines.push(`   Into: "${entryA.note.title} (consolidated)"`);
@@ -2401,18 +2438,18 @@ async function suggestMerges(
         lines.push(`     - ${src.note.title} (${src.note.id})${simStr}`);
       }
       const modeDescription = ((): string => {
-        switch (consolidationMode) {
+        switch (effectiveMode) {
           case "supersedes":
             return "preserves history";
           case "delete":
             return "removes sources";
           default: {
-            const _exhaustive: never = consolidationMode;
+            const _exhaustive: never = effectiveMode;
             return _exhaustive;
           }
         }
       })();
-      lines.push(`   Mode: ${consolidationMode} (${modeDescription})`);
+      lines.push(`   Mode: ${effectiveMode} (${modeDescription})`);
       lines.push("   To execute:");
       lines.push(`     consolidate({ strategy: "execute-merge", mergePlan: {`);
       lines.push(`       sourceIds: [${sources.map((s) => `"${s.note.id}"`).join(", ")}],`);
@@ -2452,9 +2489,10 @@ async function suggestMerges(
 async function executeMerge(
   entries: NoteEntry[],
   mergePlan: { sourceIds: string[]; targetTitle: string; description?: string; summary?: string; tags?: string[] },
-  consolidationMode: ConsolidationMode,
+  defaultConsolidationMode: ConsolidationMode,
   project: Awaited<ReturnType<typeof resolveProject>>,
   cwd?: string,
+  explicitMode?: ConsolidationMode,
 ): Promise<{ content: Array<{ type: "text"; text: string }>; structuredContent: ConsolidateResult }> {
   const sourceIds = normalizeMergePlanSourceIds(mergePlan.sourceIds);
   const targetTitle = mergePlan.targetTitle.trim();
@@ -2505,6 +2543,12 @@ async function executeMerge(
     sourceEntries.push(entry);
   }
 
+  const consolidationMode = resolveEffectiveConsolidationMode(
+    sourceEntries.map((entry) => entry.note),
+    defaultConsolidationMode,
+    explicitMode,
+  );
+
   const projectVault = cwd ? await vaultManager.getOrCreateProjectVault(cwd) : null;
   const targetVault = projectVault ?? vaultManager.main;
   const now = new Date().toISOString();
@@ -2538,6 +2582,7 @@ async function executeMerge(
     title: targetTitle,
     content: sections.join("\n").trim(),
     tags: combinedTags,
+    lifecycle: "permanent",
     project: project?.id,
     projectName: project?.name,
     relatedTo: allRelationships,
@@ -2782,12 +2827,14 @@ async function pruneSuperseded(
 async function dryRunAll(
   entries: NoteEntry[],
   threshold: number,
-  consolidationMode: ConsolidationMode,
+  defaultConsolidationMode: ConsolidationMode,
   project: Awaited<ReturnType<typeof resolveProject>>,
+  explicitMode?: ConsolidationMode,
 ): Promise<{ content: Array<{ type: "text"; text: string }>; structuredContent: ConsolidateResult }> {
   const lines: string[] = [];
   lines.push(`Consolidation analysis for ${project?.name ?? "global"}:`);
-  lines.push(`Mode: ${consolidationMode} | Threshold: ${threshold}`);
+  const modeLabel = explicitMode ?? `${defaultConsolidationMode} (project/default; all-temporary merges auto-delete)`;
+  lines.push(`Mode: ${modeLabel} | Threshold: ${threshold}`);
   lines.push("");
 
   // Run all analysis strategies
@@ -2801,7 +2848,7 @@ async function dryRunAll(
   lines.push(clusters.content[0]?.text ?? "No output");
   lines.push("");
 
-  const merges = await suggestMerges(entries, threshold, consolidationMode, project);
+  const merges = await suggestMerges(entries, threshold, defaultConsolidationMode, project, explicitMode);
   lines.push("=== MERGE SUGGESTIONS ===");
   lines.push(merges.content[0]?.text ?? "No output");
 

@@ -107,7 +107,7 @@ describe("Migrator", () => {
     });
 
     it("should return no migrations when already at latest version", async () => {
-      const pending = await migrator.getPendingMigrations("1.0");
+      const pending = await migrator.getPendingMigrations("1.1");
       expect(pending.length).toBe(0);
     });
   });
@@ -280,6 +280,67 @@ Content of ${title}`;
     });
   });
 
+  describe("v0.1.1-backfill-note-lifecycle migration", () => {
+    const writeNoteWithoutLifecycle = async (id: string, title: string) => {
+      const content = `---
+title: ${title}
+tags: []
+createdAt: 2026-01-01T00:00:00.000Z
+updatedAt: 2026-01-01T00:00:00.000Z
+memoryVersion: 1
+---
+
+Content of ${title}`;
+      await fs.writeFile(path.join(tempDir, "notes", `${id}.md`), content, "utf-8");
+    };
+
+    const writeNoteWithLifecycle = async (id: string, title: string, lifecycle: "temporary" | "permanent") => {
+      const content = `---
+title: ${title}
+tags: []
+lifecycle: ${lifecycle}
+createdAt: 2026-01-01T00:00:00.000Z
+updatedAt: 2026-01-01T00:00:00.000Z
+memoryVersion: 1
+---
+
+Content of ${title}`;
+      await fs.writeFile(path.join(tempDir, "notes", `${id}.md`), content, "utf-8");
+    };
+
+    beforeEach(async () => {
+      await fs.mkdir(path.join(tempDir, "notes"), { recursive: true });
+    });
+
+    it("adds lifecycle to notes that lack it", async () => {
+      await writeNoteWithoutLifecycle("old-note", "Old Note");
+
+      const migration = migrator.listAvailableMigrations()
+        .find((m) => m.name === "v0.1.1-backfill-note-lifecycle")!;
+
+      const result = await migration.run(vault, false);
+
+      expect(result.notesProcessed).toBe(1);
+      expect(result.notesModified).toBe(1);
+
+      const note = await storage.readNote("old-note");
+      expect(note?.lifecycle).toBe("permanent");
+    });
+
+    it("is idempotent when lifecycle is already present", async () => {
+      await writeNoteWithLifecycle("temporary-note", "Temporary Note", "temporary");
+      await writeNoteWithLifecycle("permanent-note", "Permanent Note", "permanent");
+
+      const migration = migrator.listAvailableMigrations()
+        .find((m) => m.name === "v0.1.1-backfill-note-lifecycle")!;
+
+      const first = await migration.run(vault, false);
+      expect(first.notesModified).toBe(0);
+
+      await assertMigrationIdempotent(migration, vault);
+    });
+  });
+
   describe("runMigration", () => {
     beforeEach(async () => {
       await fs.mkdir(path.join(tempDir, "notes"), { recursive: true });
@@ -418,7 +479,7 @@ Test content`;
       const config = JSON.parse(await fs.readFile(path.join(tempDir, "config.json"), "utf-8")) as {
         schemaVersion: string;
       };
-      expect(config.schemaVersion).toBe("1.0");
+      expect(config.schemaVersion).toBe("1.1");
     });
 
     it("does not persist schema version during dry-run", async () => {
@@ -439,17 +500,17 @@ Test content`;
       const config = JSON.parse(await fs.readFile(path.join(tempDir, "config.json"), "utf-8")) as {
         schemaVersion: string;
       };
-      expect(config.schemaVersion).toBe("1.0");
+      expect(config.schemaVersion).toBe("1.1");
     });
 
     it("only migrates vaults that are behind on schema version", async () => {
-      // Create a second vault already at 1.0
+      // Create a second vault already at 1.1
       const otherDir = await fs.mkdtemp(path.join(os.tmpdir(), "mnemonic-other-"));
       const otherStorage = new Storage(otherDir);
       await otherStorage.init();
       await fs.writeFile(
         path.join(otherDir, "config.json"),
-        JSON.stringify({ schemaVersion: "1.0" }),
+        JSON.stringify({ schemaVersion: "1.1" }),
         "utf-8"
       );
       const otherVault: Vault = {
@@ -467,7 +528,7 @@ Test content`;
 
       // Main vault (at 0.0) should have been migrated
       expect(migrationResults.has(tempDir)).toBe(true);
-      // Other vault (at 1.0) should have been skipped entirely
+      // Other vault (at 1.1) should have been skipped entirely
       expect(migrationResults.has(otherDir)).toBe(false);
     });
 
@@ -603,6 +664,7 @@ Broken content`,
         title: "Note 2",
         content: "Fixed content",
         tags: [],
+        lifecycle: "permanent",
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       });
@@ -721,6 +783,7 @@ Main content 2`,
           title: "Other Note 1",
           content: "Other content 1",
           tags: [],
+          lifecycle: "permanent",
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         });
@@ -756,8 +819,8 @@ Main content 2`,
         const mainVersion = await readVersion(tempDir);
         const otherVersion = await readVersion(otherTempDir);
 
-        expect(mainVersion).toBe("1.0");
-        expect(otherVersion).toBe("1.0");
+        expect(mainVersion).toBe("1.1");
+        expect(otherVersion).toBe("1.1");
       } finally {
         await fs.rm(otherTempDir, { recursive: true, force: true });
       }
@@ -788,6 +851,7 @@ Main content 2`,
           title: `Vault ${i} Note`,
           content: `Content ${i}`,
           tags: [],
+          lifecycle: "permanent",
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         });
@@ -878,7 +942,7 @@ Main content 2`,
       const config = JSON.parse(await fs.readFile(path.join(tempDir, "config.json"), "utf-8")) as {
         schemaVersion: string;
       };
-      expect(config.schemaVersion).toBe("1.0");
+      expect(config.schemaVersion).toBe("1.1");
     });
 
     it("skips a project vault that was already migrated in an earlier session", async () => {
@@ -930,7 +994,7 @@ Project content`,
       let projectConfig = JSON.parse(await fs.readFile(path.join(projectDir, "config.json"), "utf-8")) as {
         schemaVersion: string;
       };
-      expect(projectConfig.schemaVersion).toBe("1.0");
+      expect(projectConfig.schemaVersion).toBe("1.1");
 
       const sessionTwoVaultManager = {
         main: vault,
@@ -955,16 +1019,16 @@ Project content`,
       projectConfig = JSON.parse(await fs.readFile(path.join(projectDir, "config.json"), "utf-8")) as {
         schemaVersion: string;
       };
-      expect(projectConfig.schemaVersion).toBe("1.0");
+      expect(projectConfig.schemaVersion).toBe("1.1");
     });
   });
 
   describe("Version comparison", () => {
     it("should correctly compare version strings", async () => {
       const migratorAny = new Migrator(vaultManager);
-      expect(await migratorAny.getPendingMigrations("0.0")).toHaveLength(1);
-      expect(await migratorAny.getPendingMigrations("0.9")).toHaveLength(1);
-      expect(await migratorAny.getPendingMigrations("1.0")).toHaveLength(0);
+      expect(await migratorAny.getPendingMigrations("0.0")).toHaveLength(2);
+      expect(await migratorAny.getPendingMigrations("0.9")).toHaveLength(2);
+      expect(await migratorAny.getPendingMigrations("1.0")).toHaveLength(1);
       expect(await migratorAny.getPendingMigrations("1.1")).toHaveLength(0);
     });
 
@@ -1001,6 +1065,7 @@ Project content`,
 
       expect(names).toEqual([
         "v0.1.0-backfill-memory-versions", // maxSchemaVersion 1.0
+        "v0.1.1-backfill-note-lifecycle",  // maxSchemaVersion 1.1
         "upgrade-to-2.0",                  // maxSchemaVersion 2.0
         "upgrade-to-3.0",                  // maxSchemaVersion 3.0
       ]);
@@ -1029,6 +1094,7 @@ Project content`,
 
       expect(names).toEqual([
         "v0.1.0-backfill-memory-versions", // maxSchemaVersion 1.0
+        "v0.1.1-backfill-note-lifecycle",  // maxSchemaVersion 1.1
         "upgrade-to-2.0",                  // maxSchemaVersion 2.0
         "always-run-fixup",                // unbounded — last
       ]);
@@ -1058,6 +1124,7 @@ Project content`,
 
       expect(names).toEqual([
         "v0.1.0-backfill-memory-versions", // maxSchemaVersion 1.0
+        "v0.1.1-backfill-note-lifecycle",  // maxSchemaVersion 1.1
         "upgrade-to-2.0",                  // maxSchemaVersion 2.0
         "min-only-at-3.0",                 // minSchemaVersion 3.0
       ]);

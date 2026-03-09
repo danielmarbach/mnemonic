@@ -26,6 +26,7 @@ describe("Storage", () => {
         title: "Test Note",
         content: "This is a test note.",
         tags: ["test", "unit"],
+        lifecycle: "permanent",
         project: "test-project",
         projectName: "Test Project",
         relatedTo: [{ id: "related-1", type: "related-to" }],
@@ -72,7 +73,26 @@ describe("Storage", () => {
       expect(read).toBeTruthy();
       expect(read!.id).toBe(oldNote.id);
       expect(read!.title).toBe(oldNote.title);
+      expect(read!.lifecycle).toBe("permanent");
       expect(read!.memoryVersion).toBe(0); // Legacy notes normalize to pre-v0.2.0 schema
+    });
+
+    it("should normalize invalid lifecycle values to permanent", async () => {
+      const notesDir = path.join(tempDir, "notes");
+      const content = `---
+title: Invalid lifecycle
+tags: []
+lifecycle: someday
+createdAt: 2023-01-01T00:00:00.000Z
+updatedAt: 2023-01-01T00:00:00.000Z
+---
+
+Body`;
+
+      await fs.writeFile(path.join(notesDir, "invalid-lifecycle.md"), content, "utf-8");
+
+      const read = await storage.readNote("invalid-lifecycle");
+      expect(read?.lifecycle).toBe("permanent");
     });
 
     it("should return null for non-existent note", async () => {
@@ -88,6 +108,7 @@ describe("Storage", () => {
           title: "Note 1",
           content: "Content 1",
           tags: [],
+          lifecycle: "permanent",
           createdAt: now,
           updatedAt: now,
         },
@@ -96,6 +117,7 @@ describe("Storage", () => {
           title: "Note 2",
           content: "Content 2",
           tags: [],
+          lifecycle: "permanent",
           createdAt: now,
           updatedAt: now,
         },
@@ -119,6 +141,7 @@ describe("Storage", () => {
           title: "Note 1",
           content: "Content 1",
           tags: [],
+          lifecycle: "permanent",
           project: "project-a",
           createdAt: now,
           updatedAt: now,
@@ -128,6 +151,7 @@ describe("Storage", () => {
           title: "Note 2",
           content: "Content 2",
           tags: [],
+          lifecycle: "permanent",
           project: "project-b",
           createdAt: now,
           updatedAt: now,
@@ -137,6 +161,7 @@ describe("Storage", () => {
           title: "Note 3",
           content: "Content 3",
           tags: [],
+          lifecycle: "permanent",
           createdAt: now,
           updatedAt: now,
           // No project = global
@@ -193,6 +218,7 @@ describe("Storage", () => {
         title: "Delete Me",
         content: "This will be deleted",
         tags: [],
+        lifecycle: "permanent",
         createdAt: now,
         updatedAt: now,
       };
@@ -218,6 +244,7 @@ describe("Storage", () => {
         title: "Original Title",
         content: "Original content",
         tags: ["original"],
+        lifecycle: "permanent",
         createdAt: now,
         updatedAt: now,
       };
@@ -297,6 +324,7 @@ describe("Storage", () => {
         title: "No Tags",
         content: "No tags here",
         tags: [],
+        lifecycle: "permanent",
         createdAt: now,
         updatedAt: now,
       };
@@ -314,6 +342,7 @@ describe("Storage", () => {
         title: "Multi Tags",
         content: "Many tags here",
         tags: ["tag1", "tag2", "tag3", "tag4"],
+        lifecycle: "permanent",
         createdAt: now,
         updatedAt: now,
       };
@@ -333,6 +362,7 @@ describe("Storage", () => {
         title: "Note with Relationships",
         content: "Has related notes",
         tags: [],
+        lifecycle: "permanent",
         relatedTo: [
           { id: "rel-1", type: "related-to" },
           { id: "rel-2", type: "explains" },
@@ -357,6 +387,7 @@ describe("Storage", () => {
         title: "No Relationships",
         content: "Standalone note",
         tags: [],
+        lifecycle: "permanent",
         createdAt: now,
         updatedAt: now,
       };
@@ -385,6 +416,7 @@ describe("Storage", () => {
         title: "Test",
         content: "Test content",
         tags: [],
+        lifecycle: "permanent",
         createdAt: now,
         updatedAt: now,
       };

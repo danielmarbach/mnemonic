@@ -82,6 +82,7 @@ Rule of thumb: if the note is about the current repo, always pass `cwd` even whe
 You can also set a per-project default once with `set_project_memory_policy`. After that, `remember` uses the saved default whenever `scope` is omitted. Supported defaults are `project`, `global`, and `ask`.
 
 Notes are plain markdown with YAML frontmatter — readable, diffable, mergeable.
+Each note also carries a `lifecycle` of `temporary` or `permanent`: use `temporary` for working-state scaffolding such as plans and WIP checkpoints, and `permanent` for durable knowledge you want future sessions to keep.
 Memory content is markdown-linted on `remember`/`update`: fixable issues are auto-corrected before save, and non-fixable issues are rejected.
 Embeddings stay local (gitignored) and are rebuilt on each machine with `reindex`.
 Mnemonic uses Ollama's `/api/embed` endpoint with truncation enabled so longer notes still embed safely with `nomic-embed-text-v2-moe`.
@@ -95,6 +96,7 @@ Each vault has its own `config.json` with a `schemaVersion`, so main and project
 - `execute_migration` and `mnemonic migrate --dry-run` let you preview changes before applying them.
 - Non-dry-run migrations update a vault's schema only after the full vault run succeeds.
 - Failed migration runs roll staged note writes back instead of leaving partial note edits in the working tree.
+- Metadata-only migrations do not re-embed notes automatically; embeddings are only recomputed when title/content changes or when you run `reindex`.
 
 If you maintain mnemonic itself and add a new latest-schema migration, bump `defaultConfig.schemaVersion` in `src/config.ts` in the same change so fresh installs start at the current schema.
 
@@ -298,12 +300,12 @@ For local development against this repository's current source tree, use `npm ru
 | `recent_memories` | Show the most recently updated memories for a scope                            |
 | `reindex`        | Manually rebuild missing embeddings (sync does this automatically)              |
 | `relate`         | Create a typed relationship between two memories (bidirectional by default)     |
-| `remember`       | Store a memory with project context from `cwd` and storage controlled by `scope` |
+| `remember`       | Store a memory with project context from `cwd`, storage controlled by `scope`, and retention controlled by `lifecycle` |
 | `set_project_identity` | Override which git remote defines project identity for a repo       |
 | `set_project_memory_policy` | Set the default write scope and consolidation mode for a project |
 | `sync`           | Bidirectional sync — pulls remote, pushes local commits, auto-embeds new notes  |
 | `unrelate`       | Remove a relationship between two memories                                      |
-| `update`         | Update content, title, or tags; `cwd` helps locate project notes                |
+| `update`         | Update content, title, tags, or lifecycle; `cwd` helps locate project notes     |
 | `where_is_memory` | Show a memory's project association and actual storage location                |
 
 ## Relationships
@@ -341,6 +343,13 @@ Relationship types:
 
 - `"project"` — store in the shared project vault
 - `"global"` — store in the private main vault
+
+`remember` also accepts a `lifecycle` parameter:
+
+- `"temporary"` — planning or WIP notes that mainly support the current implementation and should usually be deleted once consolidated
+- `"permanent"` — durable knowledge worth keeping for future sessions
+
+If omitted, `lifecycle` defaults to `"permanent"`.
 
 If a project memory policy exists, omitting `scope` uses that policy first.
 
@@ -424,6 +433,14 @@ use `consolidate` to merge them into one authoritative note.
 Pass `cwd` for anything about the current repo, even if you plan to store it with
 `scope: "global"`. `cwd` sets project association; omitting it creates a truly global note.
 
+### Choosing note lifecycle
+When calling `remember`, set lifecycle based on whether the note is temporary working state or durable knowledge:
+
+- `temporary`: planning or WIP notes that mainly support the current implementation and will likely be obsolete once the work is complete
+- `permanent`: decisions, constraints, fixes, lessons, and other knowledge worth keeping for future sessions
+- If unsure, choose `permanent`
+- Tags like `plan`, `wip`, and `completed` are descriptive only; lifecycle controls retention behavior
+
 ### When to call `remember`
 Store a memory whenever you learn something useful to know in a future session:
 
@@ -470,6 +487,7 @@ If nothing comes to mind within a few seconds, skip it — don't force links.
   upgraded, a pattern changed.
 - When you recall something and notice it's stale or partially wrong.
 - Don't create a new memory for something that already exists — update the old one.
+- Preserve the existing lifecycle unless you are intentionally changing it.
 
 ### When to call `forget`
 - When a memory is fully superseded and keeping it would cause confusion.
@@ -484,6 +502,8 @@ If nothing comes to mind within a few seconds, skip it — don't force links.
 **Consolidation modes:**
 - `supersedes` (default) — Creates a new consolidated note and marks sources with `supersedes` relationship. Preserves history, allows pruning later with `prune-superseded`.
 - `delete` — Creates a new consolidated note and deletes sources. Clean and immediate.
+- When all source notes are `temporary`, consolidation should normally use delete behavior so the temporary scaffolding is removed after the durable note is created.
+- The consolidated note should be `permanent` by default.
 
 **Workflow:**
 1. Run `consolidate` with `strategy: "dry-run"` to see analysis

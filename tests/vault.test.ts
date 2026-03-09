@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { VaultManager } from "../src/vault.js";
-import { Storage } from "../src/storage.js";
+import { Storage, type Note } from "../src/storage.js";
 import { GitOps } from "../src/git.js";
 import * as fs from "fs/promises";
 import * as path from "path";
@@ -141,11 +141,12 @@ describe("VaultManager", () => {
       expect(projectVault).toBeTruthy();
       
       // Write note to project vault
-      const note = {
+      const note: Note = {
         id: "project-note",
         title: "Project Note",
         content: "Note in project vault",
         tags: [],
+        lifecycle: "permanent",
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
@@ -168,11 +169,12 @@ describe("VaultManager", () => {
       await vaultManager.getOrCreateProjectVault(projectDir);
       
       // Write note to main vault instead
-      const note = {
+      const note: Note = {
         id: "main-only-note",
         title: "Main Only Note",
         content: "Note only in main vault",
         tags: [],
+        lifecycle: "permanent",
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
@@ -187,11 +189,12 @@ describe("VaultManager", () => {
 
     it("should find note without cwd (search all vaults)", async () => {
       // Write note to main
-      const mainNote = {
+      const mainNote: Note = {
         id: "main-note",
         title: "Main Note",
         content: "In main",
         tags: [],
+        lifecycle: "permanent",
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
@@ -216,11 +219,12 @@ describe("VaultManager", () => {
       const projectVault = await vaultManager.getOrCreateProjectVault(projectDir);
       
       // Write same ID to both vaults
-      const note = {
+      const note: Note = {
         id: "duplicate-id",
         title: "Duplicate ID",
         content: "Different content",
         tags: [],
+        lifecycle: "permanent",
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };

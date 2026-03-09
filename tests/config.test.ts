@@ -18,7 +18,7 @@ describe("MnemonicConfigStore", () => {
 
     const store = new MnemonicConfigStore(dir);
     await expect(store.load()).resolves.toEqual({
-      schemaVersion: "1.0",
+      schemaVersion: "1.1",
       reindexEmbedConcurrency: 4,
       projectMemoryPolicies: {},
       projectIdentityOverrides: {},
@@ -37,7 +37,7 @@ describe("MnemonicConfigStore", () => {
 
     const store = new MnemonicConfigStore(dir);
     await expect(store.load()).resolves.toEqual({
-      schemaVersion: "1.0",
+      schemaVersion: "1.1",
       reindexEmbedConcurrency: 16,
       projectMemoryPolicies: {},
       projectIdentityOverrides: {},
@@ -56,7 +56,7 @@ describe("MnemonicConfigStore", () => {
 
     const store = new MnemonicConfigStore(dir);
     await expect(store.load()).resolves.toEqual({
-      schemaVersion: "1.0",
+      schemaVersion: "1.1",
       reindexEmbedConcurrency: 4,
       projectMemoryPolicies: {},
       projectIdentityOverrides: {},
