@@ -5,6 +5,7 @@ tags:
   - compose
   - ollama
   - deployment
+lifecycle: permanent
 createdAt: '2026-03-07T17:59:46.933Z'
 updatedAt: '2026-03-08T13:08:06.912Z'
 project: https-github-com-danielmarbach-mnemonic

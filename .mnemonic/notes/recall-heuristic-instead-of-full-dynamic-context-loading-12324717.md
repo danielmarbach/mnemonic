@@ -5,6 +5,7 @@ tags:
   - architecture
   - decision
   - scaling
+lifecycle: permanent
 createdAt: '2026-03-08T08:36:41.517Z'
 updatedAt: '2026-03-08T08:36:41.517Z'
 project: https-github-com-danielmarbach-mnemonic

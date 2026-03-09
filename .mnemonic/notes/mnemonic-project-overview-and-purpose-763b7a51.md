@@ -5,6 +5,7 @@ tags:
   - overview
   - mcp
   - typescript
+lifecycle: permanent
 createdAt: '2026-03-07T17:58:49.005Z'
 updatedAt: '2026-03-08T13:08:05.469Z'
 project: https-github-com-danielmarbach-mnemonic

@@ -5,6 +5,7 @@ tags:
   - package-json
   - mcp
   - release
+lifecycle: permanent
 createdAt: '2026-03-07T20:29:00.474Z'
 updatedAt: '2026-03-07T20:37:33.087Z'
 project: https-github-com-danielmarbach-mnemonic

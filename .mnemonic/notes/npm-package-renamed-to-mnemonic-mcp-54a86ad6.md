@@ -5,6 +5,7 @@ tags:
   - package-name
   - github-packages
   - release
+lifecycle: permanent
 createdAt: '2026-03-07T20:37:33.036Z'
 updatedAt: '2026-03-07T20:37:33.087Z'
 project: https-github-com-danielmarbach-mnemonic

@@ -6,6 +6,7 @@ tags:
   - landing-page
   - copywriting
   - design
+lifecycle: permanent
 createdAt: '2026-03-08T12:50:29.190Z'
 updatedAt: '2026-03-08T12:50:29.190Z'
 project: https-github-com-danielmarbach-mnemonic

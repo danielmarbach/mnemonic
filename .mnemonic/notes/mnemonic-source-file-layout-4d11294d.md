@@ -5,6 +5,7 @@ tags:
   - files
   - typescript
   - structure
+lifecycle: permanent
 createdAt: '2026-03-07T17:58:59.865Z'
 updatedAt: '2026-03-07T19:11:53.717Z'
 project: https-github-com-danielmarbach-mnemonic

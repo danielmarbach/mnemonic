@@ -5,6 +5,7 @@ tags:
   - consolidation
   - mcp-tool
   - architecture
+lifecycle: permanent
 createdAt: '2026-03-07T23:15:43.251Z'
 updatedAt: '2026-03-08T09:52:24.892Z'
 project: https-github-com-danielmarbach-mnemonic

@@ -6,6 +6,7 @@ tags:
   - ci
   - publishing
   - npm
+lifecycle: permanent
 createdAt: '2026-03-07T20:29:20.704Z'
 updatedAt: '2026-03-07T20:51:25.054Z'
 project: https-github-com-danielmarbach-mnemonic

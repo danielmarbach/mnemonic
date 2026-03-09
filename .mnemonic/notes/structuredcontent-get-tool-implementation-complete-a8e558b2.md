@@ -5,6 +5,7 @@ tags:
   - structured-content
   - get-tool
   - completed
+lifecycle: permanent
 createdAt: '2026-03-08T14:32:09.877Z'
 updatedAt: '2026-03-08T14:32:09.877Z'
 project: https-github-com-danielmarbach-mnemonic

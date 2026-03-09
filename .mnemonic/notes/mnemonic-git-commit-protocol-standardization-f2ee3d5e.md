@@ -8,6 +8,7 @@ tags:
   - documentation
   - enhancement
   - llm
+lifecycle: permanent
 createdAt: '2026-03-07T23:34:04.303Z'
 updatedAt: '2026-03-07T23:50:48.095Z'
 project: https-github-com-danielmarbach-mnemonic

@@ -5,6 +5,7 @@ tags:
   - architecture
   - agent
   - decision
+lifecycle: permanent
 createdAt: '2026-03-08T09:22:05.553Z'
 updatedAt: '2026-03-08T09:52:21.423Z'
 project: https-github-com-danielmarbach-mnemonic

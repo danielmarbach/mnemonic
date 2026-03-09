@@ -6,6 +6,7 @@ tags:
   - scaling
   - future
   - architecture
+lifecycle: permanent
 createdAt: '2026-03-07T20:51:24.526Z'
 updatedAt: '2026-03-07T20:51:25.054Z'
 project: https-github-com-danielmarbach-mnemonic

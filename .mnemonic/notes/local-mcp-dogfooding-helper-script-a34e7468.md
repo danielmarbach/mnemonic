@@ -5,6 +5,7 @@ tags:
   - mcp
   - developer-workflow
   - scripts
+lifecycle: permanent
 createdAt: '2026-03-07T20:28:59.910Z'
 updatedAt: '2026-03-07T20:29:20.819Z'
 project: https-github-com-danielmarbach-mnemonic

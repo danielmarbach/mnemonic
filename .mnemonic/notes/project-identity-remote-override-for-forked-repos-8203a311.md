@@ -5,6 +5,7 @@ tags:
   - forks
   - git
   - design
+lifecycle: permanent
 createdAt: '2026-03-08T12:36:52.818Z'
 updatedAt: '2026-03-08T12:36:56.668Z'
 project: https-github-com-danielmarbach-mnemonic

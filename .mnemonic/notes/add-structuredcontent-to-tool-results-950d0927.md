@@ -5,6 +5,7 @@ tags:
   - structured-data
   - api-design
   - p0-immediate
+lifecycle: permanent
 createdAt: '2026-03-08T14:25:52.433Z'
 updatedAt: '2026-03-08T14:25:52.433Z'
 project: https-github-com-danielmarbach-mnemonic

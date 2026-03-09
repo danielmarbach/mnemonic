@@ -5,6 +5,7 @@ tags:
   - decisions
   - architecture
   - rationale
+lifecycle: permanent
 createdAt: '2026-03-07T17:59:12.124Z'
 updatedAt: '2026-03-08T14:08:04.842Z'
 project: https-github-com-danielmarbach-mnemonic

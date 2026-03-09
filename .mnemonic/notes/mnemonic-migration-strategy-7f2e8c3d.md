@@ -6,6 +6,7 @@ tags:
   - schema
   - decisions
   - breaking-changes
+lifecycle: permanent
 createdAt: '2026-03-08T01:27:30.000Z'
 updatedAt: '2026-03-08T01:27:30.000Z'
 project: https-github-com-danielmarbach-mnemonic
@@ -15,7 +16,6 @@ relatedTo:
     type: relates-to
 memoryVersion: 1
 ---
-
 # Migration Strategy Implementation
 
 ## Decision: Start with explicit schema versioning even pre-release

@@ -6,6 +6,7 @@ tags:
   - implementation
   - decisions
   - mcp-tools
+lifecycle: permanent
 createdAt: '2026-03-08T01:45:00.000Z'
 updatedAt: '2026-03-08T01:45:00.000Z'
 project: https-github-com-danielmarbach-mnemonic
@@ -15,7 +16,6 @@ relatedTo:
     type: relates-to
 memoryVersion: 1
 ---
-
 # Migration Infrastructure Implementation - Complete
 
 ## What was built

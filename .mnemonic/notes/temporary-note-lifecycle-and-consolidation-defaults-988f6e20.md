@@ -6,6 +6,7 @@ tags:
   - temporary-notes
   - consolidation
   - plans
+lifecycle: permanent
 createdAt: '2026-03-09T09:07:22.778Z'
 updatedAt: '2026-03-09T09:07:22.778Z'
 project: https-github-com-danielmarbach-mnemonic

@@ -5,6 +5,7 @@ tags:
   - documentation
   - build-process
   - p1-medium
+lifecycle: permanent
 createdAt: '2026-03-08T14:25:52.466Z'
 updatedAt: '2026-03-08T14:25:52.466Z'
 project: https-github-com-danielmarbach-mnemonic

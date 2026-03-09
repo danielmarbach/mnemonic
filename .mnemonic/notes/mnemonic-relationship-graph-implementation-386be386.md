@@ -5,6 +5,7 @@ tags:
   - graph
   - feature
   - architecture
+lifecycle: permanent
 createdAt: '2026-03-07T17:59:57.597Z'
 updatedAt: '2026-03-07T18:37:18.520Z'
 project: https-github-com-danielmarbach-mnemonic

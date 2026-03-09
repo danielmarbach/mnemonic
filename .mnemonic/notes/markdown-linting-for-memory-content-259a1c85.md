@@ -5,6 +5,7 @@ tags:
   - linting
   - decisions
   - dogfooding
+lifecycle: permanent
 createdAt: '2026-03-07T18:37:11.013Z'
 updatedAt: '2026-03-07T18:42:51.656Z'
 project: https-github-com-danielmarbach-mnemonic

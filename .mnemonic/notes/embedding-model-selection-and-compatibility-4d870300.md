@@ -6,6 +6,7 @@ tags:
   - compatibility
   - ollama
   - retrieval
+lifecycle: permanent
 createdAt: '2026-03-08T14:12:45.006Z'
 updatedAt: '2026-03-08T14:12:45.006Z'
 project: https-github-com-danielmarbach-mnemonic
@@ -15,6 +16,7 @@ relatedTo:
     type: related-to
   - id: mnemonic-key-design-decisions-3f2a6273
     type: related-to
+memoryVersion: 0
 ---
 Authoritative note for mnemonic embedding behavior, model-default rationale, compatibility, and benchmarked alternatives.
 

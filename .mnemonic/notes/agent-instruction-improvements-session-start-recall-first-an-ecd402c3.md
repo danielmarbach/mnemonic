@@ -8,6 +8,7 @@ tags:
   - consolidate
   - documentation
   - workflow
+lifecycle: permanent
 createdAt: '2026-03-08T09:52:09.787Z'
 updatedAt: '2026-03-08T09:52:24.892Z'
 project: https-github-com-danielmarbach-mnemonic

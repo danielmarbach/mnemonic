@@ -4,6 +4,7 @@ tags:
   - tools
   - mcp
   - api
+lifecycle: permanent
 createdAt: '2026-03-07T17:59:25.498Z'
 updatedAt: '2026-03-07T23:23:21.142Z'
 project: https-github-com-danielmarbach-mnemonic

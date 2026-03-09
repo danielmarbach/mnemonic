@@ -6,6 +6,7 @@ tags:
   - project-metadata
   - dogfooding
   - decision
+lifecycle: permanent
 createdAt: '2026-03-08T18:14:44.358Z'
 updatedAt: '2026-03-08T18:14:44.358Z'
 project: https-github-com-danielmarbach-mnemonic

@@ -5,10 +5,12 @@ tags:
   - structured-content
   - progress
   - completed
+lifecycle: permanent
 createdAt: '2026-03-08T20:02:56.487Z'
 updatedAt: '2026-03-08T20:02:56.487Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+memoryVersion: 0
 ---
 Replaces the progress snapshot, the completion summary, and the intermediate consolidated note with one final structuredContent rollout record so the project knowledgebase no longer surfaces duplicate implementation-history memories.
 

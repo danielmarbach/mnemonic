@@ -5,6 +5,7 @@ tags:
   - scope
   - storage
   - ux
+lifecycle: permanent
 createdAt: '2026-03-07T19:25:37.785Z'
 updatedAt: '2026-03-07T19:41:05.715Z'
 project: https-github-com-danielmarbach-mnemonic

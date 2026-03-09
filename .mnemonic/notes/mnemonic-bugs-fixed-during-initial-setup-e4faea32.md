@@ -5,6 +5,7 @@ tags:
   - setup
   - typescript
   - simple-git
+lifecycle: permanent
 createdAt: '2026-03-07T17:59:35.844Z'
 updatedAt: '2026-03-07T19:41:09.084Z'
 project: https-github-com-danielmarbach-mnemonic
