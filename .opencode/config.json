@@ -1,0 +1,12 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "mnemonic-dev": {
+      "command": "node",
+      "args": ["../build/index.js"],
+      "env": {
+        "VAULT_PATH": "~/mnemonic-dev-vault"
+      }
+    }
+  }
+}
