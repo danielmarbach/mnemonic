@@ -4,8 +4,9 @@ tags:
   - tools
   - mcp
   - api
+lifecycle: permanent
 createdAt: '2026-03-07T17:59:25.498Z'
-updatedAt: '2026-03-09T19:45:58.012Z'
+updatedAt: '2026-03-09T20:28:01.326Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
@@ -33,12 +34,11 @@ Tools registered in `src/index.ts`:
 | `project_memory_summary` | Summarize what mnemonic knows about the current project |
 | `recall` | Semantic search with optional project boost (+0.15) |
 | `recent_memories` | Show the most recently updated memories for a scope and storage location |
-| `reindex` | Rebuild missing embeddings; `force=true` rebuilds all. Works without a git remote (unlike `sync` which skips embed when no remote configured). |
 | `remember` | Write note + embedding with project context from `cwd` and storage controlled by `scope` |
 | `relate` | Create typed relationship (bidirectional by default) |
 | `set_project_identity` | Save which git remote defines project identity |
 | `set_project_memory_policy` | Set the default write scope and consolidation mode for a project |
-| `sync` | fetch → pull (rebase) → push → auto-embed pulled notes (only embeds when remote exists) |
+| `sync` | Git sync when a remote exists, then always backfills missing local embeddings; `force=true` rebuilds all embeddings |
 | `unrelate` | Remove relationship between two notes |
 | `update` | Update content/title/tags, always re-embeds |
 | `where_is_memory` | Show a memory's project association and actual storage location — lightweight alternative to `get` |
@@ -47,20 +47,19 @@ Relationship types: `related-to`, `explains`, `example-of`, `supersedes`.
 
 Main-vault operational config lives in `config.json`, including `reindexEmbedConcurrency`, per-project memory policies, and consolidation mode defaults.
 
-## Key design note: reindex vs sync
+## Key design note: sync owns embedding rebuilds
 
-`reindex` is NOT redundant with `sync`:
+`sync` is now the single recovery path for local embeddings:
 
-- `sync` only backfills embeddings when `hasRemote` is true — vaults with no remote (or `DISABLE_GIT=true`) never get embeddings via sync
-- `reindex force=true` rebuilds all embeddings regardless of model — sync's backfill skips existing same-model embeddings
-- Separation: `sync` = git operations (with incidental embedding of new pulls), `reindex` = embedding-only rebuild
+- it still performs git fetch/pull/push when a remote exists
+- it also backfills missing local embeddings even when no remote exists or git is disabled
+- `sync force=true` rebuilds all embeddings regardless of whether the current model already has them
+
+This makes `sync` the tool that brings a vault to a fully operational state, instead of splitting that responsibility across `sync` and a separate `reindex` tool.
 
 ## Zod schemas
 
-All three new tools have both interface types AND Zod output schemas in `src/structured-content.ts`:
-
-- `GetResultSchema`, `WhereIsResultSchema` — added in feat/missing-tools-get-reindex-where-is
-- `ReindexResultSchema` — existed but was missing from schema imports in `index.ts`
+The structured-content module still contains result schemas and types for removed tools as historical implementation detail, but `src/index.ts` no longer registers `reindex`.
 
 ## storageLabel return type
 
