@@ -57,6 +57,24 @@ import type {
   ConsolidateResult,
   PersistenceStatus,
 } from "./structured-content.js";
+import {
+  RememberResultSchema,
+  RecallResultSchema,
+  ListResultSchema,
+  UpdateResultSchema,
+  ForgetResultSchema,
+  MoveResultSchema,
+  RelateResultSchema,
+  RecentResultSchema,
+  MemoryGraphResultSchema,
+  ProjectSummaryResultSchema,
+  SyncResultSchema,
+  ConsolidateResultSchema,
+  ProjectIdentityResultSchema,
+  MigrationListResultSchema,
+  MigrationExecuteResultSchema,
+  PolicyResultSchema,
+} from "./structured-content.js";
 
 // ── CLI Migration Command ─────────────────────────────────────────────────────
 
@@ -747,6 +765,7 @@ server.registerTool(
       "Identify which project a working directory belongs to. " +
       "Returns the stable project id and name. " +
       "Call this to know what project context to pass to other tools.",
+    outputSchema: ProjectIdentityResultSchema,
     inputSchema: z.object({
       cwd: z.string().describe("Absolute path to the working directory"),
     }),
@@ -755,7 +774,7 @@ server.registerTool(
     const identity = await resolveProjectIdentityForCwd(cwd);
     const project = identity?.project;
     if (!project || !identity) {
-      return { content: [{ type: "text", text: `Could not detect a project for: ${cwd}` }] };
+      return { content: [{ type: "text", text: `Could not detect a project for: ${cwd}` }], isError: true };
     }
     const policyLine = await formatProjectPolicyLine(project.id);
     
@@ -797,11 +816,12 @@ server.registerTool(
     inputSchema: z.object({
       cwd: z.string().describe("Absolute path to the project working directory"),
     }),
+    outputSchema: ProjectIdentityResultSchema,
   },
   async ({ cwd }) => {
     const identity = await resolveProjectIdentityForCwd(cwd);
     if (!identity) {
-      return { content: [{ type: "text", text: `Could not detect a project for: ${cwd}` }] };
+      return { content: [{ type: "text", text: `Could not detect a project for: ${cwd}` }], isError: true };
     }
 
     const structuredContent: ProjectIdentityResult = {
@@ -841,11 +861,12 @@ server.registerTool(
       cwd: z.string().describe("Absolute path to the project working directory"),
       remoteName: z.string().min(1).describe("Git remote name to use as the canonical project identity, such as `upstream`")
     }),
+    outputSchema: ProjectIdentityResultSchema,
   },
   async ({ cwd, remoteName }) => {
     const defaultIdentity = await resolveProjectIdentity(cwd);
     if (!defaultIdentity) {
-      return { content: [{ type: "text", text: `Could not detect a project for: ${cwd}` }] };
+      return { content: [{ type: "text", text: `Could not detect a project for: ${cwd}` }], isError: true };
     }
 
     const defaultProject = defaultIdentity.project;
@@ -927,6 +948,7 @@ server.registerTool(
     title: "List Migrations",
     description: "List available migrations and show which ones are pending for the current schema version",
     inputSchema: z.object({}),
+    outputSchema: MigrationListResultSchema,
   },
   async () => {
     const available = migrator.listAvailableMigrations();
@@ -984,6 +1006,7 @@ server.registerTool(
       backup: z.boolean().default(true).describe("If true, warn about backing up before real migration"),
       cwd: projectParam.optional().describe("Optional: limit to project vault for given working directory"),
     }),
+    outputSchema: MigrationExecuteResultSchema,
   },
   async ({ migrationName, dryRun, backup, cwd }) => {
     try {
@@ -1080,6 +1103,7 @@ server.registerTool(
         .optional()
         .describe("Where to store the memory: project vault or private global vault"),
     }),
+    outputSchema: RememberResultSchema,
   },
   async ({ title, content, tags, lifecycle, summary, cwd, scope }) => {
     const project = await resolveProject(cwd);
@@ -1087,7 +1111,7 @@ server.registerTool(
     const policyScope = await getProjectPolicyScope(cwd);
     const writeScope = resolveWriteScope(scope, policyScope, Boolean(project));
     if (writeScope === "ask") {
-      return { content: [{ type: "text", text: formatAskForWriteScope(project) }] };
+      return { content: [{ type: "text", text: formatAskForWriteScope(project) }], isError: true };
     }
     const vault = await resolveWriteVault(cwd, writeScope);
 
@@ -1180,11 +1204,12 @@ server.registerTool(
         "Default consolidation mode: 'supersedes' preserves history (default), 'delete' removes sources"
       ),
     }),
+    outputSchema: PolicyResultSchema,
   },
   async ({ cwd, defaultScope, consolidationMode }) => {
     const project = await resolveProject(cwd);
     if (!project) {
-      return { content: [{ type: "text", text: `Could not detect a project for: ${cwd}` }] };
+      return { content: [{ type: "text", text: `Could not detect a project for: ${cwd}` }], isError: true };
     }
 
     const now = new Date().toISOString();
@@ -1236,11 +1261,12 @@ server.registerTool(
     inputSchema: z.object({
       cwd: z.string().describe("Absolute path to the project working directory"),
     }),
+    outputSchema: PolicyResultSchema,
   },
   async ({ cwd }) => {
     const project = await resolveProject(cwd);
     if (!project) {
-      return { content: [{ type: "text", text: `Could not detect a project for: ${cwd}` }] };
+      return { content: [{ type: "text", text: `Could not detect a project for: ${cwd}` }], isError: true };
     }
 
     const policy = await configStore.getProjectPolicy(project.id);
@@ -1302,6 +1328,7 @@ server.registerTool(
           "'all' = project-boosted then global (default)"
         ),
     }),
+    outputSchema: RecallResultSchema,
   },
   async ({ query, cwd, limit, minSimilarity, tags, scope }) => {
     const project = await resolveProject(cwd);
@@ -1342,7 +1369,8 @@ server.registerTool(
     const top = selectRecallResults(scored, limit, scope);
 
     if (top.length === 0) {
-      return { content: [{ type: "text", text: "No memories found matching that query." }] };
+      const structuredContent: RecallResult = { action: "recalled", query, scope: scope || "all", results: [] };
+      return { content: [{ type: "text", text: "No memories found matching that query." }], structuredContent };
     }
 
     const sections: string[] = [];
@@ -1420,11 +1448,12 @@ server.registerTool(
       summary: z.string().optional().describe("Brief summary of what changed and why (for git commit message). Not stored in the note."),
       cwd: projectParam,
     }),
+    outputSchema: UpdateResultSchema,
   },
   async ({ id, content, title, tags, lifecycle, summary, cwd }) => {
     const found = await vaultManager.findNote(id, cwd);
     if (!found) {
-      return { content: [{ type: "text", text: `No memory found with id '${id}'` }] };
+      return { content: [{ type: "text", text: `No memory found with id '${id}'` }], isError: true };
     }
 
     const { note, vault } = found;
@@ -1506,11 +1535,12 @@ server.registerTool(
       id: z.string().describe("Memory id to delete"),
       cwd: projectParam,
     }),
+    outputSchema: ForgetResultSchema,
   },
   async ({ id, cwd }) => {
     const found = await vaultManager.findNote(id, cwd);
     if (!found) {
-      return { content: [{ type: "text", text: `No memory found with id '${id}'` }] };
+      return { content: [{ type: "text", text: `No memory found with id '${id}'` }], isError: true };
     }
 
     const { note, vault: noteVault } = found;
@@ -1574,12 +1604,14 @@ server.registerTool(
       includeStorage: z.boolean().optional().default(false).describe("Include whether the memory lives in the project vault or main vault"),
       includeUpdated: z.boolean().optional().default(false).describe("Include the last updated timestamp for each memory"),
     }),
+    outputSchema: ListResultSchema,
   },
   async ({ cwd, scope, storedIn, tags, includeRelations, includePreview, includeStorage, includeUpdated }) => {
     const { project, entries } = await collectVisibleNotes(cwd, scope, tags, storedIn);
 
     if (entries.length === 0) {
-      return { content: [{ type: "text", text: "No memories found." }] };
+      const structuredContent: ListResult = { action: "listed", count: 0, scope: scope || "all", storedIn: storedIn || "any", project: project ? { id: project.id, name: project.name } : undefined, notes: [] };
+      return { content: [{ type: "text", text: "No memories found." }], structuredContent };
     }
 
     const lines = entries.map((entry) => formatListEntry(entry, {
@@ -1650,6 +1682,7 @@ server.registerTool(
       includePreview: z.boolean().optional().default(true),
       includeStorage: z.boolean().optional().default(true),
     }),
+    outputSchema: RecentResultSchema,
   },
   async ({ cwd, scope, storedIn, limit, includePreview, includeStorage }) => {
     const { project, entries } = await collectVisibleNotes(cwd, scope, undefined, storedIn);
@@ -1658,7 +1691,8 @@ server.registerTool(
       .slice(0, limit);
 
     if (recent.length === 0) {
-      return { content: [{ type: "text", text: "No memories found." }] };
+      const structuredContent: RecentResult = { action: "recent_shown", project: project?.id, projectName: project?.name, count: 0, limit: limit || 5, notes: [] };
+      return { content: [{ type: "text", text: "No memories found." }], structuredContent };
     }
 
     const header = project && scope !== "global"
@@ -1719,11 +1753,13 @@ server.registerTool(
       storedIn: z.enum(["project-vault", "main-vault", "any"]).optional().default("any"),
       limit: z.number().int().min(1).max(50).optional().default(25),
     }),
+    outputSchema: MemoryGraphResultSchema,
   },
   async ({ cwd, scope, storedIn, limit }) => {
     const { project, entries } = await collectVisibleNotes(cwd, scope, undefined, storedIn);
     if (entries.length === 0) {
-      return { content: [{ type: "text", text: "No memories found." }] };
+      const structuredContent: MemoryGraphResult = { action: "graph_shown", project: project?.id, projectName: project?.name, nodes: [], limit, truncated: false };
+      return { content: [{ type: "text", text: "No memories found." }], structuredContent };
     }
 
     const visibleIds = new Set(entries.map((entry) => entry.note.id));
@@ -1739,7 +1775,8 @@ server.registerTool(
       .filter(Boolean);
 
     if (lines.length === 0) {
-      return { content: [{ type: "text", text: "No relationships found for that scope." }] };
+      const structuredContent: MemoryGraphResult = { action: "graph_shown", project: project?.id, projectName: project?.name, nodes: [], limit, truncated: false };
+      return { content: [{ type: "text", text: "No relationships found for that scope." }], structuredContent };
     }
 
     const header = project && scope !== "global"
@@ -1788,14 +1825,16 @@ server.registerTool(
       maxPerTheme: z.number().int().min(1).max(5).optional().default(3),
       recentLimit: z.number().int().min(1).max(10).optional().default(5),
     }),
+    outputSchema: ProjectSummaryResultSchema,
   },
   async ({ cwd, maxPerTheme, recentLimit }) => {
     const { project, entries } = await collectVisibleNotes(cwd, "all");
     if (!project) {
-      return { content: [{ type: "text", text: `Could not detect a project for: ${cwd}` }] };
+      return { content: [{ type: "text", text: `Could not detect a project for: ${cwd}` }], isError: true };
     }
     if (entries.length === 0) {
-      return { content: [{ type: "text", text: `No memories found for project ${project.name}.` }] };
+      const structuredContent: ProjectSummaryResult = { action: "project_summary_shown", project: { id: project.id, name: project.name }, notes: { total: 0, projectVault: 0, mainVault: 0, privateProject: 0 }, themes: {}, recent: [] };
+      return { content: [{ type: "text", text: `No memories found for project ${project.name}.` }], structuredContent };
     }
 
     const policyLine = await formatProjectPolicyLine(project.id);
@@ -1881,6 +1920,7 @@ server.registerTool(
     inputSchema: z.object({
       cwd: projectParam,
     }),
+    outputSchema: SyncResultSchema,
   },
   async ({ cwd }) => {
     const lines: string[] = [];
@@ -1960,16 +2000,17 @@ server.registerTool(
       target: z.enum(["main-vault", "project-vault"]).describe("Destination storage location"),
       cwd: projectParam,
     }),
+    outputSchema: MoveResultSchema,
   },
   async ({ id, target, cwd }) => {
     const found = await vaultManager.findNote(id, cwd);
     if (!found) {
-      return { content: [{ type: "text", text: `No memory found with id '${id}'` }] };
+      return { content: [{ type: "text", text: `No memory found with id '${id}'` }], isError: true };
     }
 
     const currentStorage = storageLabel(found.vault);
     if (currentStorage === target) {
-      return { content: [{ type: "text", text: `Memory '${id}' is already stored in ${target}.` }] };
+      return { content: [{ type: "text", text: `Memory '${id}' is already stored in ${target}.` }], isError: true };
     }
 
     let targetVault: Vault;
@@ -1983,22 +2024,23 @@ server.registerTool(
             type: "text",
             text: "Moving into a project vault requires `cwd` so mnemonic can resolve the destination project.",
           }],
+          isError: true,
         };
       }
       const projectVault = await vaultManager.getOrCreateProjectVault(cwd);
       if (!projectVault) {
-        return { content: [{ type: "text", text: `Could not resolve a project vault for: ${cwd}` }] };
+        return { content: [{ type: "text", text: `Could not resolve a project vault for: ${cwd}` }], isError: true };
       }
       targetProject = await resolveProject(cwd);
       if (!targetProject) {
-        return { content: [{ type: "text", text: `Could not detect a project for: ${cwd}` }] };
+        return { content: [{ type: "text", text: `Could not detect a project for: ${cwd}` }], isError: true };
       }
       targetVault = projectVault;
     }
 
     const existing = await targetVault.storage.readNote(id);
     if (existing) {
-      return { content: [{ type: "text", text: `Cannot move '${id}' because a note with that id already exists in ${target}.` }] };
+      return { content: [{ type: "text", text: `Cannot move '${id}' because a note with that id already exists in ${target}.` }], isError: true };
     }
 
     let noteToWrite = found.note;
@@ -2070,14 +2112,15 @@ server.registerTool(
       bidirectional: z.boolean().optional().default(true),
       cwd: projectParam,
     }),
+    outputSchema: RelateResultSchema,
   },
   async ({ fromId, toId, type, bidirectional, cwd }) => {
     const [foundFrom, foundTo] = await Promise.all([
       vaultManager.findNote(fromId, cwd),
       vaultManager.findNote(toId, cwd),
     ]);
-    if (!foundFrom) return { content: [{ type: "text", text: `No memory found with id '${fromId}'` }] };
-    if (!foundTo) return { content: [{ type: "text", text: `No memory found with id '${toId}'` }] };
+    if (!foundFrom) return { content: [{ type: "text", text: `No memory found with id '${fromId}'` }], isError: true };
+    if (!foundTo) return { content: [{ type: "text", text: `No memory found with id '${toId}'` }], isError: true };
 
     const { note: fromNote, vault: fromVault } = foundFrom;
     const { note: toNote, vault: toVault } = foundTo;
@@ -2105,7 +2148,7 @@ server.registerTool(
     }
 
     if (vaultChanges.size === 0) {
-      return { content: [{ type: "text", text: `Relationship already exists between '${fromId}' and '${toId}'` }] };
+      return { content: [{ type: "text", text: `Relationship already exists between '${fromId}' and '${toId}'` }], isError: true };
     }
 
     const modifiedNoteIds: string[] = [];
@@ -2157,6 +2200,7 @@ server.registerTool(
       bidirectional: z.boolean().optional().default(true),
       cwd: projectParam,
     }),
+    outputSchema: RelateResultSchema,
   },
   async ({ fromId, toId, bidirectional, cwd }) => {
     const [foundFrom, foundTo] = await Promise.all([
@@ -2190,7 +2234,7 @@ server.registerTool(
     }
 
     if (vaultChanges.size === 0) {
-      return { content: [{ type: "text", text: `No relationship found between '${fromId}' and '${toId}'` }] };
+      return { content: [{ type: "text", text: `No relationship found between '${fromId}' and '${toId}'` }], isError: true };
     }
 
     for (const [vault, files] of vaultChanges) {
@@ -2268,11 +2312,12 @@ server.registerTool(
         .optional()
         .describe("Required for execute-merge strategy"),
     }),
+    outputSchema: ConsolidateResultSchema,
   },
   async ({ cwd, strategy, mode, threshold, mergePlan }) => {
     const project = await resolveProject(cwd);
     if (!project && cwd) {
-      return { content: [{ type: "text", text: `Could not detect a project for: ${cwd}` }] };
+      return { content: [{ type: "text", text: `Could not detect a project for: ${cwd}` }], isError: true };
     }
 
     // Gather notes from all vaults (project + main) for this project
@@ -2282,7 +2327,7 @@ server.registerTool(
       : entries.filter((e) => !e.note.project);
 
     if (projectNotes.length === 0) {
-      return { content: [{ type: "text", text: "No memories found to consolidate." }] };
+      return { content: [{ type: "text", text: "No memories found to consolidate." }], isError: true };
     }
 
     // Resolve project/default consolidation mode. Temporary-only merges may still
@@ -2302,7 +2347,7 @@ server.registerTool(
 
       case "execute-merge":
         if (!mergePlan) {
-          return { content: [{ type: "text", text: "execute-merge strategy requires a mergePlan with sourceIds and targetTitle." }] };
+          return { content: [{ type: "text", text: "execute-merge strategy requires a mergePlan with sourceIds and targetTitle." }], isError: true };
         }
         return executeMerge(projectNotes, mergePlan, defaultConsolidationMode, project, cwd, mode);
 
@@ -2313,7 +2358,7 @@ server.registerTool(
         return dryRunAll(projectNotes, threshold, defaultConsolidationMode, project, mode);
 
       default:
-        return { content: [{ type: "text", text: `Unknown strategy: ${strategy}` }] };
+        return { content: [{ type: "text", text: `Unknown strategy: ${strategy}` }], isError: true };
     }
   }
 );
@@ -3041,5 +3086,14 @@ async function warnAboutPendingMigrationsOnStartup(): Promise<void> {
 // ── start ─────────────────────────────────────────────────────────────────────
 await warnAboutPendingMigrationsOnStartup();
 const transport = new StdioServerTransport();
+
+async function shutdown() {
+  await server.close();
+  process.exit(0);
+}
+process.on("SIGINT", shutdown);
+process.on("SIGTERM", shutdown);
+transport.onclose = () => process.exit(0);
+
 await server.connect(transport);
 console.error(`[mnemonic] Started. Main vault: ${VAULT_PATH}`);

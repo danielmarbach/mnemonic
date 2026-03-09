@@ -1,3 +1,4 @@
+import { z } from "zod";
 import type { Vault } from "./vault.js";
 import type { Note, NoteLifecycle, RelationshipType } from "./storage.js";
 
@@ -274,3 +275,260 @@ export interface ProjectSummaryResult extends Record<string, unknown> {
     updatedAt: string;
   }>;
 }
+
+// ── Zod output schemas ────────────────────────────────────────────────────────
+
+const _NoteLifecycle = z.enum(["temporary", "permanent"]);
+const _RelationshipType = z.enum(["related-to", "explains", "example-of", "supersedes"]);
+const _VaultLabel = z.enum(["project-vault", "main-vault"]);
+
+export const PersistenceStatusSchema = z.object({
+  notePath: z.string(),
+  embeddingPath: z.string(),
+  embedding: z.object({
+    status: z.enum(["written", "skipped"]),
+    model: z.string(),
+    reason: z.string().optional(),
+  }),
+  git: z.object({
+    commit: z.enum(["committed", "skipped"]),
+    push: z.enum(["pushed", "skipped"]),
+    commitMessage: z.string().optional(),
+    commitBody: z.string().optional(),
+    commitReason: z.string().optional(),
+    pushReason: z.string().optional(),
+  }),
+  durability: z.enum(["local-only", "committed", "pushed"]),
+});
+
+export const RememberResultSchema = z.object({
+  action: z.literal("remembered"),
+  id: z.string(),
+  title: z.string(),
+  project: z.object({ id: z.string(), name: z.string() }).optional(),
+  scope: z.enum(["project", "global"]),
+  vault: _VaultLabel,
+  tags: z.array(z.string()),
+  lifecycle: _NoteLifecycle,
+  timestamp: z.string(),
+  persistence: PersistenceStatusSchema,
+});
+
+export const RecallResultSchema = z.object({
+  action: z.literal("recalled"),
+  query: z.string(),
+  scope: z.enum(["project", "global", "all"]),
+  results: z.array(z.object({
+    id: z.string(),
+    title: z.string(),
+    score: z.number(),
+    boosted: z.number(),
+    project: z.string().optional(),
+    projectName: z.string().optional(),
+    vault: _VaultLabel,
+    tags: z.array(z.string()),
+    lifecycle: _NoteLifecycle,
+    updatedAt: z.string(),
+  })),
+});
+
+export const ListResultSchema = z.object({
+  action: z.literal("listed"),
+  count: z.number(),
+  scope: z.enum(["project", "global", "all"]),
+  storedIn: z.enum(["project-vault", "main-vault", "any"]),
+  project: z.object({ id: z.string(), name: z.string() }).optional(),
+  notes: z.array(z.object({
+    id: z.string(),
+    title: z.string(),
+    project: z.string().optional(),
+    projectName: z.string().optional(),
+    tags: z.array(z.string()),
+    lifecycle: _NoteLifecycle,
+    vault: _VaultLabel,
+    updatedAt: z.string(),
+    hasRelated: z.boolean().optional(),
+  })),
+  options: z.object({
+    includeRelations: z.boolean().optional(),
+    includePreview: z.boolean().optional(),
+    includeStorage: z.boolean().optional(),
+    includeUpdated: z.boolean().optional(),
+  }).optional(),
+});
+
+export const UpdateResultSchema = z.object({
+  action: z.literal("updated"),
+  id: z.string(),
+  title: z.string(),
+  fieldsModified: z.array(z.string()),
+  timestamp: z.string(),
+  project: z.string().optional(),
+  projectName: z.string().optional(),
+  lifecycle: _NoteLifecycle,
+  persistence: PersistenceStatusSchema,
+});
+
+export const ForgetResultSchema = z.object({
+  action: z.literal("forgotten"),
+  id: z.string(),
+  title: z.string(),
+  project: z.string().optional(),
+  projectName: z.string().optional(),
+  relationshipsCleaned: z.number(),
+  vaultsModified: z.array(z.string()),
+});
+
+export const MoveResultSchema = z.object({
+  action: z.literal("moved"),
+  id: z.string(),
+  fromVault: _VaultLabel,
+  toVault: _VaultLabel,
+  projectAssociation: z.string(),
+  title: z.string(),
+  metadataRewritten: z.boolean().optional(),
+  persistence: PersistenceStatusSchema,
+});
+
+export const RelateResultSchema = z.object({
+  action: z.enum(["related", "unrelated"]),
+  fromId: z.string(),
+  toId: z.string(),
+  type: _RelationshipType,
+  bidirectional: z.boolean(),
+  notesModified: z.array(z.string()),
+});
+
+export const RecentResultSchema = z.object({
+  action: z.literal("recent_shown"),
+  project: z.string().optional(),
+  projectName: z.string().optional(),
+  count: z.number(),
+  limit: z.number(),
+  notes: z.array(z.object({
+    id: z.string(),
+    title: z.string(),
+    project: z.string().optional(),
+    projectName: z.string().optional(),
+    tags: z.array(z.string()),
+    lifecycle: _NoteLifecycle,
+    vault: _VaultLabel,
+    updatedAt: z.string(),
+    preview: z.string().optional(),
+  })),
+});
+
+export const MemoryGraphResultSchema = z.object({
+  action: z.literal("graph_shown"),
+  project: z.string().optional(),
+  projectName: z.string().optional(),
+  nodes: z.array(z.object({
+    id: z.string(),
+    title: z.string(),
+    edges: z.array(z.object({ toId: z.string(), type: _RelationshipType })),
+  })),
+  limit: z.number(),
+  truncated: z.boolean(),
+});
+
+export const ProjectSummaryResultSchema = z.object({
+  action: z.literal("project_summary_shown"),
+  project: z.object({ id: z.string(), name: z.string() }),
+  notes: z.object({
+    total: z.number(),
+    projectVault: z.number(),
+    mainVault: z.number(),
+    privateProject: z.number(),
+  }),
+  themes: z.record(z.number()),
+  recent: z.array(z.object({
+    id: z.string(),
+    title: z.string(),
+    updatedAt: z.string(),
+  })),
+});
+
+export const SyncResultSchema = z.object({
+  action: z.literal("synced"),
+  vaults: z.array(z.object({
+    vault: z.enum(["main", "project"]),
+    hasRemote: z.boolean(),
+    pulled: z.number(),
+    deleted: z.number(),
+    pushed: z.number(),
+    embedded: z.number(),
+    failed: z.array(z.string()),
+  })),
+});
+
+export const ReindexResultSchema = z.object({
+  action: z.literal("reindexed"),
+  vaults: z.array(z.object({
+    vault: z.enum(["main", "project"]),
+    rebuilt: z.number(),
+    failed: z.array(z.string()),
+  })),
+});
+
+export const ConsolidateResultSchema = z.object({
+  action: z.literal("consolidated"),
+  strategy: z.string(),
+  project: z.string().optional(),
+  projectName: z.string().optional(),
+  notesProcessed: z.number(),
+  notesModified: z.number(),
+  warnings: z.array(z.string()).optional(),
+  persistence: PersistenceStatusSchema.optional(),
+});
+
+export const ProjectIdentityResultSchema = z.object({
+  action: z.enum(["project_identity_set", "project_identity_shown", "project_identity_detected"]),
+  project: z.object({
+    id: z.string(),
+    name: z.string(),
+    source: z.string(),
+    remoteName: z.string().optional(),
+  }).optional(),
+  identityOverride: z.object({
+    remoteName: z.string(),
+    updatedAt: z.string(),
+  }).optional(),
+  defaultProject: z.object({
+    id: z.string(),
+    name: z.string(),
+    remoteName: z.string().optional(),
+  }).optional(),
+});
+
+export const MigrationListResultSchema = z.object({
+  action: z.literal("migration_list"),
+  vaults: z.array(z.object({
+    path: z.string(),
+    type: z.enum(["main", "project"]),
+    version: z.string(),
+    pending: z.number(),
+  })),
+  available: z.array(z.object({ name: z.string(), description: z.string() })),
+});
+
+export const MigrationExecuteResultSchema = z.object({
+  action: z.literal("migration_executed"),
+  migration: z.string(),
+  dryRun: z.boolean(),
+  vaultsProcessed: z.number(),
+  vaultResults: z.array(z.object({
+    path: z.string(),
+    notesProcessed: z.number(),
+    notesModified: z.number(),
+    errors: z.array(z.object({ noteId: z.string(), error: z.string() })),
+    warnings: z.array(z.string()),
+  })),
+});
+
+export const PolicyResultSchema = z.object({
+  action: z.enum(["policy_set", "policy_shown"]),
+  project: z.object({ id: z.string(), name: z.string() }),
+  defaultScope: z.string().optional(),
+  consolidationMode: z.string().optional(),
+  updatedAt: z.string().optional(),
+});
