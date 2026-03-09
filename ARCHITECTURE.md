@@ -104,7 +104,7 @@ Recall searches embeddings from the project vault first when `cwd` is present, t
 ```mermaid
 flowchart TD
     Query[recall query] --> Embed[Embed query text]
-    Embed --> Search[VaultManager.searchOrder(cwd)]
+    Embed --> Search[VaultManager.searchOrder#40;cwd#41;]
     Search --> ProjectEmbeddings[Project vault embeddings]
     Search --> MainEmbeddings[Main vault embeddings]
     ProjectEmbeddings --> Score[cosine similarity + project boost]
