@@ -8,7 +8,7 @@ tags:
   - plans
 lifecycle: permanent
 createdAt: '2026-03-09T09:07:22.778Z'
-updatedAt: '2026-03-09T09:07:22.778Z'
+updatedAt: '2026-03-09T09:33:16.115Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 memoryVersion: 1
@@ -25,5 +25,6 @@ Key decisions from the design discussion:
 - During consolidation, explicit mode still wins. Otherwise, if all source notes are `temporary`, use delete behavior by default; mixed lifecycle sources fall back to the normal project policy/default behavior.
 - A consolidated note created from temporary notes should become `permanent` by default because it represents the durable outcome after the scaffolding has served its purpose.
 - The lifecycle decision rubric should be documented in `AGENT.md`, the README system prompt snippet, and the mirrored `docs/index.html` prompt snippet so MCP clients know when to choose temporary vs permanent.
+- Metadata-only lifecycle migrations do not recompute embeddings. Embeddings remain derived from note title/content and are only refreshed when semantic content changes or when `reindex` is run explicitly.
 
 Intent: temporary notes exist to support active work and should disappear cleanly once consolidated into a durable note, without overloading tags or introducing a larger storage-layout refactor.
