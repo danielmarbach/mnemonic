@@ -7,10 +7,9 @@ tags:
   - persistence-status
 lifecycle: permanent
 createdAt: '2026-03-09T11:32:57.609Z'
-updatedAt: '2026-03-09T11:58:03.794Z'
+updatedAt: '2026-03-09T12:00:28.311Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
-memoryVersion: 0
 ---
 Implementation outcome for persistence-status visibility in mutating MCP tools.
 
