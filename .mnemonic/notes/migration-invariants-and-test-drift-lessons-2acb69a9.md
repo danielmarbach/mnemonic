@@ -18,7 +18,7 @@ createdAt: '2026-03-08T19:26:40.116Z'
 updatedAt: '2026-03-08T19:26:40.116Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
-memoryVersion: 0
+memoryVersion: 1
 ---
 Consolidates the migration robustness invariants with the later dogfooding lesson that some Kimi-authored tests drifted from those invariants, so there is one canonical memory covering both the intended behavior and how to validate future failing tests against it.
 

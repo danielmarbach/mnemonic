@@ -14,7 +14,7 @@ createdAt: '2026-03-08T09:08:28.685Z'
 updatedAt: '2026-03-08T09:08:28.685Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
-memoryVersion: 0
+memoryVersion: 1
 ---
 Consolidated operational guidance for CI-safe MCP integration tests and artifact-first CI failure learning in mnemonic.
 
