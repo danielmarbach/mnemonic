@@ -4,6 +4,18 @@ All notable changes to `mnemonic` will be documented in this file.
 
 The format is loosely based on Keep a Changelog and uses semver-style version headings.
 
+## [0.2.0] - 2026-03-10
+
+### Added
+
+- `mnemonic import-claude-memory` CLI command imports Claude Code auto-memory notes into the vault. Each `##` heading becomes a separate note tagged `claude-memory` and `imported`. Safe to re-run — notes whose titles already exist are skipped.
+- `mutationPushMode` config option controls when mutating writes auto-push to the remote: `main-only` (default), `all`, or `none`. Prevents push failures on unpublished project branches while keeping the main vault in sync automatically.
+
+### Changed
+
+- Published to the public npm registry with provenance attestation via OIDC trusted publishing. No authentication required to install.
+- Renovate configured for automated dependency updates.
+
 ## [0.1.0] - 2026-03-08
 
 First public release candidate.

@@ -75,27 +75,15 @@ Override the vault location:
 VAULT_PATH=/path/to/your-vault docker compose run --rm mnemonic
 ```
 
-## Installing from GitHub Packages
+## Installing from npm
 
-Staging builds are published to GitHub Packages under the `staging` dist-tag. To install outside GitHub Actions, you need a GitHub token with at least the `read:packages` scope.
-
-Create an `.npmrc` in the consuming project (or your home directory):
-
-```ini
-@danielmarbach:registry=https://npm.pkg.github.com
-//npm.pkg.github.com/:_authToken=YOUR_GITHUB_TOKEN
-```
-
-Then install:
+Packages are published to the public npm registry. No authentication required.
 
 ```bash
-# Latest staging build
-npm install @danielmarbach/mnemonic-mcp@staging
+# Latest stable release
+npm install @danielmarbach/mnemonic-mcp
 
-# Specific prerelease
-npm install @danielmarbach/mnemonic-mcp@0.1.0-staging.12
-
-# Stable release
+# Specific release
 npm install @danielmarbach/mnemonic-mcp@0.1.0
 ```
 
@@ -108,7 +96,7 @@ npm install @danielmarbach/mnemonic-mcp@0.1.0
   "mcpServers": {
     "mnemonic": {
       "command": "npx",
-      "args": ["@danielmarbach/mnemonic-mcp@staging"],
+      "args": ["@danielmarbach/mnemonic-mcp"],
       "env": {
         "VAULT_PATH": "/Users/you/mnemonic-vault"
       }

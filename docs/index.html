@@ -1569,15 +1569,15 @@
         </div>
         <p><code>npm run build</code> already runs typecheck first. Running it explicitly just gives you a faster feedback loop while developing.</p>
 
-        <h3>3 &mdash; Or install from GitHub Packages</h3>
+        <h3>3 &mdash; Or install from npm</h3>
         <div class="code-block">
           <div class="code-block-header">
             <span class="code-label">bash</span>
             <button class="copy-btn" onclick="copyCode(this)">copy</button>
           </div>
-          <pre><span class="cmd">npm install @danielmarbach/mnemonic-mcp@staging</span></pre>
+          <pre><span class="cmd">npm install @danielmarbach/mnemonic-mcp</span></pre>
         </div>
-        <p>Stable releases are published from tags like <code>v0.1.0</code>. Use an exact version when you want a fixed release instead of the latest staging build.</p>
+        <p>Releases are published from tags like <code>v0.1.0</code>. Use an exact version when you want to pin to a specific release.</p>
       </div>
 
       <div class="qs-col fade-up">
@@ -1591,7 +1591,7 @@
   <span class="key">"mcpServers"</span>: {
     <span class="key">"mnemonic"</span>: {
       <span class="key">"command"</span>: <span class="str">"npx"</span>,
-      <span class="key">"args"</span>: [<span class="str">"@danielmarbach/mnemonic-mcp@staging"</span>],
+      <span class="key">"args"</span>: [<span class="str">"@danielmarbach/mnemonic-mcp"</span>],
       <span class="key">"env"</span>: {
         <span class="key">"VAULT_PATH"</span>: <span class="str">"/Users/you/mnemonic-vault"</span>
       }
