@@ -8,7 +8,8 @@
     "url": "git+https://github.com/danielmarbach/mnemonic.git"
   },
   "publishConfig": {
-    "registry": "https://npm.pkg.github.com"
+    "registry": "https://registry.npmjs.org",
+    "access": "public"
   },
   "files": [
     "build",

@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      packages: write
+      id-token: write  # Required for npm OIDC trusted publishing
 
     steps:
       - name: Check out repository
@@ -22,7 +22,10 @@ jobs:
         with:
           node-version: 20
           cache: npm
-          registry-url: https://npm.pkg.github.com
+          registry-url: https://registry.npmjs.org
+
+      - name: Update npm for OIDC trusted publishing
+        run: npm install -g npm@latest  # Requires npm >= 11.5.1
 
       - name: Install dependencies
         run: npm ci
@@ -40,12 +43,10 @@ jobs:
 
           const packageJson = JSON.parse(fs.readFileSync("package.json", "utf8"));
           const baseVersion = packageJson.version.replace(/-.*/, "");
-          packageJson.version = `${baseVersion}-staging.${process.env.GITHUB_RUN_NUMBER}`;
+          packageJson.version = `${baseVersion}-next.${process.env.GITHUB_RUN_NUMBER}`;
 
           fs.writeFileSync("package.json", `${JSON.stringify(packageJson, null, 2)}\n`);
           EOF
 
-      - name: Publish to GitHub Packages
-        run: npm publish --tag staging
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Publish to npm (next)
+        run: npm publish --tag next  # Provenance attestation is automatic via OIDC trusted publishing

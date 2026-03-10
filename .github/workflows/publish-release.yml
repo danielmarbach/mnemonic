@@ -9,9 +9,10 @@ on:
 jobs:
   publish-release:
     runs-on: ubuntu-latest
+    environment: Release
     permissions:
       contents: read
-      packages: write
+      id-token: write  # Required for npm OIDC trusted publishing
 
     steps:
       - name: Check out repository
@@ -22,12 +23,15 @@ jobs:
         with:
           node-version: 20
           cache: npm
-          registry-url: https://npm.pkg.github.com
+          registry-url: https://registry.npmjs.org
+
+      - name: Update npm for OIDC trusted publishing
+        run: npm install -g npm@latest  # Requires npm >= 11.5.1
 
       - name: Verify tag matches package version
         run: |
           PACKAGE_VERSION=$(node -p "require('./package.json').version")
-          TAG_NAME="${GITHUB_REF_NAME#refs/tags/}"
+          TAG_NAME="${GITHUB_REF_NAME}"
 
           if [ "$TAG_NAME" != "v$PACKAGE_VERSION" ]; then
             echo "Tag $TAG_NAME does not match package version v$PACKAGE_VERSION"
@@ -43,7 +47,5 @@ jobs:
       - name: Run tests
         run: npm test
 
-      - name: Publish to GitHub Packages
-        run: npm publish
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Publish to npm
+        run: npm publish  # Provenance attestation is automatic via OIDC trusted publishing
