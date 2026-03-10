@@ -8,13 +8,15 @@ tags:
   - backfill
 lifecycle: permanent
 createdAt: '2026-03-10T19:31:51.002Z'
-updatedAt: '2026-03-10T19:51:05.637Z'
+updatedAt: '2026-03-10T19:51:11.447Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
   - id: implementation-plan-recall-lazy-backfill-and-staleness-detec-307b2512
     type: explains
   - id: embedding-lazy-backfill-and-staleness-detection-implementati-235207a1
+    type: supersedes
+  - id: embedding-lazy-backfill-and-staleness-detection-implementati-b3415cb2
     type: supersedes
 memoryVersion: 1
 ---
