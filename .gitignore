@@ -1,5 +1,6 @@
 node_modules/
 build/
+build-evals/
 *.js.map
 *.d.ts.map
 .DS_Store

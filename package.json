@@ -29,7 +29,8 @@
     "start": "node build/index.js",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "eval": "tsc -p tsconfig.eval.json && node build-evals/run.js"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.10.1",
@@ -39,7 +40,9 @@
     "zod": "^3.25.0"
   },
   "devDependencies": {
-    "@types/node": "^24.0.0",
+    "@anthropic-ai/sdk": "^0.78.0",
+    "@types/node": "^22.0.0",
+    "openai": "^6.27.0",
     "typescript": "^5.5.0",
     "vitest": "^4.0.18"
   }
