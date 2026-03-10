@@ -1,5 +1,5 @@
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
-import { mkdtemp, mkdir, readFile, rm, stat, writeFile } from "fs/promises";
+import { mkdtemp, mkdir, readFile, readdir, rm, stat, writeFile } from "fs/promises";
 import os from "os";
 import path from "path";
 import { spawn } from "child_process";
@@ -489,6 +489,89 @@ describe("local MCP script", () => {
       expect(consolidatedContents).toContain(distilledContent);
       expect(consolidatedContents).not.toContain("## Consolidated from:");
       expect(consolidatedContents).not.toContain("Plan: do X, Y, Z.");
+    } finally {
+      await embeddingServer.close();
+    }
+  }, 15000);
+
+  it("reuses an existing execute-merge target on retry instead of creating a duplicate", async () => {
+    const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-vault-"));
+    const repoDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-project-"));
+    tempDirs.push(vaultDir, repoDir);
+
+    await execFileAsync("git", ["init"], { cwd: repoDir });
+
+    const embeddingServer = await startFakeEmbeddingServer();
+
+    try {
+      const firstRemember = await callLocalMcp(vaultDir, "remember", {
+        title: "Retry source A",
+        content: "First source note for execute-merge retry handling.",
+        tags: ["integration", "merge"],
+        lifecycle: "permanent",
+        summary: "Create first source for execute-merge idempotency test",
+        cwd: repoDir,
+        scope: "project",
+      }, embeddingServer.url);
+      const secondRemember = await callLocalMcp(vaultDir, "remember", {
+        title: "Retry source B",
+        content: "Second source note for execute-merge retry handling.",
+        tags: ["integration", "merge"],
+        lifecycle: "permanent",
+        summary: "Create second source for execute-merge idempotency test",
+        cwd: repoDir,
+        scope: "project",
+      }, embeddingServer.url);
+
+      const firstId = extractRememberedId(firstRemember);
+      const secondId = extractRememberedId(secondRemember);
+
+      const firstMerge = await callLocalMcp(vaultDir, "consolidate", {
+        cwd: repoDir,
+        strategy: "execute-merge",
+        mode: "supersedes",
+        mergePlan: {
+          sourceIds: [firstId, secondId],
+          targetTitle: "Retry-safe consolidated note",
+          content: "First consolidated body.",
+        },
+      }, embeddingServer.url);
+
+      const firstTargetIdMatch = firstMerge.match(/Consolidated \d+ notes into '([^']+)'/);
+      expect(firstTargetIdMatch).toBeTruthy();
+      const firstTargetId = firstTargetIdMatch![1]!;
+
+      const secondMerge = await callLocalMcp(vaultDir, "consolidate", {
+        cwd: repoDir,
+        strategy: "execute-merge",
+        mode: "supersedes",
+        mergePlan: {
+          sourceIds: [firstId, secondId],
+          targetTitle: "Retry-safe consolidated note",
+          content: "Updated consolidated body after retry.",
+        },
+      }, embeddingServer.url);
+
+      const secondTargetIdMatch = secondMerge.match(/Consolidated \d+ notes into '([^']+)'/);
+      expect(secondTargetIdMatch).toBeTruthy();
+      const secondTargetId = secondTargetIdMatch![1]!;
+
+      expect(secondTargetId).toBe(firstTargetId);
+      expect(secondMerge).toContain("Idempotency: reused existing target note.");
+
+      const targetPath = path.join(repoDir, ".mnemonic", "notes", `${firstTargetId}.md`);
+      const targetContents = await readFile(targetPath, "utf-8");
+      expect(targetContents).toContain("Updated consolidated body after retry.");
+      expect(targetContents).not.toContain("First consolidated body.");
+
+      const noteFiles = await readdir(path.join(repoDir, ".mnemonic", "notes"));
+      const matchingTargets = noteFiles.filter((file) => file.startsWith("retry-safe-consolidated-note-") && file.endsWith(".md"));
+      expect(matchingTargets).toHaveLength(1);
+
+      const firstSourceContents = await readFile(path.join(repoDir, ".mnemonic", "notes", `${firstId}.md`), "utf-8");
+      const secondSourceContents = await readFile(path.join(repoDir, ".mnemonic", "notes", `${secondId}.md`), "utf-8");
+      expect(firstSourceContents.match(new RegExp(firstTargetId, "g")) ?? []).toHaveLength(1);
+      expect(secondSourceContents.match(new RegExp(firstTargetId, "g")) ?? []).toHaveLength(1);
     } finally {
       await embeddingServer.close();
     }

@@ -3021,8 +3021,9 @@ async function executeMerge(
     explicitMode,
   );
 
+  const existingTargetEntry = findExistingExecuteMergeTarget(entries, sourceEntries, targetTitle);
   const projectVault = cwd ? await vaultManager.getOrCreateProjectVault(cwd) : null;
-  const targetVault = projectVault ?? vaultManager.main;
+  const targetVault = existingTargetEntry?.vault ?? projectVault ?? vaultManager.main;
   const now = new Date().toISOString();
 
   // Build consolidated content
@@ -3053,10 +3054,13 @@ async function executeMerge(
 
   // Collect all unique relationships from sources (excluding relationships among sources)
   const sourceIdsSet = new Set(sourceIds);
-  const allRelationships = mergeRelationshipsFromNotes(sourceEntries.map((entry) => entry.note), sourceIdsSet);
+  const relationshipSources = existingTargetEntry
+    ? [...sourceEntries.map((entry) => entry.note), existingTargetEntry.note]
+    : sourceEntries.map((entry) => entry.note);
+  const allRelationships = mergeRelationshipsFromNotes(relationshipSources, sourceIdsSet);
 
-  // Create consolidated note
-  const targetId = makeId(targetTitle);
+  // Create or update the consolidated note
+  const targetId = existingTargetEntry?.note.id ?? makeId(targetTitle);
   const consolidatedNote: Note = {
     id: targetId,
     title: targetTitle,
@@ -3066,7 +3070,7 @@ async function executeMerge(
     project: project?.id,
     projectName: project?.name,
     relatedTo: allRelationships,
-    createdAt: now,
+    createdAt: existingTargetEntry?.note.createdAt ?? now,
     updatedAt: now,
     memoryVersion: 1,
   };
@@ -3201,6 +3205,9 @@ async function executeMerge(
   lines.push(`Consolidated ${sourceIds.length} notes into '${targetId}'`);
   lines.push(`Mode: ${consolidationMode}`);
   lines.push(`Stored in: ${targetVault.isProject ? "project-vault" : "main-vault"}`);
+  if (existingTargetEntry) {
+    lines.push("Idempotency: reused existing target note.");
+  }
   lines.push(formatPersistenceSummary(persistence));
 
   switch (consolidationMode) {
@@ -3228,6 +3235,46 @@ async function executeMerge(
   };
 
   return { content: [{ type: "text", text: lines.join("\n") }], structuredContent };
+}
+
+function findExistingExecuteMergeTarget(
+  entries: NoteEntry[],
+  sourceEntries: NoteEntry[],
+  targetTitle: string,
+): NoteEntry | undefined {
+  const normalizedTitle = targetTitle.trim();
+  const targetSlug = slugify(normalizedTitle);
+  const sourceIds = new Set(sourceEntries.map((entry) => entry.note.id));
+  let sharedTargetIds: Set<string> | undefined;
+
+  for (const entry of sourceEntries) {
+    const supersededTargetIds = new Set(
+      (entry.note.relatedTo ?? [])
+        .filter((rel) => rel.type === "supersedes")
+        .map((rel) => rel.id)
+        .filter((id) => !sourceIds.has(id)),
+    );
+
+    if (supersededTargetIds.size === 0) {
+      return undefined;
+    }
+
+    sharedTargetIds = sharedTargetIds
+      ? new Set([...sharedTargetIds].filter((id) => supersededTargetIds.has(id)))
+      : supersededTargetIds;
+
+    if (sharedTargetIds.size === 0) {
+      return undefined;
+    }
+  }
+
+  const candidates = entries
+    .filter((entry) => sharedTargetIds?.has(entry.note.id))
+    .filter((entry) => entry.note.title.trim() === normalizedTitle)
+    .filter((entry) => !targetSlug || entry.note.id === targetSlug || entry.note.id.startsWith(`${targetSlug}-`))
+    .sort((left, right) => right.note.updatedAt.localeCompare(left.note.updatedAt));
+
+  return candidates[0];
 }
 
 async function pruneSuperseded(

@@ -14,6 +14,7 @@ The format is loosely based on Keep a Changelog and uses semver-style version he
 
 - `parseNote` in `Storage` now converts gray-matter `Date` objects to ISO strings for `createdAt` and `updatedAt`. YAML frontmatter with unquoted ISO timestamps is parsed by gray-matter as JS `Date` instances; notes arriving via `git pull` from another machine were affected, causing output validation errors on recall.
 - `pushWithStatus` in `GitOps` now returns `{ status: "failed", error }` instead of throwing on push failure. Previously, any push error caused mutating MCP tools (`remember`, `update`, `consolidate`, etc.) to return `isError: true` even though the note was committed successfully. The `PersistenceStatus` schema gains a `"failed"` push status and a `pushError` field to surface the failure detail without blocking the operation.
+- `consolidate` `execute-merge` now reuses an existing consolidated target note on retry when the same source notes already point to the same `supersedes` target with the same title. This prevents duplicate consolidated notes after partial-success retry flows and keeps repeated merge attempts idempotent without requiring caller-supplied ids.
 
 ## [0.2.0] - 2026-03-10
 
