@@ -252,6 +252,14 @@ Each vault has its own `config.json` with a `schemaVersion`, so main and project
 - Failed migration runs roll staged note writes back instead of leaving partial edits.
 - Metadata-only migrations do not re-embed automatically; re-embedding happens on title/content change or during `sync` backfill.
 
+The main vault `config.json` also controls mutation push behavior:
+
+- `mutationPushMode: "main-only"` *(default)* - auto-push main-vault mutations, but leave project-vault commits local until the user pushes or runs `sync`
+- `mutationPushMode: "all"` - auto-push mutating writes in both vault types
+- `mutationPushMode: "none"` - never auto-push mutating writes; use `sync` or manual git commands instead
+
+This keeps unpublished project branches from failing on `remember`/`update`, while still letting the main vault stay in sync by default.
+
 ## CLI commands
 
 mnemonic ships CLI commands in addition to the MCP server.

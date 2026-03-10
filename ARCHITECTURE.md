@@ -69,7 +69,7 @@ flowchart LR
 
 ### Write flow
 
-For commands like `remember` and `update`, the server resolves project context, chooses the target vault, writes the note, attempts to refresh embeddings, and then commits/pushes the changed files when git is enabled.
+For commands like `remember` and `update`, the server resolves project context, chooses the target vault, writes the note, attempts to refresh embeddings, commits the changed files, and then only auto-pushes when the main-vault `config.json` `mutationPushMode` allows it.
 
 ```mermaid
 sequenceDiagram
@@ -93,7 +93,7 @@ sequenceDiagram
         S->>T: write embedding JSON
     end
     S->>G: commit changed files
-    S->>G: push when remote exists
+        S->>G: push when allowed by mutationPushMode
     S-->>C: concise MCP response
 ```
 
@@ -164,6 +164,7 @@ Main-vault `config.json` stores machine-local operational settings rather than m
 
 - `schemaVersion`: current vault schema.
 - `reindexEmbedConcurrency`: bounded concurrency for rebuilding embeddings.
+- `mutationPushMode`: whether mutating writes auto-push for both vaults, main-vault only, or neither.
 - `projectMemoryPolicies`: saved per-project defaults for write scope and consolidation mode.
 - `projectIdentityOverrides`: saved per-project remote overrides for fork-aware project identity resolution.
 
@@ -173,7 +174,7 @@ Main-vault `config.json` stores machine-local operational settings rather than m
 - **Embeddings are derived**: never treat them as source-of-truth or something that must be committed.
 - **Project context and storage are separate**: a note can belong to a project while living in the main vault.
 - **Lifecycle is retention semantics, not taxonomy**: tags like `plan` or `wip` stay descriptive, while `lifecycle` controls temporary-vs-permanent behavior.
-- **Git is part of the product behavior**: most mutating operations commit and push, so error handling must treat git failures as real failures.
+- **Git is part of the product behavior**: mutating operations commit immediately; pushing is explicit via `sync` or controlled by `mutationPushMode`.
 - **Project recall is biased, not exclusive**: project memory should be preferred without making global memory disappear.
 - **Migrations are explicit**: schema changes should go through `src/migration.ts`, tests, and dry-run-first workflows.
 - **Temporary-only consolidation defaults to cleanup**: when every source note is `temporary`, consolidation prefers `delete`, and the merged note becomes `permanent`.

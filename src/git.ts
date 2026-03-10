@@ -25,7 +25,7 @@ export interface CommitResult {
 
 export interface PushResult {
   status: "pushed" | "skipped";
-  reason?: "git-disabled" | "no-remote";
+  reason?: "git-disabled" | "no-remote" | "auto-push-disabled";
 }
 
 export class GitOps {

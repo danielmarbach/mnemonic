@@ -125,7 +125,6 @@ export class VaultManager {
     if (isNew) {
       // Commit the .gitignore so collaborators also ignore embeddings/
       await vault.git.commit("chore: initialize .mnemonic vault", [".mnemonic/.gitignore"]);
-      await vault.git.push();
     }
 
     this.projectVaults.set(resolved, vault);

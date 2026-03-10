@@ -4,9 +4,12 @@ import path from "path";
 import type { ProjectMemoryPolicy } from "./project-memory-policy.js";
 import type { ProjectIdentityOverride } from "./project.js";
 
+export type MutationPushMode = "all" | "main-only" | "none";
+
 export interface MnemonicConfig {
   schemaVersion: string;
   reindexEmbedConcurrency: number;
+  mutationPushMode: MutationPushMode;
   projectMemoryPolicies: Record<string, ProjectMemoryPolicy>;
   projectIdentityOverrides: Record<string, ProjectIdentityOverride>;
 }
@@ -17,6 +20,7 @@ const defaultConfig: MnemonicConfig = {
   // the current schema instead of missing that migration.
   schemaVersion: "1.1",
   reindexEmbedConcurrency: 4,
+  mutationPushMode: "main-only",
   projectMemoryPolicies: {},
   projectIdentityOverrides: {},
 };
@@ -36,6 +40,17 @@ function normalizeConcurrency(value: unknown): number {
   }
 
   return Math.min(16, Math.max(1, Math.floor(value)));
+}
+
+function normalizeMutationPushMode(value: unknown): MutationPushMode {
+  switch (value) {
+    case "all":
+    case "main-only":
+    case "none":
+      return value;
+    default:
+      return defaultConfig.mutationPushMode;
+  }
 }
 
 function normalizeProjectIdentityOverrides(value: unknown): Record<string, ProjectIdentityOverride> {
@@ -143,6 +158,7 @@ export class MnemonicConfigStore {
       return {
         schemaVersion: normalizeSchemaVersion(parsed.schemaVersion),
         reindexEmbedConcurrency: normalizeConcurrency(parsed.reindexEmbedConcurrency),
+        mutationPushMode: normalizeMutationPushMode(parsed.mutationPushMode),
         projectMemoryPolicies: parsed.projectMemoryPolicies ?? {},
         projectIdentityOverrides: normalizeProjectIdentityOverrides(parsed.projectIdentityOverrides),
       };

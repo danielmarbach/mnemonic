@@ -28,7 +28,7 @@ Before calling `remember`:
 3. Write the note summary-first: put the main fact, decision, or outcome in the opening sentences, then follow with supporting detail.
 4. Pass `cwd` for anything about the current repo, even if you intend to store it in the main vault with `scope: "global"`.
 5. Omit `cwd` only for truly cross-project or personal memories; missing `cwd` makes the note global and unassociated.
-6. After `remember`, `update`, `move_memory`, or consolidation writes, inspect the returned structured persistence status before doing extra verification calls. It tells you the note path, embedding path, embedding outcome, and git commit/push outcome.
+6. After `remember`, `update`, `move_memory`, or consolidation writes, inspect the returned structured persistence status before doing extra verification calls. It tells you the note path, embedding path, embedding outcome, and git commit/push outcome, including when push is intentionally skipped by config.
 
 ### Choosing note lifecycle
 
@@ -179,10 +179,10 @@ When `recall` called with `cwd`, project notes get **+0.15 cosine similarity boo
 - Main vault's own git repo excluded from detection (`isMainRepo()` guard)
 
 ### Main vault config
-Machine-local settings in `~/mnemonic-vault/config.json`. Survives sessions without becoming memory notes. Includes `reindexEmbedConcurrency`, per-project policy defaults, and optional project-identity remote overrides for fork workflows.
+Machine-local settings in `~/mnemonic-vault/config.json`. Survives sessions without becoming memory notes. Includes `reindexEmbedConcurrency`, `mutationPushMode` (`all` | `main-only` | `none`), per-project policy defaults, and optional project-identity remote overrides for fork workflows.
 
 ### Bidirectional sync
-`sync` does: fetch/pull/push when a remote exists, plus embedding backfill on every run. `sync { force: true }` rebuilds all embeddings. Single call, linear history. Syncs main vault; pass `cwd` for project vault too.
+`sync` does: fetch/pull/push when a remote exists, plus embedding backfill on every run. `sync { force: true }` rebuilds all embeddings. Single call, linear history. Syncs main vault; pass `cwd` for project vault too. Mutating tools may skip auto-push based on `mutationPushMode`, but `sync` remains the explicit catch-up path.
 
 ### MCP output style
 Optimized for LLM consumption:

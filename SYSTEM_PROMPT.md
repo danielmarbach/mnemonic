@@ -19,7 +19,7 @@ use `consolidate` to merge them into one authoritative note.
 Pass `cwd` for anything about the current repo, even if you plan to store it with
 `scope: "global"`. `cwd` sets project association; omitting it creates a truly global note.
 
-After `remember`, `update`, `move_memory`, or a consolidation write, inspect the returned structured persistence status before doing extra verification calls. It reports the canonical note path, embedding path, embedding outcome, and git commit/push outcome.
+After `remember`, `update`, `move_memory`, or a consolidation write, inspect the returned structured persistence status before doing extra verification calls. It reports the canonical note path, embedding path, embedding outcome, and git commit/push outcome, including intentional push skips.
 
 ### Choosing note lifecycle
 When calling `remember`, set lifecycle based on whether the note is temporary working state or durable knowledge:

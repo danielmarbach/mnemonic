@@ -130,6 +130,50 @@ describe("local MCP script", () => {
     expect(after).toContain("**default id:** `github-com-user-myapp-fork`");
   }, 15000);
 
+  it("skips auto-push for project-vault mutations by default", async () => {
+    const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-vault-"));
+    const remoteDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-remote-"));
+    const repoDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-project-"));
+    tempDirs.push(vaultDir, remoteDir, repoDir);
+
+    await execFileAsync("git", ["init", "--bare"], { cwd: remoteDir });
+    await execFileAsync("git", ["init"], { cwd: repoDir });
+    await execFileAsync("git", ["config", "user.name", "Test User"], { cwd: repoDir });
+    await execFileAsync("git", ["config", "user.email", "test@example.com"], { cwd: repoDir });
+    await execFileAsync("git", ["remote", "add", "origin", remoteDir], { cwd: repoDir });
+
+    const embeddingServer = await startFakeEmbeddingServer();
+
+    try {
+      const response = await callLocalMcpResponse(
+        vaultDir,
+        "remember",
+        {
+          title: "Project mutation push mode test",
+          content: "Project-vault writes should commit locally without pushing unpublished branches by default.",
+          tags: ["integration"],
+          summary: "Avoid auto-push for unpublished project branches",
+          cwd: repoDir,
+          scope: "project",
+        },
+        { ollamaUrl: embeddingServer.url, disableGit: false },
+      );
+
+      expect(response.text).toContain("Persistence: embedding written | git committed");
+      const structured = response.structuredContent as Record<string, unknown>;
+      const persistence = structured?.["persistence"] as Record<string, unknown>;
+      const git = persistence?.["git"] as Record<string, unknown>;
+      expect(persistence?.["durability"]).toBe("committed");
+      expect(git?.["push"]).toBe("skipped");
+      expect(git?.["pushReason"]).toBe("auto-push-disabled");
+
+      const noteId = structured?.["id"] as string;
+      await expect(stat(path.join(repoDir, ".mnemonic", "notes", `${noteId}.md`))).resolves.toBeDefined();
+    } finally {
+      await embeddingServer.close();
+    }
+  }, 20000);
+
   it("rewrites project metadata when moving a global note into a project vault", async () => {
     const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-vault-"));
     const repoDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-project-"));

@@ -18,7 +18,7 @@ import {
 } from "./consolidate.js";
 import { selectRecallResults } from "./recall.js";
 import { cleanMarkdown } from "./markdown.js";
-import { MnemonicConfigStore, readVaultSchemaVersion } from "./config.js";
+import { MnemonicConfigStore, readVaultSchemaVersion, type MutationPushMode } from "./config.js";
 import {
   CONSOLIDATION_MODES,
   PROJECT_POLICY_SCOPES,
@@ -350,8 +350,12 @@ Examples:
     ].join("\n");
 
     try {
+      const importConfigStore = new MnemonicConfigStore(VAULT_PATH);
       await vault.git.commit(commitMessage, filesToCommit);
-      await vault.git.push();
+      const mutationPushMode = (await importConfigStore.load()).mutationPushMode;
+      if (mutationPushMode !== "none") {
+        await vault.git.push();
+      }
     } catch (err) {
       console.error(`\nNotes written but git operation failed: ${err}`);
     }
@@ -747,6 +751,30 @@ function formatPersistenceSummary(persistence: PersistenceStatus): string {
   return parts.join(" | ");
 }
 
+async function getMutationPushMode(): Promise<MutationPushMode> {
+  const latestConfig = await configStore.load();
+  return latestConfig.mutationPushMode;
+}
+
+async function pushAfterMutation(vault: Vault): Promise<PushResult> {
+  const mutationPushMode = await getMutationPushMode();
+
+  switch (mutationPushMode) {
+    case "all":
+      return vault.git.pushWithStatus();
+    case "main-only":
+      return vault.isProject
+        ? { status: "skipped", reason: "auto-push-disabled" }
+        : vault.git.pushWithStatus();
+    case "none":
+      return { status: "skipped", reason: "auto-push-disabled" };
+    default: {
+      const _exhaustive: never = mutationPushMode;
+      throw new Error(`Unknown mutation push mode: ${_exhaustive}`);
+    }
+  }
+}
+
 type SearchScope = "project" | "global" | "all";
 type StorageScope = "project-vault" | "main-vault" | "any";
 
@@ -872,9 +900,9 @@ async function moveNoteBetweenVaults(
     projectName: finalNote.projectName,
   });
   await sourceVault.git.commitWithStatus(`move: ${finalNote.title}`, [vaultManager.noteRelPath(sourceVault, finalNote.id)], sourceCommitBody);
-  const targetPush = await targetVault.git.pushWithStatus();
+  const targetPush = await pushAfterMutation(targetVault);
   if (sourceVault !== targetVault) {
-    await sourceVault.git.pushWithStatus();
+    await pushAfterMutation(sourceVault);
   }
 
   return {
@@ -1080,7 +1108,7 @@ server.registerTool(
       ["config.json"],
       commitBody
     );
-    await vaultManager.main.git.push();
+    await pushAfterMutation(vaultManager.main);
 
     const structuredContent: ProjectIdentityResult = {
       action: "project_identity_set",
@@ -1327,7 +1355,7 @@ server.registerTool(
       [vaultManager.noteRelPath(vault, id)],
       commitBody
     );
-    const pushStatus = await vault.git.pushWithStatus();
+    const pushStatus = await pushAfterMutation(vault);
     const persistence = buildPersistenceStatus({
       storage: vault.storage,
       id,
@@ -1404,7 +1432,7 @@ server.registerTool(
       ["config.json"],
       commitBody
     );
-    await vaultManager.main.git.push();
+    await pushAfterMutation(vaultManager.main);
 
     const structuredContent: PolicyResult = {
       action: "policy_set",
@@ -1670,7 +1698,7 @@ server.registerTool(
       tags: updated.tags,
     });
     const commitStatus = await vault.git.commitWithStatus(`update: ${updated.title}`, [vaultManager.noteRelPath(vault, id)], commitBody);
-    const pushStatus = await vault.git.pushWithStatus();
+    const pushStatus = await pushAfterMutation(vault);
     const persistence = buildPersistenceStatus({
       storage: vault.storage,
       id,
@@ -1734,7 +1762,7 @@ server.registerTool(
         projectName: note.projectName,
       });
       await v.git.commit(`forget: ${note.title}`, files, commitBody);
-      await v.git.push();
+      await pushAfterMutation(v);
     }
 
     const structuredContent: ForgetResult = {
@@ -2451,7 +2479,7 @@ server.registerTool(
         },
       });
       await vault.git.commit(`relate: ${fromNote.title} ↔ ${toNote.title}`, files, commitBody);
-      await vault.git.push();
+      await pushAfterMutation(vault);
       modifiedNoteIds.push(...files.map(f => path.basename(f, '.md')));
     }
 
@@ -2531,7 +2559,7 @@ server.registerTool(
           })
         : undefined;
       await vault.git.commit(`unrelate: ${fromId} ↔ ${toId}`, files, commitBody);
-      await vault.git.push();
+      await pushAfterMutation(vault);
     }
 
     const modifiedNoteIds: string[] = [];
@@ -3144,7 +3172,7 @@ async function executeMerge(
         });
     const commitMessage = `${action}: ${targetTitle}`;
     const commitStatus = await vault.git.commitWithStatus(commitMessage, files, commitBody);
-    const pushStatus = await vault.git.pushWithStatus();
+    const pushStatus = await pushAfterMutation(vault);
     if (isTargetVault) {
       targetCommitStatus = commitStatus;
       targetPushStatus = pushStatus;
@@ -3279,7 +3307,7 @@ async function pruneSuperseded(
       description: `Pruned ${prunedIds.length} superseded note(s)\nNotes: ${prunedIds.join(", ")}`,
     });
     await vault.git.commit(`prune: removed ${files.length} superseded note(s)`, files, commitBody);
-    await vault.git.push();
+    await pushAfterMutation(vault);
   }
 
   lines.push("");

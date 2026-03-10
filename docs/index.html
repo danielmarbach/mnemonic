@@ -1203,7 +1203,7 @@
       <div class="feature-card fade-up">
         <span class="feature-icon">&#x1F33F;</span>
         <h3>Git is the database</h3>
-        <p>No Postgres to babysit. Notes commit and push automatically. History is inspectable, conflicts are isolated to individual files, and sync works across machines.</p>
+        <p>No Postgres to babysit. Notes commit automatically, and pushes are controlled so project-vault writes do not fail on unpublished branches by default. History is inspectable, conflicts are isolated to individual files, and sync works across machines.</p>
       </div>
       <div class="feature-card fade-up">
         <span class="feature-icon">&#x1F50D;</span>
@@ -1656,6 +1656,7 @@
       </table>
     </div>
     <p>The runtime is compatible with other Ollama embedding models that support <code>/api/embed</code>. For example, <code>qwen3-embedding:0.6b</code> works as a drop-in <code>EMBED_MODEL</code> override and may be preferable for longer-context notes.</p>
+    <p>Main-vault <code>config.json</code> also supports <code>mutationPushMode</code>: <code>main-only</code> (default), <code>all</code>, or <code>none</code>. The default keeps private main-vault notes auto-pushed while leaving project-vault commits for the user or <code>sync</code>.</p>
 
     <div id="agent-snippet" class="agent-snippet fade-up">
       <h3>Add to your AGENT.md or system prompt</h3>
