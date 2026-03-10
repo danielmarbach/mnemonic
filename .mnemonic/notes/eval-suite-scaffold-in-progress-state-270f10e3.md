@@ -7,9 +7,12 @@ tags:
   - in-progress
 lifecycle: temporary
 createdAt: '2026-03-10T22:00:51.357Z'
-updatedAt: '2026-03-10T22:00:51.357Z'
+updatedAt: '2026-03-10T22:03:01.772Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: eval-suite-design-for-system-prompt-behavioral-testing-258d67e8
+    type: related-to
 memoryVersion: 1
 ---
 ## Status: in-progress
