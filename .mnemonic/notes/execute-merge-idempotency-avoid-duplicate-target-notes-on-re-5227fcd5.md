@@ -5,9 +5,9 @@ tags:
   - idempotency
   - future
   - design
-lifecycle: permanent
+lifecycle: temporary
 createdAt: '2026-03-10T20:04:35.192Z'
-updatedAt: '2026-03-10T20:04:35.192Z'
+updatedAt: '2026-03-10T20:06:31.733Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 memoryVersion: 1
