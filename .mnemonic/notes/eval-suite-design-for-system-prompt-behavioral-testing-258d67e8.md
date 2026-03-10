@@ -8,9 +8,12 @@ tags:
   - multi-provider
 lifecycle: permanent
 createdAt: '2026-03-10T21:56:09.869Z'
-updatedAt: '2026-03-10T21:56:09.869Z'
+updatedAt: '2026-03-10T22:03:01.772Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: eval-suite-scaffold-in-progress-state-270f10e3
+    type: related-to
 memoryVersion: 1
 ---
 ## Decision
