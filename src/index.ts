@@ -633,7 +633,7 @@ async function embedMissingNotes(
 
       if (!force) {
         const existing = await storage.readEmbedding(note.id);
-        if (existing?.model === embedModel) {
+        if (existing?.model === embedModel && existing.updatedAt >= note.updatedAt) {
           continue;
         }
       }
@@ -1511,7 +1511,8 @@ server.registerTool(
       "Semantic search over memories. " +
       "When `cwd` is provided, searches both the project vault (.mnemonic/) and the " +
       "main vault — project memories are boosted by +0.15 and shown first. " +
-      "Without `cwd`, searches only the main vault.",
+      "Without `cwd`, searches only the main vault. " +
+      "Missing or stale embeddings (e.g. from a git pull or direct editor edit) are backfilled on demand before searching.",
     inputSchema: z.object({
       query: z.string().describe("What to search for"),
       cwd: projectParam,
@@ -1534,6 +1535,10 @@ server.registerTool(
     const project = await resolveProject(cwd);
     const queryVec = await embed(query);
     const vaults = await vaultManager.searchOrder(cwd);
+
+    for (const vault of vaults) {
+      await embedMissingNotes(vault.storage).catch(() => { /* best-effort: don't block recall if Ollama is down */ });
+    }
 
     const scored: Array<{ id: string; score: number; boosted: number; vault: Vault; isCurrentProject: boolean }> = [];
 
