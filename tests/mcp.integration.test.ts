@@ -130,6 +130,80 @@ describe("local MCP script", () => {
     expect(after).toContain("**default id:** `github-com-user-myapp-fork`");
   }, 15000);
 
+  it("applies project memory policy end-to-end for remember routing", async () => {
+    const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-vault-"));
+    const repoDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-project-"));
+    tempDirs.push(vaultDir, repoDir);
+
+    await execFileAsync("git", ["init"], { cwd: repoDir });
+
+    const embeddingServer = await startFakeEmbeddingServer();
+
+    try {
+      const setGlobal = await callLocalMcpResponse(vaultDir, "set_project_memory_policy", {
+        cwd: repoDir,
+        defaultScope: "global",
+      }, embeddingServer.url);
+      expect(setGlobal.text).toContain("defaultScope=global");
+
+      const getGlobal = await callLocalMcpResponse(vaultDir, "get_project_memory_policy", { cwd: repoDir }, embeddingServer.url);
+      expect(getGlobal.text).toContain("defaultScope=global");
+      expect(getGlobal.structuredContent?.["defaultScope"]).toBe("global");
+
+      const rememberedGlobal = await callLocalMcpResponse(vaultDir, "remember", {
+        title: "Policy global default note",
+        content: "Should land in the main vault while keeping project association.",
+        tags: ["integration", "policy"],
+        summary: "Use global policy default for remember routing",
+        cwd: repoDir,
+      }, embeddingServer.url);
+
+      const globalId = extractRememberedId(rememberedGlobal.text);
+      expect(rememberedGlobal.structuredContent?.["scope"]).toBe("global");
+      expect(rememberedGlobal.structuredContent?.["vault"]).toBe("main-vault");
+      await expect(stat(path.join(vaultDir, "notes", `${globalId}.md`))).resolves.toBeDefined();
+
+      const setProject = await callLocalMcpResponse(vaultDir, "set_project_memory_policy", {
+        cwd: repoDir,
+        defaultScope: "project",
+      }, embeddingServer.url);
+      expect(setProject.text).toContain("defaultScope=project");
+
+      const rememberedProject = await callLocalMcpResponse(vaultDir, "remember", {
+        title: "Policy project default note",
+        content: "Should land in the project vault when scope is omitted.",
+        tags: ["integration", "policy"],
+        summary: "Use project policy default for remember routing",
+        cwd: repoDir,
+      }, embeddingServer.url);
+
+      const projectId = extractRememberedId(rememberedProject.text);
+      expect(rememberedProject.structuredContent?.["scope"]).toBe("project");
+      expect(rememberedProject.structuredContent?.["vault"]).toBe("project-vault");
+      await expect(stat(path.join(repoDir, ".mnemonic", "notes", `${projectId}.md`))).resolves.toBeDefined();
+
+      const setAsk = await callLocalMcpResponse(vaultDir, "set_project_memory_policy", {
+        cwd: repoDir,
+        defaultScope: "ask",
+      }, embeddingServer.url);
+      expect(setAsk.text).toContain("defaultScope=ask");
+
+      const askRemember = await callLocalMcp(vaultDir, "remember", {
+        title: "Policy ask note",
+        content: "Should not be written until scope is explicit.",
+        tags: ["integration", "policy"],
+        summary: "Require explicit scope when policy is ask",
+        cwd: repoDir,
+      }, embeddingServer.url);
+
+      expect(askRemember).toContain("always ask");
+      expect(askRemember).toContain("scope: \"project\"");
+      expect(askRemember).toContain("scope: \"global\"");
+    } finally {
+      await embeddingServer.close();
+    }
+  }, 20000);
+
   it("skips auto-push for project-vault mutations by default", async () => {
     const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-vault-"));
     const remoteDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-remote-"));
@@ -248,6 +322,240 @@ describe("local MCP script", () => {
       await embeddingServer.close();
     }
   }, 15000);
+
+  it("keeps note visibility coherent when moving a note from main to project and back", async () => {
+    const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-vault-"));
+    const repoDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-project-"));
+    tempDirs.push(vaultDir, repoDir);
+
+    await execFileAsync("git", ["init"], { cwd: repoDir });
+
+    const embeddingServer = await startFakeEmbeddingServer();
+
+    try {
+      const rememberText = await callLocalMcp(vaultDir, "remember", {
+        title: "Round trip move test",
+        content: "Start in the main vault and move through both storage locations.",
+        tags: ["integration", "move"],
+        summary: "Create note for move round-trip visibility test",
+        scope: "global",
+      }, embeddingServer.url);
+
+      const noteId = extractRememberedId(rememberText);
+
+      const moveToProject = await callLocalMcpResponse(vaultDir, "move_memory", {
+        id: noteId,
+        target: "project-vault",
+        cwd: repoDir,
+      }, embeddingServer.url);
+      expect(moveToProject.text).toContain("Project association is now");
+
+      const moveBackToMain = await callLocalMcpResponse(vaultDir, "move_memory", {
+        id: noteId,
+        target: "main-vault",
+        cwd: repoDir,
+      }, embeddingServer.url);
+      expect(moveBackToMain.text).toContain("Project association remains");
+
+      await expect(stat(path.join(vaultDir, "notes", `${noteId}.md`))).resolves.toBeDefined();
+      await expect(stat(path.join(repoDir, ".mnemonic", "notes", `${noteId}.md`))).rejects.toThrow();
+
+      const listed = await callLocalMcpResponse(vaultDir, "list", {
+        cwd: repoDir,
+        scope: "project",
+        storedIn: "main-vault",
+        includeStorage: true,
+        includeUpdated: true,
+      }, embeddingServer.url);
+
+      expect(listed.text).toContain("Round trip move test");
+      expect(listed.text).toContain("stored=main-vault");
+      expect(listed.structuredContent?.["count"]).toBe(1);
+      const notes = listed.structuredContent?.["notes"] as Array<Record<string, unknown>>;
+      expect(notes[0]?.["id"]).toBe(noteId);
+      expect(notes[0]?.["vault"]).toBe("main-vault");
+      expect(notes[0]?.["project"]).toBeTruthy();
+    } finally {
+      await embeddingServer.close();
+    }
+  }, 20000);
+
+  it("shows consistent cross-vault results for list recent_memories and project_memory_summary", async () => {
+    const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-vault-"));
+    const repoDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-project-"));
+    tempDirs.push(vaultDir, repoDir);
+
+    await execFileAsync("git", ["init"], { cwd: repoDir });
+
+    const embeddingServer = await startFakeEmbeddingServer();
+
+    try {
+      const privateProjectRemember = await callLocalMcp(vaultDir, "remember", {
+        title: "Private project memory",
+        content: "Stored in main vault but associated with the current project.",
+        tags: ["integration", "cross-vault"],
+        summary: "Create private project memory for visibility test",
+        cwd: repoDir,
+        scope: "global",
+      }, embeddingServer.url);
+      const privateProjectId = extractRememberedId(privateProjectRemember);
+
+      const sharedProjectRemember = await callLocalMcp(vaultDir, "remember", {
+        title: "Shared project memory",
+        content: "Stored in the project vault for the current repo.",
+        tags: ["integration", "cross-vault"],
+        summary: "Create shared project memory for visibility test",
+        cwd: repoDir,
+        scope: "project",
+      }, embeddingServer.url);
+      const sharedProjectId = extractRememberedId(sharedProjectRemember);
+
+      const globalRemember = await callLocalMcp(vaultDir, "remember", {
+        title: "Unscoped global memory",
+        content: "Stored in main vault without project association.",
+        tags: ["integration", "cross-vault"],
+        summary: "Create unscoped global memory for visibility test",
+        scope: "global",
+      }, embeddingServer.url);
+      const globalId = extractRememberedId(globalRemember);
+
+      const listed = await callLocalMcpResponse(vaultDir, "list", {
+        cwd: repoDir,
+        scope: "all",
+        storedIn: "any",
+        tags: ["integration", "cross-vault"],
+        includeStorage: true,
+        includeUpdated: true,
+      }, embeddingServer.url);
+
+      expect(listed.structuredContent?.["count"]).toBe(3);
+      const listedNotes = listed.structuredContent?.["notes"] as Array<Record<string, unknown>>;
+      expect(listedNotes.map((note) => note["id"])).toEqual([privateProjectId, sharedProjectId, globalId]);
+      expect(listed.text).toContain("stored=project-vault");
+      expect(listed.text).toContain("stored=main-vault");
+
+      const recent = await callLocalMcpResponse(vaultDir, "recent_memories", {
+        cwd: repoDir,
+        scope: "project",
+        storedIn: "any",
+        limit: 5,
+        includePreview: false,
+        includeStorage: true,
+      }, embeddingServer.url);
+
+      expect(recent.structuredContent?.["count"]).toBe(2);
+      const recentNotes = recent.structuredContent?.["notes"] as Array<Record<string, unknown>>;
+      expect(recentNotes.map((note) => note["id"])).toEqual([sharedProjectId, privateProjectId]);
+      expect(recent.text).not.toContain("Unscoped global memory");
+
+      const summary = await callLocalMcpResponse(vaultDir, "project_memory_summary", {
+        cwd: repoDir,
+        recentLimit: 5,
+      }, embeddingServer.url);
+
+      const summaryNotes = summary.structuredContent?.["notes"] as Record<string, unknown>;
+      expect(summaryNotes?.["total"]).toBe(3);
+      expect(summaryNotes?.["projectVault"]).toBe(1);
+      expect(summaryNotes?.["mainVault"]).toBe(2);
+      expect(summaryNotes?.["privateProject"]).toBe(1);
+      expect(summary.text).toContain("private project memories: 1");
+    } finally {
+      await embeddingServer.close();
+    }
+  }, 20000);
+
+  it("shows only visible cross-vault relationships in memory_graph", async () => {
+    const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-vault-"));
+    const repoDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-project-"));
+    tempDirs.push(vaultDir, repoDir);
+
+    await execFileAsync("git", ["init"], { cwd: repoDir });
+
+    const embeddingServer = await startFakeEmbeddingServer();
+
+    try {
+      const privateProjectRemember = await callLocalMcp(vaultDir, "remember", {
+        title: "Graph private project memory",
+        content: "Stored in main vault but associated with the current project.",
+        tags: ["integration", "graph"],
+        summary: "Create private project memory for graph test",
+        cwd: repoDir,
+        scope: "global",
+      }, embeddingServer.url);
+      const privateProjectId = extractRememberedId(privateProjectRemember);
+
+      const sharedProjectRemember = await callLocalMcp(vaultDir, "remember", {
+        title: "Graph shared project memory",
+        content: "Stored in the project vault and linked into the graph.",
+        tags: ["integration", "graph"],
+        summary: "Create shared project memory for graph test",
+        cwd: repoDir,
+        scope: "project",
+      }, embeddingServer.url);
+      const sharedProjectId = extractRememberedId(sharedProjectRemember);
+
+      const globalRemember = await callLocalMcp(vaultDir, "remember", {
+        title: "Graph global memory",
+        content: "Unscoped global memory that should disappear from project-only graph results.",
+        tags: ["integration", "graph"],
+        summary: "Create global memory for graph test",
+        scope: "global",
+      }, embeddingServer.url);
+      const globalId = extractRememberedId(globalRemember);
+
+      await callLocalMcp(vaultDir, "relate", {
+        fromId: privateProjectId,
+        toId: sharedProjectId,
+        type: "related-to",
+        bidirectional: true,
+        cwd: repoDir,
+      }, embeddingServer.url);
+
+      await callLocalMcp(vaultDir, "relate", {
+        fromId: privateProjectId,
+        toId: globalId,
+        type: "explains",
+        bidirectional: true,
+        cwd: repoDir,
+      }, embeddingServer.url);
+
+      const graphAll = await callLocalMcpResponse(vaultDir, "memory_graph", {
+        cwd: repoDir,
+        scope: "all",
+        storedIn: "any",
+        limit: 10,
+      }, embeddingServer.url);
+
+      expect(graphAll.text).toContain(privateProjectId);
+      expect(graphAll.text).toContain(sharedProjectId);
+      expect(graphAll.text).toContain(globalId);
+      const allNodes = graphAll.structuredContent?.["nodes"] as Array<Record<string, unknown>>;
+      const privateNode = allNodes.find((node) => node["id"] === privateProjectId);
+      expect(privateNode).toBeTruthy();
+      expect((privateNode?.["edges"] as Array<Record<string, unknown>>).map((edge) => edge["toId"]).sort()).toEqual([
+        globalId,
+        sharedProjectId,
+      ].sort());
+
+      const graphProject = await callLocalMcpResponse(vaultDir, "memory_graph", {
+        cwd: repoDir,
+        scope: "project",
+        storedIn: "any",
+        limit: 10,
+      }, embeddingServer.url);
+
+      expect(graphProject.text).toContain(privateProjectId);
+      expect(graphProject.text).toContain(sharedProjectId);
+      expect(graphProject.text).not.toContain(globalId);
+      const projectNodes = graphProject.structuredContent?.["nodes"] as Array<Record<string, unknown>>;
+      const projectPrivateNode = projectNodes.find((node) => node["id"] === privateProjectId);
+      expect((projectPrivateNode?.["edges"] as Array<Record<string, unknown>>).map((edge) => edge["toId"])).toEqual([
+        sharedProjectId,
+      ]);
+    } finally {
+      await embeddingServer.close();
+    }
+  }, 20000);
 
   it("updates an existing memory through the MCP and persists the edited content", async () => {
     const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-vault-"));
@@ -376,6 +684,65 @@ describe("local MCP script", () => {
       await embeddingServer.close();
     }
   }, 15000);
+
+  it("removes bidirectional cross-vault relationships via unrelate", async () => {
+    const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-vault-"));
+    const repoDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-project-"));
+    tempDirs.push(vaultDir, repoDir);
+
+    await execFileAsync("git", ["init"], { cwd: repoDir });
+
+    const embeddingServer = await startFakeEmbeddingServer();
+
+    try {
+      const mainRemember = await callLocalMcp(vaultDir, "remember", {
+        title: "Cross vault main note",
+        content: "Stored privately in main but tied to the current project.",
+        tags: ["integration", "relations"],
+        summary: "Create main-vault note for unrelate test",
+        cwd: repoDir,
+        scope: "global",
+      }, embeddingServer.url);
+      const mainId = extractRememberedId(mainRemember);
+
+      const projectRemember = await callLocalMcp(vaultDir, "remember", {
+        title: "Cross vault project note",
+        content: "Stored in the project vault and linked to the main-vault note.",
+        tags: ["integration", "relations"],
+        summary: "Create project-vault note for unrelate test",
+        cwd: repoDir,
+        scope: "project",
+      }, embeddingServer.url);
+      const projectId = extractRememberedId(projectRemember);
+
+      const relateText = await callLocalMcp(vaultDir, "relate", {
+        fromId: mainId,
+        toId: projectId,
+        type: "related-to",
+        bidirectional: true,
+        cwd: repoDir,
+      }, embeddingServer.url);
+      expect(relateText).toContain(`Linked \`${mainId}\` ↔ \`${projectId}\``);
+
+      const unrelated = await callLocalMcpResponse(vaultDir, "unrelate", {
+        fromId: mainId,
+        toId: projectId,
+        bidirectional: true,
+        cwd: repoDir,
+      }, embeddingServer.url);
+
+      expect(unrelated.text).toContain(`Removed relationship between \`${mainId}\` and \`${projectId}\``);
+      const modified = unrelated.structuredContent?.["notesModified"] as string[];
+      expect(modified.sort()).toEqual([mainId, projectId].sort());
+
+      const mainContents = await readFile(path.join(vaultDir, "notes", `${mainId}.md`), "utf-8");
+      const projectContents = await readFile(path.join(repoDir, ".mnemonic", "notes", `${projectId}.md`), "utf-8");
+      expect(mainContents).not.toContain(projectId);
+      expect(projectContents).not.toContain(mainId);
+    } finally {
+      await embeddingServer.close();
+    }
+  }, 20000);
 
   it("deletes temporary source notes and creates a permanent target on consolidation", async () => {
     const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-vault-"));

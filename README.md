@@ -84,7 +84,7 @@ Packages are published to the public npm registry. No authentication required.
 npm install @danielmarbach/mnemonic-mcp
 
 # Specific release
-npm install @danielmarbach/mnemonic-mcp@0.1.0
+npm install @danielmarbach/mnemonic-mcp@0.2.0
 ```
 
 ## MCP client config
