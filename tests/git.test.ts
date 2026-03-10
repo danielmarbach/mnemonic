@@ -71,14 +71,16 @@ describe("GitOps", () => {
     expect(commit).not.toHaveBeenCalled();
   });
 
-  it("throws when push fails", async () => {
+  it("returns failed status when push fails", async () => {
     const { GitOps } = await import("../src/git.js");
     const git = new GitOps("/tmp/repo");
     await git.init();
 
     push.mockRejectedValueOnce(new Error("network down"));
 
-    await expect(git.push()).rejects.toThrow("Git push failed: network down");
+    const result = await git.pushWithStatus();
+    expect(result.status).toBe("failed");
+    expect(result.error).toContain("network down");
   });
 
   describe("sync", () => {

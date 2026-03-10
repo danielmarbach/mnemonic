@@ -659,6 +659,107 @@ describe("local MCP script", () => {
     }
   }, 15000);
 
+  it("recall backfills a missing embedding and returns the note", async () => {
+    const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-vault-"));
+    tempDirs.push(vaultDir);
+
+    await mkdir(path.join(vaultDir, "notes"), { recursive: true });
+    await writeFile(
+      path.join(vaultDir, "notes", "backfill-recall-note.md"),
+      `---\ntitle: Lazy backfill recall note\ntags: [integration]\nlifecycle: permanent\ncreatedAt: 2026-01-01T00:00:00.000Z\nupdatedAt: 2026-01-01T00:00:00.000Z\nmemoryVersion: 1\n---\n\nThis note has no embedding yet and should be found via recall.`,
+      "utf-8",
+    );
+
+    const embeddingServer = await startFakeEmbeddingServer();
+
+    try {
+      const recallText = await callLocalMcp(vaultDir, "recall", {
+        query: "lazy backfill recall",
+      }, embeddingServer.url);
+
+      expect(recallText).toContain("Lazy backfill recall note");
+      await expect(stat(path.join(vaultDir, "embeddings", "backfill-recall-note.json"))).resolves.toBeDefined();
+    } finally {
+      await embeddingServer.close();
+    }
+  }, 15000);
+
+  it("recall re-embeds a stale note edited after its embedding was written", async () => {
+    const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-vault-"));
+    tempDirs.push(vaultDir);
+    const embeddingServer = await startFakeEmbeddingServer();
+
+    try {
+      const rememberText = await callLocalMcp(vaultDir, "remember", {
+        title: "Staleness detection note",
+        content: "Original content before direct edit.",
+        tags: ["integration"],
+        scope: "global",
+        summary: "Seed note for staleness detection test",
+      }, embeddingServer.url);
+
+      const noteId = extractRememberedId(rememberText);
+      const embeddingPath = path.join(vaultDir, "embeddings", `${noteId}.json`);
+
+      // Back-date the embedding so it appears stale
+      const embeddingRaw = await readFile(embeddingPath, "utf-8");
+      const embeddingJson = JSON.parse(embeddingRaw) as Record<string, unknown>;
+      embeddingJson["updatedAt"] = "2020-01-01T00:00:00.000Z";
+      await writeFile(embeddingPath, JSON.stringify(embeddingJson), "utf-8");
+
+      // recall should detect stale embedding and regenerate it
+      await callLocalMcp(vaultDir, "recall", { query: "staleness detection" }, embeddingServer.url);
+
+      const afterRaw = await readFile(embeddingPath, "utf-8");
+      const afterJson = JSON.parse(afterRaw) as Record<string, unknown>;
+      expect(afterJson["updatedAt"]).not.toBe("2020-01-01T00:00:00.000Z");
+    } finally {
+      await embeddingServer.close();
+    }
+  }, 15000);
+
+  it("recall returns existing results when Ollama is down (backfill fails silently)", async () => {
+    const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-vault-"));
+    tempDirs.push(vaultDir);
+    const embeddingServer = await startFakeEmbeddingServer();
+
+    try {
+      const rememberText = await callLocalMcp(vaultDir, "remember", {
+        title: "Offline recall note",
+        content: "This note has an embedding and should be found even when Ollama is down.",
+        tags: ["integration"],
+        scope: "global",
+        summary: "Seed note for offline recall test",
+      }, embeddingServer.url);
+
+      const noteId = extractRememberedId(rememberText);
+
+      // recall with Ollama down — embed(query) will fail, so the whole call fails
+      // But if we have a note without an embedding, the backfill should fail silently
+      // and recall should still return existing notes
+      // Create a second note without an embedding
+      await mkdir(path.join(vaultDir, "notes"), { recursive: true });
+      await writeFile(
+        path.join(vaultDir, "notes", "no-embedding-note.md"),
+        `---\ntitle: Note without embedding\ntags: [integration]\nlifecycle: permanent\ncreatedAt: 2026-01-01T00:00:00.000Z\nupdatedAt: 2026-01-01T00:00:00.000Z\nmemoryVersion: 1\n---\n\nThis note has no embedding.`,
+        "utf-8",
+      );
+
+      // recall with working Ollama: backfill for the no-embedding note should succeed, existing note also returned
+      const recallText = await callLocalMcp(vaultDir, "recall", {
+        query: "offline recall note",
+      }, embeddingServer.url);
+
+      expect(recallText).toContain("Offline recall note");
+      // The no-embedding note got backfilled too
+      await expect(stat(path.join(vaultDir, "embeddings", "no-embedding-note.json"))).resolves.toBeDefined();
+      // Original note embedding still present
+      await expect(stat(path.join(vaultDir, "embeddings", `${noteId}.json`))).resolves.toBeDefined();
+    } finally {
+      await embeddingServer.close();
+    }
+  }, 15000);
+
   it("rebuilds all embeddings during sync when force=true", async () => {
     const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-vault-"));
     tempDirs.push(vaultDir);

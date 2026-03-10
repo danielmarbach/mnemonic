@@ -24,7 +24,7 @@ After `remember`, `update`, `move_memory`, or a consolidation write, inspect the
 ### Choosing note lifecycle
 When calling `remember`, set lifecycle based on whether the note is temporary working state or durable knowledge:
 
-- `temporary`: planning or WIP notes that mainly support the current implementation and will likely be obsolete once the work is complete
+- `temporary`: planning or WIP notes that mainly support the current implementation and will likely be obsolete once the work is complete; also unvalidated future ideas and design options not yet chosen
 - `permanent`: decisions, constraints, fixes, lessons, and other knowledge worth keeping for future sessions
 - If unsure, choose `permanent`
 - Tags like `plan`, `wip`, and `completed` are descriptive only; lifecycle controls retention behavior

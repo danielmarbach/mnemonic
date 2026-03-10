@@ -12,11 +12,12 @@ export interface PersistenceStatus {
   };
   git: {
     commit: "committed" | "skipped";
-    push: "pushed" | "skipped";
+    push: "pushed" | "skipped" | "failed";
     commitMessage?: string;
     commitBody?: string;
     commitReason?: string;
     pushReason?: string;
+    pushError?: string;
   };
   durability: "local-only" | "committed" | "pushed";
 }
@@ -292,11 +293,12 @@ export const PersistenceStatusSchema = z.object({
   }),
   git: z.object({
     commit: z.enum(["committed", "skipped"]),
-    push: z.enum(["pushed", "skipped"]),
+    push: z.enum(["pushed", "skipped", "failed"]),
     commitMessage: z.string().optional(),
     commitBody: z.string().optional(),
     commitReason: z.string().optional(),
     pushReason: z.string().optional(),
+    pushError: z.string().optional(),
   }),
   durability: z.enum(["local-only", "committed", "pushed"]),
 });

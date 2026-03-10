@@ -4,6 +4,17 @@ All notable changes to `mnemonic` will be documented in this file.
 
 The format is loosely based on Keep a Changelog and uses semver-style version headings.
 
+## [0.3.0] - Unreleased
+
+### Added
+
+- `recall` now backfills missing and stale embeddings on demand before searching. Notes that arrived via `git pull` without a local embedding, or that were edited directly in an editor after their embedding was written, are re-embedded automatically. If Ollama is unavailable the backfill fails silently and recall continues with existing embeddings.
+
+### Fixed
+
+- `parseNote` in `Storage` now converts gray-matter `Date` objects to ISO strings for `createdAt` and `updatedAt`. YAML frontmatter with unquoted ISO timestamps is parsed by gray-matter as JS `Date` instances; notes arriving via `git pull` from another machine were affected, causing output validation errors on recall.
+- `pushWithStatus` in `GitOps` now returns `{ status: "failed", error }` instead of throwing on push failure. Previously, any push error caused mutating MCP tools (`remember`, `update`, `consolidate`, etc.) to return `isError: true` even though the note was committed successfully. The `PersistenceStatus` schema gains a `"failed"` push status and a `pushError` field to surface the failure detail without blocking the operation.
+
 ## [0.2.0] - 2026-03-10
 
 ### Added

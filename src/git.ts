@@ -24,8 +24,9 @@ export interface CommitResult {
 }
 
 export interface PushResult {
-  status: "pushed" | "skipped";
+  status: "pushed" | "skipped" | "failed";
   reason?: "git-disabled" | "no-remote" | "auto-push-disabled";
+  error?: string;
 }
 
 export class GitOps {
@@ -152,8 +153,9 @@ export class GitOps {
       console.error("[git] Pushed");
       return { status: "pushed" };
     } catch (err) {
-      console.error(`[git] Push failed: ${err}`);
-      throw new GitOperationError("push", err);
+      const message = err instanceof Error ? err.message : String(err);
+      console.error(`[git] Push failed: ${message}`);
+      return { status: "failed", error: message };
     }
   }
 

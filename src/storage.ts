@@ -311,8 +311,8 @@ export class Storage {
       project: parsed.data["project"] as string | undefined,
       projectName: parsed.data["projectName"] as string | undefined,
       relatedTo: parsed.data["relatedTo"] as Relationship[] | undefined,
-      createdAt: parsed.data["createdAt"] ?? new Date().toISOString(),
-      updatedAt: parsed.data["updatedAt"] ?? new Date().toISOString(),
+      createdAt: toIsoString(parsed.data["createdAt"]),
+      updatedAt: toIsoString(parsed.data["updatedAt"]),
       memoryVersion: normalizeMemoryVersion(parsed.data["memoryVersion"]),
     };
   }
@@ -328,4 +328,10 @@ function normalizeMemoryVersion(value: unknown): number {
 
 function normalizeLifecycle(value: unknown): NoteLifecycle {
   return value === "temporary" ? "temporary" : "permanent";
+}
+
+function toIsoString(value: unknown): string {
+  if (value instanceof Date) return value.toISOString();
+  if (typeof value === "string" && value) return value;
+  return new Date().toISOString();
 }
