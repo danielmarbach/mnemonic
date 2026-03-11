@@ -5,7 +5,8 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci
 
-COPY *.ts tsconfig*.json ./
+COPY tsconfig*.json ./
+COPY src ./src
 RUN npm run build
 
 # ── runtime ──────────────────────────────────────────────────────────────────
@@ -22,7 +23,7 @@ COPY --from=builder /app/build ./build
 
 ENV VAULT_PATH=/vault
 ENV OLLAMA_URL=http://host-gateway:11434
-ENV EMBED_MODEL=nomic-embed-text
+ENV EMBED_MODEL=nomic-embed-text-v2-moe
 ENV DISABLE_GIT=false
 
 CMD ["node", "build/index.js"]

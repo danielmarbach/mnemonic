@@ -6,6 +6,10 @@ The format is loosely based on Keep a Changelog and uses semver-style version he
 
 ## [0.4.1] - 2026-03-11
 
+### Added
+
+- Docker image published to `danielmarbach/mnemonic-mcp` on Docker Hub for `linux/amd64` and `linux/arm64`. Tagged with the release version and `latest`.
+
 ### Fixed
 
 - `list_migrations` now returns structured content that matches its declared MCP output schema. The handler already included `totalPending`, but the zod schema omitted it, causing the tool to fail with a structured-content validation error instead of listing migrations.
