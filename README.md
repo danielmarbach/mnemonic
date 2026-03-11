@@ -13,7 +13,7 @@ For the high-level system map, see [`ARCHITECTURE.md`](ARCHITECTURE.md). For rel
 - 🤝 Shared `.mnemonic/` notes travel with the repository, so project knowledge isn't trapped in one person's chat history.
 - 🔒 Embeddings stay local and gitignored — semantic search without committing generated vector data.
 - 📝 Every `remember`, `update`, and `consolidate` creates a semantic git commit — decision log and plans travel with the code in the same history.
-- 🔓 No lock-in: if you stop using mnemonic, what remains is plain markdown with YAML frontmatter — no proprietary format to migrate away from.
+- 🔓 Designed for removability — though we're quietly confident you won't use that exit. Every note is plain markdown with YAML frontmatter; the knowledge you gather is independent of mnemonic and always yours.
 
 ## Stability
 
@@ -371,7 +371,7 @@ Easier search is part of it, but three things work together:
 - **A connected knowledge graph.** Notes link to each other with typed relationships (`explains`, `supersedes`, `example-of`). Related context surfaces together automatically; `memory_graph` shows the full web. A folder of markdown files has no edges between them.
 - **Decision history travels with the code.** Every `remember`, `update`, and `consolidate` creates a descriptive git commit, so your decision log and implementation plans evolve alongside the code they describe — attributed and timestamped in `git log`.
 
-If mnemonic turns out not to be for you: what remains is plain markdown with standard YAML frontmatter — readable in any editor, searchable with `grep`, committable to git without mnemonic. No proprietary format to escape.
+mnemonic is designed to be removable — so give it a try with confidence. We think once you do, you'll stay. But if you ever leave, all the knowledge you've gathered is independent: plain markdown with standard YAML frontmatter, readable in any editor, searchable with `grep`, committable to git. No rescue operation required.
 
 **Are mnemonic's embeddings the same as what Claude uses?**
 
