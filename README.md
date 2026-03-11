@@ -151,6 +151,28 @@ For local development against this repository's source tree, use `npm run mcp:lo
 | `EMBED_MODEL` | `nomic-embed-text-v2-moe` | Ollama embedding model           |
 | `DISABLE_GIT` | `false`                   | Set `true` to skip all git ops   |
 
+### config.json
+
+The main vault's `~/mnemonic-vault/config.json` holds machine-local settings that survive across sessions. You can edit it by hand — unknown fields are ignored and invalid values fall back to defaults.
+
+User-tunable fields:
+
+| Field | Default | Description |
+|-------|---------|-------------|
+| `reindexEmbedConcurrency` | `4` | Parallel embedding requests during `sync` (capped 1–16) |
+| `mutationPushMode` | `"main-only"` | When to auto-push after a write: `"all"`, `"main-only"`, or `"none"` |
+
+`projectMemoryPolicies` and `projectIdentityOverrides` are written automatically by `set_project_memory_policy` and `set_project_identity` — no need to edit them by hand.
+
+Example — raise concurrency on a fast machine and disable auto-push everywhere:
+
+```json
+{
+  "reindexEmbedConcurrency": 8,
+  "mutationPushMode": "none"
+}
+```
+
 ## How it works
 
 ### Vault layout
