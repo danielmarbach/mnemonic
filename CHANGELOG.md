@@ -4,6 +4,12 @@ All notable changes to `mnemonic` will be documented in this file.
 
 The format is loosely based on Keep a Changelog and uses semver-style version headings.
 
+## [0.4.0] - 2026-03-11
+
+### Added
+
+- Unadopted project detection in `remember`: when a project has no saved memory policy and no existing `.mnemonic/` directory, mnemonic now asks which vault to use instead of silently creating `.mnemonic/`. The prompt distinguishes first-time adoption from an explicit `ask` policy, and hints to call `set_project_memory_policy` to avoid being prompted again.
+
 ## [0.3.2] - 2026-03-11
 
 ### Fixed

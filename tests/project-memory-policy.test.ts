@@ -14,23 +14,35 @@ afterEach(async () => {
 
 describe("resolveWriteScope", () => {
   it("prefers explicit scope over project policy", () => {
-    expect(resolveWriteScope("global", "project", true)).toBe("global");
+    expect(resolveWriteScope("global", "project", true, true)).toBe("global");
   });
 
   it("uses the project policy when scope is omitted", () => {
-    expect(resolveWriteScope(undefined, "global", true)).toBe("global");
+    expect(resolveWriteScope(undefined, "global", true, true)).toBe("global");
   });
 
   it("returns ask when the project policy requires explicit selection", () => {
-    expect(resolveWriteScope(undefined, "ask", true)).toBe("ask");
+    expect(resolveWriteScope(undefined, "ask", true, true)).toBe("ask");
   });
 
-  it("falls back to project storage when project context exists", () => {
-    expect(resolveWriteScope(undefined, undefined, true)).toBe("project");
+  it("falls back to project storage when project context and vault both exist", () => {
+    expect(resolveWriteScope(undefined, undefined, true, true)).toBe("project");
   });
 
   it("falls back to global storage without project context", () => {
-    expect(resolveWriteScope(undefined, undefined, false)).toBe("global");
+    expect(resolveWriteScope(undefined, undefined, false, false)).toBe("global");
+  });
+
+  it("returns ask when project context exists but vault does not (unadopted project)", () => {
+    expect(resolveWriteScope(undefined, undefined, true, false)).toBe("ask");
+  });
+
+  it("explicit scope bypasses unadopted project check", () => {
+    expect(resolveWriteScope("project", undefined, true, false)).toBe("project");
+  });
+
+  it("saved policy bypasses unadopted project check", () => {
+    expect(resolveWriteScope(undefined, "global", true, false)).toBe("global");
   });
 });
 

@@ -599,13 +599,21 @@ function formatCommitBody(options: CommitBodyOptions): string {
   return lines.join("\n");
 }
 
-function formatAskForWriteScope(project: Awaited<ReturnType<typeof resolveProject>>): string {
+function formatAskForWriteScope(
+  project: Awaited<ReturnType<typeof resolveProject>>,
+  unadopted: boolean = false,
+): string {
   const projectLabel = project ? `${project.name} (${project.id})` : "this context";
+  const header = unadopted
+    ? `No memory policy set for ${projectLabel} and this project hasn't adopted mnemonic yet.`
+    : `Project memory policy for ${projectLabel} is set to always ask.`;
   return [
-    `Project memory policy for ${projectLabel} is set to always ask.`,
+    header,
     "Choose where to store this memory and call `remember` again with one of:",
-    "- `scope: \"project\"` — shared project vault (`.mnemonic/`)",
+    "- `scope: \"project\"` — create `.mnemonic/` in this repo and store there (adopts mnemonic)",
     "- `scope: \"global\"` — private main vault with project association",
+    "",
+    "To avoid being asked again: call `set_project_memory_policy` with your preferred scope.",
   ].join("\n");
 }
 
@@ -1309,9 +1317,11 @@ server.registerTool(
     const project = await resolveProject(cwd);
     const cleanedContent = await cleanMarkdown(content);
     const policyScope = await getProjectPolicyScope(cwd);
-    const writeScope = resolveWriteScope(scope, policyScope, Boolean(project));
+    const projectVaultExists = cwd ? Boolean(await vaultManager.getProjectVaultIfExists(cwd)) : true;
+    const writeScope = resolveWriteScope(scope, policyScope, Boolean(project), projectVaultExists);
     if (writeScope === "ask") {
-      return { content: [{ type: "text", text: formatAskForWriteScope(project) }], isError: true };
+      const unadopted = !projectVaultExists && !policyScope;
+      return { content: [{ type: "text", text: formatAskForWriteScope(project, unadopted) }], isError: true };
     }
     const vault = await resolveWriteVault(cwd, writeScope);
 
