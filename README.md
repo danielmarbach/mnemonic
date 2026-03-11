@@ -12,6 +12,8 @@ For the high-level system map, see [`ARCHITECTURE.md`](ARCHITECTURE.md). For rel
 - 🎯 Project-scoped recall surfaces the right repo context first while keeping global memories accessible.
 - 🤝 Shared `.mnemonic/` notes travel with the repository, so project knowledge isn't trapped in one person's chat history.
 - 🔒 Embeddings stay local and gitignored — semantic search without committing generated vector data.
+- 📝 Every `remember`, `update`, and `consolidate` creates a semantic git commit — decision log and plans travel with the code in the same history.
+- 🔓 No lock-in: if you stop using mnemonic, what remains is plain markdown with YAML frontmatter — no proprietary format to migrate away from.
 
 ## Stability
 
@@ -360,6 +362,16 @@ git clone git@github.com:you/mnemonic-vault.git ~/mnemonic-vault
 After the first sync, call `sync` (with `cwd` for project vaults) whenever you switch machines. It handles pull, push, and embeddings in one shot.
 
 ## FAQ
+
+**Is the advantage over plain markdown files and grep just easier search?**
+
+Easier search is part of it, but three things work together:
+
+- **Semantic search over vector embeddings.** Each note is locally indexed via Ollama so `recall` finds the right note even when you don't remember the exact words — searching "JWT expiry bug" can surface a note titled "RS256 migration rationale". `grep` only matches strings you already know.
+- **A connected knowledge graph.** Notes link to each other with typed relationships (`explains`, `supersedes`, `example-of`). Related context surfaces together automatically; `memory_graph` shows the full web. A folder of markdown files has no edges between them.
+- **Decision history travels with the code.** Every `remember`, `update`, and `consolidate` creates a descriptive git commit, so your decision log and implementation plans evolve alongside the code they describe — attributed and timestamped in `git log`.
+
+If mnemonic turns out not to be for you: what remains is plain markdown with standard YAML frontmatter — readable in any editor, searchable with `grep`, committable to git without mnemonic. No proprietary format to escape.
 
 **Are mnemonic's embeddings the same as what Claude uses?**
 
