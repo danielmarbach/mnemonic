@@ -8,6 +8,12 @@ import { fileURLToPath } from "url";
 import { promisify } from "util";
 import { execFile } from "child_process";
 
+import {
+  MemoryGraphResultSchema,
+  MigrationExecuteResultSchema,
+  MigrationListResultSchema,
+} from "../src/structured-content.js";
+
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const execFileAsync = promisify(execFile);
 const builtEntryPoint = path.join(repoRoot, "build", "index.js");
@@ -1023,6 +1029,62 @@ describe("local MCP script", () => {
       await embeddingServer.close();
     }
   }, 20000);
+
+  it("returns structured migration metadata from list_migrations", async () => {
+    const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-vault-"));
+    tempDirs.push(vaultDir);
+
+    const response = await callLocalMcpResponse(vaultDir, "list_migrations", {});
+
+    expect(response.text).toContain("Available migrations:");
+
+    const structured = response.structuredContent;
+    expect(structured?.["action"]).toBe("migration_list");
+    expect(structured?.["totalPending"]).toBeTypeOf("number");
+
+    const available = structured?.["available"] as Array<Record<string, unknown>>;
+    expect(Array.isArray(available)).toBe(true);
+    expect(available.length).toBeGreaterThan(0);
+    expect(available.some((migration) => migration["name"] === "v0.1.0-backfill-memory-versions")).toBe(true);
+
+    const vaults = structured?.["vaults"] as Array<Record<string, unknown>>;
+    expect(Array.isArray(vaults)).toBe(true);
+    expect(vaults.length).toBeGreaterThan(0);
+  }, 15000);
+
+  it("keeps migration and graph structured outputs aligned with their schemas", async () => {
+    const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-vault-"));
+    tempDirs.push(vaultDir);
+    const embeddingServer = await startFakeEmbeddingServer();
+
+    try {
+      const rememberText = await callLocalMcp(vaultDir, "remember", {
+        title: "Schema audit graph note",
+        content: "Used to validate structured MCP output schemas.",
+        tags: ["integration"],
+        scope: "global",
+        summary: "Create note for structured output schema audit",
+      }, embeddingServer.url);
+
+      extractRememberedId(rememberText);
+
+      const migrationList = await callLocalMcpResponse(vaultDir, "list_migrations", {});
+      expect(() => MigrationListResultSchema.parse(migrationList.structuredContent)).not.toThrow();
+
+      const executeMigration = await callLocalMcpResponse(vaultDir, "execute_migration", {
+        migrationName: "v0.1.0-backfill-memory-versions",
+        dryRun: true,
+        backup: true,
+      });
+      expect(() => MigrationExecuteResultSchema.parse(executeMigration.structuredContent)).not.toThrow();
+
+      const memoryGraph = await callLocalMcpResponse(vaultDir, "memory_graph", {});
+      const graph = MemoryGraphResultSchema.parse(memoryGraph.structuredContent);
+      expect(Array.isArray(graph.nodes)).toBe(true);
+    } finally {
+      await embeddingServer.close();
+    }
+  }, 15000);
 
   it("fetches full note content via get by exact id", async () => {
     const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-vault-"));

@@ -4,6 +4,12 @@ All notable changes to `mnemonic` will be documented in this file.
 
 The format is loosely based on Keep a Changelog and uses semver-style version headings.
 
+## [0.4.1] - 2026-03-11
+
+### Fixed
+
+- `list_migrations` now returns structured content that matches its declared MCP output schema. The handler already included `totalPending`, but the zod schema omitted it, causing the tool to fail with a structured-content validation error instead of listing migrations.
+
 ## [0.4.0] - 2026-03-11
 
 ### Added

@@ -193,6 +193,7 @@ export interface MigrationListResult extends Record<string, unknown> {
     pending: number;
   }>;
   available: Array<{ name: string; description: string }>;
+  totalPending: number;
 }
 
 export interface MigrationExecuteResult extends Record<string, unknown> {
@@ -541,6 +542,7 @@ export const MigrationListResultSchema = z.object({
     pending: z.number(),
   })),
   available: z.array(z.object({ name: z.string(), description: z.string() })),
+  totalPending: z.number(),
 });
 
 export const MigrationExecuteResultSchema = z.object({
