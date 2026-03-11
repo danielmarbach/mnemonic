@@ -15,7 +15,27 @@ on:
         default: true
 
 jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+        with:
+          sparse-checkout: package.json
+          sparse-checkout-cone-mode: false
+
+      - name: Verify tag matches package version
+        run: |
+          PACKAGE_VERSION=$(node -p "require('./package.json').version")
+          TAG_NAME="${{ inputs.tag || github.ref_name }}"
+
+          if [ "$TAG_NAME" != "v$PACKAGE_VERSION" ]; then
+            echo "Tag $TAG_NAME does not match package version v$PACKAGE_VERSION"
+            exit 1
+          fi
+
   publish-npm:
+    needs: verify
     runs-on: ubuntu-latest
     environment: Release
     permissions:
@@ -36,16 +56,6 @@ jobs:
       - name: Update npm for OIDC trusted publishing
         run: npm install -g npm@latest  # Requires npm >= 11.5.1
 
-      - name: Verify tag matches package version
-        run: |
-          PACKAGE_VERSION=$(node -p "require('./package.json').version")
-          TAG_NAME="${{ inputs.tag || github.ref_name }}"
-
-          if [ "$TAG_NAME" != "v$PACKAGE_VERSION" ]; then
-            echo "Tag $TAG_NAME does not match package version v$PACKAGE_VERSION"
-            exit 1
-          fi
-
       - name: Install dependencies
         run: npm ci
 
@@ -60,6 +70,7 @@ jobs:
         run: npm publish  # Provenance attestation is automatic via OIDC trusted publishing
 
   publish-docker:
+    needs: verify
     runs-on: ubuntu-latest
     environment: Release
     permissions:
