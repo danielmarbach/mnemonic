@@ -23,6 +23,7 @@ export function resolveWriteScope(
   explicitScope: WriteScope | undefined,
   projectPolicyScope: ProjectPolicyScope | undefined,
   hasProjectContext: boolean,
+  projectVaultExists: boolean = true,
 ): WriteScope | "ask" {
   if (explicitScope) {
     return explicitScope;
@@ -30,6 +31,12 @@ export function resolveWriteScope(
 
   if (projectPolicyScope) {
     return projectPolicyScope;
+  }
+
+  // No policy and no existing project vault: project hasn't adopted mnemonic yet.
+  // Ask rather than silently creating .mnemonic/.
+  if (hasProjectContext && !projectVaultExists) {
+    return "ask";
   }
 
   return hasProjectContext ? "project" : "global";
