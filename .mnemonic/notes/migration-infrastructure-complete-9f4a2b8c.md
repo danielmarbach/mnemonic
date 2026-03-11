@@ -13,7 +13,7 @@ project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
   - id: mnemonic-migration-strategy-7f2e8c3d
-    type: relates-to
+    type: related-to
 memoryVersion: 1
 ---
 # Migration Infrastructure Implementation - Complete
