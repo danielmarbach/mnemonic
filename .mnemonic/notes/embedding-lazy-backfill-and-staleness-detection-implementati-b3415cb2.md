@@ -8,11 +8,13 @@ tags:
   - fixed
 lifecycle: permanent
 createdAt: '2026-03-10T19:51:11.447Z'
-updatedAt: '2026-03-10T19:51:11.447Z'
+updatedAt: '2026-03-11T14:42:57.846Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
   - id: embedding-lazy-backfill-and-staleness-detection-implementati-235207a1
+    type: supersedes
+  - id: embedding-lazy-backfill-and-staleness-detection-implementati-c87cce90
     type: supersedes
 memoryVersion: 1
 ---
