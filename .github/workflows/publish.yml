@@ -5,6 +5,14 @@ on:
     tags:
       - "v*.*.*"
   workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to simulate (e.g. v0.4.1)"
+        required: true
+      dry_run:
+        description: "Skip publishing (npm, Docker, GitHub release, milestone)"
+        type: boolean
+        default: true
 
 jobs:
   publish-npm:
@@ -17,6 +25,8 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.tag || github.ref }}
 
       - name: Set up Node.js
         uses: actions/setup-node@v6
@@ -31,7 +41,7 @@ jobs:
       - name: Verify tag matches package version
         run: |
           PACKAGE_VERSION=$(node -p "require('./package.json').version")
-          TAG_NAME="${GITHUB_REF_NAME}"
+          TAG_NAME="${{ inputs.tag || github.ref_name }}"
 
           if [ "$TAG_NAME" != "v$PACKAGE_VERSION" ]; then
             echo "Tag $TAG_NAME does not match package version v$PACKAGE_VERSION"
@@ -48,6 +58,7 @@ jobs:
         run: npm test
 
       - name: Publish to npm
+        if: ${{ !inputs.dry_run }}
         run: npm publish  # Provenance attestation is automatic via OIDC trusted publishing
 
   publish-docker:
@@ -59,6 +70,8 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.tag || github.ref }}
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -67,6 +80,7 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Log in to Docker Hub
+        if: ${{ !inputs.dry_run }}
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
@@ -74,14 +88,14 @@ jobs:
 
       - name: Extract version for Docker tag
         id: version
-        run: echo "tag=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+        run: echo "tag=${{ inputs.tag || github.ref_name }}" | sed 's/tag=v/tag=/' >> "$GITHUB_OUTPUT"
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v6
         with:
           context: .
           platforms: linux/amd64,linux/arm64
-          push: true
+          push: ${{ !inputs.dry_run }}
           tags: |
             danielmarbach/mnemonic-mcp:latest
             danielmarbach/mnemonic-mcp:${{ steps.version.outputs.tag }}
@@ -95,10 +109,13 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.tag || github.ref }}
 
       - name: Extract release notes from changelog
         run: |
-          VERSION="${GITHUB_REF_NAME#v}"
+          VERSION="${{ inputs.tag || github.ref_name }}"
+          VERSION="${VERSION#v}"
           awk "/^## \[${VERSION}\]/{found=1; next} found && /^## \[/{exit} found{print}" CHANGELOG.md \
             | sed '/./,$!d' \
             > RELEASE_NOTES_LATEST.md
@@ -106,23 +123,26 @@ jobs:
           cat RELEASE_NOTES_LATEST.md
 
       - name: Create GitHub release
+        if: ${{ !inputs.dry_run }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" \
-            --title "$GITHUB_REF_NAME" \
+          gh release create "${{ inputs.tag || github.ref_name }}" \
+            --title "${{ inputs.tag || github.ref_name }}" \
             --notes-file RELEASE_NOTES_LATEST.md
 
       - name: Close milestone
+        if: ${{ !inputs.dry_run }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          TAG="${{ inputs.tag || github.ref_name }}"
           MILESTONE=$(gh api "repos/${{ github.repository }}/milestones" \
-            --jq ".[] | select(.title == \"$GITHUB_REF_NAME\") | .number" 2>/dev/null || true)
+            --jq ".[] | select(.title == \"${TAG}\") | .number" 2>/dev/null || true)
           if [ -n "$MILESTONE" ]; then
             gh api "repos/${{ github.repository }}/milestones/${MILESTONE}" \
               -X PATCH -f state=closed
-            echo "Closed milestone $GITHUB_REF_NAME (#${MILESTONE})"
+            echo "Closed milestone ${TAG} (#${MILESTONE})"
           else
-            echo "No milestone named $GITHUB_REF_NAME found, skipping"
+            echo "No milestone named ${TAG} found, skipping"
           fi
