@@ -1,0 +1,11 @@
+node_modules
+build
+.git
+.mnemonic
+.opencode
+tests
+*.md
+.dockerignore
+.gitignore
+.npmignore
+scripts
