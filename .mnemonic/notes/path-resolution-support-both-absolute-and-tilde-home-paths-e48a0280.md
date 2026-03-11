@@ -7,9 +7,14 @@ tags:
   - configuration
 lifecycle: permanent
 createdAt: '2026-03-11T10:30:20.416Z'
-updatedAt: '2026-03-11T10:30:56.887Z'
+updatedAt: '2026-03-11T10:32:28.988Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: import-claude-memory-cli-command-design-and-implementation-dcdc5a05
+    type: related-to
+  - id: mnemonic-source-file-layout-4d11294d
+    type: explains
 memoryVersion: 1
 ---
 Key learning: configuration paths must support both absolute paths and home-directory shorthand (`~`), not just absolute paths.

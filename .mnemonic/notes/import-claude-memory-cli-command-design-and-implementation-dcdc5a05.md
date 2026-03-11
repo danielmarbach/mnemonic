@@ -7,9 +7,12 @@ tags:
   - design-decision
 lifecycle: permanent
 createdAt: '2026-03-09T21:24:01.304Z'
-updatedAt: '2026-03-09T21:24:01.304Z'
+updatedAt: '2026-03-11T10:32:28.981Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: path-resolution-support-both-absolute-and-tilde-home-paths-e48a0280
+    type: related-to
 memoryVersion: 1
 ---
 Added `mnemonic import-claude-memory` CLI command to import Claude Code auto-memory into the mnemonic vault.
