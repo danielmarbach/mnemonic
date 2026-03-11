@@ -25,6 +25,7 @@ jobs:
           sparse-checkout-cone-mode: false
 
       - name: Verify tag matches package version
+        if: ${{ !inputs.dry_run }}
         run: |
           PACKAGE_VERSION=$(node -p "require('./package.json').version")
           TAG_NAME="${{ inputs.tag || github.ref_name }}"
