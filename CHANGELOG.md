@@ -4,6 +4,12 @@ All notable changes to `mnemonic` will be documented in this file.
 
 The format is loosely based on Keep a Changelog and uses semver-style version headings.
 
+## [Unreleased]
+
+### Changed
+
+- Upgraded `zod` to `^4.3.6` and aligned schema declarations with Zod v4's stricter `z.record` signature to keep MCP structured-output validation and type-checking consistent.
+
 ## [0.4.1] - 2026-03-11
 
 ### Added

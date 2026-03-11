@@ -36,7 +36,7 @@
     "gray-matter": "^4.0.3",
     "markdownlint": "^0.40.0",
     "simple-git": "^3.27.0",
-    "zod": "^4.0.0"
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
