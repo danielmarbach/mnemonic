@@ -443,7 +443,7 @@ export const ProjectSummaryResultSchema = z.object({
     mainVault: z.number(),
     privateProject: z.number(),
   }),
-  themes: z.record(z.number()),
+  themes: z.record(z.string(), z.number()),
   recent: z.array(z.object({
     id: z.string(),
     title: z.string(),
