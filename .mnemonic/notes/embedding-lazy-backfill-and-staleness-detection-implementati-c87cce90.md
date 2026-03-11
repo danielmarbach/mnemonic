@@ -10,217 +10,32 @@ tags:
   - fixed
 lifecycle: permanent
 createdAt: '2026-03-11T14:42:57.846Z'
-updatedAt: '2026-03-11T14:42:57.846Z'
+updatedAt: '2026-03-11T14:49:13.373Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 memoryVersion: 1
 ---
-## Consolidated from:
-### Embedding lazy backfill and staleness detection — implementation
-*Source: `embedding-lazy-backfill-and-staleness-detection-implementati-235207a1`*
+Decision: `recall` should lazily backfill missing or stale embeddings on demand so notes become searchable immediately after `git pull` or direct file edits, without requiring an explicit `sync`.
 
-## What was built
+## Implementation
 
-Two minimal changes to make `recall` find notes immediately after a `git pull` or direct editor edit, without requiring an explicit `sync`.
+### Staleness detection
 
-## Changes
+In `embedMissingNotes`, skip re-embedding only when the stored embedding uses the current model and its `updatedAt` is at least as new as the note.
 
-### 1. Staleness detection in `embedMissingNotes` (`src/index.ts`)
-
-Extended the skip condition from:
-```typescript
-if (existing?.model === embedModel)
-```
-to:
-```typescript
-if (existing?.model === embedModel && existing.updatedAt >= note.updatedAt)
-```
-`sync` inherits this for free since it calls `embedMissingNotes` too.
-
-### 2. Pre-recall backfill (`src/index.ts` — `recall` handler)
-
-Added before the search loop:
-```typescript
-for (const vault of vaults) {
-  await embedMissingNotes(vault.storage).catch(() => {});
-}
-```
-If Ollama is down, backfill fails silently and recall still returns results from existing embeddings.
-
-### 3. Bonus bug fix: `parseNote` Date object handling (`src/storage.ts`)
-
-gray-matter parses unquoted ISO timestamps in YAML frontmatter as JS Date objects. Notes written by mnemonic tools are safe. Notes arriving via git pull from another machine are affected.
-
-Fixed with a `toIsoString()` helper:
-```typescript
-function toIsoString(value: unknown): string {
-  if (value instanceof Date) return value.toISOString();
-  if (typeof value === 'string' && value) return value;
-  return new Date().toISOString();
-}
-```
-Discovered during testing when hand-crafted test notes triggered output validation error 'received date, expected string'.
-
-## Why lazy backfill (not file watching)
-
-- The MCP server is a stdio process, not always-on. A watcher only runs during an active session — misses pulls between sessions.
-- A standalone mnemonic watch daemon would be a separate process requiring user setup.
-- Lazy backfill on recall is architecturally consistent: embeddings are derived data and should be rebuilt on demand.
-
-## Tests added
-
-- Recall backfills a missing embedding and returns the note
-- Recall re-embeds a stale note edited after its embedding was written
-- Recall returns existing results when Ollama is down (graceful degradation)
-
-All 162 tests pass.
-
-### Embedding lazy backfill and staleness detection — implementation
-*Source: `embedding-lazy-backfill-and-staleness-detection-implementati-a416e3f7`*
-
-## What was built
-
-Two minimal changes to make `recall` find notes immediately after a `git pull` or direct editor edit, without requiring an explicit `sync`.
-
-## Changes
-
-### 1. Staleness detection in `embedMissingNotes` (`src/index.ts`)
-
-Extended the skip condition from:
-```typescript
-if (existing?.model === embedModel)
-```
-to:
-```typescript
-if (existing?.model === embedModel && existing.updatedAt >= note.updatedAt)
-```
-`sync` inherits this for free since it calls `embedMissingNotes` too.
-
-### 2. Pre-recall backfill (`src/index.ts` — `recall` handler)
-
-Added before the search loop:
-```typescript
-for (const vault of vaults) {
-  await embedMissingNotes(vault.storage).catch(() => {});
-}
-```
-If Ollama is down, backfill fails silently and recall still returns results from existing embeddings.
-
-### 3. Bonus bug fix: `parseNote` Date object handling (`src/storage.ts`)
-
-gray-matter parses unquoted ISO timestamps in YAML frontmatter as JS Date objects. Notes written by mnemonic tools are safe. Notes arriving via git pull from another machine are affected.
-
-Fixed with a `toIsoString()` helper:
-```typescript
-function toIsoString(value: unknown): string {
-  if (value instanceof Date) return value.toISOString();
-  if (typeof value === 'string' && value) return value;
-  return new Date().toISOString();
-}
-```
-Discovered during testing when hand-crafted test notes triggered output validation error 'received date, expected string'.
-
-## Why lazy backfill (not file watching)
-
-- The MCP server is a stdio process, not always-on. A watcher only runs during an active session — misses pulls between sessions.
-- A standalone mnemonic watch daemon would be a separate process requiring user setup.
-- Lazy backfill on recall is architecturally consistent: embeddings are derived data and should be rebuilt on demand.
-
-## Tests added
-
-- Recall backfills a missing embedding and returns the note
-- Recall re-embeds a stale note edited after its embedding was written
-- Recall returns existing results when Ollama is down (graceful degradation)
-
-All 162 tests pass.
-
-### Embedding lazy backfill and staleness detection — implementation
-*Source: `embedding-lazy-backfill-and-staleness-detection-implementati-b3415cb2`*
-
-## What was built
-
-Two minimal changes to make `recall` find notes immediately after a `git pull` or direct editor edit, without requiring an explicit `sync`.
-
-## Changes
-
-### 1. Staleness detection in `embedMissingNotes` (`src/index.ts`)
-
-Extended the skip condition from:
-```typescript
-if (existing?.model === embedModel)
-```
-to:
-```typescript
-if (existing?.model === embedModel && existing.updatedAt >= note.updatedAt)
-```
-`sync` inherits this for free since it calls `embedMissingNotes` too.
-
-### 2. Pre-recall backfill (`src/index.ts` — `recall` handler)
-
-Added before the search loop:
-```typescript
-for (const vault of vaults) {
-  await embedMissingNotes(vault.storage).catch(() => {});
-}
-```
-If Ollama is down, backfill fails silently and recall still returns results from existing embeddings.
-
-### 3. Bonus bug fix: `parseNote` Date object handling (`src/storage.ts`)
-
-gray-matter parses unquoted ISO timestamps in YAML frontmatter as JS Date objects. Notes written by mnemonic tools are safe. Notes arriving via git pull from another machine are affected.
-
-Fixed with a `toIsoString()` helper:
-```typescript
-function toIsoString(value: unknown): string {
-  if (value instanceof Date) return value.toISOString();
-  if (typeof value === 'string' && value) return value;
-  return new Date().toISOString();
-}
-```
-Discovered during testing when hand-crafted test notes triggered output validation error 'received date, expected string'.
-
-## Why lazy backfill (not file watching)
-
-- The MCP server is a stdio process, not always-on. A watcher only runs during an active session — misses pulls between sessions.
-- A standalone mnemonic watch daemon would be a separate process requiring user setup.
-- Lazy backfill on recall is architecturally consistent: embeddings are derived data and should be rebuilt on demand.
-
-## Tests added
-
-- Recall backfills a missing embedding and returns the note
-- Recall re-embeds a stale note edited after its embedding was written
-- Recall returns existing results when Ollama is down (graceful degradation)
-
-All 162 tests pass.
-
-### Embedding lazy backfill and staleness detection — implementation
-*Source: `embedding-lazy-backfill-and-staleness-detection-implementati-eb820222`*
-
-## What was built
-
-Two minimal changes to make `recall` find notes immediately after a `git pull` or direct editor edit, without requiring an explicit `sync`.
-
-## Changes
-
-### 1. Staleness detection in `embedMissingNotes` (`src/index.ts`)
-
-Extended the skip condition from:
-
-```typescript
-if (existing?.model === embedModel)
-```
-
-to:
+Conceptually:
 
 ```typescript
 if (existing?.model === embedModel && existing.updatedAt >= note.updatedAt)
 ```
 
-`sync` inherits this for free since it calls `embedMissingNotes` too.
+This lets the existing sync path continue to work while also refreshing stale embeddings automatically.
 
-### 2. Pre-recall backfill (`src/index.ts` — `recall` handler)
+### Pre-recall backfill
 
-Added before the search loop:
+Before semantic search, `recall` runs `embedMissingNotes` for each active vault.
+
+Conceptually:
 
 ```typescript
 for (const vault of vaults) {
@@ -228,29 +43,24 @@ for (const vault of vaults) {
 }
 ```
 
-If Ollama is down, backfill fails silently and recall still returns results from existing embeddings.
+If embedding generation is unavailable, recall still returns results from already-stored embeddings instead of failing.
 
-### 3. `parseNote` Date object fix (`src/storage.ts`)
+### Supporting fix
 
-gray-matter parses unquoted ISO timestamps in YAML frontmatter as JS Date objects. Notes written by mnemonic tools are safe. Notes arriving via git pull are affected.
+`parseNote` was updated to normalize YAML timestamps that `gray-matter` may parse as JavaScript `Date` objects when notes arrive via git from another machine. Converting both `Date` and string inputs to ISO strings avoids schema/output validation issues.
 
-Fixed with a `toIsoString()` helper. Discovered during testing when hand-crafted test notes triggered output validation error 'received date, expected string'.
+## Why this approach
 
-### 4. `pushWithStatus` now returns instead of throwing (`src/git.ts`, `src/structured-content.ts`)
+- The MCP server is stdio-based and not always running, so file watching would miss changes between sessions.
+- Embeddings are derived data, so rebuilding them lazily at read time is simpler and more reliable than adding a separate watcher or daemon.
+- This preserves graceful degradation: recall still works with existing embeddings even if new embedding generation fails.
 
-Push failures previously threw `GitOperationError`, causing all mutating MCP tools to return `isError: true` when a push failed — even though the note was committed successfully. Changed to return `{ status: failed, error }` instead. Added `failed` to the `PushResult` type and `pushError` field to the persistence schema. Discovered during consolidate dogfooding on a branch with no upstream.
+## Test coverage
 
-## Why lazy backfill (not file watching)
+Added coverage for:
 
-- The MCP server is a stdio process, not always-on. A watcher only runs during an active session — misses pulls between sessions.
-- A standalone mnemonic watch daemon would be a separate process requiring user setup.
-- Lazy backfill on recall is architecturally consistent: embeddings are derived data and should be rebuilt on demand.
+- recalling a note whose embedding is missing
+- recalling a note whose embedding is stale
+- recalling successfully when embedding generation is temporarily unavailable
 
-## Tests
-
-- Recall backfills a missing embedding and returns the note
-- Recall re-embeds a stale note edited after its embedding was written
-- Recall returns existing results when Ollama is down (graceful degradation)
-- Push-fail test updated: asserts `status: failed` instead of `rejects.toThrow`
-
-All 162 tests pass.
+Result: notes become discoverable after pull/edit without a manual sync step.
