@@ -4,6 +4,12 @@ All notable changes to `mnemonic` will be documented in this file.
 
 The format is loosely based on Keep a Changelog and uses semver-style version headings.
 
+## [0.3.2] - 2026-03-11
+
+### Fixed
+
+- `consolidate` `execute-merge` now resolves `sourceIds` from the full vault scan instead of the scope-filtered note list. Previously, merging a purely global note with a project-associated note in a single call silently failed with "Source note not found" because each scope filter excluded the other scope's notes. Explicit `sourceIds` now bypass scope filtering — the caller owns the scope decision.
+
 ## [0.3.1] - 2026-03-11
 
 ### Fixed

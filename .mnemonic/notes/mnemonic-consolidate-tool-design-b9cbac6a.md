@@ -7,7 +7,7 @@ tags:
   - architecture
 lifecycle: permanent
 createdAt: '2026-03-07T23:15:43.251Z'
-updatedAt: '2026-03-08T09:52:24.892Z'
+updatedAt: '2026-03-11T11:07:16.639Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
@@ -17,6 +17,8 @@ relatedTo:
     type: explains
   - id: agent-instruction-improvements-session-start-recall-first-an-ecd402c3
     type: example-of
+  - id: execute-merge-scope-bug-projectnotes-filter-excludes-cross-s-99d357af
+    type: explains
 memoryVersion: 1
 ---
 New MCP tool `consolidate` for memory consolidation with cross-vault support.
