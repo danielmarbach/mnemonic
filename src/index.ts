@@ -2666,7 +2666,7 @@ server.registerTool(
         if (!mergePlan) {
           return { content: [{ type: "text", text: "execute-merge strategy requires a mergePlan with sourceIds and targetTitle." }], isError: true };
         }
-        return executeMerge(projectNotes, mergePlan, defaultConsolidationMode, project, cwd, mode);
+        return executeMerge(entries, mergePlan, defaultConsolidationMode, project, cwd, mode);
 
       case "prune-superseded":
         return pruneSuperseded(projectNotes, mode ?? defaultConsolidationMode, project);

@@ -1210,6 +1210,74 @@ describe("local MCP script", () => {
     }
   }, 15000);
 
+  it("merges a global note and a project-associated note in a single execute-merge call", async () => {
+    const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-vault-"));
+    const repoDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-project-"));
+    tempDirs.push(vaultDir, repoDir);
+
+    await execFileAsync("git", ["init"], { cwd: repoDir });
+
+    const embeddingServer = await startFakeEmbeddingServer();
+
+    try {
+      // A purely global note — no project association, no cwd
+      const globalRemember = await callLocalMcp(vaultDir, "remember", {
+        title: "Cross scope source A (global)",
+        content: "A purely global note with no project association.",
+        tags: ["integration", "cross-scope"],
+        lifecycle: "permanent",
+        summary: "Create global note for cross-scope consolidation test",
+        scope: "global",
+      }, embeddingServer.url);
+      const globalId = extractRememberedId(globalRemember);
+
+      // A project-associated note stored in main-vault (private/global scope with cwd)
+      const projectRemember = await callLocalMcp(vaultDir, "remember", {
+        title: "Cross scope source B (project-associated, main-vault)",
+        content: "A project-associated note stored privately in main-vault.",
+        tags: ["integration", "cross-scope"],
+        lifecycle: "permanent",
+        summary: "Create project-associated note for cross-scope consolidation test",
+        cwd: repoDir,
+        scope: "global",
+      }, embeddingServer.url);
+      const projectAssociatedId = extractRememberedId(projectRemember);
+
+      // Both notes are in main-vault but have different project associations.
+      // A single execute-merge call must resolve both — previously only one scope
+      // was searched and the other source was reported as not found.
+      // Consolidate without cwd — no project context, but both notes live in main-vault.
+      // Previously this failed because the global-scope filter excluded the project-associated note.
+      const consolidateText = await callLocalMcp(vaultDir, "consolidate", {
+        strategy: "execute-merge",
+        mode: "delete",
+        mergePlan: {
+          sourceIds: [globalId, projectAssociatedId],
+          targetTitle: "Cross scope consolidated note",
+          content: "Merged content from a global note and a project-associated note.",
+        },
+      }, embeddingServer.url);
+
+      expect(consolidateText).not.toContain("not found");
+      expect(consolidateText).toContain("Mode: delete");
+      expect(consolidateText).toContain("Source notes deleted.");
+
+      const consolidatedIdMatch = consolidateText.match(/Consolidated \d+ notes into '([^']+)'/);
+      expect(consolidatedIdMatch).toBeTruthy();
+      const consolidatedId = consolidatedIdMatch![1]!;
+
+      const consolidatedPath = path.join(vaultDir, "notes", `${consolidatedId}.md`);
+      const consolidatedContents = await readFile(consolidatedPath, "utf-8");
+      expect(consolidatedContents).toContain("Merged content from a global note and a project-associated note.");
+
+      // Both source notes must be gone
+      await expect(stat(path.join(vaultDir, "notes", `${globalId}.md`))).rejects.toThrow();
+      await expect(stat(path.join(vaultDir, "notes", `${projectAssociatedId}.md`))).rejects.toThrow();
+    } finally {
+      await embeddingServer.close();
+    }
+  }, 15000);
+
   it("rebuilds all embeddings during sync when force=true", async () => {
     const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-vault-"));
     tempDirs.push(vaultDir);
