@@ -1619,6 +1619,42 @@
   }
 }</pre>
         </div>
+
+        <h3>OpenCode</h3>
+        <p style="font-size:0.85rem;margin:8px 0 12px">Add to <code>~/.config/opencode/opencode.json</code> or project-local <code>opencode.json</code>.</p>
+        <div class="code-block">
+          <div class="code-block-header">
+            <span class="code-label">opencode.json</span>
+            <button class="copy-btn" onclick="copyCode(this)">copy</button>
+          </div>
+          <pre>{
+  <span class="key">"$schema"</span>: <span class="str">"https://opencode.ai/config.json"</span>,
+  <span class="key">"mcp"</span>: {
+    <span class="key">"mnemonic"</span>: {
+      <span class="key">"type"</span>: <span class="str">"local"</span>,
+      <span class="key">"command"</span>: [<span class="str">"npx"</span>, <span class="str">"@danielmarbach/mnemonic-mcp"</span>],
+      <span class="key">"environment"</span>: {
+        <span class="key">"VAULT_PATH"</span>: <span class="str">"/Users/you/mnemonic-vault"</span>
+      }
+    }
+  }
+}</pre>
+        </div>
+
+        <h3>Codex</h3>
+        <p style="font-size:0.85rem;margin:8px 0 12px">Add to <code>~/.codex/config.toml</code> or project-local <code>.codex/config.toml</code>.</p>
+        <div class="code-block">
+          <div class="code-block-header">
+            <span class="code-label">config.toml</span>
+            <button class="copy-btn" onclick="copyCode(this)">copy</button>
+          </div>
+          <pre>[mcp_servers.mnemonic]
+command = <span class="str">"npx"</span>
+args = [<span class="str">"@danielmarbach/mnemonic-mcp"</span>]
+
+[mcp_servers.mnemonic.env]
+VAULT_PATH = <span class="str">"/Users/you/mnemonic-vault"</span></pre>
+        </div>
       </div>
     </div>
 

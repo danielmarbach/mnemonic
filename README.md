@@ -140,6 +140,38 @@ For a fixed installed version, point at the local binary instead:
 
 > Ollama must be running before the MCP client invokes mnemonic. Start it once with `docker compose up ollama -d` and it will stay up between calls.
 
+### OpenCode
+
+Add to `~/.config/opencode/opencode.json` (global) or `opencode.json` in your project root:
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "mnemonic": {
+      "type": "local",
+      "command": ["npx", "@danielmarbach/mnemonic-mcp"],
+      "environment": {
+        "VAULT_PATH": "/Users/you/mnemonic-vault"
+      }
+    }
+  }
+}
+```
+
+### Codex
+
+Add to `~/.codex/config.toml` (global) or `.codex/config.toml` in a trusted project:
+
+```toml
+[mcp_servers.mnemonic]
+command = "npx"
+args = ["@danielmarbach/mnemonic-mcp"]
+
+[mcp_servers.mnemonic.env]
+VAULT_PATH = "/Users/you/mnemonic-vault"
+```
+
 For local development against this repository's source tree, use `npm run mcp:local` or point your MCP client at `scripts/mcp-local.sh`.
 
 ## Configuration
