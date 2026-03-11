@@ -4,6 +4,13 @@ All notable changes to `mnemonic` will be documented in this file.
 
 The format is loosely based on Keep a Changelog and uses semver-style version headings.
 
+## [0.3.1] - 2026-03-11
+
+### Fixed
+
+- Path resolution now correctly supports home-directory shorthand (`~`) for user-configurable paths before absolute resolution. `VAULT_PATH` and `CLAUDE_HOME` no longer resolve to accidental cwd-relative paths when configured with tildes.
+- `import-claude-memory` now applies the same home-aware path resolution to CLI options (`--cwd`, `--claude-home`) for consistent behavior across absolute and home-based paths.
+
 ## [0.3.0] - 2026-03-10
 
 ### Added

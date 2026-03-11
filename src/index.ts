@@ -35,6 +35,7 @@ import { detectProject, resolveProjectIdentity, type ProjectIdentityResolution }
 import { VaultManager, type Vault } from "./vault.js";
 import { Migrator } from "./migration.js";
 import { parseMemorySections } from "./import.js";
+import { defaultClaudeHome, defaultVaultPath, resolveUserPath } from "./paths.js";
 import type {
   StructuredResponse,
   RememberResult,
@@ -82,8 +83,8 @@ import {
 
 if (process.argv[2] === "migrate") {
   const VAULT_PATH = process.env["VAULT_PATH"]
-    ? path.resolve(process.env["VAULT_PATH"])
-    : path.join(process.env["HOME"] ?? "~", "mnemonic-vault");
+    ? resolveUserPath(process.env["VAULT_PATH"])
+    : defaultVaultPath();
 
   async function runMigrationCli() {
     const cwd = process.cwd();
@@ -206,15 +207,13 @@ Examples:
 // ── CLI: import-claude-memory ─────────────────────────────────────────────────
 
 if (process.argv[2] === "import-claude-memory") {
-  const homeDir = process.env["HOME"] ?? process.env["USERPROFILE"] ?? "~";
-
   const VAULT_PATH = process.env["VAULT_PATH"]
-    ? path.resolve(process.env["VAULT_PATH"])
-    : path.join(homeDir, "mnemonic-vault");
+    ? resolveUserPath(process.env["VAULT_PATH"])
+    : defaultVaultPath();
 
   const CLAUDE_HOME = process.env["CLAUDE_HOME"]
-    ? path.resolve(process.env["CLAUDE_HOME"])
-    : path.join(homeDir, ".claude");
+    ? resolveUserPath(process.env["CLAUDE_HOME"])
+    : defaultClaudeHome();
 
   function makeImportNoteId(title: string): string {
     const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60);
@@ -256,9 +255,9 @@ Examples:
 
     const dryRun = argv.includes("--dry-run");
     const cwdOption = argv.find(arg => arg.startsWith("--cwd="));
-    const targetCwd = cwdOption ? path.resolve(cwdOption.split("=")[1]!) : process.cwd();
+    const targetCwd = cwdOption ? resolveUserPath(cwdOption.split("=")[1]!) : process.cwd();
     const claudeHomeOption = argv.find(arg => arg.startsWith("--claude-home="));
-    const claudeHome = claudeHomeOption ? path.resolve(claudeHomeOption.split("=")[1]!) : CLAUDE_HOME;
+    const claudeHome = claudeHomeOption ? resolveUserPath(claudeHomeOption.split("=")[1]!) : CLAUDE_HOME;
 
     // Encode the project path the same way Claude Code does:
     // /Users/foo/Projects/bar → -Users-foo-Projects-bar
@@ -376,8 +375,8 @@ Examples:
 // ── Config ────────────────────────────────────────────────────────────────────
 
 const VAULT_PATH = process.env["VAULT_PATH"]
-  ? path.resolve(process.env["VAULT_PATH"])
-  : path.join(process.env["HOME"] ?? "~", "mnemonic-vault");
+  ? resolveUserPath(process.env["VAULT_PATH"])
+  : defaultVaultPath();
 
 const DEFAULT_RECALL_LIMIT = 5;
 const DEFAULT_MIN_SIMILARITY = 0.3;
