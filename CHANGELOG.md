@@ -9,6 +9,7 @@ The format is loosely based on Keep a Changelog and uses semver-style version he
 ### Fixed
 
 - `GitOps.commitWithStatus` now passes the explicit file list to `git commit` so that staged changes outside the vault are never accidentally included in a mnemonic commit. Previously `git.commit(message)` was called with no path arguments, which committed everything in the index — including unrelated files that happened to be staged in the same repo.
+- `consolidate` `execute-merge` no longer creates a `.mnemonic/` directory as a side effect when `cwd` points to a project that has not adopted mnemonic. Previously `executeMerge` called `getOrCreateProjectVault(cwd)` unconditionally, initialising the project vault even when all source notes lived in the main vault. It now calls `getProjectVaultIfExists`, consistent with the unadopted-project protection already present in `remember`.
 
 ## [0.5.0] - 2026-03-12
 
