@@ -118,6 +118,10 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+          sparse-checkout: CHANGELOG.md
+          sparse-checkout-cone-mode: false
 
       - name: Extract release notes from changelog
         run: |
