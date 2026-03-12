@@ -3333,7 +3333,7 @@ async function executeMerge(
   );
 
   const existingTargetEntry = findExistingExecuteMergeTarget(entries, sourceEntries, targetTitle);
-  const projectVault = cwd ? await vaultManager.getOrCreateProjectVault(cwd) : null;
+  const projectVault = cwd ? await vaultManager.getProjectVaultIfExists(cwd) : null;
   const targetVault = existingTargetEntry?.vault ?? projectVault ?? vaultManager.main;
   const now = new Date().toISOString();
 
