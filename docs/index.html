@@ -734,6 +734,28 @@
       border-bottom: 1px solid var(--border);
     }
 
+    .qs-col > * + h3 {
+      margin-top: 40px;
+    }
+
+    .install-or {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin: 20px 0;
+      color: var(--text-muted);
+      font-size: 0.75rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    .install-or::before,
+    .install-or::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+
     /* ── Config table ── */
     .config-table-wrap {
       margin-top: 48px;
@@ -1557,37 +1579,37 @@
         </div>
         <p>No code changes are required; set <code>EMBED_MODEL=qwen3-embedding:0.6b</code>.</p>
 
-        <h3>2 &mdash; Install &amp; build</h3>
+        <h3>2 &mdash; Install mnemonic</h3>
+        <p style="font-size:0.85rem;margin:0 0 12px">Pick one:</p>
+        <div class="code-block">
+          <div class="code-block-header">
+            <span class="code-label">npm (recommended)</span>
+            <button class="copy-btn" onclick="copyCode(this)">copy</button>
+          </div>
+          <pre><span class="cmd">npm install @danielmarbach/mnemonic-mcp</span></pre>
+        </div>
+
+        <div class="install-or">or</div>
+
+        <div class="code-block">
+          <div class="code-block-header">
+            <span class="code-label">docker</span>
+            <button class="copy-btn" onclick="copyCode(this)">copy</button>
+          </div>
+          <pre><span class="cmd">docker pull danielmarbach/mnemonic-mcp:latest</span></pre>
+        </div>
+        <p>Pre-built for <code>linux/amd64</code> and <code>linux/arm64</code>. Tagged with the release version and <code>latest</code>.</p>
+
+        <div class="install-or">or build from source</div>
+
         <div class="code-block">
           <div class="code-block-header">
             <span class="code-label">bash</span>
             <button class="copy-btn" onclick="copyCode(this)">copy</button>
           </div>
           <pre><span class="cmd">npm install</span>
-<span class="cmd">npm run typecheck</span>
 <span class="cmd">npm run build</span></pre>
         </div>
-        <p><code>npm run build</code> already runs typecheck first. Running it explicitly just gives you a faster feedback loop while developing.</p>
-
-        <h3>3 &mdash; Or install from npm</h3>
-        <div class="code-block">
-          <div class="code-block-header">
-            <span class="code-label">bash</span>
-            <button class="copy-btn" onclick="copyCode(this)">copy</button>
-          </div>
-          <pre><span class="cmd">npm install @danielmarbach/mnemonic-mcp</span></pre>
-        </div>
-        <p>Releases are published from tags like <code>v0.x.y</code>. Use an exact version when you want to pin to a specific release.</p>
-
-        <h3>Or pull from Docker Hub</h3>
-        <div class="code-block">
-          <div class="code-block-header">
-            <span class="code-label">bash</span>
-            <button class="copy-btn" onclick="copyCode(this)">copy</button>
-          </div>
-          <pre><span class="cmd">docker pull danielmarbach/mnemonic-mcp:latest</span></pre>
-        </div>
-        <p>Pre-built for <code>linux/amd64</code> and <code>linux/arm64</code>. Tagged with the release version and <code>latest</code>.</p>
       </div>
 
       <div class="qs-col fade-up">
