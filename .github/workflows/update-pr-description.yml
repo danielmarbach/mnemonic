@@ -1,0 +1,66 @@
+name: Update PR Description
+
+# Automatically updates the PR title and description from mnemonic design decision notes
+# whenever `.mnemonic/notes/` files are changed in a PR.
+#
+# Can also be triggered manually by commenting `/update-pr` on any PR.
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+    paths:
+      - ".mnemonic/notes/**"
+  issue_comment:
+    types: [created]
+
+permissions:
+  pull-requests: write
+  contents: read
+
+jobs:
+  update-pr-description:
+    runs-on: ubuntu-latest
+
+    # Run when:
+    #   - a pull_request event fires (already filtered to .mnemonic/notes/** by paths above), OR
+    #   - a PR comment starts with `/update-pr`
+    if: |
+      github.event_name == 'pull_request' ||
+      (
+        github.event_name == 'issue_comment' &&
+        github.event.issue.pull_request != null &&
+        startsWith(github.event.comment.body, '/update-pr')
+      )
+
+    steps:
+      - name: Resolve PR number and head commit
+        id: ctx
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "pr_number=${{ github.event.pull_request.number }}" >> "$GITHUB_OUTPUT"
+            echo "head_sha=${{ github.event.pull_request.head.sha }}" >> "$GITHUB_OUTPUT"
+          else
+            PR_NUMBER="${{ github.event.issue.number }}"
+            HEAD_SHA=$(gh pr view "$PR_NUMBER" \
+              --repo "${{ github.repository }}" \
+              --json headRefOid \
+              --jq '.headRefOid')
+            echo "pr_number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
+            echo "head_sha=$HEAD_SHA" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Always check out the base branch so we only run trusted script code.
+      # Note file contents are fetched via GitHub API using the resolved head SHA.
+      - name: Check out base branch
+        uses: actions/checkout@v6
+
+      - name: Generate and update PR description
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node scripts/ci/update-pr-description.mjs \
+            --pr "${{ steps.ctx.outputs.pr_number }}" \
+            --repo "${{ github.repository }}" \
+            --head-sha "${{ steps.ctx.outputs.head_sha }}"
