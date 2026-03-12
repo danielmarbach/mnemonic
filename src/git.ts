@@ -84,17 +84,17 @@ export class GitOps {
   async commitWithStatus(message: string, files: string[], body?: string): Promise<CommitResult> {
     if (!this.enabled) return { status: "skipped", reason: "git-disabled" };
     try {
-      if (files.length > 0) {
-        await this.git.add(files);
-      } else {
-        await this.git.add(`${this.notesRelDir}/`);
-      }
+      // Scope every add+commit to only the paths mnemonic manages.
+      // Never commit files outside the vault — e.g. src/ or test/ changes
+      // that happen to be staged in the same repo.
+      const scopedFiles = files.length > 0 ? files : [`${this.notesRelDir}/`];
+      await this.git.add(scopedFiles);
       const status = await this.git.status();
       if (status.staged.length === 0) return { status: "skipped", reason: "no-changes" };
 
       // Build commit message with optional body
       const fullMessage = body ? `${message}\n\n${body}` : message;
-      await this.git.commit(fullMessage);
+      await this.git.commit(fullMessage, scopedFiles);
 
       const displayMessage = body ? `${message} [...]` : message;
       console.error(`[git] Committed: ${displayMessage}`);

@@ -60,6 +60,32 @@ describe("GitOps", () => {
     );
   });
 
+  it("passes explicit file paths to git commit so stray staged files are never swept in", async () => {
+    const { GitOps } = await import("../src/git.js");
+    const git = new GitOps("/tmp/repo");
+    await git.init();
+
+    commit.mockResolvedValueOnce(undefined);
+
+    await git.commit("remember: test", ["notes/my-note.md"]);
+
+    expect(add).toHaveBeenCalledWith(["notes/my-note.md"]);
+    expect(commit).toHaveBeenCalledWith(expect.any(String), ["notes/my-note.md"]);
+  });
+
+  it("falls back to notesRelDir/ when no files are specified, scoping the commit to the notes directory", async () => {
+    const { GitOps } = await import("../src/git.js");
+    const git = new GitOps("/tmp/repo", ".mnemonic/notes");
+    await git.init();
+
+    commit.mockResolvedValueOnce(undefined);
+
+    await git.commit("chore: init vault", []);
+
+    expect(add).toHaveBeenCalledWith([".mnemonic/notes/"]);
+    expect(commit).toHaveBeenCalledWith(expect.any(String), [".mnemonic/notes/"]);
+  });
+
   it("returns false when there is nothing staged to commit", async () => {
     const { GitOps } = await import("../src/git.js");
     const git = new GitOps("/tmp/repo");
