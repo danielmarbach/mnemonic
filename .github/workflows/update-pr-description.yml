@@ -3,7 +3,7 @@ name: Update PR Description
 # Automatically updates the PR title and description from mnemonic design decision notes
 # whenever `.mnemonic/notes/` files are changed in a PR.
 #
-# Can also be triggered manually by commenting `/update-pr` on any PR.
+# Can also be triggered manually by collaborators commenting `/update-pr` on any PR.
 
 on:
   pull_request:
@@ -23,13 +23,14 @@ jobs:
 
     # Run when:
     #   - a pull_request event fires (already filtered to .mnemonic/notes/** by paths above), OR
-    #   - a PR comment starts with `/update-pr`
+    #   - a PR comment starts with `/update-pr` AND the commenter is a collaborator/member/owner
     if: |
       github.event_name == 'pull_request' ||
       (
         github.event_name == 'issue_comment' &&
         github.event.issue.pull_request != null &&
-        startsWith(github.event.comment.body, '/update-pr')
+        startsWith(github.event.comment.body, '/update-pr') &&
+        contains(fromJson('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.comment.author_association)
       )
 
     steps:
