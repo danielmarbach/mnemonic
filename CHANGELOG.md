@@ -4,10 +4,11 @@ All notable changes to `mnemonic` will be documented in this file.
 
 The format is loosely based on Keep a Changelog and uses semver-style version headings.
 
-## [Unreleased]
+## [0.5.0] - 2026-03-12
 
 ### Changed
 
+- **Self-describing tools — no system prompt required.** All 22 MCP tools now include detailed descriptions with "use when" / "do not use when" decision boundaries, follow-up tool hints, and side-effect documentation. Tool-level `annotations` (`readOnlyHint`, `destructiveHint`, `idempotentHint`, `openWorldHint`) are set on every tool. Parameter descriptions are enriched with semantics, examples, and guidance (e.g. `lifecycle`, `summary`, `cwd`, `scope`). The 141-line `SYSTEM_PROMPT.md` has been replaced by a one-liner fallback — models discover correct behavior from tool metadata alone.
 - Upgraded `zod` to `^4.3.6` and aligned schema declarations with Zod v4's stricter `z.record` signature to keep MCP structured-output validation and type-checking consistent.
 
 ## [0.4.1] - 2026-03-11
