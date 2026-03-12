@@ -734,6 +734,28 @@
       border-bottom: 1px solid var(--border);
     }
 
+    .qs-col > * + h3 {
+      margin-top: 40px;
+    }
+
+    .install-or {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin: 20px 0;
+      color: var(--text-muted);
+      font-size: 0.75rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    .install-or::before,
+    .install-or::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+
     /* ── Config table ── */
     .config-table-wrap {
       margin-top: 48px;
@@ -1045,7 +1067,6 @@
       <li><a href="#setup">Setup</a></li>
       <li><a href="#cli">CLI</a></li>
       <li><a href="#dogfooding">Dogfooding</a></li>
-      <li><a href="#agent-snippet">System prompt</a></li>
       <li>
         <a href="https://github.com/danielmarbach/mnemonic" class="nav-cta" target="_blank" rel="noopener">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.477 2 2 6.477 2 12c0 4.42 2.865 8.17 6.839 9.49.5.092.682-.217.682-.482 0-.237-.008-.866-.013-1.7-2.782.603-3.369-1.34-3.369-1.34-.454-1.156-1.11-1.463-1.11-1.463-.908-.62.069-.608.069-.608 1.003.07 1.531 1.03 1.531 1.03.892 1.529 2.341 1.087 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.11-4.555-4.943 0-1.091.39-1.984 1.029-2.683-.103-.253-.446-1.27.098-2.647 0 0 .84-.269 2.75 1.025A9.578 9.578 0 0112 6.836c.85.004 1.705.114 2.504.336 1.909-1.294 2.747-1.025 2.747-1.025.546 1.377.203 2.394.1 2.647.64.699 1.028 1.592 1.028 2.683 0 3.842-2.339 4.687-4.566 4.935.359.309.678.919.678 1.852 0 1.336-.012 2.415-.012 2.741 0 .267.18.579.688.481C19.138 20.165 22 16.418 22 12c0-5.523-4.477-10-10-10z"/></svg>
@@ -1060,7 +1081,7 @@
 <div class="early-banner">
   <div class="container">
     <span class="early-icon">&#x26A0;&#xFE0F;</span>
-    <span><strong>Early stage.</strong> The storage format is still stabilizing and may change between releases. Pending migrations are surfaced automatically; run <code>list_migrations</code> after each update and keep an eye on the changelog.</span>
+    <span><strong>Early stage.</strong> The storage format is still stabilizing and may change between releases. Pending migrations are surfaced automatically after each update — keep an eye on the changelog.</span>
   </div>
 </div>
 
@@ -1163,7 +1184,7 @@
 <div class="divider"></div>
 
 <!-- ── Why section ── -->
-<section id="why">
+<section>
   <svg class="section-art" width="480" height="480" viewBox="0 0 480 480" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
     <!-- Concentric rotated squares (diamonds) -->
     <polygon points="240,210 270,240 240,270 210,240" stroke="#4ade80" stroke-width="1.5"/>
@@ -1557,27 +1578,37 @@
         </div>
         <p>No code changes are required; set <code>EMBED_MODEL=qwen3-embedding:0.6b</code>.</p>
 
-        <h3>2 &mdash; Install &amp; build</h3>
+        <h3>2 &mdash; Install mnemonic</h3>
+        <p style="font-size:0.85rem;margin:0 0 12px">Pick one:</p>
+        <div class="code-block">
+          <div class="code-block-header">
+            <span class="code-label">npm (recommended)</span>
+            <button class="copy-btn" onclick="copyCode(this)">copy</button>
+          </div>
+          <pre><span class="cmd">npm install @danielmarbach/mnemonic-mcp</span></pre>
+        </div>
+
+        <div class="install-or">or</div>
+
+        <div class="code-block">
+          <div class="code-block-header">
+            <span class="code-label">docker</span>
+            <button class="copy-btn" onclick="copyCode(this)">copy</button>
+          </div>
+          <pre><span class="cmd">docker pull danielmarbach/mnemonic-mcp:latest</span></pre>
+        </div>
+        <p>Pre-built for <code>linux/amd64</code> and <code>linux/arm64</code>. Tagged with the release version and <code>latest</code>.</p>
+
+        <div class="install-or">or build from source</div>
+
         <div class="code-block">
           <div class="code-block-header">
             <span class="code-label">bash</span>
             <button class="copy-btn" onclick="copyCode(this)">copy</button>
           </div>
           <pre><span class="cmd">npm install</span>
-<span class="cmd">npm run typecheck</span>
 <span class="cmd">npm run build</span></pre>
         </div>
-        <p><code>npm run build</code> already runs typecheck first. Running it explicitly just gives you a faster feedback loop while developing.</p>
-
-        <h3>3 &mdash; Or install from npm</h3>
-        <div class="code-block">
-          <div class="code-block-header">
-            <span class="code-label">bash</span>
-            <button class="copy-btn" onclick="copyCode(this)">copy</button>
-          </div>
-          <pre><span class="cmd">npm install @danielmarbach/mnemonic-mcp</span></pre>
-        </div>
-        <p>Releases are published from tags like <code>v0.x.y</code>. Use an exact version when you want to pin to a specific release.</p>
       </div>
 
       <div class="qs-col fade-up">
@@ -1728,155 +1759,16 @@ VAULT_PATH = <span class="str">"/Users/you/mnemonic-vault"</span></pre>
 }</pre>
     </div>
 
-    <div id="agent-snippet" class="agent-snippet fade-up">
-      <h3>Add to your AGENT.md or system prompt</h3>
-      <p>Drop this snippet into your <code style="font-family:JetBrains Mono,monospace;font-size:0.85em;color:var(--cyan-lt)">AGENT.md</code>, Cursor rules, or Claude system prompt to activate proactive memory behavior.</p>
+    <div class="agent-snippet fade-up">
+      <h3>No system prompt required</h3>
+      <p>Mnemonic's tools are self-describing — each includes "use when" / "do not use when" guidance, behavioral annotations, and typed schemas. Most models will use them correctly from tool metadata alone.</p>
+      <p>If your model isn't picking up the tools proactively, add this single line to your <code style="font-family:JetBrains Mono,monospace;font-size:0.85em;color:var(--cyan-lt)">AGENT.md</code> or system prompt:</p>
       <div class="code-block" style="margin:0">
         <div class="code-block-header">
-          <span class="code-label">AGENT.md snippet</span>
+          <span class="code-label">AGENT.md (optional one-liner)</span>
           <button class="copy-btn" onclick="copyCode(this)">copy</button>
         </div>
-        <pre><span class="cmt">## Mnemonic Memory System</span>
-
-You have access to a long-term memory system via the `mnemonic` MCP server.
-Use it proactively — don't wait to be asked.
-
-<span class="cmt">### On every session start (in a project)</span>
-<span class="num">1.</span> Call `detect_project` with the working directory and keep that absolute `cwd` for all project-specific memory operations.
-<span class="num">2.</span> Call `project_memory_summary` with `cwd` for a rich overview of what's known, or
-   `recall` with a broad query like "project overview architecture decisions" — to
-   surface relevant prior context before doing any work.
-<span class="num">3.</span> If the user mentions something you don't recognize, call `recall` before asking
-   them to explain — you may already know it.
-
-<span class="cmt">### Before calling `remember`</span>
-Do a quick `recall` first. If a related note exists, call `update` instead — this avoids
-accumulating fragmented notes on the same topic. When several related captures pile up,
-use `consolidate` to merge them into one authoritative note. Write the note summary-first:
-put the main fact, decision, or outcome in the opening sentences, then follow with
-supporting detail.
-
-Pass `cwd` for anything about the current repo, even if you plan to store it with
-`scope: "global"`. `cwd` sets project association; omitting it creates a truly global note.
-
-After `remember`, `update`, `move_memory`, or a consolidation write, inspect the returned structured persistence status before doing extra verification calls. It reports the canonical note path, embedding path, embedding outcome, and git commit/push outcome.
-
-<span class="cmt">### Choosing note lifecycle</span>
-When calling `remember`, set lifecycle based on whether the note is temporary working state or durable knowledge:
-
-- `temporary`: planning or WIP notes that mainly support the current implementation and will likely be obsolete once the work is complete
-- `permanent`: decisions, constraints, fixes, lessons, and other knowledge worth keeping for future sessions
-- If unsure, choose `permanent`
-- Tags like `plan`, `wip`, and `completed` are descriptive only; lifecycle controls retention behavior
-
-<span class="cmt">### When to call `remember`</span>
-Store a memory whenever you learn something useful to know in a future session:
-
-- <strong>Decisions made</strong>: architecture choices, library selections, rejected
-  approaches and why ("we chose X over Y because Z")
-- <strong>User preferences</strong>: coding style, communication style, tools they like/dislike
-- <strong>Project context</strong>: what the project does, who it's for, current priorities
-- <strong>Bug fixes</strong>: non-obvious fixes, especially ones that explain <em>why</em> something broke
-- <strong>Tribal knowledge</strong>: anything the user had to explain that isn't obvious from the codebase
-- <strong>Recurring patterns</strong>: if the user corrects you twice on the same thing, remember it
-
-When in doubt, store it. Storage is cheap; re-explaining context is expensive.
-
-<strong>Writing good `remember` calls:</strong>
-- Use the `summary` parameter: provide a brief, commit-message-style summary (50-72 chars recommended)
-  - Good: "Add JWT RS256 migration decision for distributed auth"
-  - Bad: "stuff about auth" or "as discussed"
-- The summary appears in git commits for traceability, but isn't stored in the note
-- First sentence of content is used as fallback if no summary provided
-- Write memory content summary-first: put the main fact, decision, or outcome in the opening sentences, then follow with supporting detail
-- Avoid burying the key point deep in long notes; embeddings may truncate later sections
-
-<span class="cmt">### After every `remember` — check for relationships immediately</span>
-You have full session context right now. That advantage is gone next session.
-Before moving on, ask yourself:
-
-<span class="num">1.</span> Did I `recall` anything earlier in this session that this note connects to?
-<span class="num">2.</span> Did I just store multiple notes in this session that relate to each other?
-<span class="num">3.</span> Does the new note explain, exemplify, or supersede something I already know exists?
-
-If yes to any of these, call `relate` now. Pick the most specific type:
-
-| If the new note…                                  | Use           |
-|---------------------------------------------------|---------------|
-| and the other note are about the same topic       | `related-to`  |
-| clarifies <em>why</em> the other note's decision was made | `explains`   |
-| is a concrete case of a general pattern           | `example-of`  |
-| replaces a previous decision or approach          | `supersedes`  |
-
-If nothing comes to mind within a few seconds, skip it — don't force links.
-
-<span class="cmt">### When to call `update`</span>
-- When a stored memory becomes outdated — a decision was revisited, a dependency
-  upgraded, a pattern changed.
-- When you recall something and notice it's stale or partially wrong.
-- Don't create a new memory for something that already exists — update the old one.
-- Preserve the existing lifecycle unless you are intentionally changing it.
-- Use the returned persistence status to decide whether you need any follow-up; don't automatically re-check a write that already reports a healthy persisted result.
-
-<span class="cmt">### When to call `forget`</span>
-- When a memory is fully superseded and keeping it would cause confusion.
-- Don't forget things just because they're old — outdated context can still be
-  useful if clearly dated.
-
-<span class="cmt">### When to call `consolidate`</span>
-- When you notice duplicate or highly similar memories from repeated `remember` calls
-- When a cluster of related notes should become one comprehensive note
-- When a feature or bug arc is complete and incremental captures can be synthesized
-
-<strong>Consolidation modes:</strong>
-- `supersedes` (default) — Creates a new consolidated note and marks sources with `supersedes` relationship. Preserves history, allows pruning later with `prune-superseded`.
-- `delete` — Creates a new consolidated note and deletes sources. Clean and immediate.
-- When all source notes are `temporary`, consolidation should normally use delete behavior so the temporary scaffolding is removed after the durable note is created.
-- The consolidated note should be `permanent` by default.
-
-<strong>Workflow:</strong>
-<span class="num">1.</span> Run `consolidate` with `strategy: "dry-run"` to see analysis
-<span class="num">2.</span> Review `suggest-merges` output for actionable recommendations
-<span class="num">3.</span> Execute a merge with `strategy: "execute-merge"` and a `mergePlan`
-<span class="num">4.</span> Optionally run `consolidate` with `strategy: "prune-superseded"` to clean up old notes
-
-<span class="cmt">### Memory hygiene</span>
-- Use `memory_graph` to spot dense clusters of related notes — these are consolidation candidates.
-- Use `recent_memories` or `project_memory_summary` to orient before a session and catch stale notes.
-- Prefer `update` over `remember` when a note already covers the topic. Prefer `consolidate` when 3+ notes on the same topic have accumulated.
-
-<span class="cmt">### Working with relationships</span>
-- After `recall`, check the `related:` line in each result. Call `get` with those ids
-  to pull in the linked context before acting — you may already have the answer.
-- Prefer `supersedes` over `forget` when the old memory has historical value.
-- Don't over-link. One or two meaningful edges per note is better than linking everything.
-
-<span class="cmt">### Scoping rules</span>
-- Pass `cwd` for anything specific to the current project.
-- Pass `cwd` even when storing privately with `scope: "global"`; `cwd` controls project association, `scope` controls storage.
-- Omit `cwd` only for truly cross-project or personal memories.
-- Omit `cwd` for things that apply across all projects (user preferences,
-  cross-project patterns, general facts about the user).
-
-<span class="cmt">## MCP output style</span>
-
-Mnemonic intentionally keeps MCP responses text-first because the primary consumer is an LLM reading tool output in-context.
-
-Guidelines:
-- prefer compact, semantically explicit text over structured payloads
-- always distinguish `project` from `stored` when both matter
-- reuse stable labels like `project:`, `stored:`, `policy:`, and `updated:`
-- answer first, details second
-- keep summaries grouped and shallow rather than returning large raw dumps
-- add non-text structure only when real LLM failure cases show text is not enough
-
-<span class="cmt">### Memory quality</span>
-- Titles should be searchable: "JWT RS256 migration rationale" not "auth stuff"
-- Content should be self-contained: written as if you'll have no other context
-  when you read it later.
-- Tags should be consistent: use the same terms you'd use in a search query.
-- Be specific about dates and versions when they matter:
-  "as of March 2026, using Prisma 5.x"</pre>
+        <pre>You have access to a long-term memory system via the `mnemonic` MCP server. Use it proactively — don't wait to be asked.</pre>
       </div>
     </div>
   </div>

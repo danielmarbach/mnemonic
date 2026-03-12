@@ -77,9 +77,11 @@ Override the vault location:
 VAULT_PATH=/path/to/your-vault docker compose run --rm mnemonic
 ```
 
-## Installing from npm
+## Installing
 
-Packages are published to the public npm registry. No authentication required.
+### npm
+
+Published to the public npm registry. No authentication required.
 
 ```bash
 # Latest stable release
@@ -87,6 +89,17 @@ npm install @danielmarbach/mnemonic-mcp
 
 # Specific release
 npm install @danielmarbach/mnemonic-mcp@0.2.0
+```
+
+### Docker Hub
+
+Pre-built images for `linux/amd64` and `linux/arm64`:
+
+```bash
+docker pull danielmarbach/mnemonic-mcp:latest
+
+# Or a specific version
+docker pull danielmarbach/mnemonic-mcp:0.5.0
 ```
 
 ## MCP client config
@@ -454,4 +467,8 @@ build/     Compiled JavaScript output
 
 ## Agent instructions
 
-See [`SYSTEM_PROMPT.md`](SYSTEM_PROMPT.md) for the system prompt to use with your MCP client.
+No system prompt required. Mnemonic's tools are self-describing — each includes "use when" / "do not use when" guidance, behavioral annotations, and typed schemas. Models will use them correctly from tool metadata alone.
+
+If your model isn't picking up the tools proactively, add this one-liner to your AGENT.md or system prompt:
+
+> You have access to a long-term memory system via the `mnemonic` MCP server. Use it proactively — don't wait to be asked.
