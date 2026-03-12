@@ -1729,39 +1729,15 @@ VAULT_PATH = <span class="str">"/Users/you/mnemonic-vault"</span></pre>
     </div>
 
     <div id="agent-snippet" class="agent-snippet fade-up">
-      <h3>Optional: Add to your AGENT.md or system prompt</h3>
-      <p>Mnemonic's tools are self-describing — most models will use them correctly from tool metadata alone. This optional snippet adds cross-tool workflow hints for best results. Drop it into your <code style="font-family:JetBrains Mono,monospace;font-size:0.85em;color:var(--cyan-lt)">AGENT.md</code>, Cursor rules, or system prompt.</p>
+      <h3>No system prompt required</h3>
+      <p>Mnemonic's tools are self-describing — each includes "use when" / "do not use when" guidance, behavioral annotations, and typed schemas. Most models will use them correctly from tool metadata alone.</p>
+      <p>If your model isn't picking up the tools proactively, add this single line to your <code style="font-family:JetBrains Mono,monospace;font-size:0.85em;color:var(--cyan-lt)">AGENT.md</code> or system prompt:</p>
       <div class="code-block" style="margin:0">
         <div class="code-block-header">
-          <span class="code-label">AGENT.md snippet (optional)</span>
+          <span class="code-label">AGENT.md (optional one-liner)</span>
           <button class="copy-btn" onclick="copyCode(this)">copy</button>
         </div>
-        <pre><span class="cmt">## Mnemonic Memory System</span>
-
-You have access to a long-term memory system via the `mnemonic` MCP server.
-Use it proactively — don't wait to be asked. Each tool's description explains when and how to use it.
-
-<span class="cmt">### Session start</span>
-
-<span class="num">1.</span> Call `detect_project` with the working directory to get `cwd` for all subsequent calls.
-<span class="num">2.</span> Call `project_memory_summary` (or `recall` with a broad query) to orient on prior context.
-<span class="num">3.</span> If the user mentions something unfamiliar, `recall` before asking — you may already know it.
-
-<span class="cmt">### Before storing a new memory</span>
-
-Call `recall` first. If a note on the topic exists, call `update` instead of `remember`.
-When 3+ notes on the same topic accumulate, use `consolidate` to merge them.
-
-<span class="cmt">### After storing a memory</span>
-
-Check whether the new note connects to anything you recalled earlier in this session.
-If so, call `relate` to link them while you have context — that advantage is gone next session.
-
-<span class="cmt">### Scoping</span>
-
-- Always pass `cwd` when working in a project — it controls routing and search boosting.
-- Pass `cwd` even with `scope: "global"` — `cwd` sets project association, `scope` sets storage.
-- Omit `cwd` only for truly cross-project or personal memories.</pre>
+        <pre>You have access to a long-term memory system via the `mnemonic` MCP server. Use it proactively — don't wait to be asked.</pre>
       </div>
     </div>
   </div>

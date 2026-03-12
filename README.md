@@ -454,6 +454,8 @@ build/     Compiled JavaScript output
 
 ## Agent instructions
 
-Mnemonic's tools are self-describing — each tool includes detailed descriptions with "use when" / "do not use when" guidance, behavioral annotations, and typed schemas. Most models will use them correctly from tool metadata alone.
+No system prompt required. Mnemonic's tools are self-describing — each includes "use when" / "do not use when" guidance, behavioral annotations, and typed schemas. Models will use them correctly from tool metadata alone.
 
-For best results with cross-tool workflows (session startup, deduplication, relationship linking), see the optional [`SYSTEM_PROMPT.md`](SYSTEM_PROMPT.md) snippet.
+If your model isn't picking up the tools proactively, add this one-liner to your AGENT.md or system prompt:
+
+> You have access to a long-term memory system via the `mnemonic` MCP server. Use it proactively — don't wait to be asked.
