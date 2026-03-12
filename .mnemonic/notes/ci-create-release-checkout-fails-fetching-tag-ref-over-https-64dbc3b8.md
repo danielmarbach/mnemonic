@@ -1,5 +1,5 @@
 ---
-title: 'CI: create-release checkout fails fetching tag ref over HTTPS'
+title: 'CI: create-release uses sparse checkout to avoid tag-ref HTTPS failure'
 tags:
   - ci
   - github-actions
@@ -8,7 +8,7 @@ tags:
   - release
 lifecycle: permanent
 createdAt: '2026-03-12T05:41:48.692Z'
-updatedAt: '2026-03-12T05:42:36.826Z'
+updatedAt: '2026-03-12T05:46:28.186Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 memoryVersion: 1
