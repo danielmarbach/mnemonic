@@ -8,9 +8,12 @@ tags:
   - testing
 lifecycle: permanent
 createdAt: '2026-03-12T15:41:29.294Z'
-updatedAt: '2026-03-12T15:41:29.294Z'
+updatedAt: '2026-03-12T15:41:39.192Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: project-memory-policy-defaults-storage-location-f563f634
+    type: related-to
 memoryVersion: 1
 ---
 Audit of all cwd-accepting MCP tools against spurious project vault creation. Only three call sites use `getOrCreateProjectVault` — two are intentional, one was a bug (fixed 2026-03-12).

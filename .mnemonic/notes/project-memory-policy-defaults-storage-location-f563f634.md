@@ -8,11 +8,13 @@ tags:
   - unadopted
 lifecycle: permanent
 createdAt: '2026-03-07T19:25:37.785Z'
-updatedAt: '2026-03-12T15:36:11.244Z'
+updatedAt: '2026-03-12T15:41:39.192Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
   - id: mnemonic-key-design-decisions-3f2a6273
+    type: related-to
+  - id: vault-creation-audit-which-tools-can-create-mnemonic-and-whi-d0388691
     type: related-to
 memoryVersion: 1
 ---
