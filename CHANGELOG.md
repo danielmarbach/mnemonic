@@ -4,6 +4,12 @@ All notable changes to `mnemonic` will be documented in this file.
 
 The format is loosely based on Keep a Changelog and uses semver-style version headings.
 
+## [0.5.1] - 2026-03-12
+
+### Fixed
+
+- `GitOps.commitWithStatus` now passes the explicit file list to `git commit` so that staged changes outside the vault are never accidentally included in a mnemonic commit. Previously `git.commit(message)` was called with no path arguments, which committed everything in the index — including unrelated files that happened to be staged in the same repo.
+
 ## [0.5.0] - 2026-03-12
 
 ### Changed
