@@ -8,9 +8,12 @@ tags:
   - navigation
 lifecycle: permanent
 createdAt: '2026-03-12T05:18:19.833Z'
-updatedAt: '2026-03-12T05:18:19.833Z'
+updatedAt: '2026-03-12T05:18:29.203Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: docs-index-html-tools-section-redesign-ux-lessons-912a441c
+    type: related-to
 memoryVersion: 1
 ---
 ## Setup section design lessons (March 2026)

@@ -8,9 +8,12 @@ tags:
   - design
 lifecycle: permanent
 createdAt: '2026-03-08T12:50:29.190Z'
-updatedAt: '2026-03-08T12:50:29.190Z'
+updatedAt: '2026-03-12T05:18:29.203Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: docs-index-html-setup-section-layout-and-nav-design-principl-2f1fee2b
+    type: related-to
 memoryVersion: 1
 ---
 ## Tools section redesign (March 2026)
