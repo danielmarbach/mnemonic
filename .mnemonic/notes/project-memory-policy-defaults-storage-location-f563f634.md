@@ -8,11 +8,13 @@ tags:
   - unadopted
 lifecycle: permanent
 createdAt: '2026-03-07T19:25:37.785Z'
-updatedAt: '2026-03-11T11:25:50.075Z'
+updatedAt: '2026-03-12T15:41:39.192Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
   - id: mnemonic-key-design-decisions-3f2a6273
+    type: related-to
+  - id: vault-creation-audit-which-tools-can-create-mnemonic-and-whi-d0388691
     type: related-to
 memoryVersion: 1
 ---
@@ -37,3 +39,16 @@ For projects with no saved policy AND no existing `.mnemonic/` directory, `resol
 - `formatAskForWriteScope` differentiates unadopted (first-time) from explicit `ask` policy messages.
 - The ask message hints: call `set_project_memory_policy` to avoid being prompted again.
 - Explicit `scope` or a saved policy always bypass the unadopted check.
+
+## Consolidate remnant bug (fixed 2026-03-12)
+
+`executeMerge` in `consolidate` was calling `getOrCreateProjectVault(cwd)` whenever `cwd` was passed — even when all source notes lived in main vault. This created `.mnemonic/` in an unadopted project as a side effect.
+
+Fixed by changing line 3336 in `src/index.ts` to `getProjectVaultIfExists(cwd)`. The vault-targeting logic already falls back to `vaultManager.main` when `projectVault` is null, so no consolidation behavior changed.
+
+The `update` path was already safe — it uses `findNote` → `searchOrder` → `getProjectVaultIfExists`, which never creates. When vault creation was observed after an `update` call in a session, it was caused by a prior `consolidate` call in the same session.
+
+Regression tests added in `tests/mcp.integration.test.ts`:
+
+- "does not create a project vault when updating a main-vault note with cwd pointing to unadopted project"
+- "does not create a project vault when consolidating main-vault notes with cwd pointing to unadopted project"

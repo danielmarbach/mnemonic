@@ -1376,6 +1376,90 @@ describe("local MCP script", () => {
       await embeddingServer.close();
     }
   }, 15000);
+
+  it("does not create a project vault when updating a main-vault note with cwd pointing to unadopted project", async () => {
+    const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-vault-"));
+    const repoDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-project-"));
+    tempDirs.push(vaultDir, repoDir);
+
+    await execFileAsync("git", ["init"], { cwd: repoDir });
+
+    const embeddingServer = await startFakeEmbeddingServer();
+
+    try {
+      const rememberText = await callLocalMcp(vaultDir, "remember", {
+        title: "Global note for update test",
+        content: "Original content.",
+        tags: ["update-test"],
+        lifecycle: "permanent",
+        summary: "Create global note for update test",
+        cwd: repoDir,
+        scope: "global",
+      }, embeddingServer.url);
+
+      const noteId = extractRememberedId(rememberText);
+
+      await callLocalMcp(vaultDir, "update", {
+        id: noteId,
+        content: "Updated content.",
+        summary: "Update note content",
+        cwd: repoDir,
+      }, embeddingServer.url);
+
+      // Project vault must NOT have been created as a side effect of passing cwd
+      await expect(stat(path.join(repoDir, ".mnemonic"))).rejects.toThrow();
+    } finally {
+      await embeddingServer.close();
+    }
+  }, 15000);
+
+  it("does not create a project vault when consolidating main-vault notes with cwd pointing to unadopted project", async () => {
+    const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-vault-"));
+    const repoDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-project-"));
+    tempDirs.push(vaultDir, repoDir);
+
+    await execFileAsync("git", ["init"], { cwd: repoDir });
+
+    const embeddingServer = await startFakeEmbeddingServer();
+
+    try {
+      const firstRemember = await callLocalMcp(vaultDir, "remember", {
+        title: "Global note A",
+        content: "First global note for consolidation.",
+        tags: ["global-merge"],
+        lifecycle: "temporary",
+        summary: "Create first global note",
+        cwd: repoDir,
+        scope: "global",
+      }, embeddingServer.url);
+      const secondRemember = await callLocalMcp(vaultDir, "remember", {
+        title: "Global note B",
+        content: "Second global note for consolidation.",
+        tags: ["global-merge"],
+        lifecycle: "temporary",
+        summary: "Create second global note",
+        cwd: repoDir,
+        scope: "global",
+      }, embeddingServer.url);
+
+      const firstId = extractRememberedId(firstRemember);
+      const secondId = extractRememberedId(secondRemember);
+
+      await callLocalMcp(vaultDir, "consolidate", {
+        cwd: repoDir,
+        strategy: "execute-merge",
+        mergePlan: {
+          sourceIds: [firstId, secondId],
+          targetTitle: "Merged global note",
+        },
+      }, embeddingServer.url);
+
+      // Project vault must NOT have been created as a side effect
+      await expect(stat(path.join(repoDir, ".mnemonic"))).rejects.toThrow();
+    } finally {
+      await embeddingServer.close();
+    }
+  }, 15000);
 });
 
 async function callLocalMcp(
