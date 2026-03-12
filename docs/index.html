@@ -1729,154 +1729,39 @@ VAULT_PATH = <span class="str">"/Users/you/mnemonic-vault"</span></pre>
     </div>
 
     <div id="agent-snippet" class="agent-snippet fade-up">
-      <h3>Add to your AGENT.md or system prompt</h3>
-      <p>Drop this snippet into your <code style="font-family:JetBrains Mono,monospace;font-size:0.85em;color:var(--cyan-lt)">AGENT.md</code>, Cursor rules, or Claude system prompt to activate proactive memory behavior.</p>
+      <h3>Optional: Add to your AGENT.md or system prompt</h3>
+      <p>Mnemonic's tools are self-describing — most models will use them correctly from tool metadata alone. This optional snippet adds cross-tool workflow hints for best results. Drop it into your <code style="font-family:JetBrains Mono,monospace;font-size:0.85em;color:var(--cyan-lt)">AGENT.md</code>, Cursor rules, or system prompt.</p>
       <div class="code-block" style="margin:0">
         <div class="code-block-header">
-          <span class="code-label">AGENT.md snippet</span>
+          <span class="code-label">AGENT.md snippet (optional)</span>
           <button class="copy-btn" onclick="copyCode(this)">copy</button>
         </div>
         <pre><span class="cmt">## Mnemonic Memory System</span>
 
 You have access to a long-term memory system via the `mnemonic` MCP server.
-Use it proactively — don't wait to be asked.
+Use it proactively — don't wait to be asked. Each tool's description explains when and how to use it.
 
-<span class="cmt">### On every session start (in a project)</span>
-<span class="num">1.</span> Call `detect_project` with the working directory and keep that absolute `cwd` for all project-specific memory operations.
-<span class="num">2.</span> Call `project_memory_summary` with `cwd` for a rich overview of what's known, or
-   `recall` with a broad query like "project overview architecture decisions" — to
-   surface relevant prior context before doing any work.
-<span class="num">3.</span> If the user mentions something you don't recognize, call `recall` before asking
-   them to explain — you may already know it.
+<span class="cmt">### Session start</span>
 
-<span class="cmt">### Before calling `remember`</span>
-Do a quick `recall` first. If a related note exists, call `update` instead — this avoids
-accumulating fragmented notes on the same topic. When several related captures pile up,
-use `consolidate` to merge them into one authoritative note. Write the note summary-first:
-put the main fact, decision, or outcome in the opening sentences, then follow with
-supporting detail.
+<span class="num">1.</span> Call `detect_project` with the working directory to get `cwd` for all subsequent calls.
+<span class="num">2.</span> Call `project_memory_summary` (or `recall` with a broad query) to orient on prior context.
+<span class="num">3.</span> If the user mentions something unfamiliar, `recall` before asking — you may already know it.
 
-Pass `cwd` for anything about the current repo, even if you plan to store it with
-`scope: "global"`. `cwd` sets project association; omitting it creates a truly global note.
+<span class="cmt">### Before storing a new memory</span>
 
-After `remember`, `update`, `move_memory`, or a consolidation write, inspect the returned structured persistence status before doing extra verification calls. It reports the canonical note path, embedding path, embedding outcome, and git commit/push outcome.
+Call `recall` first. If a note on the topic exists, call `update` instead of `remember`.
+When 3+ notes on the same topic accumulate, use `consolidate` to merge them.
 
-<span class="cmt">### Choosing note lifecycle</span>
-When calling `remember`, set lifecycle based on whether the note is temporary working state or durable knowledge:
+<span class="cmt">### After storing a memory</span>
 
-- `temporary`: planning or WIP notes that mainly support the current implementation and will likely be obsolete once the work is complete
-- `permanent`: decisions, constraints, fixes, lessons, and other knowledge worth keeping for future sessions
-- If unsure, choose `permanent`
-- Tags like `plan`, `wip`, and `completed` are descriptive only; lifecycle controls retention behavior
+Check whether the new note connects to anything you recalled earlier in this session.
+If so, call `relate` to link them while you have context — that advantage is gone next session.
 
-<span class="cmt">### When to call `remember`</span>
-Store a memory whenever you learn something useful to know in a future session:
+<span class="cmt">### Scoping</span>
 
-- <strong>Decisions made</strong>: architecture choices, library selections, rejected
-  approaches and why ("we chose X over Y because Z")
-- <strong>User preferences</strong>: coding style, communication style, tools they like/dislike
-- <strong>Project context</strong>: what the project does, who it's for, current priorities
-- <strong>Bug fixes</strong>: non-obvious fixes, especially ones that explain <em>why</em> something broke
-- <strong>Tribal knowledge</strong>: anything the user had to explain that isn't obvious from the codebase
-- <strong>Recurring patterns</strong>: if the user corrects you twice on the same thing, remember it
-
-When in doubt, store it. Storage is cheap; re-explaining context is expensive.
-
-<strong>Writing good `remember` calls:</strong>
-- Use the `summary` parameter: provide a brief, commit-message-style summary (50-72 chars recommended)
-  - Good: "Add JWT RS256 migration decision for distributed auth"
-  - Bad: "stuff about auth" or "as discussed"
-- The summary appears in git commits for traceability, but isn't stored in the note
-- First sentence of content is used as fallback if no summary provided
-- Write memory content summary-first: put the main fact, decision, or outcome in the opening sentences, then follow with supporting detail
-- Avoid burying the key point deep in long notes; embeddings may truncate later sections
-
-<span class="cmt">### After every `remember` — check for relationships immediately</span>
-You have full session context right now. That advantage is gone next session.
-Before moving on, ask yourself:
-
-<span class="num">1.</span> Did I `recall` anything earlier in this session that this note connects to?
-<span class="num">2.</span> Did I just store multiple notes in this session that relate to each other?
-<span class="num">3.</span> Does the new note explain, exemplify, or supersede something I already know exists?
-
-If yes to any of these, call `relate` now. Pick the most specific type:
-
-| If the new note…                                  | Use           |
-|---------------------------------------------------|---------------|
-| and the other note are about the same topic       | `related-to`  |
-| clarifies <em>why</em> the other note's decision was made | `explains`   |
-| is a concrete case of a general pattern           | `example-of`  |
-| replaces a previous decision or approach          | `supersedes`  |
-
-If nothing comes to mind within a few seconds, skip it — don't force links.
-
-<span class="cmt">### When to call `update`</span>
-- When a stored memory becomes outdated — a decision was revisited, a dependency
-  upgraded, a pattern changed.
-- When you recall something and notice it's stale or partially wrong.
-- Don't create a new memory for something that already exists — update the old one.
-- Preserve the existing lifecycle unless you are intentionally changing it.
-- Use the returned persistence status to decide whether you need any follow-up; don't automatically re-check a write that already reports a healthy persisted result.
-
-<span class="cmt">### When to call `forget`</span>
-- When a memory is fully superseded and keeping it would cause confusion.
-- Don't forget things just because they're old — outdated context can still be
-  useful if clearly dated.
-
-<span class="cmt">### When to call `consolidate`</span>
-- When you notice duplicate or highly similar memories from repeated `remember` calls
-- When a cluster of related notes should become one comprehensive note
-- When a feature or bug arc is complete and incremental captures can be synthesized
-
-<strong>Consolidation modes:</strong>
-- `supersedes` (default) — Creates a new consolidated note and marks sources with `supersedes` relationship. Preserves history, allows pruning later with `prune-superseded`.
-- `delete` — Creates a new consolidated note and deletes sources. Clean and immediate.
-- When all source notes are `temporary`, consolidation should normally use delete behavior so the temporary scaffolding is removed after the durable note is created.
-- The consolidated note should be `permanent` by default.
-
-<strong>Workflow:</strong>
-<span class="num">1.</span> Run `consolidate` with `strategy: "dry-run"` to see analysis
-<span class="num">2.</span> Review `suggest-merges` output for actionable recommendations
-<span class="num">3.</span> Execute a merge with `strategy: "execute-merge"` and a `mergePlan`
-<span class="num">4.</span> Optionally run `consolidate` with `strategy: "prune-superseded"` to clean up old notes
-
-<span class="cmt">### Memory hygiene</span>
-- Use `memory_graph` to spot dense clusters of related notes — these are consolidation candidates.
-- Use `recent_memories` or `project_memory_summary` to orient before a session and catch stale notes.
-- Prefer `update` over `remember` when a note already covers the topic. Prefer `consolidate` when 3+ notes on the same topic have accumulated.
-
-<span class="cmt">### Working with relationships</span>
-- After `recall`, check the `related:` line in each result. Call `get` with those ids
-  to pull in the linked context before acting — you may already have the answer.
-- Prefer `supersedes` over `forget` when the old memory has historical value.
-- Don't over-link. One or two meaningful edges per note is better than linking everything.
-
-<span class="cmt">### Scoping rules</span>
-- Pass `cwd` for anything specific to the current project.
-- Pass `cwd` even when storing privately with `scope: "global"`; `cwd` controls project association, `scope` controls storage.
-- Omit `cwd` only for truly cross-project or personal memories.
-- Omit `cwd` for things that apply across all projects (user preferences,
-  cross-project patterns, general facts about the user).
-
-<span class="cmt">## MCP output style</span>
-
-Mnemonic intentionally keeps MCP responses text-first because the primary consumer is an LLM reading tool output in-context.
-
-Guidelines:
-- prefer compact, semantically explicit text over structured payloads
-- always distinguish `project` from `stored` when both matter
-- reuse stable labels like `project:`, `stored:`, `policy:`, and `updated:`
-- answer first, details second
-- keep summaries grouped and shallow rather than returning large raw dumps
-- add non-text structure only when real LLM failure cases show text is not enough
-
-<span class="cmt">### Memory quality</span>
-- Titles should be searchable: "JWT RS256 migration rationale" not "auth stuff"
-- Content should be self-contained: written as if you'll have no other context
-  when you read it later.
-- Tags should be consistent: use the same terms you'd use in a search query.
-- Be specific about dates and versions when they matter:
-  "as of March 2026, using Prisma 5.x"</pre>
+- Always pass `cwd` when working in a project — it controls routing and search boosting.
+- Pass `cwd` even with `scope: "global"` — `cwd` sets project association, `scope` sets storage.
+- Omit `cwd` only for truly cross-project or personal memories.</pre>
       </div>
     </div>
   </div>

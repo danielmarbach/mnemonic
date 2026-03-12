@@ -454,4 +454,6 @@ build/     Compiled JavaScript output
 
 ## Agent instructions
 
-See [`SYSTEM_PROMPT.md`](SYSTEM_PROMPT.md) for the system prompt to use with your MCP client.
+Mnemonic's tools are self-describing — each tool includes detailed descriptions with "use when" / "do not use when" guidance, behavioral annotations, and typed schemas. Most models will use them correctly from tool metadata alone.
+
+For best results with cross-tool workflows (session startup, deduplication, relationship linking), see the optional [`SYSTEM_PROMPT.md`](SYSTEM_PROMPT.md) snippet.
