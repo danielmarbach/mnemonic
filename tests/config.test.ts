@@ -122,4 +122,38 @@ describe("MnemonicConfigStore", () => {
     });
   });
 
+  it("normalizes project memory policies loaded from config", async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "mnemonic-config-"));
+    tempDirs.push(dir);
+
+    await fs.writeFile(
+      path.join(dir, "config.json"),
+      JSON.stringify({
+        projectMemoryPolicies: {
+          "project-a": {
+            projectId: "project-a",
+            projectName: "Project A",
+            defaultScope: "not-a-scope",
+            consolidationMode: "supersedes",
+            protectedBranchBehavior: "sometimes",
+            protectedBranchPatterns: ["main", "", 42],
+            updatedAt: "2026-03-13T10:00:00.000Z",
+          },
+        },
+      }, null, 2),
+      "utf-8"
+    );
+
+    const store = new MnemonicConfigStore(dir);
+    await expect(store.getProjectPolicy("project-a")).resolves.toEqual({
+      projectId: "project-a",
+      projectName: "Project A",
+      defaultScope: "project",
+      consolidationMode: "supersedes",
+      protectedBranchBehavior: undefined,
+      protectedBranchPatterns: ["main"],
+      updatedAt: "2026-03-13T10:00:00.000Z",
+    });
+  });
+
 });

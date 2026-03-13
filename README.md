@@ -208,6 +208,7 @@ User-tunable fields:
 | `mutationPushMode` | `"main-only"` | When to auto-push after a write: `"all"`, `"main-only"`, or `"none"` |
 
 `projectMemoryPolicies` and `projectIdentityOverrides` are written automatically by `set_project_memory_policy` and `set_project_identity` — no need to edit them by hand.
+Project memory policies can include protected-branch settings (`protectedBranchBehavior`, `protectedBranchPatterns`) used by `remember` when writing to project vaults.
 
 Example — raise concurrency on a fast machine and disable auto-push everywhere:
 
@@ -255,7 +256,14 @@ Two vault types store notes:
 - `cwd` + `scope: "global"` → main vault, with project association in frontmatter
 - no `cwd` → main vault as a plain global memory
 
-Use `set_project_memory_policy` to save a per-project default. Supported values: `project`, `global`, `ask`. When policy is `ask`, `remember` returns a clear choice instead of guessing.
+Use `set_project_memory_policy` to save per-project defaults:
+
+- write scope (`project`, `global`, `ask`)
+- consolidation mode (`supersedes`, `delete`)
+- protected-branch behavior for project-vault writes (`ask`, `block`, `allow`)
+- protected-branch patterns (glob strings; defaults are `main`, `master`, `release*`)
+
+When write scope policy is `ask`, `remember` returns a clear storage choice instead of guessing. When protected-branch behavior is `ask`, `remember` returns a one-time override option plus instructions to persist `block`/`allow`.
 
 ### Project identity
 
@@ -370,7 +378,7 @@ Imported notes are written to the main vault with `lifecycle: permanent` and `sc
 | `forget`                    | Delete note + embedding, git commit + push, cleanup relationships        |
 | `get`                       | Fetch one or more notes by exact id                                      |
 | `get_project_identity`      | Show effective project identity and remote override                      |
-| `get_project_memory_policy` | Show saved default write scope                                           |
+| `get_project_memory_policy` | Show saved write scope, consolidation mode, and protected-branch settings |
 | `list`                      | List notes filtered by scope/tags/storage                                |
 | `list_migrations`           | List available migrations and pending count                              |
 | `memory_graph`              | Show compact adjacency list of relationships                             |
@@ -381,7 +389,7 @@ Imported notes are written to the main vault with `lifecycle: permanent` and `sc
 | `remember`                  | Write note + embedding; `cwd` sets context, `scope` picks storage, `lifecycle` picks temporary vs permanent |
 | `relate`                    | Create typed relationship between notes (bidirectional)                  |
 | `set_project_identity`      | Save which git remote defines project identity                           |
-| `set_project_memory_policy` | Save default write scope for project (`project`, `global`, `ask`)       |
+| `set_project_memory_policy` | Save project policy defaults (scope, consolidation mode, protected-branch behavior/patterns) |
 | `sync`                      | Git sync when remote exists plus embedding backfill always; `force=true` rebuilds all embeddings |
 | `unrelate`                  | Remove relationship between notes                                        |
 | `update`                    | Update note content/title/tags/lifecycle, re-embeds always               |

@@ -215,6 +215,8 @@ export interface PolicyResult extends Record<string, unknown> {
   project: { id: string; name: string };
   defaultScope?: string;
   consolidationMode?: string;
+  protectedBranchPatterns?: string[];
+  protectedBranchBehavior?: string;
   updatedAt?: string;
 }
 
@@ -564,5 +566,7 @@ export const PolicyResultSchema = z.object({
   project: z.object({ id: z.string(), name: z.string() }),
   defaultScope: z.string().optional(),
   consolidationMode: z.string().optional(),
+  protectedBranchPatterns: z.array(z.string()).optional(),
+  protectedBranchBehavior: z.string().optional(),
   updatedAt: z.string().optional(),
 });

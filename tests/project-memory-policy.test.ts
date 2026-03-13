@@ -4,7 +4,13 @@ import path from "path";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { MnemonicConfigStore } from "../src/config.js";
-import { resolveWriteScope } from "../src/project-memory-policy.js";
+import {
+  branchMatchesProtectedPattern,
+  isProtectedBranch,
+  resolveProtectedBranchBehavior,
+  resolveProtectedBranchPatterns,
+  resolveWriteScope,
+} from "../src/project-memory-policy.js";
 
 const tempDirs: string[] = [];
 
@@ -66,5 +72,32 @@ describe("project memory policies in config", () => {
       defaultScope: "ask",
       updatedAt: "2026-03-07T00:00:00.000Z",
     });
+  });
+});
+
+describe("protected branch policy helpers", () => {
+  it("uses default protected branch settings when policy fields are unset", () => {
+    expect(resolveProtectedBranchBehavior(undefined)).toBe("ask");
+    expect(resolveProtectedBranchPatterns(undefined)).toEqual(["main", "master", "release*"]);
+  });
+
+  it("defaults to allow for existing project policies without branch behavior", () => {
+    expect(resolveProtectedBranchBehavior({
+      projectId: "p1",
+      defaultScope: "project",
+      updatedAt: "2026-03-13T10:00:00.000Z",
+    })).toBe("allow");
+  });
+
+  it("matches protected branch globs", () => {
+    expect(branchMatchesProtectedPattern("main", "main")).toBe(true);
+    expect(branchMatchesProtectedPattern("release-1.2", "release*")).toBe(true);
+    expect(branchMatchesProtectedPattern("feature/foo", "release*")).toBe(false);
+  });
+
+  it("checks branch names against all protected patterns", () => {
+    expect(isProtectedBranch("master", ["main", "master", "release*"])).toBe(true);
+    expect(isProtectedBranch("release/2026.03", ["main", "master", "release*"])).toBe(true);
+    expect(isProtectedBranch("feature/xyz", ["main", "master", "release*"])).toBe(false);
   });
 });
