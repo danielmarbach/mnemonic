@@ -12,9 +12,6 @@ createdAt: '2026-03-13T07:52:12.728Z'
 updatedAt: '2026-03-13T08:18:19.580Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
-relatedTo:
-  - id: temporary-implementation-plan-for-protected-branch-policy-98487b33
-    type: explains
 memoryVersion: 1
 ---
 Feature #49 is implemented: automatic project-vault commits in `remember` now respect protected-branch policy, using local branch matching only.
