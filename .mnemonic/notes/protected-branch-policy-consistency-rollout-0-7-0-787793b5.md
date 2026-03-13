@@ -1,19 +1,24 @@
 ---
-title: Release 0.7.0 rollout plan for protected-branch policy consistency
+title: Protected-branch policy consistency rollout 0.7.0
 tags:
-  - plan
   - release
   - protected-branches
-  - docs
-  - testing
-  - versioning
-lifecycle: temporary
-createdAt: '2026-03-13T09:27:24.014Z'
-updatedAt: '2026-03-13T09:27:24.014Z'
+  - rollout
+  - 0.7.0
+  - implementation
+lifecycle: permanent
+createdAt: '2026-03-13T09:44:43.390Z'
+updatedAt: '2026-03-13T09:44:43.390Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 memoryVersion: 1
 ---
+Consolidated planning and execution notes for the 0.7.0 protected-branch rollout into a single durable implementation record.
+
+## Consolidated from:
+### Release 0.7.0 rollout plan for protected-branch policy consistency
+*Source: `release-0-7-0-rollout-plan-for-protected-branch-policy-consi-e38381d0`*
+
 Plan for the 0.7.0 release that extends protected-branch safeguards across mutating tools and updates docs + tests.
 
 ## Goals
@@ -71,3 +76,25 @@ Plan for the 0.7.0 release that extends protected-branch safeguards across mutat
 - Unit: policy resolution, branch matching, guard decision matrix.
 - MCP integration: end-to-end behavior for `remember`, `update`, `forget`, `move_memory`, and `consolidate` mutating paths under ask/block/allow.
 - Regression: ensure existing non-mutating tools and explicit safe paths remain unchanged.
+
+### Release 0.7.0 protected-branch rollout execution results
+*Source: `release-0-7-0-protected-branch-rollout-execution-results-5cbc2ca1`*
+
+Implemented the 0.7.0 rollout plan for protected-branch policy consistency.
+
+Completed work:
+
+- Extended protected-branch enforcement beyond `remember` to `update`, `forget`, `move_memory`, and mutating `consolidate` paths.
+- Added one-time override input support (`allowProtectedBranch`) for those tools.
+- Updated branch-protection guidance text to reference the active tool name.
+- Updated user and maintainer docs (`README.md`, `AGENT.md`, `docs/index.html`) to reflect cross-tool behavior.
+- Added changelog entry for 0.7.0 and bumped package version to 0.7.0.
+- Expanded MCP integration coverage to verify protected-branch policy behavior for the newly covered tools.
+- Verified with build and targeted test suites.
+
+Validation run:
+
+- `npm run build`
+- `npm run test -- tests/project-memory-policy.test.ts tests/config.test.ts tests/mcp.integration.test.ts`
+
+Result: tests passed and build succeeded.
