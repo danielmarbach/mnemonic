@@ -612,15 +612,15 @@ function formatAskForWriteScope(
 }
 
 function formatAskForProtectedBranch(
-  project: Awaited<ReturnType<typeof resolveProject>>,
+  projectLabel: string,
   branch: string,
   patterns: string[],
+  toolName: string,
 ): string {
-  const projectLabel = project ? `${project.name} (${project.id})` : "this context";
   return [
     `Protected branch check for ${projectLabel}: current branch \`${branch}\` matches ${patterns.join(", ")}.`,
     "Choose how to proceed:",
-    "- One-time override: call `remember` again with `allowProtectedBranch: true`",
+    `- One-time override: call \`${toolName}\` again with \`allowProtectedBranch: true\``,
     "- Persist policy: call `set_project_memory_policy` with `protectedBranchBehavior: \"block\"`",
     "- Persist policy: call `set_project_memory_policy` with `protectedBranchBehavior: \"allow\"`",
     "",
@@ -629,15 +629,15 @@ function formatAskForProtectedBranch(
 }
 
 function formatProtectedBranchBlocked(
-  project: Awaited<ReturnType<typeof resolveProject>>,
+  projectLabel: string,
   branch: string,
   patterns: string[],
+  toolName: string,
 ): string {
-  const projectLabel = project ? `${project.name} (${project.id})` : "this context";
   return [
     `Auto-commit blocked for ${projectLabel}: current branch \`${branch}\` matches protected patterns ${patterns.join(", ")}.`,
     "Policy is set to `protectedBranchBehavior: \"block\"`.",
-    "To proceed once, call `remember` again with `allowProtectedBranch: true`.",
+    `To proceed once, call \`${toolName}\` again with \`allowProtectedBranch: true\`.`,
     "To change the default, call `set_project_memory_policy` with `protectedBranchBehavior: \"allow\"`.",
   ].join("\n");
 }
@@ -646,11 +646,12 @@ async function shouldBlockProtectedBranchCommit(options: {
   cwd?: string;
   writeScope: WriteScope;
   automaticCommit: boolean;
-  project: Awaited<ReturnType<typeof resolveProject>>;
+  projectLabel: string;
   policy: ProjectMemoryPolicy | undefined;
   allowProtectedBranch: boolean;
+  toolName: string;
 }): Promise<{ blocked: boolean; message?: string }> {
-  const { cwd, writeScope, automaticCommit, project, policy, allowProtectedBranch } = options;
+  const { cwd, writeScope, automaticCommit, projectLabel, policy, allowProtectedBranch, toolName } = options;
   if (!cwd || writeScope !== "project" || !automaticCommit) {
     return { blocked: false };
   }
@@ -671,9 +672,27 @@ async function shouldBlockProtectedBranchCommit(options: {
   }
 
   const message = behavior === "block"
-    ? formatProtectedBranchBlocked(project, branch, patterns)
-    : formatAskForProtectedBranch(project, branch, patterns);
+    ? formatProtectedBranchBlocked(projectLabel, branch, patterns, toolName)
+    : formatAskForProtectedBranch(projectLabel, branch, patterns, toolName);
   return { blocked: true, message };
+}
+
+async function wouldRelationshipCleanupTouchProjectVault(noteIds: string[]): Promise<boolean> {
+  const noteIdSet = new Set(noteIds);
+  for (const vault of vaultManager.allKnownVaults()) {
+    if (!vault.isProject) {
+      continue;
+    }
+
+    const notes = await vault.storage.listNotes();
+    for (const note of notes) {
+      if ((note.relatedTo ?? []).some((rel) => noteIdSet.has(rel.id))) {
+        return true;
+      }
+    }
+  }
+
+  return false;
 }
 
 async function embedMissingNotes(
@@ -1478,9 +1497,10 @@ server.registerTool(
       cwd,
       writeScope,
       automaticCommit: scope === undefined,
-      project,
+      projectLabel: project ? `${project.name} (${project.id})` : "this context",
       policy,
       allowProtectedBranch,
+      toolName: "remember",
     });
     if (protectedBranchCheck.blocked) {
       return { content: [{ type: "text", text: protectedBranchCheck.message ?? "Protected branch policy blocked this commit." }], isError: true };
@@ -1591,7 +1611,7 @@ server.registerTool(
         "Default consolidation mode: 'supersedes' preserves history (default), 'delete' removes sources immediately"
       ),
       protectedBranchBehavior: z.enum(PROTECTED_BRANCH_BEHAVIORS).optional().describe(
-        "Behavior for protected-branch matches during project-vault remember writes: 'ask', 'block', or 'allow'"
+        "Behavior for protected-branch matches during project-vault commits by mutating tools: 'ask', 'block', or 'allow'"
       ),
       protectedBranchPatterns: z.array(z.string()).optional().describe(
         "Protected branch glob patterns. Defaults to [\"main\", \"master\", \"release*\"] when not set"
@@ -1918,8 +1938,8 @@ server.registerTool(
       "Do not use this when:\n" +
       "- No note exists on this topic yet — use `remember` instead\n" +
       "- Multiple notes need merging — use `consolidate` instead\n\n" +
-      "Side effects: re-embeds the note, git commits. Only provided fields are changed; omitted fields keep their current values. " +
-      "Project metadata is not changed by this tool.",
+      "Side effects: re-embeds the note, git commits. On protected branches, project-vault commits follow policy and may ask or block unless overridden. " +
+      "Only provided fields are changed; omitted fields keep their current values. Project metadata is not changed by this tool.",
     annotations: {
       readOnlyHint: false,
       destructiveHint: false,
@@ -1937,16 +1957,46 @@ server.registerTool(
         .describe("Change lifecycle. Preserve the existing value unless you're intentionally switching it."),
       summary: z.string().optional().describe("Git commit message summary explaining what changed and why. Not stored in the note."),
       cwd: projectParam,
+      allowProtectedBranch: z
+        .boolean()
+        .optional()
+        .describe(
+          "One-time override for protected branch checks. " +
+          "When true, update can commit on a protected branch without changing project policy."
+        ),
     }),
     outputSchema: UpdateResultSchema,
   },
-  async ({ id, content, title, tags, lifecycle, summary, cwd }) => {
+  async ({ id, content, title, tags, lifecycle, summary, cwd, allowProtectedBranch = false }) => {
     const found = await vaultManager.findNote(id, cwd);
     if (!found) {
       return { content: [{ type: "text", text: `No memory found with id '${id}'` }], isError: true };
     }
 
     const { note, vault } = found;
+    if (vault.isProject) {
+      const resolvedProject = await resolveProject(cwd);
+      const projectLabel = resolvedProject
+        ? `${resolvedProject.name} (${resolvedProject.id})`
+        : `${note.projectName ?? "project"} (${note.project ?? "unknown"})`;
+      const policy = note.project ? await configStore.getProjectPolicy(note.project) : undefined;
+      const protectedBranchCheck = await shouldBlockProtectedBranchCommit({
+        cwd,
+        writeScope: "project",
+        automaticCommit: true,
+        projectLabel,
+        policy,
+        allowProtectedBranch,
+        toolName: "update",
+      });
+      if (protectedBranchCheck.blocked) {
+        return {
+          content: [{ type: "text", text: protectedBranchCheck.message ?? "Protected branch policy blocked this commit." }],
+          isError: true,
+        };
+      }
+    }
+
     const now = new Date().toISOString();
     const cleanedContent = content === undefined ? undefined : await cleanMarkdown(content);
 
@@ -2029,7 +2079,8 @@ server.registerTool(
       "- The memory is just outdated — use `update` to correct it instead\n" +
       "- The memory has historical value — use `relate` with type 'supersedes' to mark it replaced\n" +
       "- You want to merge notes — use `consolidate` instead\n\n" +
-      "Side effects: deletes note + embedding files, removes relationship references from other notes, git commits per vault.",
+      "Side effects: deletes note + embedding files, removes relationship references from other notes, git commits per vault. " +
+      "On protected branches, project-vault commits follow policy and may ask or block unless overridden.",
     annotations: {
       readOnlyHint: false,
       destructiveHint: true,
@@ -2039,16 +2090,47 @@ server.registerTool(
     inputSchema: z.object({
       id: z.string().describe("Memory id to permanently delete"),
       cwd: projectParam,
+      allowProtectedBranch: z
+        .boolean()
+        .optional()
+        .describe(
+          "One-time override for protected branch checks. " +
+          "When true, forget can commit on a protected branch without changing project policy."
+        ),
     }),
     outputSchema: ForgetResultSchema,
   },
-  async ({ id, cwd }) => {
+  async ({ id, cwd, allowProtectedBranch = false }) => {
     const found = await vaultManager.findNote(id, cwd);
     if (!found) {
       return { content: [{ type: "text", text: `No memory found with id '${id}'` }], isError: true };
     }
 
     const { note, vault: noteVault } = found;
+    const touchesProjectVault = noteVault.isProject || await wouldRelationshipCleanupTouchProjectVault([id]);
+    if (touchesProjectVault) {
+      const resolvedProject = await resolveProject(cwd);
+      const projectLabel = resolvedProject
+        ? `${resolvedProject.name} (${resolvedProject.id})`
+        : `${note.projectName ?? "project"} (${note.project ?? "unknown"})`;
+      const policy = note.project ? await configStore.getProjectPolicy(note.project) : undefined;
+      const protectedBranchCheck = await shouldBlockProtectedBranchCommit({
+        cwd,
+        writeScope: "project",
+        automaticCommit: true,
+        projectLabel,
+        policy,
+        allowProtectedBranch,
+        toolName: "forget",
+      });
+      if (protectedBranchCheck.blocked) {
+        return {
+          content: [{ type: "text", text: protectedBranchCheck.message ?? "Protected branch policy blocked this commit." }],
+          isError: true,
+        };
+      }
+    }
+
     await noteVault.storage.deleteNote(id);
 
     // Clean up dangling references grouped by vault so we make one commit per vault
@@ -2706,7 +2788,8 @@ server.registerTool(
       "- You want to delete the note — use `forget` instead\n\n" +
       "When moving to project vault, project metadata is rewritten from `cwd`. " +
       "When moving to main vault, existing project association is preserved. " +
-      "Side effects: writes to target vault, deletes from source vault, git commits per vault.",
+      "Side effects: writes to target vault, deletes from source vault, git commits per vault. " +
+      "On protected branches, project-vault commits follow policy and may ask or block unless overridden.",
     annotations: {
       readOnlyHint: false,
       destructiveHint: false,
@@ -2717,10 +2800,17 @@ server.registerTool(
       id: z.string().describe("Memory id to move"),
       target: z.enum(["main-vault", "project-vault"]).describe("Destination: 'main-vault' for private storage, 'project-vault' for shared project storage"),
       cwd: projectParam,
+      allowProtectedBranch: z
+        .boolean()
+        .optional()
+        .describe(
+          "One-time override for protected branch checks. " +
+          "When true, move_memory can commit on a protected branch without changing project policy."
+        ),
     }),
     outputSchema: MoveResultSchema,
   },
-  async ({ id, target, cwd }) => {
+  async ({ id, target, cwd, allowProtectedBranch = false }) => {
     const found = await vaultManager.findNote(id, cwd);
     if (!found) {
       return { content: [{ type: "text", text: `No memory found with id '${id}'` }], isError: true };
@@ -2754,6 +2844,30 @@ server.registerTool(
         return { content: [{ type: "text", text: `Could not detect a project for: ${cwd}` }], isError: true };
       }
       targetVault = projectVault;
+    }
+
+    if (found.vault.isProject || targetVault.isProject) {
+      const resolvedProject = targetProject ?? await resolveProject(cwd);
+      const projectLabel = resolvedProject
+        ? `${resolvedProject.name} (${resolvedProject.id})`
+        : `${found.note.projectName ?? "project"} (${found.note.project ?? "unknown"})`;
+      const projectId = targetProject?.id ?? found.note.project;
+      const policy = projectId ? await configStore.getProjectPolicy(projectId) : undefined;
+      const protectedBranchCheck = await shouldBlockProtectedBranchCommit({
+        cwd,
+        writeScope: "project",
+        automaticCommit: true,
+        projectLabel,
+        policy,
+        allowProtectedBranch,
+        toolName: "move_memory",
+      });
+      if (protectedBranchCheck.blocked) {
+        return {
+          content: [{ type: "text", text: protectedBranchCheck.message ?? "Protected branch policy blocked this commit." }],
+          isError: true,
+        };
+      }
     }
 
     const existing = await targetVault.storage.readNote(id);
@@ -3036,6 +3150,7 @@ server.registerTool(
       "When all sources are temporary, prefer 'delete' so scaffolding is cleaned up.\n\n" +
       "Read-only strategies: detect-duplicates, find-clusters, suggest-merges, dry-run. " +
       "Mutating strategies: execute-merge, prune-superseded. " +
+      "On protected branches, project-vault commits from mutating strategies follow policy and may ask or block unless overridden. " +
       "Gathers notes from both main and project vaults.",
     annotations: {
       readOnlyHint: false,
@@ -3081,10 +3196,17 @@ server.registerTool(
         })
         .optional()
         .describe("Required for 'execute-merge' strategy. Get sourceIds from 'suggest-merges' output."),
+      allowProtectedBranch: z
+        .boolean()
+        .optional()
+        .describe(
+          "One-time override for protected branch checks. " +
+          "When true, consolidate can commit on a protected branch without changing project policy."
+        ),
     }),
     outputSchema: ConsolidateResultSchema,
   },
-  async ({ cwd, strategy, mode, threshold, mergePlan }) => {
+  async ({ cwd, strategy, mode, threshold, mergePlan, allowProtectedBranch = false }) => {
     const project = await resolveProject(cwd);
     if (!project && cwd) {
       return { content: [{ type: "text", text: `Could not detect a project for: ${cwd}` }], isError: true };
@@ -3119,10 +3241,10 @@ server.registerTool(
         if (!mergePlan) {
           return { content: [{ type: "text", text: "execute-merge strategy requires a mergePlan with sourceIds and targetTitle." }], isError: true };
         }
-        return executeMerge(entries, mergePlan, defaultConsolidationMode, project, cwd, mode);
+        return executeMerge(entries, mergePlan, defaultConsolidationMode, project, cwd, mode, policy, allowProtectedBranch);
 
       case "prune-superseded":
-        return pruneSuperseded(projectNotes, mode ?? defaultConsolidationMode, project);
+        return pruneSuperseded(projectNotes, mode ?? defaultConsolidationMode, project, cwd, policy, allowProtectedBranch);
 
       case "dry-run":
         return dryRunAll(projectNotes, threshold, defaultConsolidationMode, project, mode);
@@ -3417,6 +3539,8 @@ async function executeMerge(
   project: Awaited<ReturnType<typeof resolveProject>>,
   cwd?: string,
   explicitMode?: ConsolidationMode,
+  policy?: ProjectMemoryPolicy,
+  allowProtectedBranch: boolean = false,
 ): Promise<{ content: Array<{ type: "text"; text: string }>; structuredContent: ConsolidateResult }> {
   const sourceIds = normalizeMergePlanSourceIds(mergePlan.sourceIds);
   const targetTitle = mergePlan.targetTitle.trim();
@@ -3476,6 +3600,39 @@ async function executeMerge(
   const existingTargetEntry = findExistingExecuteMergeTarget(entries, sourceEntries, targetTitle);
   const projectVault = cwd ? await vaultManager.getProjectVaultIfExists(cwd) : null;
   const targetVault = existingTargetEntry?.vault ?? projectVault ?? vaultManager.main;
+
+  let touchesProjectVault = targetVault.isProject || sourceEntries.some((entry) => entry.vault.isProject);
+  if (!touchesProjectVault && consolidationMode === "delete") {
+    touchesProjectVault = await wouldRelationshipCleanupTouchProjectVault(sourceIds);
+  }
+  if (touchesProjectVault) {
+    const projectLabel = project
+      ? `${project.name} (${project.id})`
+      : "this context";
+    const protectedBranchCheck = await shouldBlockProtectedBranchCommit({
+      cwd,
+      writeScope: "project",
+      automaticCommit: true,
+      projectLabel,
+      policy,
+      allowProtectedBranch,
+      toolName: "consolidate",
+    });
+    if (protectedBranchCheck.blocked) {
+      const message = protectedBranchCheck.message ?? "Protected branch policy blocked this commit.";
+      const structuredContent: ConsolidateResult = {
+        action: "consolidated",
+        strategy: "execute-merge",
+        project: project?.id,
+        projectName: project?.name,
+        notesProcessed: entries.length,
+        notesModified: 0,
+        warnings: [message],
+      };
+      return { content: [{ type: "text", text: message }], structuredContent };
+    }
+  }
+
   const now = new Date().toISOString();
 
   // Build consolidated content
@@ -3733,6 +3890,9 @@ async function pruneSuperseded(
   entries: NoteEntry[],
   consolidationMode: ConsolidationMode,
   project: Awaited<ReturnType<typeof resolveProject>>,
+  cwd?: string,
+  policy?: ProjectMemoryPolicy,
+  allowProtectedBranch: boolean = false,
 ): Promise<{ content: Array<{ type: "text"; text: string }>; structuredContent: ConsolidateResult }> {
   if (consolidationMode !== "delete") {
     const structuredContent: ConsolidateResult = {
@@ -3781,6 +3941,39 @@ async function pruneSuperseded(
       notesModified: 0,
     };
     return { content: [{ type: "text", text: lines.join("\n") }], structuredContent };
+  }
+
+  const supersededList = Array.from(supersededIds);
+  let touchesProjectVault = supersededList.some((id) => entries.find((e) => e.note.id === id)?.vault.isProject);
+  if (!touchesProjectVault) {
+    touchesProjectVault = await wouldRelationshipCleanupTouchProjectVault(supersededList);
+  }
+  if (touchesProjectVault) {
+    const projectLabel = project
+      ? `${project.name} (${project.id})`
+      : "this context";
+    const protectedBranchCheck = await shouldBlockProtectedBranchCommit({
+      cwd,
+      writeScope: "project",
+      automaticCommit: true,
+      projectLabel,
+      policy,
+      allowProtectedBranch,
+      toolName: "consolidate",
+    });
+    if (protectedBranchCheck.blocked) {
+      const message = protectedBranchCheck.message ?? "Protected branch policy blocked this commit.";
+      const structuredContent: ConsolidateResult = {
+        action: "consolidated",
+        strategy: "prune-superseded",
+        project: project?.id,
+        projectName: project?.name,
+        notesProcessed: entries.length,
+        notesModified: 0,
+        warnings: [message],
+      };
+      return { content: [{ type: "text", text: message }], structuredContent };
+    }
   }
 
   lines.push(`Found ${supersededIds.size} superseded note(s) to prune:`);
