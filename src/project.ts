@@ -105,8 +105,13 @@ export async function getCurrentGitBranch(cwd: string): Promise<string | undefin
 async function detectDefaultProject(cwd: string): Promise<ProjectInfo | null> {
   if (!cwd) return null;
 
-  // Try git remote first
-  const remote = await getGitRemoteUrl(cwd, "origin");
+  // Resolve the effective git root, walking up through any submodule boundaries
+  // so that project identity is always based on the top-level superproject.
+  const topLevelRoot = await findTopLevelGitRoot(cwd);
+
+  // Try git remote first (using the top-level root when available)
+  const remoteCwd = topLevelRoot ?? cwd;
+  const remote = await getGitRemoteUrl(remoteCwd, "origin");
   if (remote) {
     const id = normalizeRemote(remote);
     const name = extractRepoName(remote);
@@ -114,19 +119,9 @@ async function detectDefaultProject(cwd: string): Promise<ProjectInfo | null> {
   }
 
   // Try git root folder name (repo without remote)
-  try {
-    const { stdout: rootOut } = await execFileAsync(
-      "git",
-      ["rev-parse", "--show-toplevel"],
-      { cwd }
-    );
-    const root = rootOut.trim();
-    if (root) {
-      const name = path.basename(root);
-      return { id: slugify(name), name, source: "git-folder" };
-    }
-  } catch {
-    // not a git repo at all — fall through
+  if (topLevelRoot) {
+    const name = path.basename(topLevelRoot);
+    return { id: slugify(name), name, source: "git-folder" };
   }
 
   // Fallback: just use the directory name
@@ -136,6 +131,42 @@ async function detectDefaultProject(cwd: string): Promise<ProjectInfo | null> {
   }
 
   return null;
+}
+
+/**
+ * Resolve the top-level git root for a working directory, walking up through
+ * any git submodule boundaries. Returns null when the directory is not inside
+ * a git repository at all.
+ */
+async function findTopLevelGitRoot(cwd: string, visited: Set<string> = new Set()): Promise<string | null> {
+  try {
+    const { stdout: rootOut } = await execFileAsync("git", ["rev-parse", "--show-toplevel"], { cwd });
+    const root = rootOut.trim();
+    if (!root) return null;
+
+    // Guard against infinite recursion in pathological submodule configurations.
+    if (visited.has(root)) return root;
+    visited.add(root);
+
+    // Check if we are inside a git submodule and walk up to the superproject root.
+    try {
+      const { stdout: superOut } = await execFileAsync(
+        "git",
+        ["rev-parse", "--show-superproject-working-tree"],
+        { cwd },
+      );
+      const superproject = superOut.trim();
+      if (superproject) {
+        return findTopLevelGitRoot(superproject, visited);
+      }
+    } catch {
+      // Not inside a submodule or git version does not support the flag; use current root.
+    }
+
+    return root;
+  } catch {
+    return null;
+  }
 }
 
 async function getGitRemoteUrl(cwd: string, remoteName: string): Promise<string | null> {

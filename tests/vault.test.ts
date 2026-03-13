@@ -5,7 +5,11 @@ import { GitOps } from "../src/git.js";
 import * as fs from "fs/promises";
 import * as path from "path";
 import os from "os";
+import { execFile } from "child_process";
+import { promisify } from "util";
 import { simpleGit } from "simple-git";
+
+const execFileAsync = promisify(execFile);
 
 describe("VaultManager", () => {
   let tempDir: string;
@@ -285,6 +289,55 @@ describe("VaultManager", () => {
     });
   });
 
+  describe("Git Submodule Support", () => {
+    it("should anchor project vault in the superproject when cwd is inside a submodule", async () => {
+      // Set up a parent repo with a nested submodule
+      const parentDir = path.join(tempDir, "parent-repo");
+      const submoduleDir = path.join(tempDir, "submodule-repo");
+
+      // Create the submodule repo first (as a standalone repo)
+      await fs.mkdir(submoduleDir, { recursive: true });
+      await initGitRepoWithCommit(submoduleDir, "# Submodule");
+
+      // Create the parent repo and add the submodule
+      await fs.mkdir(parentDir, { recursive: true });
+      await initGitRepoWithCommit(parentDir, "# Parent");
+      await addSubmodule(parentDir, submoduleDir, "vendor/submodule");
+
+      const submoduleCwd = path.join(parentDir, "vendor/submodule");
+
+      // getOrCreateProjectVault from inside the submodule should place .mnemonic in the parent
+      const vault = await vaultManager.getOrCreateProjectVault(submoduleCwd);
+      expect(vault).toBeTruthy();
+      expect(vault!.isProject).toBe(true);
+      // The vault storage path must be inside the parent repo, not the submodule
+      expect(vault!.storage.vaultPath).toContain(parentDir);
+      expect(vault!.storage.vaultPath).not.toContain("vendor/submodule");
+    });
+
+    it("should return the same project vault whether cwd is in the superproject or its submodule", async () => {
+      const parentDir = path.join(tempDir, "parent-repo-2");
+      const submoduleDir = path.join(tempDir, "submodule-repo-2");
+
+      await fs.mkdir(submoduleDir, { recursive: true });
+      await initGitRepoWithCommit(submoduleDir, "# Submodule 2");
+
+      await fs.mkdir(parentDir, { recursive: true });
+      await initGitRepoWithCommit(parentDir, "# Parent 2");
+      await addSubmodule(parentDir, submoduleDir, "vendor/lib");
+
+      const submoduleCwd = path.join(parentDir, "vendor/lib");
+
+      const vaultFromParent = await vaultManager.getOrCreateProjectVault(parentDir);
+      const vaultFromSubmodule = await vaultManager.getOrCreateProjectVault(submoduleCwd);
+
+      expect(vaultFromParent).toBeTruthy();
+      expect(vaultFromSubmodule).toBeTruthy();
+      // Both must resolve to the same vault instance (same superproject git root)
+      expect(vaultFromParent!.storage.vaultPath).toBe(vaultFromSubmodule!.storage.vaultPath);
+    });
+  });
+
   describe("Search Order", () => {
     it("should return main vault when no cwd", async () => {
       const order = await vaultManager.searchOrder();
@@ -328,4 +381,15 @@ async function initGitRepo(projectDir: string, readmeContent: string): Promise<v
   const git = simpleGit(projectDir);
   await git.init();
   await fs.writeFile(path.join(projectDir, "README.md"), readmeContent);
+}
+
+async function initGitRepoWithCommit(projectDir: string, readmeContent: string): Promise<void> {
+  await initGitRepo(projectDir, readmeContent);
+  await execFileAsync("git", ["add", "README.md"], { cwd: projectDir });
+  await execFileAsync("git", ["-c", "user.email=test@example.com", "-c", "user.name=Test", "commit", "-m", "chore: initial commit"], { cwd: projectDir });
+}
+
+async function addSubmodule(parentDir: string, submoduleDir: string, submodulePath: string): Promise<void> {
+  await execFileAsync("git", ["-c", "protocol.file.allow=always", "-c", "user.email=test@example.com", "-c", "user.name=Test", "submodule", "add", submoduleDir, submodulePath], { cwd: parentDir });
+  await execFileAsync("git", ["-c", "user.email=test@example.com", "-c", "user.name=Test", "commit", "-m", "chore: add submodule", ".gitmodules", submodulePath], { cwd: parentDir });
 }
