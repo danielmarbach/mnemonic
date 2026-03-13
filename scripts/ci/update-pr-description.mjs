@@ -25,6 +25,10 @@ import { spawnSync } from "node:child_process";
 
 const args = parseArgs(process.argv.slice(2));
 
+// Tag categories used to classify notes and drive summary generation.
+const BUG_TAGS = ["bug", "bugs", "fix", "bugfix", "hotfix"];
+const ENHANCEMENT_TAGS = ["enhancement", "feature"];
+
 if (import.meta.url === `file://${process.argv[1]}`) {
   await main();
 }
@@ -127,9 +131,9 @@ export function generateTitle(notes) {
     return notes[0].frontmatter.title ?? baseName(notes[0].file);
   }
 
-  // Multiple notes: use the first note's title as the primary signal.
-  // Prefer notes tagged with design/decision/architecture as the lead.
+  // Multiple notes: prefer bug/fix notes first (most actionable), then design/decision/architecture.
   const primary =
+    notes.find((n) => hasAnyTag(n.frontmatter.tags, BUG_TAGS)) ??
     notes.find((n) => hasAnyTag(n.frontmatter.tags, ["decision", "design", "architecture"])) ??
     notes[0];
 
@@ -138,6 +142,7 @@ export function generateTitle(notes) {
 
 export function generateDescription(notes) {
   const lines = [];
+  const sortedNotes = sortNotesByPriority(notes);
 
   lines.push("## Summary");
   lines.push("");
@@ -146,9 +151,11 @@ export function generateDescription(notes) {
     const summary = extractLeadingSummary(notes[0].body);
     lines.push(summary);
   } else {
-    lines.push("This PR captures the following design decisions:");
+    const hasBugs = notes.some((n) => hasAnyTag(n.frontmatter.tags, BUG_TAGS));
+    const hasEnhancements = notes.some((n) => hasAnyTag(n.frontmatter.tags, ENHANCEMENT_TAGS));
+    lines.push(buildSummaryIntro(hasBugs, hasEnhancements));
     lines.push("");
-    for (const note of notes) {
+    for (const note of sortedNotes) {
       const title = note.frontmatter.title ?? baseName(note.file);
       lines.push(`- **${title}**`);
     }
@@ -158,7 +165,7 @@ export function generateDescription(notes) {
   lines.push("## Design Decisions");
   lines.push("");
 
-  for (const note of notes) {
+  for (const note of sortedNotes) {
     const title = note.frontmatter.title ?? baseName(note.file);
     const tags = normalizeTags(note.frontmatter.tags);
 
@@ -181,6 +188,32 @@ export function generateDescription(notes) {
   );
 
   return lines.join("\n");
+}
+
+/**
+ * Returns notes sorted by priority: bug/fix first, then enhancements,
+ * then design/decision/architecture, then everything else.
+ * Stable sort — notes within the same priority retain their original order.
+ */
+export function sortNotesByPriority(notes) {
+  const priority = (note) => {
+    if (hasAnyTag(note.frontmatter.tags, BUG_TAGS)) return 0;
+    if (hasAnyTag(note.frontmatter.tags, ENHANCEMENT_TAGS)) return 1;
+    if (hasAnyTag(note.frontmatter.tags, ["decision", "design", "architecture"])) return 2;
+    return 3;
+  };
+  return [...notes].sort((a, b) => priority(a) - priority(b));
+}
+
+/**
+ * Builds the opening line of the multi-note Summary section based on
+ * the types of notes present in the PR.
+ */
+export function buildSummaryIntro(hasBugs, hasEnhancements) {
+  if (hasBugs && hasEnhancements) return "This PR fixes bugs and adds enhancements:";
+  if (hasBugs) return "This PR fixes the following issues:";
+  if (hasEnhancements) return "This PR adds the following enhancements:";
+  return "This PR captures the following design decisions:";
 }
 
 /**
