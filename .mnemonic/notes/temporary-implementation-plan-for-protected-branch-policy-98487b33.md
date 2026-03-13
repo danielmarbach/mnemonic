@@ -6,9 +6,12 @@ tags:
   - protected-branches
 lifecycle: temporary
 createdAt: '2026-03-13T07:54:28.865Z'
-updatedAt: '2026-03-13T07:54:28.865Z'
+updatedAt: '2026-03-13T07:54:32.268Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: protected-branch-policy-plan-for-remember-commits-2e2e83d3
+    type: explains
 memoryVersion: 1
 ---
 Temporary implementation plan for feature #49.

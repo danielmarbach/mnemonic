@@ -8,9 +8,12 @@ tags:
   - design
 lifecycle: permanent
 createdAt: '2026-03-13T07:52:12.728Z'
-updatedAt: '2026-03-13T07:54:15.249Z'
+updatedAt: '2026-03-13T07:54:32.268Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: temporary-implementation-plan-for-protected-branch-policy-98487b33
+    type: explains
 memoryVersion: 1
 ---
 Design decisions for feature request #49 (avoid automatic commits on protected branches).
