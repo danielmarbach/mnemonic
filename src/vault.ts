@@ -148,11 +148,30 @@ function makeVault(
   };
 }
 
-async function findGitRoot(cwd: string): Promise<string | null> {
+async function findGitRoot(cwd: string, visited: Set<string> = new Set()): Promise<string | null> {
   try {
     const git = simpleGit(cwd);
     const root = await git.revparse(["--show-toplevel"]);
-    return root.trim();
+    const trimmedRoot = root.trim();
+    if (!trimmedRoot) return null;
+
+    // Guard against infinite recursion in pathological submodule configurations.
+    if (visited.has(trimmedRoot)) return trimmedRoot;
+    visited.add(trimmedRoot);
+
+    // When inside a git submodule, walk up to the top-level superproject root
+    // so that project vaults are always anchored at the main repository.
+    try {
+      const superproject = await git.revparse(["--show-superproject-working-tree"]);
+      const trimmedSuperproject = superproject.trim();
+      if (trimmedSuperproject) {
+        return findGitRoot(trimmedSuperproject, visited);
+      }
+    } catch {
+      // Not inside a submodule or git version does not support the flag; use current root.
+    }
+
+    return trimmedRoot;
   } catch {
     return null;
   }

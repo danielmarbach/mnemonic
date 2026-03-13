@@ -4,6 +4,12 @@ All notable changes to `mnemonic` will be documented in this file.
 
 The format is loosely based on Keep a Changelog and uses semver-style version headings.
 
+## [Unreleased]
+
+### Added
+
+- Git submodule support: when `cwd` is inside a git submodule, project vault creation and project identity resolution now walk up through submodule boundaries to anchor at the top-level superproject root. This prevents `.mnemonic/` from being created inside a submodule directory and ensures project identity is derived from the superproject's remote URL rather than the submodule's.
+
 ## [0.7.0] - 2026-03-13
 
 ### Added
