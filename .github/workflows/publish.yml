@@ -108,8 +108,54 @@ jobs:
             danielmarbach/mnemonic-mcp:latest
             danielmarbach/mnemonic-mcp:${{ steps.version.outputs.tag }}
 
+  publish-homebrew-tap:
+    needs: publish-npm
+    runs-on: ubuntu-latest
+    environment: Release
+    permissions:
+      contents: read
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+        with:
+          sparse-checkout: Formula/mnemonic.rb
+          sparse-checkout-cone-mode: false
+
+      - name: Extract version
+        id: version
+        run: |
+          TAG="${{ inputs.tag || github.ref_name }}"
+          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Calculate npm tarball SHA256
+        id: tarball
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          URL="https://registry.npmjs.org/@danielmarbach/mnemonic-mcp/-/mnemonic-mcp-${VERSION}.tgz"
+          SHA256=$(curl -fsSL "$URL" | sha256sum | cut -d' ' -f1)
+          echo "sha256=$SHA256" >> "$GITHUB_OUTPUT"
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+
+      - name: Update Homebrew tap formula
+        if: ${{ !inputs.dry_run }}
+        env:
+          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          git clone "https://x-access-token:${HOMEBREW_TAP_TOKEN}@github.com/danielmarbach/homebrew-mnemonic.git" tap
+          cp Formula/mnemonic.rb tap/Formula/mnemonic.rb
+          cd tap
+          sed -i "s|url \".*\"|url \"${{ steps.tarball.outputs.url }}\"|" Formula/mnemonic.rb
+          sed -i "s|sha256 \".*\"|sha256 \"${{ steps.tarball.outputs.sha256 }}\"|" Formula/mnemonic.rb
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+          git add Formula/mnemonic.rb
+          git commit -m "Update mnemonic to ${VERSION}"
+          git push
+
   create-release:
-    needs: [publish-npm, publish-docker]
+    needs: [publish-npm, publish-docker, publish-homebrew-tap]
     runs-on: ubuntu-latest
     permissions:
       contents: write  # Required to create GitHub releases
