@@ -458,21 +458,26 @@ When you call `recall` with `cwd`, mnemonic adds a fixed **+0.15 boost** to the 
 
 **I want to brainstorm with no repo yet. Should I create a temp folder first?**
 
-Usually, no. Start in the **main vault** (`scope: global`) and write notes in natural language, the same way you think:
+Usually, no. If you're talking to an LLM with mnemonic MCP configured, treat it like a normal brainstorming chat and ask it to store key points in the **main vault** (global memory).
 
-```bash
-remember title="Meal planner rough idea" content="I want something that turns pantry items into a realistic week of meals." tags=[idea,brainstorm] scope=global
-remember title="Meal planner open questions" content="Not sure if v1 should be mobile-first or web-first." tags=[idea,questions] scope=global
+Example conversation style:
+
+```text
+You: I have an idea for a meal-planning app. Let's brainstorm v1 scope.
+LLM: Great. I can capture key decisions and open questions in global memory while we explore.
+
+You: Please remember that the app should build weekly meals from pantry items, and avoid recipes with too many missing ingredients.
+You: Also remember that I'm undecided on mobile-first vs web-first.
 ```
 
-When the idea becomes a real project, create the repo and only move notes that are now project-specific:
+When the idea becomes a real repo, switch to that project context and ask the LLM to migrate only the notes that became project-specific.
 
-```bash
-recall query="meal planner rough idea open questions" cwd=/path/to/meal-planner
-move_memory id=<memory-id> target=project-vault cwd=/path/to/meal-planner
+```text
+You: We're creating the repo now at /path/to/meal-planner.
+You: Recall my earlier meal-planner brainstorm notes and move the implementation-relevant ones into this project's vault.
 ```
 
-This keeps early ideation reusable in global memory while making implementation context shareable in `.mnemonic/` once a project exists.
+This keeps early ideation reusable as personal/global knowledge while moving concrete project context into `.mnemonic/` once collaboration and implementation begin.
 
 **How does mnemonic differ from Beads?**
 
