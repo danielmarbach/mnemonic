@@ -93,17 +93,17 @@ npm install @danielmarbach/mnemonic-mcp@0.2.0
 
 ### Homebrew
 
-Install via the [danielmarbach/mnemonic](https://github.com/danielmarbach/homebrew-mnemonic) tap:
+The formula lives in this repository. Tap it with an explicit URL so no separate repository is needed:
 
 ```bash
-brew tap danielmarbach/mnemonic
-brew install mnemonic
+brew tap danielmarbach/mnemonic-mcp https://github.com/danielmarbach/mnemonic
+brew install mnemonic-mcp
 ```
 
 Or in a single step:
 
 ```bash
-brew install danielmarbach/mnemonic/mnemonic
+brew install danielmarbach/mnemonic-mcp/mnemonic-mcp
 ```
 
 ### Docker Hub

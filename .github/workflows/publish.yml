@@ -113,14 +113,13 @@ jobs:
     runs-on: ubuntu-latest
     environment: Release
     permissions:
-      contents: read
+      contents: write  # Required to commit the updated formula back to main
 
     steps:
-      - name: Check out repository
+      - name: Check out main branch
         uses: actions/checkout@v6
         with:
-          sparse-checkout: Formula/mnemonic.rb
-          sparse-checkout-cone-mode: false
+          ref: main
 
       - name: Extract version
         id: version
@@ -137,21 +136,16 @@ jobs:
           echo "sha256=$SHA256" >> "$GITHUB_OUTPUT"
           echo "url=$URL" >> "$GITHUB_OUTPUT"
 
-      - name: Update Homebrew tap formula
+      - name: Update formula and push to main
         if: ${{ !inputs.dry_run }}
-        env:
-          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
         run: |
           VERSION="${{ steps.version.outputs.version }}"
-          git clone "https://x-access-token:${HOMEBREW_TAP_TOKEN}@github.com/danielmarbach/homebrew-mnemonic.git" tap
-          cp Formula/mnemonic.rb tap/Formula/mnemonic.rb
-          cd tap
-          sed -i "s|url \".*\"|url \"${{ steps.tarball.outputs.url }}\"|" Formula/mnemonic.rb
-          sed -i "s|sha256 \".*\"|sha256 \"${{ steps.tarball.outputs.sha256 }}\"|" Formula/mnemonic.rb
+          sed -i "s|^  url \"[^\"]*\"|  url \"${{ steps.tarball.outputs.url }}\"|" Formula/mnemonic-mcp.rb
+          sed -i "s|^  sha256 \"[^\"]*\"|  sha256 \"${{ steps.tarball.outputs.sha256 }}\"|" Formula/mnemonic-mcp.rb
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git config user.name "github-actions[bot]"
-          git add Formula/mnemonic.rb
-          git commit -m "Update mnemonic to ${VERSION}"
+          git add Formula/mnemonic-mcp.rb
+          git commit -m "Update mnemonic-mcp formula to ${VERSION}"
           git push
 
   create-release:

@@ -1,4 +1,4 @@
-class Mnemonic < Formula
+class MnemonicMcp < Formula
   desc "Local MCP memory server backed by markdown + JSON files, synced via git"
   homepage "https://github.com/danielmarbach/mnemonic"
   url "https://registry.npmjs.org/@danielmarbach/mnemonic-mcp/-/mnemonic-mcp-0.7.0.tgz"
@@ -10,8 +10,10 @@ class Mnemonic < Formula
   def install
     system "#{Formula["node"].opt_bin}/npm", "install", "--omit=dev", "--ignore-scripts"
     libexec.install Dir["*"]
-    (bin/"mnemonic").write_env_script "#{Formula["node"].opt_bin}/node",
-                                      "#{libexec}/build/index.js"
+    (bin/"mnemonic").write <<~EOS
+      #!/bin/bash
+      exec "#{Formula["node"].opt_bin}/node" "#{libexec}/build/index.js" "$@"
+    EOS
   end
 
   test do
