@@ -92,6 +92,16 @@ export async function resolveProjectIdentity(
   };
 }
 
+export async function getCurrentGitBranch(cwd: string): Promise<string | undefined> {
+  try {
+    const { stdout } = await execFileAsync("git", ["branch", "--show-current"], { cwd });
+    const branch = stdout.trim();
+    return branch.length > 0 ? branch : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 async function detectDefaultProject(cwd: string): Promise<ProjectInfo | null> {
   if (!cwd) return null;
 

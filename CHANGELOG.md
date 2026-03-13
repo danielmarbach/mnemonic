@@ -4,6 +4,18 @@ All notable changes to `mnemonic` will be documented in this file.
 
 The format is loosely based on Keep a Changelog and uses semver-style version headings.
 
+## [0.6.0] - 2026-03-13
+
+### Added
+
+- Protected-branch policy support for automatic `remember` project-vault commits. `ProjectMemoryPolicy` now supports `protectedBranchBehavior` (`ask` | `block` | `allow`) and `protectedBranchPatterns` (glob-like patterns). Built-in patterns are `main`, `master`, and `release*`.
+- `remember` now accepts `allowProtectedBranch` as a one-time override when a protected-branch policy would otherwise ask or block.
+
+### Changed
+
+- `set_project_memory_policy` and `get_project_memory_policy` now manage and display protected-branch settings in addition to write-scope and consolidation defaults.
+- `remember` now checks the current local git branch before automatic project-vault commits (scope omitted) and follows protected-branch policy with actionable guidance.
+
 ## [0.5.1] - 2026-03-12
 
 ### Fixed

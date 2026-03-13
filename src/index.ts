@@ -21,17 +21,20 @@ import { cleanMarkdown } from "./markdown.js";
 import { MnemonicConfigStore, readVaultSchemaVersion, type MutationPushMode } from "./config.js";
 import {
   CONSOLIDATION_MODES,
+  PROTECTED_BRANCH_BEHAVIORS,
   PROJECT_POLICY_SCOPES,
   WRITE_SCOPES,
+  isProtectedBranch,
+  resolveProtectedBranchBehavior,
+  resolveProtectedBranchPatterns,
   resolveConsolidationMode,
   resolveWriteScope,
   type ConsolidationMode,
   type ProjectMemoryPolicy,
-  type ProjectPolicyScope,
   type WriteScope,
 } from "./project-memory-policy.js";
 import { classifyTheme, summarizePreview, titleCaseTheme } from "./project-introspection.js";
-import { detectProject, resolveProjectIdentity, type ProjectIdentityResolution } from "./project.js";
+import { detectProject, getCurrentGitBranch, resolveProjectIdentity, type ProjectIdentityResolution } from "./project.js";
 import { VaultManager, type Vault } from "./vault.js";
 import { Migrator } from "./migration.js";
 import { parseMemorySections } from "./import.js";
@@ -475,16 +478,6 @@ function formatProjectIdentityText(identity: ProjectIdentityResolution): string 
   return lines.join("\n");
 }
 
-async function getProjectPolicyScope(cwd?: string): Promise<ProjectPolicyScope | undefined> {
-  const project = await resolveProject(cwd);
-  if (!project) {
-    return undefined;
-  }
-
-  const policy = await configStore.getProjectPolicy(project.id);
-  return policy?.defaultScope;
-}
-
 function describeLifecycle(lifecycle: NoteLifecycle): string {
   return `lifecycle: ${lifecycle}`;
 }
@@ -616,6 +609,71 @@ function formatAskForWriteScope(
     "",
     "To avoid being asked again: call `set_project_memory_policy` with your preferred scope.",
   ].join("\n");
+}
+
+function formatAskForProtectedBranch(
+  project: Awaited<ReturnType<typeof resolveProject>>,
+  branch: string,
+  patterns: string[],
+): string {
+  const projectLabel = project ? `${project.name} (${project.id})` : "this context";
+  return [
+    `Protected branch check for ${projectLabel}: current branch \`${branch}\` matches ${patterns.join(", ")}.`,
+    "Choose how to proceed:",
+    "- One-time override: call `remember` again with `allowProtectedBranch: true`",
+    "- Persist policy: call `set_project_memory_policy` with `protectedBranchBehavior: \"block\"`",
+    "- Persist policy: call `set_project_memory_policy` with `protectedBranchBehavior: \"allow\"`",
+    "",
+    "Optional: set `protectedBranchPatterns` to customize which branches are protected.",
+  ].join("\n");
+}
+
+function formatProtectedBranchBlocked(
+  project: Awaited<ReturnType<typeof resolveProject>>,
+  branch: string,
+  patterns: string[],
+): string {
+  const projectLabel = project ? `${project.name} (${project.id})` : "this context";
+  return [
+    `Auto-commit blocked for ${projectLabel}: current branch \`${branch}\` matches protected patterns ${patterns.join(", ")}.`,
+    "Policy is set to `protectedBranchBehavior: \"block\"`.",
+    "To proceed once, call `remember` again with `allowProtectedBranch: true`.",
+    "To change the default, call `set_project_memory_policy` with `protectedBranchBehavior: \"allow\"`.",
+  ].join("\n");
+}
+
+async function shouldBlockProtectedBranchCommit(options: {
+  cwd?: string;
+  writeScope: WriteScope;
+  automaticCommit: boolean;
+  project: Awaited<ReturnType<typeof resolveProject>>;
+  policy: ProjectMemoryPolicy | undefined;
+  allowProtectedBranch: boolean;
+}): Promise<{ blocked: boolean; message?: string }> {
+  const { cwd, writeScope, automaticCommit, project, policy, allowProtectedBranch } = options;
+  if (!cwd || writeScope !== "project" || !automaticCommit) {
+    return { blocked: false };
+  }
+
+  const branch = await getCurrentGitBranch(cwd);
+  if (!branch) {
+    return { blocked: false };
+  }
+
+  const patterns = resolveProtectedBranchPatterns(policy);
+  if (!isProtectedBranch(branch, patterns) || allowProtectedBranch) {
+    return { blocked: false };
+  }
+
+  const behavior = resolveProtectedBranchBehavior(policy);
+  if (behavior === "allow") {
+    return { blocked: false };
+  }
+
+  const message = behavior === "block"
+    ? formatProtectedBranchBlocked(project, branch, patterns)
+    : formatAskForProtectedBranch(project, branch, patterns);
+  return { blocked: true, message };
 }
 
 async function embedMissingNotes(
@@ -1359,7 +1417,9 @@ server.registerTool(
       "- Multiple related notes have accumulated — use `consolidate` to merge them\n\n" +
       "After storing: consider whether this note relates to any note you recalled earlier in this session. " +
       "If so, call `relate` to link them while you still have context.\n\n" +
-      "Side effects: writes note + embedding files, git commits. Returns persistence status.",
+      "Side effects: writes note + embedding files, git commits. " +
+      "When project-vault writes target protected branches, policy may ask or block before writing. " +
+      "Returns persistence status.",
     annotations: {
       readOnlyHint: false,
       destructiveHint: false,
@@ -1392,19 +1452,40 @@ server.registerTool(
           "Where to store: 'project' = shared project vault (.mnemonic/), " +
           "'global' = private main vault. When omitted, uses the project's saved policy or defaults to 'project'."
         ),
+      allowProtectedBranch: z
+        .boolean()
+        .optional()
+        .describe(
+          "One-time override for protected branch checks. " +
+          "When true, remember can commit on a protected branch without changing project policy."
+        ),
     }),
     outputSchema: RememberResultSchema,
   },
-  async ({ title, content, tags, lifecycle, summary, cwd, scope }) => {
+  async ({ title, content, tags, lifecycle, summary, cwd, scope, allowProtectedBranch = false }) => {
     const project = await resolveProject(cwd);
     const cleanedContent = await cleanMarkdown(content);
-    const policyScope = await getProjectPolicyScope(cwd);
+    const policy = project ? await configStore.getProjectPolicy(project.id) : undefined;
+    const policyScope = policy?.defaultScope;
     const projectVaultExists = cwd ? Boolean(await vaultManager.getProjectVaultIfExists(cwd)) : true;
     const writeScope = resolveWriteScope(scope, policyScope, Boolean(project), projectVaultExists);
     if (writeScope === "ask") {
       const unadopted = !projectVaultExists && !policyScope;
       return { content: [{ type: "text", text: formatAskForWriteScope(project, unadopted) }], isError: true };
     }
+
+    const protectedBranchCheck = await shouldBlockProtectedBranchCommit({
+      cwd,
+      writeScope,
+      automaticCommit: scope === undefined,
+      project,
+      policy,
+      allowProtectedBranch,
+    });
+    if (protectedBranchCheck.blocked) {
+      return { content: [{ type: "text", text: protectedBranchCheck.message ?? "Protected branch policy blocked this commit." }], isError: true };
+    }
+
     const vault = await resolveWriteVault(cwd, writeScope);
 
     const id = makeId(title);
@@ -1487,10 +1568,11 @@ server.registerTool(
   {
     title: "Set Project Memory Policy",
     description:
-      "Set the default write scope and consolidation mode for a project.\n\n" +
+      "Set the default write scope, consolidation mode, and protected-branch behavior for a project.\n\n" +
       "Use this when:\n" +
       "- The user wants all memories for a project to go to a specific vault by default\n" +
-      "- The current 'ask' behavior is inconvenient and should be automated\n\n" +
+      "- The current 'ask' behavior is inconvenient and should be automated\n" +
+      "- Protected branches should prompt, block, or allow project-vault commits by default\n\n" +
       "Do not use this when:\n" +
       "- You just need to store a single memory with a specific scope — pass `scope` to `remember` instead\n\n" +
       "Side effects: writes to main vault config.json, git commits and pushes.",
@@ -1502,38 +1584,82 @@ server.registerTool(
     },
     inputSchema: z.object({
       cwd: z.string().describe("Absolute path to the project working directory"),
-      defaultScope: z.enum(PROJECT_POLICY_SCOPES).describe(
+      defaultScope: z.enum(PROJECT_POLICY_SCOPES).optional().describe(
         "Default storage: 'project' = shared .mnemonic/ vault, 'global' = private main vault, 'ask' = prompt each time"
       ),
       consolidationMode: z.enum(CONSOLIDATION_MODES).optional().describe(
         "Default consolidation mode: 'supersedes' preserves history (default), 'delete' removes sources immediately"
       ),
+      protectedBranchBehavior: z.enum(PROTECTED_BRANCH_BEHAVIORS).optional().describe(
+        "Behavior for protected-branch matches during project-vault remember writes: 'ask', 'block', or 'allow'"
+      ),
+      protectedBranchPatterns: z.array(z.string()).optional().describe(
+        "Protected branch glob patterns. Defaults to [\"main\", \"master\", \"release*\"] when not set"
+      ),
     }),
     outputSchema: PolicyResultSchema,
   },
-  async ({ cwd, defaultScope, consolidationMode }) => {
+  async ({ cwd, defaultScope, consolidationMode, protectedBranchBehavior, protectedBranchPatterns }) => {
     const project = await resolveProject(cwd);
     if (!project) {
       return { content: [{ type: "text", text: `Could not detect a project for: ${cwd}` }], isError: true };
     }
 
+    if (
+      defaultScope === undefined
+      && consolidationMode === undefined
+      && protectedBranchBehavior === undefined
+      && protectedBranchPatterns === undefined
+    ) {
+      return {
+        content: [{
+          type: "text",
+          text: "No policy fields provided. Set at least one of: defaultScope, consolidationMode, protectedBranchBehavior, protectedBranchPatterns.",
+        }],
+        isError: true,
+      };
+    }
+
+    const existing = await configStore.getProjectPolicy(project.id);
+    const effectiveDefaultScope = defaultScope ?? existing?.defaultScope ?? "project";
+    const effectiveConsolidationMode = consolidationMode ?? existing?.consolidationMode;
+    const effectiveProtectedBranchBehavior = protectedBranchBehavior ?? existing?.protectedBranchBehavior;
+    const effectiveProtectedBranchPatterns = protectedBranchPatterns
+      ? protectedBranchPatterns.map((pattern) => pattern.trim()).filter((pattern) => pattern.length > 0)
+      : existing?.protectedBranchPatterns;
+
     const now = new Date().toISOString();
     const policy: ProjectMemoryPolicy = {
       projectId: project.id,
       projectName: project.name,
-      defaultScope,
-      consolidationMode,
+      defaultScope: effectiveDefaultScope,
+      consolidationMode: effectiveConsolidationMode,
+      protectedBranchBehavior: effectiveProtectedBranchBehavior,
+      protectedBranchPatterns: effectiveProtectedBranchPatterns,
       updatedAt: now,
     };
     await configStore.setProjectPolicy(policy);
 
-    const modeStr = consolidationMode ? `, consolidationMode=${consolidationMode}` : "";
+    const modeStr = effectiveConsolidationMode ? `, consolidationMode=${effectiveConsolidationMode}` : "";
+    const branchBehaviorStr = effectiveProtectedBranchBehavior
+      ? `, protectedBranchBehavior=${effectiveProtectedBranchBehavior}`
+      : "";
+    const branchPatternsStr = effectiveProtectedBranchPatterns && effectiveProtectedBranchPatterns.length > 0
+      ? `, protectedBranchPatterns=${effectiveProtectedBranchPatterns.join("|")}`
+      : "";
     const commitBody = formatCommitBody({
       projectName: project.name,
-      description: `Default scope: ${defaultScope}${modeStr ? `\nConsolidation mode: ${consolidationMode}` : ""}`,
+      description:
+        `Default scope: ${effectiveDefaultScope}` +
+        `${effectiveConsolidationMode ? `\nConsolidation mode: ${effectiveConsolidationMode}` : ""}` +
+        `${effectiveProtectedBranchBehavior ? `\nProtected branch behavior: ${effectiveProtectedBranchBehavior}` : ""}` +
+        `${effectiveProtectedBranchPatterns && effectiveProtectedBranchPatterns.length > 0
+          ? `\nProtected branch patterns: ${effectiveProtectedBranchPatterns.join(", ")}`
+          : ""
+        }`,
     });
     await vaultManager.main.git.commit(
-      `policy: ${project.name} default scope ${defaultScope}`,
+      `policy: ${project.name} default scope ${effectiveDefaultScope}`,
       ["config.json"],
       commitBody
     );
@@ -1542,15 +1668,19 @@ server.registerTool(
     const structuredContent: PolicyResult = {
       action: "policy_set",
       project: { id: project.id, name: project.name },
-      defaultScope,
-      consolidationMode,
+      defaultScope: effectiveDefaultScope,
+      consolidationMode: effectiveConsolidationMode,
+      protectedBranchBehavior: effectiveProtectedBranchBehavior,
+      protectedBranchPatterns: effectiveProtectedBranchPatterns,
       timestamp: now,
     };
 
     return {
       content: [{
         type: "text",
-        text: `Project memory policy set for ${project.name}: defaultScope=${defaultScope}${modeStr}`,
+        text:
+          `Project memory policy set for ${project.name}: defaultScope=${effectiveDefaultScope}` +
+          `${modeStr}${branchBehaviorStr}${branchPatternsStr}`,
       }],
       structuredContent,
     };
@@ -1563,7 +1693,7 @@ server.registerTool(
   {
     title: "Get Project Memory Policy",
     description:
-      "Show the saved default write scope and consolidation mode for a project.\n\n" +
+      "Show the saved default write scope, consolidation mode, and protected-branch settings for a project.\n\n" +
       "Use this when:\n" +
       "- Checking what the current storage default is before changing it\n" +
       "- Debugging why memories are landing in an unexpected vault\n\n" +
@@ -1604,13 +1734,24 @@ server.registerTool(
       project: { id: project.id, name: project.name },
       defaultScope: policy.defaultScope,
       consolidationMode: policy.consolidationMode,
+      protectedBranchBehavior: policy.protectedBranchBehavior,
+      protectedBranchPatterns: policy.protectedBranchPatterns,
       updatedAt: policy.updatedAt,
     };
+
+    const details = [
+      `defaultScope=${policy.defaultScope}`,
+      policy.consolidationMode ? `consolidationMode=${policy.consolidationMode}` : undefined,
+      policy.protectedBranchBehavior ? `protectedBranchBehavior=${policy.protectedBranchBehavior}` : undefined,
+      policy.protectedBranchPatterns && policy.protectedBranchPatterns.length > 0
+        ? `protectedBranchPatterns=${policy.protectedBranchPatterns.join("|")}`
+        : undefined,
+    ].filter(Boolean).join(", ");
 
     return {
       content: [{
         type: "text",
-        text: `Project memory policy for ${project.name}: defaultScope=${policy.defaultScope} (updated ${policy.updatedAt})`,
+        text: `Project memory policy for ${project.name}: ${details} (updated ${policy.updatedAt})`,
       }],
       structuredContent,
     };

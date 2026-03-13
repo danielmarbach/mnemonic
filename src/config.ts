@@ -1,7 +1,12 @@
 import fs from "fs/promises";
 import path from "path";
 
-import type { ProjectMemoryPolicy } from "./project-memory-policy.js";
+import {
+  CONSOLIDATION_MODES,
+  PROJECT_POLICY_SCOPES,
+  PROTECTED_BRANCH_BEHAVIORS,
+  type ProjectMemoryPolicy,
+} from "./project-memory-policy.js";
 import type { ProjectIdentityOverride } from "./project.js";
 
 export type MutationPushMode = "all" | "main-only" | "none";
@@ -73,6 +78,69 @@ function normalizeProjectIdentityOverrides(value: unknown): Record<string, Proje
     normalized[projectId] = {
       remoteName: remoteName.trim(),
       updatedAt: typeof updatedAt === "string" ? updatedAt : "",
+    };
+  }
+
+  return normalized;
+}
+
+function normalizeProjectMemoryPolicies(value: unknown): Record<string, ProjectMemoryPolicy> {
+  if (!value || typeof value !== "object") {
+    return {};
+  }
+
+  const normalized: Record<string, ProjectMemoryPolicy> = {};
+  for (const [projectId, policy] of Object.entries(value)) {
+    if (!policy || typeof policy !== "object") {
+      continue;
+    }
+
+    const policyRecord = policy as {
+      projectId?: unknown;
+      projectName?: unknown;
+      defaultScope?: unknown;
+      consolidationMode?: unknown;
+      protectedBranchPatterns?: unknown;
+      protectedBranchBehavior?: unknown;
+      updatedAt?: unknown;
+    };
+
+    const normalizedProjectId =
+      typeof policyRecord.projectId === "string" && policyRecord.projectId.trim().length > 0
+        ? policyRecord.projectId.trim()
+        : projectId;
+
+    const defaultScope = PROJECT_POLICY_SCOPES.includes(policyRecord.defaultScope as (typeof PROJECT_POLICY_SCOPES)[number])
+      ? (policyRecord.defaultScope as (typeof PROJECT_POLICY_SCOPES)[number])
+      : "project";
+
+    const consolidationMode = CONSOLIDATION_MODES.includes(
+      policyRecord.consolidationMode as (typeof CONSOLIDATION_MODES)[number]
+    )
+      ? (policyRecord.consolidationMode as (typeof CONSOLIDATION_MODES)[number])
+      : undefined;
+
+    const protectedBranchBehavior = PROTECTED_BRANCH_BEHAVIORS.includes(
+      policyRecord.protectedBranchBehavior as (typeof PROTECTED_BRANCH_BEHAVIORS)[number]
+    )
+      ? (policyRecord.protectedBranchBehavior as (typeof PROTECTED_BRANCH_BEHAVIORS)[number])
+      : undefined;
+
+    const protectedBranchPatterns = Array.isArray(policyRecord.protectedBranchPatterns)
+      ? policyRecord.protectedBranchPatterns
+        .filter((pattern): pattern is string => typeof pattern === "string")
+        .map((pattern) => pattern.trim())
+        .filter((pattern) => pattern.length > 0)
+      : undefined;
+
+    normalized[projectId] = {
+      projectId: normalizedProjectId,
+      projectName: typeof policyRecord.projectName === "string" ? policyRecord.projectName : undefined,
+      defaultScope,
+      consolidationMode,
+      protectedBranchPatterns,
+      protectedBranchBehavior,
+      updatedAt: typeof policyRecord.updatedAt === "string" ? policyRecord.updatedAt : "",
     };
   }
 
@@ -159,7 +227,7 @@ export class MnemonicConfigStore {
         schemaVersion: normalizeSchemaVersion(parsed.schemaVersion),
         reindexEmbedConcurrency: normalizeConcurrency(parsed.reindexEmbedConcurrency),
         mutationPushMode: normalizeMutationPushMode(parsed.mutationPushMode),
-        projectMemoryPolicies: parsed.projectMemoryPolicies ?? {},
+        projectMemoryPolicies: normalizeProjectMemoryPolicies(parsed.projectMemoryPolicies),
         projectIdentityOverrides: normalizeProjectIdentityOverrides(parsed.projectIdentityOverrides),
       };
     } catch {

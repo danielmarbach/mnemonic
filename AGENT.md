@@ -170,7 +170,7 @@ When `recall` called with `cwd`, project notes get **+0.15 cosine similarity boo
 - Main vault's own git repo excluded from detection (`isMainRepo()` guard)
 
 ### Main vault config
-Machine-local settings in `~/mnemonic-vault/config.json`. Survives sessions without becoming memory notes. Includes `reindexEmbedConcurrency`, `mutationPushMode` (`all` | `main-only` | `none`), per-project policy defaults, and optional project-identity remote overrides for fork workflows.
+Machine-local settings in `~/mnemonic-vault/config.json`. Survives sessions without becoming memory notes. Includes `reindexEmbedConcurrency`, `mutationPushMode` (`all` | `main-only` | `none`), per-project policy defaults (write scope, consolidation mode, protected-branch behavior/patterns), and optional project-identity remote overrides for fork workflows.
 
 ### Bidirectional sync
 `sync` does: fetch/pull/push when a remote exists, plus embedding backfill on every run. `sync { force: true }` rebuilds all embeddings. Single call, linear history. Syncs main vault; pass `cwd` for project vault too. Mutating tools may skip auto-push based on `mutationPushMode`, but `sync` remains the explicit catch-up path.
@@ -224,7 +224,7 @@ Keep these high-level anchors in mind:
 | `forget` | Delete note + embedding, git commit + push, cleanup relationships |
 | `get` | Fetch one or more notes by exact id |
 | `get_project_identity` | Show effective project identity and remote override |
-| `get_project_memory_policy` | Show saved default write scope |
+| `get_project_memory_policy` | Show saved write scope, consolidation mode, and protected-branch settings |
 | `list` | List notes filtered by scope/tags/storage |
 | `list_migrations` | List available migrations and pending count |
 | `memory_graph` | Show compact adjacency list of relationships |
@@ -235,7 +235,7 @@ Keep these high-level anchors in mind:
 | `remember` | Write note + embedding; `cwd` sets context, `scope` picks storage, `lifecycle` picks temporary vs permanent |
 | `relate` | Create typed relationship between notes (bidirectional) |
 | `set_project_identity` | Save which git remote defines project identity |
-| `set_project_memory_policy` | Save default write scope for project (`project`, `global`, `ask`) |
+| `set_project_memory_policy` | Save project policy defaults (scope, consolidation mode, protected-branch behavior/patterns) |
 | `sync` | Git sync when remote exists plus embedding backfill always; `force=true` rebuilds all embeddings |
 | `unrelate` | Remove relationship between notes |
 | `update` | Update note content/title/tags/lifecycle, re-embeds always |

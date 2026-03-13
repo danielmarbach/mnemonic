@@ -210,6 +210,90 @@ describe("local MCP script", () => {
     }
   }, 20000);
 
+  it("applies protected branch policy for project-vault remember writes", async () => {
+    const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-vault-"));
+    const repoDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-project-"));
+    tempDirs.push(vaultDir, repoDir);
+
+    await execFileAsync("git", ["init"], { cwd: repoDir });
+    await execFileAsync("git", ["checkout", "-B", "main"], { cwd: repoDir });
+
+    const embeddingServer = await startFakeEmbeddingServer();
+
+    try {
+      const bootstrapRemember = await callLocalMcpResponse(vaultDir, "remember", {
+        title: "Protected branch bootstrap note",
+        content: "Bootstraps project vault adoption with explicit scope.",
+        tags: ["integration", "protected-branch"],
+        summary: "Bootstrap project vault for protected branch policy test",
+        cwd: repoDir,
+        scope: "project",
+      }, embeddingServer.url);
+      const bootstrapId = extractRememberedId(bootstrapRemember.text);
+      await expect(stat(path.join(repoDir, ".mnemonic", "notes", `${bootstrapId}.md`))).resolves.toBeDefined();
+
+      const protectedAsk = await callLocalMcp(vaultDir, "remember", {
+        title: "Protected branch ask note",
+        content: "Should prompt for branch policy before writing.",
+        tags: ["integration", "protected-branch"],
+        summary: "Prompt for protected branch commit behavior",
+        cwd: repoDir,
+      }, embeddingServer.url);
+
+      expect(protectedAsk).toContain("Protected branch check");
+      expect(protectedAsk).toContain("allowProtectedBranch: true");
+      expect(protectedAsk).toContain("protectedBranchBehavior");
+
+      const setAllow = await callLocalMcpResponse(vaultDir, "set_project_memory_policy", {
+        cwd: repoDir,
+        protectedBranchBehavior: "allow",
+      }, embeddingServer.url);
+      expect(setAllow.text).toContain("protectedBranchBehavior=allow");
+      expect(setAllow.structuredContent?.["protectedBranchBehavior"]).toBe("allow");
+
+      const allowedRemember = await callLocalMcpResponse(vaultDir, "remember", {
+        title: "Protected branch allowed note",
+        content: "Should write and commit on protected branch after allow policy.",
+        tags: ["integration", "protected-branch"],
+        summary: "Allow protected branch remember commits for this project",
+        cwd: repoDir,
+      }, embeddingServer.url);
+
+      const allowedId = extractRememberedId(allowedRemember.text);
+      await expect(stat(path.join(repoDir, ".mnemonic", "notes", `${allowedId}.md`))).resolves.toBeDefined();
+
+      const setBlock = await callLocalMcpResponse(vaultDir, "set_project_memory_policy", {
+        cwd: repoDir,
+        protectedBranchBehavior: "block",
+      }, embeddingServer.url);
+      expect(setBlock.text).toContain("protectedBranchBehavior=block");
+
+      const protectedBlock = await callLocalMcp(vaultDir, "remember", {
+        title: "Protected branch blocked note",
+        content: "Should be blocked when policy says block.",
+        tags: ["integration", "protected-branch"],
+        summary: "Block protected branch remember commits for this project",
+        cwd: repoDir,
+      }, embeddingServer.url);
+
+      expect(protectedBlock).toContain("Auto-commit blocked");
+
+      const overrideRemember = await callLocalMcpResponse(vaultDir, "remember", {
+        title: "Protected branch override note",
+        content: "One-time override should bypass block policy.",
+        tags: ["integration", "protected-branch"],
+        summary: "Use one-time protected branch override for remember",
+        cwd: repoDir,
+        allowProtectedBranch: true,
+      }, embeddingServer.url);
+
+      const overrideId = extractRememberedId(overrideRemember.text);
+      await expect(stat(path.join(repoDir, ".mnemonic", "notes", `${overrideId}.md`))).resolves.toBeDefined();
+    } finally {
+      await embeddingServer.close();
+    }
+  }, 25000);
+
   it("skips auto-push for project-vault mutations by default", async () => {
     const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-vault-"));
     const remoteDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-remote-"));
