@@ -1690,6 +1690,26 @@ args = [<span class="str">"@danielmarbach/mnemonic-mcp"</span>]
 [mcp_servers.mnemonic.env]
 VAULT_PATH = <span class="str">"/Users/you/mnemonic-vault"</span></pre>
         </div>
+
+        <h3>VS Code</h3>
+        <p style="font-size:0.85rem;margin:8px 0 12px">Open the command palette and search for <strong>MCP: Open User Configuration</strong>, or edit <code>mcp.json</code> directly, then add the snippet below.</p>
+        <div class="code-block">
+          <div class="code-block-header">
+            <span class="code-label">mcp.json</span>
+            <button class="copy-btn" onclick="copyCode(this)">copy</button>
+          </div>
+          <pre>{
+  <span class="key">"servers"</span>: {
+    <span class="key">"mnemonic"</span>: {
+      <span class="key">"command"</span>: <span class="str">"npx"</span>,
+      <span class="key">"args"</span>: [<span class="str">"@danielmarbach/mnemonic-mcp"</span>],
+      <span class="key">"env"</span>: {
+        <span class="key">"VAULT_PATH"</span>: <span class="str">"/Users/YOU/mnemonic-vault"</span>
+      }
+    }
+  }
+}</pre>
+        </div>
       </div>
     </div>
 
