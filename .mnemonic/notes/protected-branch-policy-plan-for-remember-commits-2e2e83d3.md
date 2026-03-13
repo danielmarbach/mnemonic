@@ -1,14 +1,15 @@
 ---
-title: Protected branch policy design decisions for remember commits
+title: Protected branch policy decisions and implementation for remember commits
 tags:
   - policy
   - git
   - protected-branches
   - feature-49
   - design
+  - implementation
 lifecycle: permanent
 createdAt: '2026-03-13T07:52:12.728Z'
-updatedAt: '2026-03-13T07:54:32.268Z'
+updatedAt: '2026-03-13T08:18:19.580Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
@@ -16,38 +17,40 @@ relatedTo:
     type: explains
 memoryVersion: 1
 ---
-Design decisions for feature request #49 (avoid automatic commits on protected branches).
+Feature #49 is implemented: automatic project-vault commits in `remember` now respect protected-branch policy, using local branch matching only.
 
-Core direction:
+Final decisions and behavior:
 
-- Keep detection local-only. Do not query GitHub branch protection APIs.
-- Reuse existing per-project policy storage in main-vault config (`projectMemoryPolicies`) instead of introducing a new top-level config section.
-- Keep commit behavior deterministic: if the current branch matches a protected pattern, behavior is policy-driven and explicit.
-
-Policy model:
-
-- Extend `ProjectMemoryPolicy` with:
-  - `protectedBranchPatterns: string[]` (glob-like patterns)
+- Detection is local-only (no GitHub branch protection API calls).
+- Policy is stored in existing per-project config under `projectMemoryPolicies`.
+- `ProjectMemoryPolicy` includes:
+  - `protectedBranchPatterns: string[]`
   - `protectedBranchBehavior: "ask" | "block" | "allow"`
-- Built-in default patterns when unset: `main`, `master`, `release*`.
-- Default behavior when unset: `ask`.
+- Built-in protected branch patterns: `main`, `master`, `release*`.
 
-Runtime behavior (remember + project-vault writes):
+Runtime semantics:
 
-- `allow`: proceed with note write + commit/push flow.
-- `block`: reject auto-commit path on protected branch with clear remediation text.
-- `ask`: return actionable guidance that offers two paths:
-  1) one-time override to proceed now, and
-  2) persistent policy update to `block` or `allow` so the user is not prompted again.
+- Protected-branch checks apply to automatic project-vault commits (scope omitted).
+- `protectedBranchBehavior: "ask"` returns actionable guidance with:
+  1) one-time override via `allowProtectedBranch: true`, and
+  2) persistent policy options (`block` or `allow`).
+- `block` refuses automatic commit with remediation text.
+- `allow` proceeds normally.
+- Explicit `scope` continues to work and does not trigger protected-branch prompting.
 
-UX constraints:
+Compatibility tradeoff:
 
-- Never silently skip commit.
-- Never auto-create/switch branches.
-- Preserve existing non-project and main-vault behavior.
-- Keep fallback defaults safe and discoverable through tool descriptions/output.
+- No-policy projects default to `ask` for safer first-time behavior on common protected branches.
+- Existing project policies without `protectedBranchBehavior` default to `allow` to avoid breaking established workflows.
 
-Compatibility:
+Implementation completed across:
 
-- Existing policies remain valid; new fields are optional.
-- If users never configure branch behavior, default patterns + `ask` handle common protected branches out of the box.
+- policy + matching helpers, config normalization, current-branch detection
+- remember guard + one-time override input
+- set/get project policy schemas/descriptions/structured output
+- README + AGENT documentation updates
+- unit + integration coverage (including ask/block/allow and override)
+
+Validation:
+
+- Targeted tests passed: `tests/project-memory-policy.test.ts`, `tests/config.test.ts`, `tests/mcp.integration.test.ts` (53/53).
