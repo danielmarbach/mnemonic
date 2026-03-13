@@ -289,10 +289,133 @@ describe("local MCP script", () => {
 
       const overrideId = extractRememberedId(overrideRemember.text);
       await expect(stat(path.join(repoDir, ".mnemonic", "notes", `${overrideId}.md`))).resolves.toBeDefined();
+
+      const protectedUpdateAsk = await callLocalMcp(vaultDir, "update", {
+        id: overrideId,
+        content: "Update should ask for protected-branch override.",
+        cwd: repoDir,
+      }, embeddingServer.url);
+      expect(protectedUpdateAsk).toContain("Auto-commit blocked");
+      expect(protectedUpdateAsk).toContain("`update`");
+
+      const protectedUpdateOverride = await callLocalMcp(vaultDir, "update", {
+        id: overrideId,
+        content: "Update with one-time override should proceed.",
+        cwd: repoDir,
+        allowProtectedBranch: true,
+      }, embeddingServer.url);
+      expect(protectedUpdateOverride).toContain(`Updated memory '${overrideId}'`);
+
+      const projectForgetRemember = await callLocalMcpResponse(vaultDir, "remember", {
+        title: "Protected branch forget note",
+        content: "Used to verify protected branch checks for forget.",
+        tags: ["integration", "protected-branch"],
+        summary: "Create note for protected branch forget test",
+        cwd: repoDir,
+        scope: "project",
+      }, embeddingServer.url);
+      const forgetId = extractRememberedId(projectForgetRemember.text);
+
+      const protectedForgetAsk = await callLocalMcp(vaultDir, "forget", {
+        id: forgetId,
+        cwd: repoDir,
+      }, embeddingServer.url);
+      expect(protectedForgetAsk).toContain("Auto-commit blocked");
+      expect(protectedForgetAsk).toContain("`forget`");
+
+      const protectedForgetOverride = await callLocalMcp(vaultDir, "forget", {
+        id: forgetId,
+        cwd: repoDir,
+        allowProtectedBranch: true,
+      }, embeddingServer.url);
+      expect(protectedForgetOverride).toContain(`Forgotten '${forgetId}'`);
+
+      const moveRemember = await callLocalMcpResponse(vaultDir, "remember", {
+        title: "Protected branch move source",
+        content: "Created as global note for move protected-branch test.",
+        tags: ["integration", "protected-branch"],
+        summary: "Create global note for protected branch move test",
+        scope: "global",
+      }, embeddingServer.url);
+      const moveId = extractRememberedId(moveRemember.text);
+
+      const protectedMoveAsk = await callLocalMcp(vaultDir, "move_memory", {
+        id: moveId,
+        target: "project-vault",
+        cwd: repoDir,
+      }, embeddingServer.url);
+      expect(protectedMoveAsk).toContain("Auto-commit blocked");
+      expect(protectedMoveAsk).toContain("`move_memory`");
+
+      const protectedMoveOverride = await callLocalMcp(vaultDir, "move_memory", {
+        id: moveId,
+        target: "project-vault",
+        cwd: repoDir,
+        allowProtectedBranch: true,
+      }, embeddingServer.url);
+      expect(protectedMoveOverride).toContain(`Moved '${moveId}'`);
+
+      const consolidateA = await callLocalMcpResponse(vaultDir, "remember", {
+        title: "Protected branch consolidate A",
+        content: "First note for consolidate policy coverage.",
+        tags: ["integration", "protected-branch", "consolidate"],
+        summary: "Create first consolidate source note",
+        cwd: repoDir,
+        scope: "project",
+      }, embeddingServer.url);
+      const consolidateAId = extractRememberedId(consolidateA.text);
+
+      const consolidateB = await callLocalMcpResponse(vaultDir, "remember", {
+        title: "Protected branch consolidate B",
+        content: "Second note for consolidate policy coverage.",
+        tags: ["integration", "protected-branch", "consolidate"],
+        summary: "Create second consolidate source note",
+        cwd: repoDir,
+        scope: "project",
+      }, embeddingServer.url);
+      const consolidateBId = extractRememberedId(consolidateB.text);
+
+      const protectedConsolidateAsk = await callLocalMcp(vaultDir, "consolidate", {
+        cwd: repoDir,
+        strategy: "execute-merge",
+        mergePlan: {
+          sourceIds: [consolidateAId, consolidateBId],
+          targetTitle: "Protected branch consolidate target",
+        },
+      }, embeddingServer.url);
+      expect(protectedConsolidateAsk).toContain("Auto-commit blocked");
+      expect(protectedConsolidateAsk).toContain("`consolidate`");
+
+      const protectedConsolidateOverride = await callLocalMcp(vaultDir, "consolidate", {
+        cwd: repoDir,
+        strategy: "execute-merge",
+        mergePlan: {
+          sourceIds: [consolidateAId, consolidateBId],
+          targetTitle: "Protected branch consolidate target",
+        },
+        allowProtectedBranch: true,
+      }, embeddingServer.url);
+      expect(protectedConsolidateOverride).toContain("Consolidated 2 notes");
+
+      const protectedPruneAsk = await callLocalMcp(vaultDir, "consolidate", {
+        cwd: repoDir,
+        strategy: "prune-superseded",
+        mode: "delete",
+      }, embeddingServer.url);
+      expect(protectedPruneAsk).toContain("Auto-commit blocked");
+      expect(protectedPruneAsk).toContain("`consolidate`");
+
+      const protectedPruneOverride = await callLocalMcp(vaultDir, "consolidate", {
+        cwd: repoDir,
+        strategy: "prune-superseded",
+        mode: "delete",
+        allowProtectedBranch: true,
+      }, embeddingServer.url);
+      expect(protectedPruneOverride).toContain("Pruned");
     } finally {
       await embeddingServer.close();
     }
-  }, 25000);
+  }, 35000);
 
   it("skips auto-push for project-vault mutations by default", async () => {
     const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-vault-"));
@@ -361,6 +484,7 @@ describe("local MCP script", () => {
         id: noteId,
         target: "project-vault",
         cwd: repoDir,
+        allowProtectedBranch: true,
       }, embeddingServer.url);
 
       expect(moveText).toContain("Project association is now");
@@ -399,6 +523,7 @@ describe("local MCP script", () => {
         id: noteId,
         target: "main-vault",
         cwd: repoDir,
+        allowProtectedBranch: true,
       }, embeddingServer.url);
 
       expect(moveText).toContain("Project association remains");
@@ -437,6 +562,7 @@ describe("local MCP script", () => {
         id: noteId,
         target: "project-vault",
         cwd: repoDir,
+        allowProtectedBranch: true,
       }, embeddingServer.url);
       expect(moveToProject.text).toContain("Project association is now");
 
@@ -444,6 +570,7 @@ describe("local MCP script", () => {
         id: noteId,
         target: "main-vault",
         cwd: repoDir,
+        allowProtectedBranch: true,
       }, embeddingServer.url);
       expect(moveBackToMain.text).toContain("Project association remains");
 
@@ -873,6 +1000,7 @@ describe("local MCP script", () => {
           sourceIds: [firstId, secondId],
           targetTitle: "Consolidated implementation plan",
         },
+        allowProtectedBranch: true,
       }, embeddingServer.url);
 
       expect(consolidateText).toContain("Mode: delete");
@@ -933,6 +1061,7 @@ describe("local MCP script", () => {
           targetTitle: "Persistence status reporting",
           content: distilledContent,
         },
+        allowProtectedBranch: true,
       }, embeddingServer.url);
 
       expect(consolidateText).toContain("Mode: delete");
@@ -992,6 +1121,7 @@ describe("local MCP script", () => {
           targetTitle: "Retry-safe consolidated note",
           content: "First consolidated body.",
         },
+        allowProtectedBranch: true,
       }, embeddingServer.url);
 
       const firstTargetIdMatch = firstMerge.match(/Consolidated \d+ notes into '([^']+)'/);
@@ -1007,6 +1137,7 @@ describe("local MCP script", () => {
           targetTitle: "Retry-safe consolidated note",
           content: "Updated consolidated body after retry.",
         },
+        allowProtectedBranch: true,
       }, embeddingServer.url);
 
       const secondTargetIdMatch = secondMerge.match(/Consolidated \d+ notes into '([^']+)'/);

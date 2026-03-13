@@ -4,6 +4,19 @@ All notable changes to `mnemonic` will be documented in this file.
 
 The format is loosely based on Keep a Changelog and uses semver-style version headings.
 
+## [0.7.0] - 2026-03-13
+
+### Added
+
+- Protected-branch one-time override input (`allowProtectedBranch`) for additional mutating tools that can commit to project vaults: `update`, `forget`, `move_memory`, and `consolidate` (mutating strategies).
+- Integration coverage for protected-branch policy now verifies ask/override flows across `update`, `forget`, `move_memory`, and `consolidate` in addition to `remember`.
+
+### Changed
+
+- Protected-branch policy enforcement now applies consistently to automatic project-vault commits from mutating tools, not just `remember`. Affected paths include `update`, `forget`, `move_memory`, and mutating `consolidate` strategies (`execute-merge`, `prune-superseded`).
+- Protected-branch guidance text now references the active tool when suggesting one-time override retries.
+- Tool descriptions/docs were updated to reflect cross-tool protected-branch behavior in `README.md`, `AGENT.md`, and `docs/index.html`.
+
 ## [0.6.0] - 2026-03-13
 
 ### Added

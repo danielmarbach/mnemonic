@@ -165,6 +165,7 @@ When `recall` called with `cwd`, project notes get **+0.15 cosine similarity boo
 - `remember` without `cwd` → main vault
 - `move_memory` main-vault → project-vault rewrites `project` / `projectName` from `cwd`
 - `move_memory` project-vault → main-vault preserves project association while changing storage
+- project-vault commits from mutating tools (`remember`, `update`, `forget`, `move_memory`, mutating `consolidate`) honor protected-branch policy (`ask` | `block` | `allow`)
 - `recall`, `list`, `get`, `sync` → project vault first, then main
 - `relate`/`unrelate`/`forget` → any vault, commit per vault
 - Main vault's own git repo excluded from detection (`isMainRepo()` guard)

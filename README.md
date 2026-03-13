@@ -208,7 +208,7 @@ User-tunable fields:
 | `mutationPushMode` | `"main-only"` | When to auto-push after a write: `"all"`, `"main-only"`, or `"none"` |
 
 `projectMemoryPolicies` and `projectIdentityOverrides` are written automatically by `set_project_memory_policy` and `set_project_identity` — no need to edit them by hand.
-Project memory policies can include protected-branch settings (`protectedBranchBehavior`, `protectedBranchPatterns`) used by `remember` when writing to project vaults.
+Project memory policies can include protected-branch settings (`protectedBranchBehavior`, `protectedBranchPatterns`) used by mutating tools when they commit to project vaults (`remember`, `update`, `forget`, `move_memory`, and mutating `consolidate` strategies).
 
 Example — raise concurrency on a fast machine and disable auto-push everywhere:
 
@@ -263,7 +263,7 @@ Use `set_project_memory_policy` to save per-project defaults:
 - protected-branch behavior for project-vault writes (`ask`, `block`, `allow`)
 - protected-branch patterns (glob strings; defaults are `main`, `master`, `release*`)
 
-When write scope policy is `ask`, `remember` returns a clear storage choice instead of guessing. When protected-branch behavior is `ask`, `remember` returns a one-time override option plus instructions to persist `block`/`allow`.
+When write scope policy is `ask`, `remember` returns a clear storage choice instead of guessing. When protected-branch behavior is `ask`, mutating tools that would commit to the project vault return a one-time override option (`allowProtectedBranch: true`) plus instructions to persist `block`/`allow`.
 
 ### Project identity
 
