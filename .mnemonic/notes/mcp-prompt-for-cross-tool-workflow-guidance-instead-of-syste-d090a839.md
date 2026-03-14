@@ -8,9 +8,12 @@ tags:
   - decision
 lifecycle: permanent
 createdAt: '2026-03-14T14:45:16.894Z'
-updatedAt: '2026-03-14T14:45:16.894Z'
+updatedAt: '2026-03-14T15:01:15.669Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: mnemonic-key-design-decisions-3f2a6273
+    type: related-to
 memoryVersion: 1
 ---
 Added `mnemonic-workflow-hint` as an optional MCP prompt (via `server.registerPrompt`) to surface cross-tool workflow guidance without bloating individual tool descriptions.
