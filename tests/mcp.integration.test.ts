@@ -289,6 +289,18 @@ describe("local MCP script", () => {
     const embeddingServer = await startFakeEmbeddingServer();
 
     try {
+      const explicitScopeBlocked = await callLocalMcp(vaultDir, "remember", {
+        title: "Protected branch explicit scope blocked note",
+        content: "Explicit project scope should still respect protected-branch policy.",
+        tags: ["integration", "protected-branch"],
+        summary: "Block explicit project scope remember on protected branch",
+        cwd: repoDir,
+        scope: "project",
+      }, embeddingServer.url);
+
+      expect(explicitScopeBlocked).toContain("Protected branch check");
+      expect(explicitScopeBlocked).toContain("allowProtectedBranch: true");
+
       const bootstrapRemember = await callLocalMcpResponse(vaultDir, "remember", {
         title: "Protected branch bootstrap note",
         content: "Bootstraps project vault adoption with explicit scope.",
@@ -296,6 +308,7 @@ describe("local MCP script", () => {
         summary: "Bootstrap project vault for protected branch policy test",
         cwd: repoDir,
         scope: "project",
+        allowProtectedBranch: true,
       }, embeddingServer.url);
       const bootstrapId = extractRememberedId(bootstrapRemember.text);
       await expect(stat(path.join(repoDir, ".mnemonic", "notes", `${bootstrapId}.md`))).resolves.toBeDefined();
@@ -381,6 +394,7 @@ describe("local MCP script", () => {
         summary: "Create note for protected branch forget test",
         cwd: repoDir,
         scope: "project",
+        allowProtectedBranch: true,
       }, embeddingServer.url);
       const forgetId = extractRememberedId(projectForgetRemember.text);
 
@@ -430,6 +444,7 @@ describe("local MCP script", () => {
         summary: "Create first consolidate source note",
         cwd: repoDir,
         scope: "project",
+        allowProtectedBranch: true,
       }, embeddingServer.url);
       const consolidateAId = extractRememberedId(consolidateA.text);
 
@@ -440,6 +455,7 @@ describe("local MCP script", () => {
         summary: "Create second consolidate source note",
         cwd: repoDir,
         scope: "project",
+        allowProtectedBranch: true,
       }, embeddingServer.url);
       const consolidateBId = extractRememberedId(consolidateB.text);
 

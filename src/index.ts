@@ -1636,7 +1636,7 @@ server.registerTool(
     const protectedBranchCheck = await shouldBlockProtectedBranchCommit({
       cwd,
       writeScope,
-      automaticCommit: scope === undefined,
+      automaticCommit: true,
       projectLabel: project ? `${project.name} (${project.id})` : "this context",
       policy,
       allowProtectedBranch,
