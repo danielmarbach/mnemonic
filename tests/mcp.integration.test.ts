@@ -20,6 +20,11 @@ const builtEntryPoint = path.join(repoRoot, "build", "index.js");
 
 const tempDirs: string[] = [];
 
+async function initTestRepo(repoDir: string, branch = "feature/test"): Promise<void> {
+  await execFileAsync("git", ["init"], { cwd: repoDir });
+  await execFileAsync("git", ["checkout", "-B", branch], { cwd: repoDir });
+}
+
 afterEach(async () => {
   await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })));
 });
@@ -154,7 +159,7 @@ describe("local MCP script", () => {
     const repoDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-project-"));
     tempDirs.push(vaultDir, repoDir);
 
-    await execFileAsync("git", ["init"], { cwd: repoDir });
+    await initTestRepo(repoDir);
     await execFileAsync("git", ["remote", "add", "origin", "git@github.com:user/myapp-fork.git"], { cwd: repoDir });
     await execFileAsync("git", ["remote", "add", "upstream", "git@github.com:acme/myapp.git"], { cwd: repoDir });
 
@@ -180,7 +185,7 @@ describe("local MCP script", () => {
     const repoDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-project-"));
     tempDirs.push(vaultDir, repoDir);
 
-    await execFileAsync("git", ["init"], { cwd: repoDir });
+    await initTestRepo(repoDir);
     await execFileAsync("git", ["init"], { cwd: vaultDir });
     await writeFile(path.join(vaultDir, ".git", "index.lock"), "locked\n", "utf-8");
 
@@ -204,7 +209,7 @@ describe("local MCP script", () => {
     const repoDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-project-"));
     tempDirs.push(vaultDir, repoDir);
 
-    await execFileAsync("git", ["init"], { cwd: repoDir });
+    await initTestRepo(repoDir);
 
     const embeddingServer = await startFakeEmbeddingServer();
 
@@ -278,12 +283,24 @@ describe("local MCP script", () => {
     const repoDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-project-"));
     tempDirs.push(vaultDir, repoDir);
 
-    await execFileAsync("git", ["init"], { cwd: repoDir });
+    await initTestRepo(repoDir);
     await execFileAsync("git", ["checkout", "-B", "main"], { cwd: repoDir });
 
     const embeddingServer = await startFakeEmbeddingServer();
 
     try {
+      const explicitScopeBlocked = await callLocalMcp(vaultDir, "remember", {
+        title: "Protected branch explicit scope blocked note",
+        content: "Explicit project scope should still respect protected-branch policy.",
+        tags: ["integration", "protected-branch"],
+        summary: "Block explicit project scope remember on protected branch",
+        cwd: repoDir,
+        scope: "project",
+      }, embeddingServer.url);
+
+      expect(explicitScopeBlocked).toContain("Protected branch check");
+      expect(explicitScopeBlocked).toContain("allowProtectedBranch: true");
+
       const bootstrapRemember = await callLocalMcpResponse(vaultDir, "remember", {
         title: "Protected branch bootstrap note",
         content: "Bootstraps project vault adoption with explicit scope.",
@@ -291,6 +308,7 @@ describe("local MCP script", () => {
         summary: "Bootstrap project vault for protected branch policy test",
         cwd: repoDir,
         scope: "project",
+        allowProtectedBranch: true,
       }, embeddingServer.url);
       const bootstrapId = extractRememberedId(bootstrapRemember.text);
       await expect(stat(path.join(repoDir, ".mnemonic", "notes", `${bootstrapId}.md`))).resolves.toBeDefined();
@@ -376,6 +394,7 @@ describe("local MCP script", () => {
         summary: "Create note for protected branch forget test",
         cwd: repoDir,
         scope: "project",
+        allowProtectedBranch: true,
       }, embeddingServer.url);
       const forgetId = extractRememberedId(projectForgetRemember.text);
 
@@ -425,6 +444,7 @@ describe("local MCP script", () => {
         summary: "Create first consolidate source note",
         cwd: repoDir,
         scope: "project",
+        allowProtectedBranch: true,
       }, embeddingServer.url);
       const consolidateAId = extractRememberedId(consolidateA.text);
 
@@ -435,6 +455,7 @@ describe("local MCP script", () => {
         summary: "Create second consolidate source note",
         cwd: repoDir,
         scope: "project",
+        allowProtectedBranch: true,
       }, embeddingServer.url);
       const consolidateBId = extractRememberedId(consolidateB.text);
 
@@ -487,7 +508,7 @@ describe("local MCP script", () => {
     tempDirs.push(vaultDir, remoteDir, repoDir);
 
     await execFileAsync("git", ["init", "--bare"], { cwd: remoteDir });
-    await execFileAsync("git", ["init"], { cwd: repoDir });
+    await initTestRepo(repoDir);
     await execFileAsync("git", ["config", "user.name", "Test User"], { cwd: repoDir });
     await execFileAsync("git", ["config", "user.email", "test@example.com"], { cwd: repoDir });
     await execFileAsync("git", ["remote", "add", "origin", remoteDir], { cwd: repoDir });
@@ -529,7 +550,7 @@ describe("local MCP script", () => {
     const repoDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-project-"));
     tempDirs.push(vaultDir, repoDir);
 
-    await execFileAsync("git", ["init"], { cwd: repoDir });
+    await initTestRepo(repoDir);
 
     const embeddingServer = await startFakeEmbeddingServer();
 
@@ -567,7 +588,7 @@ describe("local MCP script", () => {
     const repoDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-project-"));
     tempDirs.push(vaultDir, repoDir);
 
-    await execFileAsync("git", ["init"], { cwd: repoDir });
+    await initTestRepo(repoDir);
 
     const embeddingServer = await startFakeEmbeddingServer();
 
@@ -606,7 +627,7 @@ describe("local MCP script", () => {
     const repoDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-project-"));
     tempDirs.push(vaultDir, repoDir);
 
-    await execFileAsync("git", ["init"], { cwd: repoDir });
+    await initTestRepo(repoDir);
 
     const embeddingServer = await startFakeEmbeddingServer();
 
@@ -665,7 +686,7 @@ describe("local MCP script", () => {
     const repoDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-project-"));
     tempDirs.push(vaultDir, repoDir);
 
-    await execFileAsync("git", ["init"], { cwd: repoDir });
+    await initTestRepo(repoDir);
 
     const embeddingServer = await startFakeEmbeddingServer();
 
@@ -749,7 +770,7 @@ describe("local MCP script", () => {
     const repoDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-project-"));
     tempDirs.push(vaultDir, repoDir);
 
-    await execFileAsync("git", ["init"], { cwd: repoDir });
+    await initTestRepo(repoDir);
 
     const embeddingServer = await startFakeEmbeddingServer();
 
@@ -970,7 +991,7 @@ describe("local MCP script", () => {
     const repoDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-project-"));
     tempDirs.push(vaultDir, repoDir);
 
-    await execFileAsync("git", ["init"], { cwd: repoDir });
+    await initTestRepo(repoDir);
 
     const embeddingServer = await startFakeEmbeddingServer();
 
@@ -1029,7 +1050,7 @@ describe("local MCP script", () => {
     const repoDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-project-"));
     tempDirs.push(vaultDir, repoDir);
 
-    await execFileAsync("git", ["init"], { cwd: repoDir });
+    await initTestRepo(repoDir);
 
     const embeddingServer = await startFakeEmbeddingServer();
 
@@ -1088,7 +1109,7 @@ describe("local MCP script", () => {
     const repoDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-project-"));
     tempDirs.push(vaultDir, repoDir);
 
-    await execFileAsync("git", ["init"], { cwd: repoDir });
+    await initTestRepo(repoDir);
 
     const embeddingServer = await startFakeEmbeddingServer();
 
@@ -1148,7 +1169,7 @@ describe("local MCP script", () => {
     const repoDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-project-"));
     tempDirs.push(vaultDir, repoDir);
 
-    await execFileAsync("git", ["init"], { cwd: repoDir });
+    await initTestRepo(repoDir);
 
     const embeddingServer = await startFakeEmbeddingServer();
 
@@ -1233,7 +1254,7 @@ describe("local MCP script", () => {
     const repoDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-project-"));
     tempDirs.push(vaultDir, repoDir);
 
-    await execFileAsync("git", ["init"], { cwd: repoDir });
+    await initTestRepo(repoDir);
     const embeddingServer = await startFakeEmbeddingServer();
 
     try {
@@ -1555,7 +1576,7 @@ describe("local MCP script", () => {
     const repoDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-project-"));
     tempDirs.push(vaultDir, repoDir);
 
-    await execFileAsync("git", ["init"], { cwd: repoDir });
+    await initTestRepo(repoDir);
 
     const embeddingServer = await startFakeEmbeddingServer();
 
@@ -1660,7 +1681,7 @@ describe("local MCP script", () => {
     const repoDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-project-"));
     tempDirs.push(vaultDir, repoDir);
 
-    await execFileAsync("git", ["init"], { cwd: repoDir });
+    await initTestRepo(repoDir);
 
     const embeddingServer = await startFakeEmbeddingServer();
 

@@ -36,6 +36,7 @@ import {
 import { classifyTheme, summarizePreview, titleCaseTheme } from "./project-introspection.js";
 import { detectProject, getCurrentGitBranch, resolveProjectIdentity, type ProjectIdentityResolution } from "./project.js";
 import { VaultManager, type Vault } from "./vault.js";
+import { checkBranchChange } from "./branch-tracker.js";
 import { Migrator } from "./migration.js";
 import { parseMemorySections } from "./import.js";
 import { defaultClaudeHome, defaultVaultPath, resolveUserPath } from "./paths.js";
@@ -452,6 +453,39 @@ async function resolveWriteVault(cwd: string | undefined, scope: WriteScope): Pr
 
 function describeProject(project: Awaited<ReturnType<typeof resolveProject>>): string {
   return project ? `project '${project.name}' (${project.id})` : "global";
+}
+
+/**
+ * Checks if the git branch has changed since the last operation for a directory.
+ * If a branch change is detected, automatically triggers sync to rebuild embeddings.
+ * Returns true if sync was triggered, false otherwise.
+ */
+async function ensureBranchSynced(cwd?: string): Promise<boolean> {
+  if (!cwd) return false;
+
+  const previousBranch = await checkBranchChange(cwd);
+  if (!previousBranch) return false; // No branch change or not in git repo
+
+  console.error(`[branch] Detected branch change from '${previousBranch}' — auto-syncing`);
+  
+  // Trigger sync to rebuild embeddings
+  const mainResult = await vaultManager.main.git.sync();
+  console.error(`[branch] Main vault sync: ${JSON.stringify(mainResult)}`);
+
+  const projectVault = await vaultManager.getProjectVaultIfExists(cwd);
+  if (projectVault) {
+    const projectResult = await projectVault.git.sync();
+    console.error(`[branch] Project vault sync: ${JSON.stringify(projectResult)}`);
+    
+    // Backfill embeddings after sync
+    const backfill = await backfillEmbeddingsAfterSync(projectVault.storage, "project vault", [], true);
+    console.error(`[branch] Project vault embedded ${backfill.embedded} notes`);
+  }
+
+  const mainBackfill = await backfillEmbeddingsAfterSync(vaultManager.main.storage, "main vault", [], true);
+  console.error(`[branch] Main vault embedded ${mainBackfill.embedded} notes`);
+
+  return true;
 }
 
 function formatProjectIdentityText(identity: ProjectIdentityResolution): string {
@@ -1444,6 +1478,8 @@ server.registerTool(
     outputSchema: MigrationExecuteResultSchema,
   },
   async ({ migrationName, dryRun, backup, cwd }) => {
+    await ensureBranchSynced(cwd);
+
     try {
       const { results, vaultsProcessed } = await migrator.runMigration(migrationName, {
         dryRun,
@@ -1586,6 +1622,8 @@ server.registerTool(
     outputSchema: RememberResultSchema,
   },
   async ({ title, content, tags, lifecycle, summary, cwd, scope, allowProtectedBranch = false }) => {
+    await ensureBranchSynced(cwd);
+
     const project = await resolveProject(cwd);
     const cleanedContent = await cleanMarkdown(content);
     const policy = project ? await configStore.getProjectPolicy(project.id) : undefined;
@@ -1600,7 +1638,7 @@ server.registerTool(
     const protectedBranchCheck = await shouldBlockProtectedBranchCommit({
       cwd,
       writeScope,
-      automaticCommit: scope === undefined,
+      automaticCommit: true,
       projectLabel: project ? `${project.name} (${project.id})` : "this context",
       policy,
       allowProtectedBranch,
@@ -1956,6 +1994,8 @@ server.registerTool(
     outputSchema: RecallResultSchema,
   },
   async ({ query, cwd, limit, minSimilarity, tags, scope }) => {
+    await ensureBranchSynced(cwd);
+
     const project = await resolveProject(cwd);
     const queryVec = await embed(query);
     const vaults = await vaultManager.searchOrder(cwd);
@@ -2122,6 +2162,8 @@ server.registerTool(
     outputSchema: UpdateResultSchema,
   },
   async ({ id, content, title, tags, lifecycle, summary, cwd, allowProtectedBranch = false }) => {
+    await ensureBranchSynced(cwd);
+
     const found = await vaultManager.findNote(id, cwd);
     if (!found) {
       return { content: [{ type: "text", text: `No memory found with id '${id}'` }], isError: true };
@@ -2271,6 +2313,8 @@ server.registerTool(
     outputSchema: ForgetResultSchema,
   },
   async ({ id, cwd, allowProtectedBranch = false }) => {
+    await ensureBranchSynced(cwd);
+
     const found = await vaultManager.findNote(id, cwd);
     if (!found) {
       return { content: [{ type: "text", text: `No memory found with id '${id}'` }], isError: true };
@@ -2382,6 +2426,8 @@ server.registerTool(
     outputSchema: GetResultSchema,
   },
   async ({ ids, cwd }) => {
+    await ensureBranchSynced(cwd);
+
     const found: GetResult["notes"] = [];
     const notFound: string[] = [];
 
@@ -2461,6 +2507,8 @@ server.registerTool(
     outputSchema: WhereIsResultSchema,
   },
   async ({ id, cwd }) => {
+    await ensureBranchSynced(cwd);
+
     const found = await vaultManager.findNote(id, cwd);
     if (!found) {
       return { content: [{ type: "text", text: `No memory found with id '${id}'` }], isError: true };
@@ -2547,6 +2595,8 @@ server.registerTool(
     outputSchema: ListResultSchema,
   },
   async ({ cwd, scope, storedIn, tags, includeRelations, includePreview, includeStorage, includeUpdated }) => {
+    await ensureBranchSynced(cwd);
+
     const { project, entries } = await collectVisibleNotes(cwd, scope, tags, storedIn);
 
     if (entries.length === 0) {
@@ -2642,6 +2692,8 @@ server.registerTool(
     outputSchema: RecentResultSchema,
   },
   async ({ cwd, scope, storedIn, limit, includePreview, includeStorage }) => {
+    await ensureBranchSynced(cwd);
+
     const { project, entries } = await collectVisibleNotes(cwd, scope, undefined, storedIn);
     const recent = [...entries]
       .sort((a, b) => b.note.updatedAt.localeCompare(a.note.updatedAt))
@@ -2720,6 +2772,8 @@ server.registerTool(
     outputSchema: MemoryGraphResultSchema,
   },
   async ({ cwd, scope, storedIn, limit }) => {
+    await ensureBranchSynced(cwd);
+
     const { project, entries } = await collectVisibleNotes(cwd, scope, undefined, storedIn);
     if (entries.length === 0) {
       const structuredContent: MemoryGraphResult = { action: "graph_shown", project: project?.id, projectName: project?.name, nodes: [], limit, truncated: false };
@@ -2809,6 +2863,8 @@ server.registerTool(
     outputSchema: ProjectSummaryResultSchema,
   },
   async ({ cwd, maxPerTheme, recentLimit }) => {
+    await ensureBranchSynced(cwd);
+
     const { project, entries } = await collectVisibleNotes(cwd, "all");
     if (!project) {
       return { content: [{ type: "text", text: `Could not detect a project for: ${cwd}` }], isError: true };
@@ -3027,6 +3083,8 @@ server.registerTool(
     outputSchema: MoveResultSchema,
   },
   async ({ id, target, vaultFolder, cwd, allowProtectedBranch = false }) => {
+    await ensureBranchSynced(cwd);
+
     const found = await vaultManager.findNote(id, cwd);
     if (!found) {
       return { content: [{ type: "text", text: `No memory found with id '${id}'` }], isError: true };
@@ -3198,6 +3256,8 @@ server.registerTool(
     outputSchema: RelateResultSchema,
   },
   async ({ fromId, toId, type, bidirectional, cwd }) => {
+    await ensureBranchSynced(cwd);
+
     const [foundFrom, foundTo] = await Promise.all([
       vaultManager.findNote(fromId, cwd),
       vaultManager.findNote(toId, cwd),
@@ -3319,6 +3379,8 @@ server.registerTool(
     outputSchema: RelateResultSchema,
   },
   async ({ fromId, toId, bidirectional, cwd }) => {
+    await ensureBranchSynced(cwd);
+
     const [foundFrom, foundTo] = await Promise.all([
       vaultManager.findNote(fromId, cwd),
       vaultManager.findNote(toId, cwd),
@@ -3473,6 +3535,8 @@ server.registerTool(
     outputSchema: ConsolidateResultSchema,
   },
   async ({ cwd, strategy, mode, threshold, mergePlan, allowProtectedBranch = false }) => {
+    await ensureBranchSynced(cwd);
+
     const project = await resolveProject(cwd);
     if (!project && cwd) {
       return { content: [{ type: "text", text: `Could not detect a project for: ${cwd}` }], isError: true };

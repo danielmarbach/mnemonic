@@ -4,6 +4,17 @@ All notable changes to `mnemonic` will be documented in this file.
 
 The format is loosely based on Keep a Changelog and uses semver-style version headings.
 
+## [0.11.0] - 2026-03-15
+
+### Added
+
+- Automatic branch change detection now syncs vault state for `cwd`-aware operations after git branch switches, keeping embeddings current without a manual `sync`.
+
+### Fixed
+
+- `remember` now enforces protected-branch policy for explicit `scope: "project"` writes instead of allowing direct commits to protected branches.
+- Branch-switch auto-sync now covers the remaining `cwd`-aware memory operations and `execute_migration`, with direct tests for real branch change detection.
+
 ## [0.10.0] - 2026-03-14
 
 ### Changed
