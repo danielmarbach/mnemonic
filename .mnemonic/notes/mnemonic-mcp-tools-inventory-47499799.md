@@ -6,7 +6,7 @@ tags:
   - api
 lifecycle: permanent
 createdAt: '2026-03-07T17:59:25.498Z'
-updatedAt: '2026-03-14T15:02:17.433Z'
+updatedAt: '2026-03-14T15:02:51.665Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
@@ -34,11 +34,11 @@ Tools registered in `src/index.ts`:
 | `list` | List memories with optional previews, relations, storage, timestamps, and `storedIn` filtering |
 | `list_migrations` | List available migrations and pending count |
 | `memory_graph` | Show a compact adjacency list of note relationships |
-| `move_memory` | Move a memory between `main-vault` and `project-vault` without changing its id |
+| `move_memory` | Move a memory between vaults without changing its id; accepts optional `vaultFolder` to target sub-vaults |
 | `project_memory_summary` | Summarize what mnemonic knows about the current project |
 | `recall` | Semantic search with optional project boost (+0.15) |
 | `recent_memories` | Show the most recently updated memories for a scope and storage location |
-| `remember` | Write note + embedding with project context from `cwd` and storage controlled by `scope` |
+| `remember` | Write note + embedding with project context from `cwd` and storage controlled by `scope`; `checkedForExisting` is a schema-only agent hint |
 | `relate` | Create typed relationship (bidirectional by default) |
 | `set_project_identity` | Save which git remote defines project identity |
 | `set_project_memory_policy` | Set the default write scope and consolidation mode for a project |
@@ -48,6 +48,12 @@ Tools registered in `src/index.ts`:
 | `where_is_memory` | Show a memory's project association and actual storage location — lightweight alternative to `get` |
 
 Relationship types: `related-to`, `explains`, `example-of`, `supersedes`.
+
+## Prompts
+
+| Prompt | Description |
+| ------ | ----------- |
+| `mnemonic-workflow-hint` | Optional, on-demand. Covers discover → inspect → modify → organize pattern, storage-label model, and `recall` → `get` → `update` preference. Not auto-injected. |
 
 Main-vault operational config lives in `config.json`, including `reindexEmbedConcurrency`, per-project memory policies, and consolidation mode defaults.
 
@@ -67,4 +73,8 @@ The structured-content module still contains result schemas and types for remove
 
 ## storageLabel return type
 
-`storageLabel(vault: Vault)` was widened to return `"project-vault" | "main-vault"` (was `string`) to satisfy the structured result types.
+`storageLabel(vault: Vault)` returns one of three values:
+
+- `"main-vault"` for the global vault
+- `"project-vault"` for the primary project vault (`.mnemonic/`)
+- `` `sub-vault:${vaultFolderName}` `` for named sub-vaults (`.mnemonic-<name>/`)
