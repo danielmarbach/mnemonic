@@ -889,17 +889,44 @@ function buildMutationRetryContract(args: {
   };
 }
 
+function formatRetrySummary(retry?: MutationRetryContract): string | undefined {
+  if (!retry) {
+    return undefined;
+  }
+
+  const safety = retry.retrySafe ? "safe" : "requires review";
+  return [
+    `Retry: ${safety} | vault=${retry.attemptedCommit.vault} | files=${retry.attemptedCommit.files.length}`,
+    `Git commit error: ${retry.attemptedCommit.error}`,
+  ].join("\n");
+}
+
 function formatPersistenceSummary(persistence: PersistenceStatus): string {
   const parts = [
     `Persistence: embedding ${persistence.embedding.status}`,
     `git ${persistence.durability}`,
   ];
 
+  const lines = [parts.join(" | ")];
+
   if (persistence.embedding.reason) {
-    parts.push(`embedding reason=${persistence.embedding.reason}`);
+    lines[0] += ` | embedding reason=${persistence.embedding.reason}`;
   }
 
-  return parts.join(" | ");
+  if (persistence.git.commit === "failed" && persistence.git.commitError) {
+    lines.push(`Git commit error: ${persistence.git.commitError}`);
+  }
+
+  if (persistence.git.push === "failed" && persistence.git.pushError) {
+    lines.push(`Git push error: ${persistence.git.pushError}`);
+  }
+
+  const retrySummary = formatRetrySummary(persistence.retry);
+  if (retrySummary) {
+    lines.push(retrySummary);
+  }
+
+  return lines.join("\n");
 }
 
 async function getMutationPushMode(): Promise<MutationPushMode> {
@@ -1370,7 +1397,10 @@ server.registerTool(
         text:
           `Project identity override set for ${defaultProject.name}: ` +
           `default=\`${defaultProject.id}\`, effective=\`${candidateIdentity.project.id}\`, remote=${remoteName}` +
-          `${commitStatus.status === "failed" ? `\nCommit failed; retry data included. Push status: ${pushStatus.status}.` : ""}`,
+          `${commitStatus.status === "failed"
+            ? `\n${formatRetrySummary(retry) ?? `Commit failed. Push status: ${pushStatus.status}.`}`
+            : ""
+          }`,
       }],
       structuredContent,
     };
@@ -1866,7 +1896,10 @@ server.registerTool(
         text:
           `Project memory policy set for ${project.name}: defaultScope=${effectiveDefaultScope}` +
           `${modeStr}${branchBehaviorStr}${branchPatternsStr}` +
-          `${commitStatus.status === "failed" ? `\nCommit failed; retry data included. Push status: ${pushStatus.status}.` : ""}`,
+          `${commitStatus.status === "failed"
+            ? `\n${formatRetrySummary(retry) ?? `Commit failed. Push status: ${pushStatus.status}.`}`
+            : ""
+          }`,
       }],
       structuredContent,
     };
@@ -2392,7 +2425,14 @@ server.registerTool(
       retry,
     };
     
-    return { content: [{ type: "text", text: `Forgotten '${id}' (${note.title})` }], structuredContent };
+    const retrySummary = formatRetrySummary(retry);
+    return {
+      content: [{
+        type: "text",
+        text: `Forgotten '${id}' (${note.title})${retrySummary ? `\n${retrySummary}` : ""}`,
+      }],
+      structuredContent,
+    };
   }
 );
 
@@ -3340,8 +3380,12 @@ server.registerTool(
       retry,
     };
     
+    const retrySummary = formatRetrySummary(retry);
     return {
-      content: [{ type: "text", text: `Linked \`${fromId}\` ${dirStr} \`${toId}\` (${type})` }],
+      content: [{
+        type: "text",
+        text: `Linked \`${fromId}\` ${dirStr} \`${toId}\` (${type})${retrySummary ? `\n${retrySummary}` : ""}`,
+      }],
       structuredContent,
     };
   }
@@ -3458,7 +3502,14 @@ server.registerTool(
       retry,
     };
     
-    return { content: [{ type: "text", text: `Removed relationship between \`${fromId}\` and \`${toId}\`` }], structuredContent };
+    const retrySummary = formatRetrySummary(retry);
+    return {
+      content: [{
+        type: "text",
+        text: `Removed relationship between \`${fromId}\` and \`${toId}\`${retrySummary ? `\n${retrySummary}` : ""}`,
+      }],
+      structuredContent,
+    };
   }
 );
 
