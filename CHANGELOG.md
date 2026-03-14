@@ -4,6 +4,13 @@ All notable changes to `mnemonic` will be documented in this file.
 
 The format is loosely based on Keep a Changelog and uses semver-style version headings.
 
+## [Unreleased]
+
+### Added
+
+- Automatic branch change detection triggers sync when git switches branches, ensuring embeddings stay up-to-date without manual `sync` calls.
+- Unit tests for branch tracking including cache management and change detection.
+
 ## [0.10.0] - 2026-03-14
 
 ### Changed
