@@ -2,22 +2,16 @@ import { getCurrentGitBranch } from "./project.js";
 
 const branchHistory = new Map<string, string>();
 
+export function resetBranchHistory(): void {
+  branchHistory.clear();
+}
+
 export function getLastBranch(cwd: string): string | undefined {
   return branchHistory.get(cwd);
 }
 
 export function updateBranchHistory(cwd: string, branch: string): void {
   branchHistory.set(cwd, branch);
-}
-
-export function hasBranchChanged(cwd: string): boolean {
-  const lastBranch = getLastBranch(cwd);
-  if (!lastBranch) {
-    // First time seeing this directory, not a change
-    return false;
-  }
-  const currentBranch = branchHistory.get(cwd);
-  return currentBranch !== lastBranch;
 }
 
 export async function checkBranchChange(cwd: string): Promise<string | undefined> {

@@ -1478,6 +1478,8 @@ server.registerTool(
     outputSchema: MigrationExecuteResultSchema,
   },
   async ({ migrationName, dryRun, backup, cwd }) => {
+    await ensureBranchSynced(cwd);
+
     try {
       const { results, vaultsProcessed } = await migrator.runMigration(migrationName, {
         dryRun,
@@ -2311,6 +2313,8 @@ server.registerTool(
     outputSchema: ForgetResultSchema,
   },
   async ({ id, cwd, allowProtectedBranch = false }) => {
+    await ensureBranchSynced(cwd);
+
     const found = await vaultManager.findNote(id, cwd);
     if (!found) {
       return { content: [{ type: "text", text: `No memory found with id '${id}'` }], isError: true };
@@ -2503,6 +2507,8 @@ server.registerTool(
     outputSchema: WhereIsResultSchema,
   },
   async ({ id, cwd }) => {
+    await ensureBranchSynced(cwd);
+
     const found = await vaultManager.findNote(id, cwd);
     if (!found) {
       return { content: [{ type: "text", text: `No memory found with id '${id}'` }], isError: true };
@@ -2686,6 +2692,8 @@ server.registerTool(
     outputSchema: RecentResultSchema,
   },
   async ({ cwd, scope, storedIn, limit, includePreview, includeStorage }) => {
+    await ensureBranchSynced(cwd);
+
     const { project, entries } = await collectVisibleNotes(cwd, scope, undefined, storedIn);
     const recent = [...entries]
       .sort((a, b) => b.note.updatedAt.localeCompare(a.note.updatedAt))
@@ -2764,6 +2772,8 @@ server.registerTool(
     outputSchema: MemoryGraphResultSchema,
   },
   async ({ cwd, scope, storedIn, limit }) => {
+    await ensureBranchSynced(cwd);
+
     const { project, entries } = await collectVisibleNotes(cwd, scope, undefined, storedIn);
     if (entries.length === 0) {
       const structuredContent: MemoryGraphResult = { action: "graph_shown", project: project?.id, projectName: project?.name, nodes: [], limit, truncated: false };
@@ -2853,6 +2863,8 @@ server.registerTool(
     outputSchema: ProjectSummaryResultSchema,
   },
   async ({ cwd, maxPerTheme, recentLimit }) => {
+    await ensureBranchSynced(cwd);
+
     const { project, entries } = await collectVisibleNotes(cwd, "all");
     if (!project) {
       return { content: [{ type: "text", text: `Could not detect a project for: ${cwd}` }], isError: true };
@@ -3244,6 +3256,8 @@ server.registerTool(
     outputSchema: RelateResultSchema,
   },
   async ({ fromId, toId, type, bidirectional, cwd }) => {
+    await ensureBranchSynced(cwd);
+
     const [foundFrom, foundTo] = await Promise.all([
       vaultManager.findNote(fromId, cwd),
       vaultManager.findNote(toId, cwd),
@@ -3365,6 +3379,8 @@ server.registerTool(
     outputSchema: RelateResultSchema,
   },
   async ({ fromId, toId, bidirectional, cwd }) => {
+    await ensureBranchSynced(cwd);
+
     const [foundFrom, foundTo] = await Promise.all([
       vaultManager.findNote(fromId, cwd),
       vaultManager.findNote(toId, cwd),
@@ -3519,6 +3535,8 @@ server.registerTool(
     outputSchema: ConsolidateResultSchema,
   },
   async ({ cwd, strategy, mode, threshold, mergePlan, allowProtectedBranch = false }) => {
+    await ensureBranchSynced(cwd);
+
     const project = await resolveProject(cwd);
     if (!project && cwd) {
       return { content: [{ type: "text", text: `Could not detect a project for: ${cwd}` }], isError: true };

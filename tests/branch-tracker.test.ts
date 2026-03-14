@@ -1,62 +1,107 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import {
-  getLastBranch,
-  updateBranchHistory,
-  hasBranchChanged,
-} from "../src/branch-tracker.js";
+const { getCurrentGitBranchMock } = vi.hoisted(() => ({
+  getCurrentGitBranchMock: vi.fn(),
+}));
 
-// Use unique paths to avoid test interference between test runs
-const path1 = "/test/directory-1";
-const path2 = "/test/directory-2";
-const path3 = "/test/directory-3";
+vi.mock("../src/project.js", () => ({
+  getCurrentGitBranch: getCurrentGitBranchMock,
+}));
+
+import { checkBranchChange, getLastBranch, resetBranchHistory, updateBranchHistory } from "../src/branch-tracker.js";
+
+function testPath(name: string): string {
+  return `/test/${name}-${crypto.randomUUID()}`;
+}
 
 describe("branch-tracker", () => {
+  beforeEach(() => {
+    resetBranchHistory();
+    getCurrentGitBranchMock.mockReset();
+  });
+
+  afterEach(() => {
+    resetBranchHistory();
+    getCurrentGitBranchMock.mockReset();
+  });
+
   describe("getLastBranch", () => {
     it("returns undefined when no branch recorded", () => {
-      expect(getLastBranch(path1)).toBeUndefined();
+      expect(getLastBranch(testPath("missing"))).toBeUndefined();
     });
 
     it("returns cached branch when set", () => {
-      updateBranchHistory(path1, "main");
-      expect(getLastBranch(path1)).toBe("main");
+      const path = testPath("cached");
+
+      updateBranchHistory(path, "main");
+      expect(getLastBranch(path)).toBe("main");
     });
   });
 
   describe("updateBranchHistory", () => {
     it("sets branch for directory", () => {
-      updateBranchHistory(path1, "main");
-      expect(getLastBranch(path1)).toBe("main");
+      const path = testPath("set");
+
+      updateBranchHistory(path, "main");
+      expect(getLastBranch(path)).toBe("main");
     });
 
     it("updates branch for directory", () => {
-      updateBranchHistory(path1, "main");
-      updateBranchHistory(path1, "feature-test");
-      expect(getLastBranch(path1)).toBe("feature-test");
+      const path = testPath("update");
+
+      updateBranchHistory(path, "main");
+      updateBranchHistory(path, "feature-test");
+      expect(getLastBranch(path)).toBe("feature-test");
     });
 
     it("handles multiple directories independently", () => {
-      updateBranchHistory(path2, "main");
-      updateBranchHistory(path3, "develop");
-      expect(getLastBranch(path2)).toBe("main");
-      expect(getLastBranch(path3)).toBe("develop");
+      const pathA = testPath("path-a");
+      const pathB = testPath("path-b");
+
+      updateBranchHistory(pathA, "main");
+      updateBranchHistory(pathB, "develop");
+      expect(getLastBranch(pathA)).toBe("main");
+      expect(getLastBranch(pathB)).toBe("develop");
     });
   });
 
-  describe("hasBranchChanged", () => {
-    it("returns false on first call (no cached branch)", () => {
-      expect(hasBranchChanged(path1)).toBe(false);
+  describe("checkBranchChange", () => {
+    it("records the first observed branch without reporting a change", async () => {
+      const path = testPath("first-observation");
+
+      getCurrentGitBranchMock.mockResolvedValue("main");
+
+      await expect(checkBranchChange(path)).resolves.toBeUndefined();
+      expect(getLastBranch(path)).toBe("main");
     });
 
-    it("returns false when branch unchanged", () => {
-      updateBranchHistory(path1, "main");
-      expect(hasBranchChanged(path1)).toBe(false);
+    it("returns the previous branch when the branch changes", async () => {
+      const path = testPath("changed");
+
+      updateBranchHistory(path, "main");
+      getCurrentGitBranchMock.mockResolvedValue("feature/test");
+
+      await expect(checkBranchChange(path)).resolves.toBe("main");
+      expect(getLastBranch(path)).toBe("feature/test");
     });
 
-    it("returns false after checking unchanged branch", () => {
-      updateBranchHistory(path1, "main");
-      hasBranchChanged(path1);
-      expect(hasBranchChanged(path1)).toBe(false);
+    it("returns undefined when the branch is unchanged", async () => {
+      const path = testPath("unchanged");
+
+      updateBranchHistory(path, "main");
+      getCurrentGitBranchMock.mockResolvedValue("main");
+
+      await expect(checkBranchChange(path)).resolves.toBeUndefined();
+      expect(getLastBranch(path)).toBe("main");
+    });
+
+    it("returns undefined when git does not report a branch", async () => {
+      const path = testPath("missing-branch");
+
+      getCurrentGitBranchMock.mockResolvedValue(undefined);
+
+      await expect(checkBranchChange(path)).resolves.toBeUndefined();
+      expect(getLastBranch(path)).toBeUndefined();
     });
   });
 });
