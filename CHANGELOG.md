@@ -4,6 +4,13 @@ All notable changes to `mnemonic` will be documented in this file.
 
 The format is loosely based on Keep a Changelog and uses semver-style version headings.
 
+## [0.8.1] - 2026-03-14
+
+### Changed
+
+- The publish workflow now updates the Homebrew formula through an automated pull request instead of pushing directly to `main`.
+- `workflow_dispatch` now supports job toggles (`run_npm`, `run_docker`, `run_homebrew`, `run_release`) so partial release failures can be resumed by rerunning only remaining jobs.
+
 ## [0.8.0] - 2026-03-14
 
 ### Changed
