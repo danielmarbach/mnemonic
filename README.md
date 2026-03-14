@@ -91,6 +91,21 @@ npm install @danielmarbach/mnemonic-mcp
 npm install @danielmarbach/mnemonic-mcp@0.2.0
 ```
 
+### Homebrew
+
+The formula lives in this repository. Tap it with an explicit URL so no separate repository is needed:
+
+```bash
+brew tap danielmarbach/mnemonic-mcp https://github.com/danielmarbach/mnemonic
+brew install mnemonic-mcp
+```
+
+Or in a single step:
+
+```bash
+brew install danielmarbach/mnemonic-mcp/mnemonic-mcp
+```
+
 ### Docker Hub
 
 Pre-built images for `linux/amd64` and `linux/arm64`:
@@ -127,6 +142,21 @@ For a fixed installed version, point at the local binary instead:
   "mcpServers": {
     "mnemonic": {
       "command": "/path/to/your/project/node_modules/.bin/mnemonic",
+      "env": {
+        "VAULT_PATH": "/Users/you/mnemonic-vault"
+      }
+    }
+  }
+}
+```
+
+### Claude Desktop / Cursor (Homebrew)
+
+```json
+{
+  "mcpServers": {
+    "mnemonic": {
+      "command": "mnemonic",
       "env": {
         "VAULT_PATH": "/Users/you/mnemonic-vault"
       }

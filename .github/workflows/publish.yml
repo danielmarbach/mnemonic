@@ -14,6 +14,10 @@ on:
         type: boolean
         default: true
 
+concurrency:
+  group: publish-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   verify:
     runs-on: ubuntu-latest
@@ -108,8 +112,61 @@ jobs:
             danielmarbach/mnemonic-mcp:latest
             danielmarbach/mnemonic-mcp:${{ steps.version.outputs.tag }}
 
+  publish-homebrew-tap:
+    needs: publish-npm
+    runs-on: ubuntu-latest
+    environment: Release
+    permissions:
+      contents: write  # Required to commit the updated formula back to main
+
+    steps:
+      - name: Check out main branch
+        uses: actions/checkout@v6
+        with:
+          ref: main
+
+      - name: Extract version
+        id: version
+        run: |
+          TAG="${{ inputs.tag || github.ref_name }}"
+          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Calculate npm tarball SHA256
+        id: tarball
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          URL="https://registry.npmjs.org/@danielmarbach/mnemonic-mcp/-/mnemonic-mcp-${VERSION}.tgz"
+          
+          for i in {1..5}; do
+            if SHA256=$(curl -fsSL "$URL" | sha256sum | cut -d' ' -f1); then
+              break
+            fi
+            echo "Retry $i/5: npm tarball not yet available, waiting..."
+            sleep 2
+          done
+          
+          if [ -z "$SHA256" ]; then
+            echo "Failed to fetch npm tarball after 5 attempts"
+            exit 1
+          fi
+          
+          echo "sha256=$SHA256" >> "$GITHUB_OUTPUT"
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+
+      - name: Update formula and push to main
+        if: ${{ !inputs.dry_run }}
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          sed -i "s|^  url \"[^\"]*\"|  url \"${{ steps.tarball.outputs.url }}\"|" Formula/mnemonic-mcp.rb
+          sed -i "s|^  sha256 \"[^\"]*\"|  sha256 \"${{ steps.tarball.outputs.sha256 }}\"|" Formula/mnemonic-mcp.rb
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+          git add Formula/mnemonic-mcp.rb
+          git commit -m "Update mnemonic-mcp formula to ${VERSION}"
+          git push https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git main
+
   create-release:
-    needs: [publish-npm, publish-docker]
+    needs: [publish-npm, publish-docker, publish-homebrew-tap]
     runs-on: ubuntu-latest
     permissions:
       contents: write  # Required to create GitHub releases
