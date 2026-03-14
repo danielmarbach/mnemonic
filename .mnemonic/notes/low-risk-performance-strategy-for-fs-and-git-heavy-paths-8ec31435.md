@@ -8,9 +8,12 @@ tags:
   - safety
 lifecycle: permanent
 createdAt: '2026-03-14T19:42:51.098Z'
-updatedAt: '2026-03-14T19:42:51.098Z'
+updatedAt: '2026-03-14T19:51:00.934Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: performance-principles-for-file-first-mcp-and-git-backed-wor-4fb3701c
+    type: supersedes
 memoryVersion: 1
 ---
 Design decision for this optimization pass: target duplicate work elimination first, then selective local caching, and only then safe parallelism in independent file reads.
