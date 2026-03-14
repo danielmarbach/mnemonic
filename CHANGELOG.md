@@ -4,21 +4,21 @@ All notable changes to `mnemonic` will be documented in this file.
 
 The format is loosely based on Keep a Changelog and uses semver-style version headings.
 
-## [Unreleased]
+## [0.8.0] - 2026-03-14
 
 ### Changed
 
-- All MCP tool descriptions rewritten for self-contained routing and sub-vault awareness.
+- All MCP tool descriptions rewritten for self-contained routing and sub-vault awareness
 
 ### Added
 
-- Homebrew tap support: Formula file (`Formula/mnemonic-mcp.rb`) published to the repository tap, enabling `brew install danielmarbach/mnemonic/mnemonic-mcp`. The publishing workflow includes retry logic for npm CDN propagation, concurrency protection to prevent parallel releases, and explicit token handling for branch protection rules.
-- Git submodule support: when `cwd` is inside a git submodule, project vault creation and project identity resolution now walk up through submodule boundaries to anchor at the top-level superproject root. This prevents `.mnemonic/` from being created inside a submodule directory and ensures project identity is derived from the superproject's remote URL rather than the submodule's.
-- **Multi-vault support (`sub-vault`):** A project git root can now contain multiple vault folders alongside the primary `.mnemonic/` — any directory named `.mnemonic-<name>` (e.g. `.mnemonic-lib`, `.mnemonic-widget`) is automatically discovered and treated as a sub-vault. All sub-vaults share the same git root and the primary vault's embeddings directory so that embeddings for the whole project stay in one place. Sub-vaults appear in `searchOrder`, `allKnownVaults`, `findNote`, and all list/recall operations. Vault labels in structured MCP output use the format `sub-vault:<folder>` (e.g. `sub-vault:.mnemonic-lib`); `"main-vault"` and `"project-vault"` are unchanged for backward compatibility.
-- `move_memory` gains an optional `vaultFolder` parameter to move a note into a specific sub-vault (e.g. `vaultFolder: ".mnemonic-lib"`) instead of the primary project vault when `target` is `"project-vault"`.
-- `Storage` constructor accepts an optional `embeddingsDirOverride` to redirect where embeddings are stored; used internally so sub-vault notes store their embeddings in the primary vault's `embeddings/` directory.
-- `Vault` interface gains a `vaultFolderName` field (`""` for the main vault, `".mnemonic"` for the primary project vault, `".mnemonic-<name>"` for sub-vaults).
-- `VaultManager` exposes a new `getVaultByFolder(cwd, folderName)` method to retrieve a specific sub-vault by its folder name.
+- Homebrew tap support: `brew install danielmarbach/mnemonic/mnemonic-mcp`.
+- Git submodule support: project vault creation and identity resolution now walk up through submodule boundaries to the superproject root.
+- Multi-vault support: project git roots can contain multiple vault folders (`.mnemonic-<name>`) alongside the primary `.mnemonic/`. Sub-vaults share the primary vault's embeddings directory and appear in `searchOrder`, `allKnownVaults`, and all list/recall operations.
+- `move_memory` accepts optional `vaultFolder` parameter to target specific sub-vaults.
+- `Storage` accepts optional `embeddingsDirOverride` to redirect where embeddings are stored.
+- `Vault` interface gains `vaultFolderName` field.
+- `VaultManager` exposes `getVaultByFolder(cwd, folderName)` method.
 
 ## [0.7.0] - 2026-03-13
 
