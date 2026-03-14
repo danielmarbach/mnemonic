@@ -8,23 +8,22 @@ tags:
   - stage-1
 lifecycle: temporary
 createdAt: '2026-03-14T19:42:35.123Z'
-updatedAt: '2026-03-14T19:42:35.123Z'
+updatedAt: '2026-03-14T19:48:08.576Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 memoryVersion: 1
 ---
-Plan for this optimization pass: prioritize low-risk reductions in repeated file and git I/O without changing behavior.
+Plan status update for performance optimization pass.
 
-Execution order:
+Completed:
 
-1) Analyze `src/index.ts`, `src/storage.ts`, `src/vault.ts`, `src/git.ts`, and `src/project.ts` to locate repeated reads, directory scans, and git subprocess churn.
-2) Rank opportunities by payoff vs behavior risk, preferring elimination of duplicate work before introducing any concurrency.
-3) In Stage 2, implement only high-confidence low-risk changes with minimal diffs, preserving ordering and error semantics.
+- Opportunity 1 implemented: recall now uses a per-request note cache keyed by vault path and note id, eliminating duplicate `readNote` and parse work during scoring and output formatting.
+- Commit: `perf: cache recall note reads per request`.
+- Validation: `npm test -- tests/recall.test.ts` passed.
 
-Safety constraints for implementation:
+Remaining sequence:
 
-- no architectural rewrites
-- no public behavior changes
-- no error semantic changes unless explicitly called out
-- bounded or no added concurrency only where clearly safe
-- validate with existing tests and targeted manual checks for recall/list/sync/consolidate flows.
+1) cache embeddings once in consolidation pairwise analysis,
+2) parallelize `Storage.listNotes` reads while preserving order,
+3) parallelize `Storage.listEmbeddings` reads,
+4) reduce duplicate git-root lookups in vault search flow.
