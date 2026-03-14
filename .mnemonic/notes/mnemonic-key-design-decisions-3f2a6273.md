@@ -7,7 +7,7 @@ tags:
   - rationale
 lifecycle: permanent
 createdAt: '2026-03-07T17:59:12.124Z'
-updatedAt: '2026-03-14T15:01:15.669Z'
+updatedAt: '2026-03-14T15:01:27.637Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
@@ -26,6 +26,8 @@ relatedTo:
   - id: project-identity-remote-override-for-forked-repos-8203a311
     type: related-to
   - id: mcp-prompt-for-cross-tool-workflow-guidance-instead-of-syste-d090a839
+    type: related-to
+  - id: remember-tool-checkedforexisting-is-schema-only-agent-hint-w-a2c94093
     type: related-to
 memoryVersion: 1
 ---
