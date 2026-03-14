@@ -256,8 +256,8 @@ jobs:
             --delete-branch
 
   create-release:
-    needs: [publish-npm, publish-docker, publish-homebrew-tap]
-    if: ${{ always() && (github.event_name == 'push' || inputs.run_release) && (needs.publish-npm.result == 'success' || needs.publish-npm.result == 'skipped') && (needs.publish-docker.result == 'success' || needs.publish-docker.result == 'skipped') && (needs.publish-homebrew-tap.result == 'success' || needs.publish-homebrew-tap.result == 'skipped') }}
+    needs: [verify, publish-npm, publish-docker, publish-homebrew-tap]
+    if: ${{ always() && (github.event_name == 'push' || inputs.run_release) && (needs.verify.result == 'success' || needs.verify.result == 'skipped') && (needs.publish-npm.result == 'success' || needs.publish-npm.result == 'skipped') && (needs.publish-docker.result == 'success' || needs.publish-docker.result == 'skipped') && (needs.publish-homebrew-tap.result == 'success' || needs.publish-homebrew-tap.result == 'skipped') }}
     runs-on: ubuntu-latest
     permissions:
       contents: write  # Required to create GitHub releases
