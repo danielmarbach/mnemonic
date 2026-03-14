@@ -7,44 +7,55 @@ tags:
   - automation
 lifecycle: permanent
 createdAt: '2026-03-14T22:41:26.358Z'
-updatedAt: '2026-03-14T22:41:26.358Z'
+updatedAt: '2026-03-14T23:12:08.871Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 memoryVersion: 1
 ---
-Automatic branch change detection and sync for all tool operations.
+Automatic branch change detection and sync now applies to `cwd`-aware memory operations plus migration execution, not literally every tool.
 
-When a developer switches git branches and calls any mnemonic tool, the branch change is detected and sync is automatically triggered to rebuild embeddings. This ensures consistent behavior without requiring manual `sync` calls after branch switches.
+When a developer switches git branches and then calls a `cwd`-aware read/write memory tool or `execute_migration`, mnemonic detects the branch change and automatically syncs vaults so embeddings stay current without requiring a manual `sync` first.
 
 Implementation approach:
 
-- Created `src/branch-tracker.ts` module to track last-seen branch per `cwd`
-- Added `ensureBranchSynced(cwd)` wrapper to all tools that accept `cwd` parameter
-- Git command runs once per `cwd` per process (in-memory cache)
-- Auto-sync triggered only when branch actually changes (not on every call)
+- `src/branch-tracker.ts` stores the last-seen branch per `cwd`
+- `checkBranchChange(cwd)` compares the current git branch to that cached value and returns the previous branch only when it actually changed
+- `ensureBranchSynced(cwd)` in `src/index.ts` triggers vault sync plus embedding backfill only after a detected branch change
+- Runtime overhead stays bounded to one branch lookup per `cwd` per tool call; sync and embedding rebuild happen only on actual branch changes
 
-Added to these tools: `remember`, `recall`, `update`, `move_memory`, `get`, `list`
+Current tool coverage:
+
+- `execute_migration`
+- `remember`
+- `recall`
+- `update`
+- `forget`
+- `get`
+- `where_is_memory`
+- `list`
+- `recent_memories`
+- `memory_graph`
+- `project_memory_summary`
+- `move_memory`
+- `relate`
+- `unrelate`
+- `consolidate`
 
 Behavioral impact:
 
-- First call per `cwd`: no git overhead (no cached branch yet)
-- Subsequent calls: single cached git branch check (negligible overhead)
-- Branch switch detected: automatic sync of main + project vaults, embeddings rebuilt
-- No config flag needed: useful by default for common branch-switching workflow
-- Read-only tools like `list` and `get` also include check so embeddings are up-to-date for any operation
+- First call for a `cwd`: record branch, no sync yet
+- Later calls on same branch: one branch check, no sync
+- First call after a branch switch: sync main/project vaults and backfill embeddings before serving the request
+- This matches the intended low-overhead design noted during performance review: minimal steady-state git work with correctness restored on branch changes
 
-Alternative approaches considered:
+Test and correctness follow-up:
 
-- Config flag for opt-in: rejected as unnecessary complexity
-- Skip check on read-only tools: rejected since sync is needed for embedding availability anyway
-- File watching: rejected as overkill and requires background process
+- Removed the broken `hasBranchChanged` helper because it compared the same cached value to itself and could never report a change
+- Added direct unit tests around `checkBranchChange` plus MCP integration coverage to verify the runtime path
 
-No config needed - the feature is useful by default and overhead is minimal.
+Files involved:
 
-Files created:
-
-- `src/branch-tracker.ts`: Branch tracking and change detection module
-
-Files modified:
-
-- `src/index.ts`: Added `ensureBranchSynced(cwd)` calls to tool handlers and import
+- `src/branch-tracker.ts`
+- `src/index.ts`
+- `tests/branch-tracker.test.ts`
+- `tests/mcp.integration.test.ts`
