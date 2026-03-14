@@ -12,9 +12,14 @@ tags:
   - lessons
 lifecycle: permanent
 createdAt: '2026-03-14T23:38:26.947Z'
-updatedAt: '2026-03-14T23:38:26.947Z'
+updatedAt: '2026-03-14T23:40:47.420Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: git-retry-contract-rollout-across-mutating-tools-5beda23b
+    type: example-of
+  - id: persistence-status-reporting-design-and-implementation-8a50b95a
+    type: related-to
 memoryVersion: 1
 ---
 Observed a gap in the git retry/persistence contract during conservative note consolidation on branch `cleanup`.
