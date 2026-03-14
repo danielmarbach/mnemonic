@@ -169,10 +169,10 @@ export class Storage {
 
   async listNotes(filter?: { project?: string | null }): Promise<Note[]> {
     const ids = await this.listNoteIds();
+    const readNotes = await Promise.all(ids.map(async (id) => ({ id, note: await this.readNote(id) })));
     const notes: Note[] = [];
 
-    for (const id of ids) {
-      const note = await this.readNote(id);
+    for (const { note } of readNotes) {
       if (!note) continue;
 
       if (filter !== undefined) {
