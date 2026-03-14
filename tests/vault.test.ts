@@ -375,6 +375,173 @@ describe("VaultManager", () => {
       expect(projectCount).toBe(1);
     });
   });
+
+  describe("Multi-Vault (Submodule Vault) Support", () => {
+    it("should discover .mnemonic-* folders alongside primary project vault", async () => {
+      const projectDir = path.join(tempDir, "project-multi");
+      await fs.mkdir(projectDir, { recursive: true });
+      await initGitRepo(projectDir, "# Multi-Vault Project");
+
+      // Create primary vault and a submodule vault folder
+      await fs.mkdir(path.join(projectDir, ".mnemonic", "notes"), { recursive: true });
+      await fs.mkdir(path.join(projectDir, ".mnemonic-sub1", "notes"), { recursive: true });
+      await fs.mkdir(path.join(projectDir, ".mnemonic-sub2", "notes"), { recursive: true });
+
+      const primaryVault = await vaultManager.getOrCreateProjectVault(projectDir);
+      expect(primaryVault).toBeTruthy();
+      expect(primaryVault!.vaultFolderName).toBe(".mnemonic");
+
+      // allKnownVaults should include main + primary + both submodule vaults
+      const allVaults = vaultManager.allKnownVaults();
+      const projectVaults = allVaults.filter(v => v.isProject);
+      expect(projectVaults).toHaveLength(3); // primary + sub1 + sub2
+
+      const folderNames = projectVaults.map(v => v.vaultFolderName).sort();
+      expect(folderNames).toEqual([".mnemonic", ".mnemonic-sub1", ".mnemonic-sub2"]);
+    });
+
+    it("should not load non-existent .mnemonic-* folders", async () => {
+      const projectDir = path.join(tempDir, "project-no-subvaults");
+      await fs.mkdir(projectDir, { recursive: true });
+      await initGitRepo(projectDir, "# No Subvaults");
+
+      // Only the primary vault folder exists
+      await fs.mkdir(path.join(projectDir, ".mnemonic", "notes"), { recursive: true });
+
+      const primaryVault = await vaultManager.getOrCreateProjectVault(projectDir);
+      expect(primaryVault).toBeTruthy();
+
+      const allVaults = vaultManager.allKnownVaults();
+      const projectVaults = allVaults.filter(v => v.isProject);
+      expect(projectVaults).toHaveLength(1);
+      expect(projectVaults[0]!.vaultFolderName).toBe(".mnemonic");
+    });
+
+    it("should return submodule vault via getVaultByFolder", async () => {
+      const projectDir = path.join(tempDir, "project-by-folder");
+      await fs.mkdir(projectDir, { recursive: true });
+      await initGitRepo(projectDir, "# By Folder");
+
+      await fs.mkdir(path.join(projectDir, ".mnemonic", "notes"), { recursive: true });
+      await fs.mkdir(path.join(projectDir, ".mnemonic-lib", "notes"), { recursive: true });
+
+      // Load vaults
+      await vaultManager.getOrCreateProjectVault(projectDir);
+
+      const libVault = await vaultManager.getVaultByFolder(projectDir, ".mnemonic-lib");
+      expect(libVault).toBeTruthy();
+      expect(libVault!.vaultFolderName).toBe(".mnemonic-lib");
+      expect(libVault!.isProject).toBe(true);
+      expect(libVault!.notesRelDir).toBe(".mnemonic-lib/notes");
+    });
+
+    it("should return null for unknown vault folder", async () => {
+      const projectDir = path.join(tempDir, "project-unknown-folder");
+      await fs.mkdir(projectDir, { recursive: true });
+      await initGitRepo(projectDir, "# Unknown Folder");
+
+      await fs.mkdir(path.join(projectDir, ".mnemonic", "notes"), { recursive: true });
+      await vaultManager.getOrCreateProjectVault(projectDir);
+
+      const result = await vaultManager.getVaultByFolder(projectDir, ".mnemonic-nonexistent");
+      expect(result).toBeNull();
+    });
+
+    it("should share embeddings directory between primary and submodule vaults", async () => {
+      const projectDir = path.join(tempDir, "project-shared-embeddings");
+      await fs.mkdir(projectDir, { recursive: true });
+      await initGitRepo(projectDir, "# Shared Embeddings");
+
+      await fs.mkdir(path.join(projectDir, ".mnemonic", "notes"), { recursive: true });
+      await fs.mkdir(path.join(projectDir, ".mnemonic-sub", "notes"), { recursive: true });
+
+      const primaryVault = await vaultManager.getOrCreateProjectVault(projectDir);
+      const subVault = await vaultManager.getVaultByFolder(projectDir, ".mnemonic-sub");
+
+      expect(primaryVault).toBeTruthy();
+      expect(subVault).toBeTruthy();
+
+      // Submodule vault embeddings dir should point to primary vault's embeddings dir
+      expect(subVault!.storage.embeddingsDir).toBe(primaryVault!.storage.embeddingsDir);
+      // Both should be inside the primary vault path
+      expect(primaryVault!.storage.embeddingsDir).toContain(".mnemonic");
+      expect(primaryVault!.storage.embeddingsDir).not.toContain(".mnemonic-sub");
+    });
+
+    it("should include submodule vaults in searchOrder", async () => {
+      const projectDir = path.join(tempDir, "project-search-order");
+      await fs.mkdir(projectDir, { recursive: true });
+      await initGitRepo(projectDir, "# Search Order");
+
+      await fs.mkdir(path.join(projectDir, ".mnemonic", "notes"), { recursive: true });
+      await fs.mkdir(path.join(projectDir, ".mnemonic-alpha", "notes"), { recursive: true });
+
+      await vaultManager.getOrCreateProjectVault(projectDir);
+
+      const order = await vaultManager.searchOrder(projectDir);
+
+      // Should have: primary project vault, submodule vault, main vault
+      expect(order.length).toBeGreaterThanOrEqual(3);
+      const projectVaultsInOrder = order.filter(v => v.isProject);
+      expect(projectVaultsInOrder).toHaveLength(2);
+
+      // Primary project vault should come first
+      expect(order[0]!.vaultFolderName).toBe(".mnemonic");
+      // Submodule vault second
+      expect(order[1]!.vaultFolderName).toBe(".mnemonic-alpha");
+      // Main vault last
+      expect(order[order.length - 1]).toBe(vaultManager.main);
+    });
+
+    it("should find notes in submodule vaults via findNote", async () => {
+      const projectDir = path.join(tempDir, "project-find-sub");
+      await fs.mkdir(projectDir, { recursive: true });
+      await initGitRepo(projectDir, "# Find In Sub");
+
+      await fs.mkdir(path.join(projectDir, ".mnemonic", "notes"), { recursive: true });
+      await fs.mkdir(path.join(projectDir, ".mnemonic-sub", "notes"), { recursive: true });
+
+      await vaultManager.getOrCreateProjectVault(projectDir);
+      const subVault = await vaultManager.getVaultByFolder(projectDir, ".mnemonic-sub");
+      expect(subVault).toBeTruthy();
+
+      const note: Note = {
+        id: "sub-note-abc",
+        title: "Sub Note",
+        content: "Note in submodule vault",
+        tags: [],
+        lifecycle: "permanent",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      await subVault!.storage.writeNote(note);
+
+      const found = await vaultManager.findNote("sub-note-abc", projectDir);
+      expect(found).toBeTruthy();
+      expect(found!.note.id).toBe("sub-note-abc");
+      expect(found!.vault.vaultFolderName).toBe(".mnemonic-sub");
+    });
+
+    it("should assign correct vaultFolderName to main vault", () => {
+      expect(vaultManager.main.vaultFolderName).toBe("");
+    });
+
+    it("should assign correct notesRelDir for submodule vault", async () => {
+      const projectDir = path.join(tempDir, "project-notes-rel");
+      await fs.mkdir(projectDir, { recursive: true });
+      await initGitRepo(projectDir, "# Notes Rel Dir");
+
+      await fs.mkdir(path.join(projectDir, ".mnemonic", "notes"), { recursive: true });
+      await fs.mkdir(path.join(projectDir, ".mnemonic-widget", "notes"), { recursive: true });
+
+      await vaultManager.getOrCreateProjectVault(projectDir);
+      const widgetVault = await vaultManager.getVaultByFolder(projectDir, ".mnemonic-widget");
+      expect(widgetVault).toBeTruthy();
+
+      const relPath = vaultManager.noteRelPath(widgetVault!, "my-note");
+      expect(relPath).toBe(".mnemonic-widget/notes/my-note.md");
+    });
+  });
 });
 
 async function initGitRepo(projectDir: string, readmeContent: string): Promise<void> {
