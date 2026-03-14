@@ -8,12 +8,14 @@ tags:
   - dogfooding
 lifecycle: permanent
 createdAt: '2026-03-14T19:57:01.350Z'
-updatedAt: '2026-03-14T20:15:50.075Z'
+updatedAt: '2026-03-14T22:11:19.937Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
   - id: mnemonic-git-commit-protocol-standardization-f2ee3d5e
     type: explains
+  - id: git-retry-contract-rollout-across-mutating-tools-5beda23b
+    type: supersedes
 memoryVersion: 1
 ---
 The git-failure retry contract should apply to **all mutating MCP tools**, not just `relate`.
