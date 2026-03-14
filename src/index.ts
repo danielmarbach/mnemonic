@@ -2874,7 +2874,7 @@ server.registerTool(
     }
 
     // Check if the note is already in the target vault.
-    if (found.vault === targetVault) {
+    if (found.vault.storage.vaultPath === targetVault.storage.vaultPath) {
       const targetLabel = storageLabel(targetVault);
       return { content: [{ type: "text", text: `Memory '${id}' is already stored in ${targetLabel}.` }], isError: true };
     }

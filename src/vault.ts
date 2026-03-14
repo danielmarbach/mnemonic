@@ -129,16 +129,12 @@ export class VaultManager {
       if (pv) {
         const gitRoot = await findGitRoot(cwd);
         if (gitRoot) {
-          const resolved = path.resolve(gitRoot);
-          const all = this.allProjectVaultsByRoot.get(resolved);
-          if (all) {
-            vaults.push(...all);
-          } else {
-            vaults.push(pv);
-          }
-        } else {
-          vaults.push(pv);
+          const all = this.allProjectVaultsByRoot.get(path.resolve(gitRoot));
+          if (all) vaults.push(...all);
         }
+        // allProjectVaultsByRoot is always populated when getProjectVaultIfExists returns
+        // a non-null vault, so the above branch covers the primary vault too.
+        if (vaults.length === 0) vaults.push(pv);
       }
     }
     vaults.push(this.main);
