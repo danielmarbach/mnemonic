@@ -421,10 +421,7 @@ const projectParam = z
   .string()
   .optional()
   .describe(
-    "Absolute path to the project working directory (get from `detect_project`). " +
-    "Sets project context for routing and search boosting. " +
-    "Pass this even when storing with scope='global' — it controls project association, not storage location. " +
-    "Omit only for truly cross-project or personal memories."
+    "Absolute project working directory. Pass this whenever the task is project-related so routing, search boosting, policy, and vault selection work correctly."
   );
 
 async function resolveProject(cwd?: string) {
@@ -1063,14 +1060,17 @@ server.registerTool(
   {
     title: "Detect Project",
     description:
-      "Resolve a working directory to a stable project identity derived from its git remote URL.\n\n" +
+      "Detect the effective project identity for a working directory.\n\n" +
       "Use this when:\n" +
-      "- Starting a session in a project — call this first to get the `cwd` value needed by all other project-scoped tools\n" +
-      "- You need to confirm which project a directory belongs to\n\n" +
+      "- You have a repo path and need the project id/name before storing or searching memories\n" +
+      "- You want project-aware routing and search boosting\n\n" +
       "Do not use this when:\n" +
-      "- You already know the project context from an earlier call in this session\n\n" +
-      "Returns: project id, name, source (git-remote/folder), and any identity override. " +
-      "Follow up with `project_memory_summary` or `recall` to orient on what is already known.",
+      "- You need to inspect identity override details; use `get_project_identity` instead\n\n" +
+      "Returns:\n" +
+      "- Effective project id, name, source, and any active policy hint\n\n" +
+      "Read-only.\n\n" +
+      "Typical next step:\n" +
+      "- Use `recall` or `project_memory_summary` to orient on existing memory.",
     annotations: {
       readOnlyHint: true,
       idempotentHint: true,
@@ -1078,7 +1078,7 @@ server.registerTool(
     },
     outputSchema: ProjectIdentityResultSchema,
     inputSchema: z.object({
-      cwd: z.string().describe("Absolute path to the working directory"),
+      cwd: z.string().describe("Absolute project working directory. Pass this whenever the task is project-related so routing, search boosting, policy, and vault selection work correctly."),
     }),
   },
   async ({ cwd }) => {
@@ -1125,18 +1125,22 @@ server.registerTool(
     description:
       "Show the effective project identity for a working directory, including any configured remote override.\n\n" +
       "Use this when:\n" +
-      "- You need to check whether a fork is using `upstream` vs `origin` for identity\n" +
-      "- Debugging project-scoping issues (notes not appearing for the expected project)\n\n" +
+      "- You need to verify whether project identity comes from `origin`, `upstream`, or an override\n" +
+      "- You are debugging project scoping issues\n\n" +
       "Do not use this when:\n" +
-      "- You just need the project id — use `detect_project` instead\n\n" +
-      "Returns: effective project id/name, default project, and any identity override. Read-only.",
+      "- You only need the project id/name to continue; use `detect_project` instead\n\n" +
+      "Returns:\n" +
+      "- Effective project identity, default identity, and any configured override\n\n" +
+      "Read-only.\n\n" +
+      "Typical next step:\n" +
+      "- Use `set_project_identity` only if the wrong remote is defining identity.",
     annotations: {
       readOnlyHint: true,
       idempotentHint: true,
       openWorldHint: false,
     },
     inputSchema: z.object({
-      cwd: z.string().describe("Absolute path to the project working directory"),
+      cwd: z.string().describe("Absolute project working directory. Pass this whenever the task is project-related so routing, search boosting, policy, and vault selection work correctly."),
     }),
     outputSchema: ProjectIdentityResultSchema,
   },
@@ -1180,11 +1184,15 @@ server.registerTool(
     description:
       "Override which git remote defines project identity for a repo.\n\n" +
       "Use this when:\n" +
-      "- Working in a fork and notes should associate with the upstream project, not the fork's origin\n\n" +
+      "- A fork should associate memory with the upstream project rather than the fork remote\n" +
+      "- Project detection is resolving to the wrong canonical repo\n\n" +
       "Do not use this when:\n" +
-      "- The default `origin` remote already points to the canonical repo\n\n" +
-      "Side effects: writes to main vault config.json, git commits and pushes. " +
-      "Changes how all future memory operations resolve this project's identity.",
+      "- The default remote already identifies the correct project\n\n" +
+      "Returns:\n" +
+      "- The new effective project identity after applying the override\n\n" +
+      "Side effects: writes config, git commits, and may push.\n\n" +
+      "Typical next step:\n" +
+      "- Re-run `detect_project` or `get_project_identity` to verify the result.",
     annotations: {
       readOnlyHint: false,
       destructiveHint: false,
@@ -1192,7 +1200,7 @@ server.registerTool(
       openWorldHint: false,
     },
     inputSchema: z.object({
-      cwd: z.string().describe("Absolute path to the project working directory"),
+      cwd: z.string().describe("Absolute project working directory. Pass this whenever the task is project-related so routing, search boosting, policy, and vault selection work correctly."),
       remoteName: z.string().min(1).describe("Git remote name to use as the canonical project identity, such as `upstream`")
     }),
     outputSchema: ProjectIdentityResultSchema,
@@ -1283,9 +1291,15 @@ server.registerTool(
     description:
       "List available schema migrations and show which ones are pending for each vault.\n\n" +
       "Use this when:\n" +
-      "- Checking if vaults need migration after a mnemonic upgrade\n" +
-      "- Before running `execute_migration` to see what would change\n\n" +
-      "Returns: vault schema versions, pending migration count, and available migration descriptions. Read-only.",
+      "- Checking whether a mnemonic upgrade requires vault changes\n" +
+      "- Preparing to run `execute_migration`\n\n" +
+      "Do not use this when:\n" +
+      "- You already know the exact migration to run and only need to execute it\n\n" +
+      "Returns:\n" +
+      "- Available migrations, vault schema versions, and pending counts\n\n" +
+      "Read-only.\n\n" +
+      "Typical next step:\n" +
+      "- Run `execute_migration` with `dryRun: true` first.",
     annotations: {
       readOnlyHint: true,
       idempotentHint: true,
@@ -1346,11 +1360,15 @@ server.registerTool(
     description:
       "Execute a named schema migration on vault notes.\n\n" +
       "Use this when:\n" +
-      "- `list_migrations` shows pending migrations that need to be applied\n\n" +
+      "- `list_migrations` shows pending migrations that should be applied\n\n" +
       "Do not use this when:\n" +
-      "- You haven't run `list_migrations` first to check what's pending\n\n" +
-      "Always run with `dryRun: true` first to preview changes, then re-run with `dryRun: false` to apply. " +
-      "Side effects: modifies note files, git commits and pushes per vault.",
+      "- You have not checked pending migrations yet\n" +
+      "- You have not previewed the migration with `dryRun: true`\n\n" +
+      "Returns:\n" +
+      "- Per-vault migration results, counts, warnings, and errors\n\n" +
+      "Side effects: modifies note files, git commits per affected vault, and may push.\n\n" +
+      "Typical next step:\n" +
+      "- Re-run `list_migrations` to confirm nothing is pending.",
     annotations: {
       readOnlyHint: false,
       destructiveHint: false,
@@ -1442,18 +1460,19 @@ server.registerTool(
   {
     title: "Remember",
     description:
-      "Store a new memory as a markdown note with embeddings for semantic search.\n\n" +
+      "Create a new memory as a markdown note with embeddings for future recall.\n\n" +
       "Use this when:\n" +
-      "- A decision, preference, bug fix, or useful context should survive beyond this session\n" +
-      "- You learn something the user had to explain that isn't obvious from the codebase\n\n" +
+      "- A decision, preference, bug fix, or durable context should survive beyond this session\n" +
+      "- No existing note already covers the topic\n\n" +
       "Do not use this when:\n" +
-      "- A note on this topic already exists — use `recall` to check first, then `update` instead\n" +
-      "- Multiple related notes have accumulated — use `consolidate` to merge them\n\n" +
-      "After storing: consider whether this note relates to any note you recalled earlier in this session. " +
-      "If so, call `relate` to link them while you still have context.\n\n" +
-      "Side effects: writes note + embedding files, git commits. " +
-      "When project-vault writes target protected branches, policy may ask or block before writing. " +
-      "Returns persistence status.",
+      "- You are unsure whether the memory already exists; use `recall` first\n" +
+      "- You need to change an existing memory; use `update`\n" +
+      "- Several overlapping notes should be merged; use `consolidate`\n\n" +
+      "Returns:\n" +
+      "- The created memory id, scope, vault label, lifecycle, and persistence status\n\n" +
+      "Side effects: writes a note, writes embeddings, git commits, and may push.\n\n" +
+      "Typical next step:\n" +
+      "- Use `relate` if this new memory connects to something recalled earlier.",
     annotations: {
       readOnlyHint: false,
       destructiveHint: false,
@@ -1461,12 +1480,11 @@ server.registerTool(
       openWorldHint: true,
     },
     inputSchema: z.object({
-      title: z.string().describe("Short, searchable title — e.g. 'JWT RS256 migration rationale', not 'auth stuff'"),
+      title: z.string().describe("Specific, retrieval-friendly title. Prefer the concrete topic or decision, not a vague label."),
       content: z.string().describe(
-        "Markdown content. Write summary-first: put the main fact, decision, or outcome in the opening sentences, " +
-        "then follow with supporting detail. Embeddings weight early content more heavily."
+        "Markdown note body. Put the key fact, decision, or outcome in the opening lines, then supporting detail. Embeddings weight early content more heavily."
       ),
-      tags: z.array(z.string()).optional().default([]).describe("Searchable tags — use terms you'd search for later"),
+      tags: z.array(z.string()).optional().default([]).describe("Optional tags for later filtering. Use a small number of stable, meaningful tags."),
       lifecycle: z
         .enum(NOTE_LIFECYCLES)
         .optional()
@@ -1475,16 +1493,16 @@ server.registerTool(
           "Choose 'permanent' for durable knowledge (decisions, constraints, lessons, bug causes). Default: permanent."
         ),
       summary: z.string().optional().describe(
-        "Git commit message summary (not stored in note). Imperative mood, 50-72 chars, explain 'why' not 'what'. " +
-        "Example: 'Add JWT RS256 migration decision for distributed auth'"
+        "Git commit summary only. Imperative mood, concise, and focused on why the change matters."
       ),
       cwd: projectParam,
       scope: z
         .enum(WRITE_SCOPES)
         .optional()
         .describe(
-          "Where to store: 'project' = shared project vault (.mnemonic/), " +
-          "'global' = private main vault. When omitted, uses the project's saved policy or defaults to 'project'."
+          "Where to store: 'project' writes to the shared project vault visible to all contributors; " +
+          "'global' writes to the private main vault visible only on this machine. " +
+          "When omitted, uses the project's saved policy or defaults to 'project'."
         ),
       allowProtectedBranch: z
         .boolean()
@@ -1603,14 +1621,17 @@ server.registerTool(
   {
     title: "Set Project Memory Policy",
     description:
-      "Set the default write scope, consolidation mode, and protected-branch behavior for a project.\n\n" +
+      "Set the default write scope and memory behavior for a project.\n\n" +
       "Use this when:\n" +
-      "- The user wants all memories for a project to go to a specific vault by default\n" +
-      "- The current 'ask' behavior is inconvenient and should be automated\n" +
-      "- Protected branches should prompt, block, or allow project-vault commits by default\n\n" +
+      "- A project should default to project or global storage\n" +
+      "- Protected-branch handling or consolidation behavior should be standardized\n\n" +
       "Do not use this when:\n" +
-      "- You just need to store a single memory with a specific scope — pass `scope` to `remember` instead\n\n" +
-      "Side effects: writes to main vault config.json, git commits and pushes.",
+      "- You only need a one-off write location for a single `remember` call\n\n" +
+      "Returns:\n" +
+      "- The saved project policy and effective values\n\n" +
+      "Side effects: writes config, git commits, and may push.\n\n" +
+      "Typical next step:\n" +
+      "- Use `get_project_memory_policy` to verify the saved policy.",
     annotations: {
       readOnlyHint: false,
       destructiveHint: false,
@@ -1618,9 +1639,9 @@ server.registerTool(
       openWorldHint: false,
     },
     inputSchema: z.object({
-      cwd: z.string().describe("Absolute path to the project working directory"),
+      cwd: z.string().describe("Absolute project working directory. Pass this whenever the task is project-related so routing, search boosting, policy, and vault selection work correctly."),
       defaultScope: z.enum(PROJECT_POLICY_SCOPES).optional().describe(
-        "Default storage: 'project' = shared .mnemonic/ vault, 'global' = private main vault, 'ask' = prompt each time"
+        "Default storage: 'project' = shared project vault, 'global' = private main vault, 'ask' = prompt each time"
       ),
       consolidationMode: z.enum(CONSOLIDATION_MODES).optional().describe(
         "Default consolidation mode: 'supersedes' preserves history (default), 'delete' removes sources immediately"
@@ -1728,18 +1749,25 @@ server.registerTool(
   {
     title: "Get Project Memory Policy",
     description:
-      "Show the saved default write scope, consolidation mode, and protected-branch settings for a project.\n\n" +
+      "Show the saved memory policy for a project.\n\n" +
       "Use this when:\n" +
-      "- Checking what the current storage default is before changing it\n" +
-      "- Debugging why memories are landing in an unexpected vault\n\n" +
-      "Returns: saved policy or 'no policy set' with default behavior explanation. Read-only.",
+      "- You want to confirm the default write scope before storing memory\n" +
+      "- You are debugging why notes land in an unexpected vault\n" +
+      "- You need to inspect protected-branch or consolidation defaults\n\n" +
+      "Do not use this when:\n" +
+      "- You want to change the policy; use `set_project_memory_policy`\n\n" +
+      "Returns:\n" +
+      "- Saved policy values or an explanation of the fallback behavior\n\n" +
+      "Read-only.\n\n" +
+      "Typical next step:\n" +
+      "- Call `remember` with explicit `scope` for a one-off override, or `set_project_memory_policy` to change defaults.",
     annotations: {
       readOnlyHint: true,
       idempotentHint: true,
       openWorldHint: false,
     },
     inputSchema: z.object({
-      cwd: z.string().describe("Absolute path to the project working directory"),
+      cwd: z.string().describe("Absolute project working directory. Pass this whenever the task is project-related so routing, search boosting, policy, and vault selection work correctly."),
     }),
     outputSchema: PolicyResultSchema,
   },
@@ -1801,35 +1829,35 @@ server.registerTool(
     description:
       "Semantic search over stored memories using embeddings.\n\n" +
       "Use this when:\n" +
-      "- Starting a session — search broadly (e.g. 'project overview architecture decisions') to orient on prior context\n" +
-      "- Before calling `remember` — check if a note on this topic already exists (use `update` instead if so)\n" +
-      "- The user mentions something unfamiliar — you may already have context stored\n" +
-      "- You need to find a specific decision, bug fix, or piece of tribal knowledge\n\n" +
+      "- You know the topic but not the exact memory id\n" +
+      "- You are starting a session and want relevant prior context\n" +
+      "- You want to check whether a memory already exists before creating another one\n\n" +
       "Do not use this when:\n" +
-      "- You know the exact note id — use `get` instead\n" +
-      "- You want a structural overview — use `project_memory_summary` instead\n\n" +
-      "When `cwd` is provided, searches both project vault and main vault with project notes boosted +0.15. " +
-      "Without `cwd`, searches only the main vault. " +
-      "Stale embeddings are backfilled on demand before searching.\n\n" +
-      "After results: check the `related:` line on each result — call `get` with those ids to pull in linked context.",
+      "- You already know the exact id; use `get`\n" +
+      "- You just want to browse by tags or scope; use `list`\n\n" +
+      "Returns:\n" +
+      "- Ranked memory matches with scores, vault label, tags, lifecycle, and updated time\n\n" +
+      "Read-only.\n\n" +
+      "Typical next step:\n" +
+      "- Use `get`, `update`, `relate`, or `consolidate` based on the results.",
     annotations: {
       readOnlyHint: true,
       idempotentHint: true,
       openWorldHint: true,
     },
     inputSchema: z.object({
-      query: z.string().describe("Natural language search query — describe what you're looking for"),
+      query: z.string().describe("Natural-language search query describing the topic, decision, bug, preference, or context you want to find."),
       cwd: projectParam,
       limit: z.number().int().min(1).max(20).optional().default(DEFAULT_RECALL_LIMIT),
       minSimilarity: z.number().min(0).max(1).optional().default(DEFAULT_MIN_SIMILARITY),
-      tags: z.array(z.string()).optional().describe("Filter results to notes with all of these tags"),
+      tags: z.array(z.string()).optional().describe("Filter results to notes with all of these tags."),
       scope: z
         .enum(["project", "global", "all"])
         .optional()
         .default("all")
         .describe(
-          "'project' = only this project's memories, " +
-          "'global' = only unscoped memories, " +
+          "'project' = only this project's memories (project-scoped storage), " +
+          "'global' = only unscoped memories (main/global storage), " +
           "'all' = both, with project notes boosted (default)"
         ),
     }),
@@ -1945,16 +1973,18 @@ server.registerTool(
   {
     title: "Update Memory",
     description:
-      "Update the content, title, tags, or lifecycle of an existing memory by id.\n\n" +
+      "Modify an existing memory by id.\n\n" +
       "Use this when:\n" +
-      "- A stored memory is outdated — a decision was revisited, a dependency upgraded, a pattern changed\n" +
-      "- You `recall` something and notice it's stale or partially wrong\n" +
-      "- You want to add detail to an existing note rather than creating a duplicate\n\n" +
+      "- A stored memory is stale, incomplete, or wrong\n" +
+      "- You recalled something useful and want to refine the same note instead of creating a duplicate\n\n" +
       "Do not use this when:\n" +
-      "- No note exists on this topic yet — use `remember` instead\n" +
-      "- Multiple notes need merging — use `consolidate` instead\n\n" +
-      "Side effects: re-embeds the note, git commits. On protected branches, project-vault commits follow policy and may ask or block unless overridden. " +
-      "Only provided fields are changed; omitted fields keep their current values. Project metadata is not changed by this tool.",
+      "- No note exists yet; use `remember`\n" +
+      "- Several notes need to be merged or retired together; use `consolidate`\n\n" +
+      "Returns:\n" +
+      "- The updated memory id, changed fields, and persistence status\n\n" +
+      "Side effects: rewrites the note, refreshes embeddings, git commits, and may push.\n\n" +
+      "Typical next step:\n" +
+      "- Use `relate` or `consolidate` if the update changes how this note connects to others.",
     annotations: {
       readOnlyHint: false,
       destructiveHint: false,
@@ -1962,15 +1992,15 @@ server.registerTool(
       openWorldHint: true,
     },
     inputSchema: z.object({
-      id: z.string().describe("Memory id to update (get this from `recall` or `list`)"),
-      content: z.string().optional().describe("New content (replaces existing). Write summary-first."),
-      title: z.string().optional().describe("New title"),
-      tags: z.array(z.string()).optional().describe("New tags (replaces existing tag list)"),
+      id: z.string().describe("Exact memory id. Use an id returned by `recall`, `list`, `recent_memories`, or `where_is`."),
+      content: z.string().optional().describe("Markdown note body. Put the key fact, decision, or outcome in the opening lines, then supporting detail."),
+      title: z.string().optional().describe("Specific, retrieval-friendly title. Prefer the concrete topic or decision, not a vague label."),
+      tags: z.array(z.string()).optional().describe("Optional tags for later filtering. Use a small number of stable, meaningful tags."),
       lifecycle: z
         .enum(NOTE_LIFECYCLES)
         .optional()
         .describe("Change lifecycle. Preserve the existing value unless you're intentionally switching it."),
-      summary: z.string().optional().describe("Git commit message summary explaining what changed and why. Not stored in the note."),
+      summary: z.string().optional().describe("Git commit summary only. Imperative mood, concise, and focused on why the change matters."),
       cwd: projectParam,
       allowProtectedBranch: z
         .boolean()
@@ -2086,16 +2116,18 @@ server.registerTool(
   {
     title: "Forget",
     description:
-      "Permanently delete a memory and its embedding. Cleans up dangling relationship references in other notes.\n\n" +
+      "Delete an existing memory by id and clean up dangling relationships.\n\n" +
       "Use this when:\n" +
-      "- A memory is fully superseded and keeping it would cause confusion\n" +
-      "- The content is factually wrong and should not appear in search results\n\n" +
+      "- A memory should be removed entirely\n" +
+      "- A note is obsolete and should not remain searchable\n\n" +
       "Do not use this when:\n" +
-      "- The memory is just outdated — use `update` to correct it instead\n" +
-      "- The memory has historical value — use `relate` with type 'supersedes' to mark it replaced\n" +
-      "- You want to merge notes — use `consolidate` instead\n\n" +
-      "Side effects: deletes note + embedding files, removes relationship references from other notes, git commits per vault. " +
-      "On protected branches, project-vault commits follow policy and may ask or block unless overridden.",
+      "- The note should stay but move to another vault; use `move_memory`\n" +
+      "- The note should be replaced or merged; use `consolidate`\n\n" +
+      "Returns:\n" +
+      "- Deleted memory id/title and relationship cleanup details\n\n" +
+      "Side effects: deletes note files, cleans relationship references, git commits, and may push.\n\n" +
+      "Typical next step:\n" +
+      "- Use `recall` or `list` to confirm the remaining memory set is clean.",
     annotations: {
       readOnlyHint: false,
       destructiveHint: true,
@@ -2103,7 +2135,7 @@ server.registerTool(
       openWorldHint: false,
     },
     inputSchema: z.object({
-      id: z.string().describe("Memory id to permanently delete"),
+      id: z.string().describe("Exact memory id. Use an id returned by `recall`, `list`, `recent_memories`, or `where_is`."),
       cwd: projectParam,
       allowProtectedBranch: z
         .boolean()
@@ -2187,14 +2219,18 @@ server.registerTool(
   {
     title: "Get Memory",
     description:
-      "Fetch one or more notes by exact id. Returns full content, metadata, tags, lifecycle, and relationships.\n\n" +
+      "Fetch one or more memories by exact id.\n\n" +
       "Use this when:\n" +
-      "- You know the exact note id (from `recall` results, `related:` links, or `list` output)\n" +
-      "- You need full content that `recall` or `list` only summarized\n\n" +
+      "- You already know the memory id and need the full note content\n" +
+      "- A previous tool returned ids that you now want to inspect exactly\n\n" +
       "Do not use this when:\n" +
-      "- You're searching by topic — use `recall` instead\n" +
-      "- You only need location metadata — use `where_is_memory` instead\n\n" +
-      "Read-only. Supports batch fetching of multiple ids in one call.",
+      "- You are still searching by topic; use `recall`\n" +
+      "- You want to browse many notes; use `list`\n\n" +
+      "Returns:\n" +
+      "- Full note content and metadata for the requested ids, including storage label\n\n" +
+      "Read-only.\n\n" +
+      "Typical next step:\n" +
+      "- Use `update`, `forget`, `move_memory`, or `relate` after inspection.",
     annotations: {
       readOnlyHint: true,
       idempotentHint: true,
@@ -2262,20 +2298,25 @@ server.registerTool(
   {
     title: "Where Is Memory",
     description:
-      "Show a memory's project association and storage location without fetching full content.\n\n" +
+      "Locate which storage label and project association a memory currently has.\n\n" +
       "Use this when:\n" +
-      "- Checking whether a note lives in the project vault or main vault before a `move_memory`\n" +
-      "- Debugging storage routing — a note landed in the wrong vault\n\n" +
+      "- You know the id and want to see where the memory lives\n" +
+      "- You are deciding whether a note should be moved between project storage locations\n\n" +
       "Do not use this when:\n" +
-      "- You need the note's content — use `get` instead\n\n" +
-      "Read-only. Returns: title, project association, vault, last updated, relationship count.",
+      "- You need the full note content; use `get`\n" +
+      "- You want to search for a note by topic; use `recall`\n\n" +
+      "Returns:\n" +
+      "- Title, project association, storage label, updated time, and relationship count\n\n" +
+      "Read-only.\n\n" +
+      "Typical next step:\n" +
+      "- Use `move_memory` if the storage location is wrong, or `get` for full inspection.",
     annotations: {
       readOnlyHint: true,
       idempotentHint: true,
       openWorldHint: false,
     },
     inputSchema: z.object({
-      id: z.string().describe("Memory id to locate"),
+      id: z.string().describe("Exact memory id. Use an id returned by `recall`, `list`, `recent_memories`, or `where_is`."),
       cwd: projectParam,
     }),
     outputSchema: WhereIsResultSchema,
@@ -2320,17 +2361,19 @@ server.registerTool(
   {
     title: "List Memories",
     description:
-      "List stored memories with filtering by scope, vault, and tags.\n\n" +
+      "List stored memories with filtering by scope, storage label, and tags.\n\n" +
       "Use this when:\n" +
-      "- Browsing all memories for a project or globally\n" +
-      "- Filtering by tags to find related notes\n" +
-      "- Checking what exists before deciding whether to `remember` or `update`\n\n" +
+      "- You want to browse what exists for a project or globally\n" +
+      "- You want a deterministic filtered list rather than a semantic search\n" +
+      "- You are checking inventory before creating, updating, or consolidating notes\n\n" +
       "Do not use this when:\n" +
-      "- Searching by topic — use `recall` for semantic search\n" +
-      "- You want a high-level project overview — use `project_memory_summary` instead\n" +
-      "- You want recent changes — use `recent_memories` instead\n\n" +
-      "Read-only. Returns id, title, tags, lifecycle for each note. " +
-      "Use optional flags to include previews, storage location, timestamps, or relationships.",
+      "- You want topic-based semantic search; use `recall`\n" +
+      "- You already know the exact id; use `get`\n\n" +
+      "Returns:\n" +
+      "- Matching memories with ids, titles, scope/storage context, and metadata\n\n" +
+      "Read-only.\n\n" +
+      "Typical next step:\n" +
+      "- Use `get` for exact inspection or `update` / `consolidate` for cleanup.",
     annotations: {
       readOnlyHint: true,
       idempotentHint: true,
@@ -2342,13 +2385,21 @@ server.registerTool(
         .enum(["project", "global", "all"])
         .optional()
         .default("all")
-        .describe("'project' = only this project, 'global' = only unscoped, 'all' = everything"),
+        .describe(
+          "'project' = only this project's memories (project-scoped storage); " +
+          "'global' = only unscoped memories (main/global storage); " +
+          "'all' = everything visible from this context (default)"
+        ),
       storedIn: z
         .enum(["project-vault", "main-vault", "any"])
         .optional()
         .default("any")
-        .describe("Filter by actual storage location (vault) instead of project association"),
-      tags: z.array(z.string()).optional().describe("Filter to notes matching all of these tags"),
+        .describe(
+          "Storage-label filter. Use `main-vault` for main/global storage. " +
+          "Use `project-vault` as the broad filter for any project vault, including sub-vaults. " +
+          "Results may still return a more specific label such as `sub-vault:.mnemonic-lib`."
+        ),
+      tags: z.array(z.string()).optional().describe("Filter to notes matching all of these tags."),
       includeRelations: z.boolean().optional().default(false).describe("Include related memory ids and relationship types"),
       includePreview: z.boolean().optional().default(false).describe("Include a short content preview for each note"),
       includeStorage: z.boolean().optional().default(false).describe("Show which vault each note is stored in"),
@@ -2424,15 +2475,18 @@ server.registerTool(
   {
     title: "Recent Memories",
     description:
-      "Show the most recently updated memories, sorted by last modification time.\n\n" +
+      "Show the most recently updated memories.\n\n" +
       "Use this when:\n" +
-      "- Orienting at session start to see what was last worked on\n" +
-      "- Catching stale notes that may need updating\n" +
-      "- Reviewing what changed since last session\n\n" +
+      "- You want to see what changed most recently\n" +
+      "- You are resuming work and want a quick chronological view\n\n" +
       "Do not use this when:\n" +
-      "- Searching by topic — use `recall` instead\n" +
-      "- You want a thematic overview — use `project_memory_summary` instead\n\n" +
-      "Read-only. Includes content previews and storage location by default.",
+      "- You need topic-based search; use `recall`\n" +
+      "- You need a tag/scope inventory; use `list`\n\n" +
+      "Returns:\n" +
+      "- Recently updated memories with ids, timestamps, storage labels, and basic metadata\n\n" +
+      "Read-only.\n\n" +
+      "Typical next step:\n" +
+      "- Use `get` for exact inspection or `update` to continue refining a recent note.",
     annotations: {
       readOnlyHint: true,
       idempotentHint: true,
@@ -2501,15 +2555,18 @@ server.registerTool(
   {
     title: "Memory Graph",
     description:
-      "Show memory relationships as a compact adjacency list.\n\n" +
+      "Show memory nodes and their relationships as a graph-oriented view.\n\n" +
       "Use this when:\n" +
-      "- Spotting dense clusters of related notes — these are consolidation candidates\n" +
-      "- Understanding how notes connect before a `consolidate` operation\n" +
-      "- Visualizing the knowledge structure for a project\n\n" +
+      "- You want to inspect how notes connect across a topic or project\n" +
+      "- You are evaluating whether relationships are too sparse or too dense\n\n" +
       "Do not use this when:\n" +
-      "- You need note content — use `get` instead\n" +
-      "- You want a thematic overview — use `project_memory_summary` instead\n\n" +
-      "Read-only. Only shows notes that have at least one relationship.",
+      "- You only need one note; use `get`\n" +
+      "- You only need ranked topic matches; use `recall`\n\n" +
+      "Returns:\n" +
+      "- Memory nodes and relationship edges for the requested slice\n\n" +
+      "Read-only.\n\n" +
+      "Typical next step:\n" +
+      "- Use `get`, `relate`, `unrelate`, or `consolidate` based on what the graph reveals.",
     annotations: {
       readOnlyHint: true,
       idempotentHint: true,
@@ -2588,21 +2645,25 @@ server.registerTool(
   {
     title: "Project Memory Summary",
     description:
-      "Get a rich overview of everything mnemonic knows about a project: policy, themes, note counts, storage layout, and recent changes.\n\n" +
+      "Generate a high-level summary of what is already known for a project.\n\n" +
       "Use this when:\n" +
-      "- Starting a session — call this after `detect_project` to orient on prior context before doing work\n" +
-      "- Checking how many notes exist and how they're distributed across vaults\n\n" +
+      "- You want fast orientation before starting work\n" +
+      "- You need a synthesized overview instead of raw note listings\n\n" +
       "Do not use this when:\n" +
-      "- Searching for a specific topic — use `recall` instead\n" +
-      "- You want just the recent notes — use `recent_memories` instead\n\n" +
-      "Read-only. Groups notes by theme (decisions, architecture, tooling, bugs, etc.) with examples.",
+      "- You need exact note contents; use `get`\n" +
+      "- You need direct semantic matches for a query; use `recall`\n\n" +
+      "Returns:\n" +
+      "- A synthesized project-level summary based on stored memories\n\n" +
+      "Read-only.\n\n" +
+      "Typical next step:\n" +
+      "- Use `recall` or `list` to drill down into specific areas.",
     annotations: {
       readOnlyHint: true,
       idempotentHint: true,
       openWorldHint: false,
     },
     inputSchema: z.object({
-      cwd: z.string().describe("Absolute path to the project working directory"),
+      cwd: z.string().describe("Absolute project working directory. Pass this whenever the task is project-related so routing, search boosting, policy, and vault selection work correctly."),
       maxPerTheme: z.number().int().min(1).max(5).optional().default(3),
       recentLimit: z.number().int().min(1).max(10).optional().default(5),
     }),
@@ -2695,15 +2756,17 @@ server.registerTool(
   {
     title: "Sync",
     description:
-      "Pull remote changes, push local commits, and backfill missing embeddings.\n\n" +
+      "Sync mnemonic vaults with their git remotes and repair local embedding coverage as needed.\n\n" +
       "Use this when:\n" +
-      "- Starting a session and you want the latest notes from collaborators\n" +
-      "- Embedding model changed — use `force: true` to rebuild all embeddings\n" +
-      "- Notes were added by direct file edit or git pull and need embedding backfill\n\n" +
+      "- You want the local vault state aligned with remote changes\n" +
+      "- You suspect another machine or collaborator updated the vaults\n\n" +
       "Do not use this when:\n" +
-      "- You just called `remember` or `update` — those tools handle their own embedding and commit\n\n" +
-      "Always syncs the main vault. When `cwd` is provided, also syncs the project vault (.mnemonic/). " +
-      "Side effects: git fetch/pull/push, Ollama embedding API calls.",
+      "- You only need to inspect or edit a single memory\n\n" +
+      "Returns:\n" +
+      "- Per-vault pull/push results, deletions, additions, and embedding rebuild info\n\n" +
+      "Side effects: performs git sync and may rebuild local embeddings.\n\n" +
+      "Typical next step:\n" +
+      "- Use `recent_memories`, `list`, or `recall` to inspect newly synced changes.",
     annotations: {
       readOnlyHint: false,
       destructiveHint: false,
@@ -2784,19 +2847,19 @@ server.registerTool(
   {
     title: "Move Memory",
     description:
-      "Move a memory between the main vault and a project vault without changing its id.\n\n" +
+      "Move a memory between main storage and project storage, optionally targeting a specific sub-vault folder.\n\n" +
       "Use this when:\n" +
-      "- A note was stored in the wrong vault and needs to be relocated\n" +
-      "- A private note (main vault) should become shared (project vault) or vice versa\n" +
-      "- Moving a note between the primary project vault and a submodule vault\n\n" +
+      "- A note is stored in the wrong place\n" +
+      "- Project-specific knowledge should move between shared project storage and main storage\n" +
+      "- A note should live in a specific sub-vault such as `.mnemonic-lib`\n\n" +
       "Do not use this when:\n" +
-      "- You want to change the note's content — use `update` instead\n" +
-      "- You want to delete the note — use `forget` instead\n\n" +
-      "When moving to project vault, project metadata is rewritten from `cwd`. " +
-      "When moving to main vault, existing project association is preserved. " +
-      "Use `vaultFolder` to target a specific submodule vault (e.g. '.mnemonic-submodule1') instead of the primary project vault. " +
-      "Side effects: writes to target vault, deletes from source vault, git commits per vault. " +
-      "On protected branches, project-vault commits follow policy and may ask or block unless overridden.",
+      "- You only need to edit the note content; use `update`\n" +
+      "- You want to delete the note; use `forget`\n\n" +
+      "Returns:\n" +
+      "- The moved memory id, resulting storage label, project association, and persistence status\n\n" +
+      "Side effects: rewrites storage location, may adjust project association, git commits, and may push.\n\n" +
+      "Typical next step:\n" +
+      "- Use `where_is_memory` or `get` to verify the final state.",
     annotations: {
       readOnlyHint: false,
       destructiveHint: false,
@@ -2804,15 +2867,14 @@ server.registerTool(
       openWorldHint: false,
     },
     inputSchema: z.object({
-      id: z.string().describe("Memory id to move"),
-      target: z.enum(["main-vault", "project-vault"]).describe("Destination: 'main-vault' for private storage, 'project-vault' for shared project storage"),
+      id: z.string().describe("Exact memory id. Use an id returned by `recall`, `list`, `recent_memories`, or `where_is`."),
+      target: z.enum(["main-vault", "project-vault"]).describe("Destination: 'main-vault' for private/global storage, 'project-vault' for shared project storage"),
       vaultFolder: z
         .string()
         .optional()
         .describe(
-          "Specific vault folder to target when moving to 'project-vault'. " +
-          "Use the folder name (e.g. '.mnemonic-submodule1') to move into a submodule vault. " +
-          "When omitted, the primary project vault (.mnemonic) is used."
+          "Optional target project vault folder name, such as `.mnemonic-lib`. " +
+          "Use this only when moving into a specific sub-vault instead of the primary project vault."
         ),
       cwd: projectParam,
       allowProtectedBranch: z
@@ -2967,19 +3029,18 @@ server.registerTool(
   {
     title: "Relate Memories",
     description:
-      "Create a typed, bidirectional relationship between two memories.\n\n" +
+      "Create a typed bidirectional relationship between two memories.\n\n" +
       "Use this when:\n" +
-      "- You just stored a note that connects to something you recalled earlier in this session\n" +
-      "- Two notes cover the same topic, one explains the other, or one replaces the other\n\n" +
+      "- A newly stored or updated note meaningfully connects to another note\n" +
+      "- One note explains, exemplifies, supersedes, or closely relates to another\n\n" +
       "Do not use this when:\n" +
-      "- The connection is weak or forced — don't over-link, one or two meaningful edges per note is better\n" +
-      "- You want to remove a relationship — use `unrelate` instead\n\n" +
-      "Relationship types:\n" +
-      "- 'related-to': same topic or area\n" +
-      "- 'explains': clarifies why the other note's decision was made\n" +
-      "- 'example-of': concrete instance of a general pattern\n" +
-      "- 'supersedes': replaces a previous decision or approach\n\n" +
-      "Side effects: modifies both notes' frontmatter, git commits per vault. Notes may be in different vaults.",
+      "- The connection is weak or speculative\n" +
+      "- You need to remove a relationship rather than add one\n\n" +
+      "Returns:\n" +
+      "- Both memory ids and the created relationship type\n\n" +
+      "Side effects: modifies both notes, git commits per affected vault, and may push.\n\n" +
+      "Typical next step:\n" +
+      "- Use `get` on both notes to verify the relationship context reads well.",
     annotations: {
       readOnlyHint: false,
       destructiveHint: false,
@@ -3077,12 +3138,17 @@ server.registerTool(
   {
     title: "Remove Relationship",
     description:
-      "Remove an existing relationship between two memories.\n\n" +
+      "Remove a relationship between two memories.\n\n" +
       "Use this when:\n" +
-      "- A relationship was created incorrectly or is no longer relevant\n\n" +
+      "- A previously created relationship is no longer accurate\n" +
+      "- Two notes should remain independent\n\n" +
       "Do not use this when:\n" +
-      "- You want to delete the note entirely — use `forget` instead\n\n" +
-      "Side effects: modifies both notes' frontmatter (when bidirectional), git commits per vault.",
+      "- You are adding a new connection; use `relate`\n\n" +
+      "Returns:\n" +
+      "- Both memory ids and the removed relationship details\n\n" +
+      "Side effects: modifies both notes, git commits per affected vault, and may push.\n\n" +
+      "Typical next step:\n" +
+      "- Use `get` to verify both notes now stand on their own.",
     annotations: {
       readOnlyHint: false,
       destructiveHint: true,
@@ -3169,23 +3235,18 @@ server.registerTool(
   {
     title: "Consolidate Memories",
     description:
-      "Analyze memories for duplicates and clusters, or merge multiple notes into one.\n\n" +
+      "Merge overlapping memories into a cleaner canonical note and retire the sources.\n\n" +
       "Use this when:\n" +
-      "- 3+ notes on the same topic have accumulated from incremental captures\n" +
-      "- A feature or bug arc is complete and related notes can be synthesized\n" +
-      "- `memory_graph` shows a dense cluster of tightly-related nodes\n\n" +
+      "- Multiple notes cover the same decision, fix, or concept\n" +
+      "- One memory supersedes several older fragments\n\n" +
       "Do not use this when:\n" +
-      "- Only one note needs updating — use `update` instead\n" +
-      "- Notes are on different topics — don't force a merge\n\n" +
-      "Workflow: start with 'dry-run' or 'suggest-merges' to see recommendations, then 'execute-merge' with a mergePlan. " +
-      "Optionally follow up with 'prune-superseded' to clean up old notes.\n\n" +
-      "Modes: 'supersedes' preserves source notes with a supersedes relationship (default). " +
-      "'delete' removes source notes immediately. " +
-      "When all sources are temporary, prefer 'delete' so scaffolding is cleaned up.\n\n" +
-      "Read-only strategies: detect-duplicates, find-clusters, suggest-merges, dry-run. " +
-      "Mutating strategies: execute-merge, prune-superseded. " +
-      "On protected branches, project-vault commits from mutating strategies follow policy and may ask or block unless overridden. " +
-      "Gathers notes from both main and project vaults.",
+      "- You only need a small edit to one note; use `update`\n" +
+      "- You only want to connect notes; use `relate`\n\n" +
+      "Returns:\n" +
+      "- The canonical memory, source ids, resulting relationships, and persistence status\n\n" +
+      "Side effects: creates or updates the canonical note, modifies or removes source notes according to mode, git commits, and may push.\n\n" +
+      "Typical next step:\n" +
+      "- Use `get` to inspect the canonical note and `recall` to confirm duplication is reduced.",
     annotations: {
       readOnlyHint: false,
       destructiveHint: true,
@@ -3225,8 +3286,8 @@ server.registerTool(
           targetTitle: z.string().describe("Title for the consolidated note"),
           content: z.string().optional().describe("Custom body for the consolidated note — distill durable knowledge rather than dumping all source content verbatim"),
           description: z.string().optional().describe("Context explaining the consolidation rationale (stored in the note)"),
-          summary: z.string().optional().describe("Git commit message summary (not stored in note)"),
-          tags: z.array(z.string()).optional().describe("Tags for the consolidated note (defaults to union of source tags)"),
+          summary: z.string().optional().describe("Git commit summary only. Imperative mood, concise, and focused on why the change matters."),
+          tags: z.array(z.string()).optional().describe("Optional tags for later filtering. Use a small number of stable, meaningful tags."),
         })
         .optional()
         .describe("Required for 'execute-merge' strategy. Get sourceIds from 'suggest-merges' output."),
