@@ -398,6 +398,12 @@ mnemonic import-claude-memory --claude-home=/custom/.claude
 
 Imported notes are written to the main vault with `lifecycle: permanent` and `scope: global`. After importing, run `sync` to embed them and push to your remote.
 
+## Prompts
+
+| Prompt | Description |
+|--------|-------------|
+| `mnemonic-workflow-hint` | Optional. Returns compact workflow guidance: discover → inspect → modify → organize, storage-label model, and the `recall` → `get` → `update` preference. Not auto-injected — request it on demand. |
+
 ## Tools
 
 | Tool                        | Description                                                              |
@@ -532,8 +538,4 @@ build/     Compiled JavaScript output
 
 ## Agent instructions
 
-No system prompt required. Mnemonic's tools are self-describing — each includes "use when" / "do not use when" guidance, behavioral annotations, and typed schemas. Models will use them correctly from tool metadata alone.
-
-If your model isn't picking up the tools proactively, add this one-liner to your AGENT.md or system prompt:
-
-> You have access to a long-term memory system via the `mnemonic` MCP server. Use it proactively — don't wait to be asked.
+See [SYSTEM_PROMPT.md](SYSTEM_PROMPT.md) for the recommended agent instructions.
