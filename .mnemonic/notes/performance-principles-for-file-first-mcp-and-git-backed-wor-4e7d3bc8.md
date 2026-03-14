@@ -8,9 +8,12 @@ tags:
   - principles
 lifecycle: permanent
 createdAt: '2026-03-14T22:14:46.759Z'
-updatedAt: '2026-03-14T22:14:46.759Z'
+updatedAt: '2026-03-14T22:14:51.593Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: mnemonic-key-design-decisions-3f2a6273
+    type: related-to
 memoryVersion: 1
 ---
 Durable performance lessons for mnemonic's file-first MCP and git-backed architecture.
