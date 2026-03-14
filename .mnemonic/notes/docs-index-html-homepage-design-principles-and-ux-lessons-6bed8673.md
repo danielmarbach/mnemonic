@@ -9,7 +9,7 @@ tags:
   - navigation
 lifecycle: permanent
 createdAt: '2026-03-12T05:20:45.016Z'
-updatedAt: '2026-03-14T13:15:56.816Z'
+updatedAt: '2026-03-14T13:17:06.223Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 memoryVersion: 1
@@ -36,9 +36,11 @@ Accumulated design principles and UX lessons for `docs/index.html`, distilled fr
 
 ## Typography principles
 
-**Fluid root font-size scales the entire page** — Set `font-size: clamp(min, fluid, max)` on `html` rather than overriding individual elements. Since the page uses `rem` throughout, one declaration makes everything scale proportionally. Used: `clamp(15px, 0.625vw + 12px, 18px)` → 15px on mobile, ~18px on 1200px+ screens.
+**Design for the full range of screens, not just the smallest** — Text that feels comfortable on a phone can feel cramped and tiring on a large desktop monitor. Typography decisions should account for how the page will actually be viewed across the audience's likely devices.
 
-**Clamp for cross-device legibility** — Small fixed `rem` values (0.75–0.875rem) that look fine on mobile become uncomfortably small on 27"+ screens. The fluid root approach avoids adding per-element media queries and keeps proportions intact across breakpoints.
+**Scale proportionally rather than patching individual elements** — When type feels too small, the instinct is to increase specific elements. But isolated overrides create inconsistency and maintenance burden. Prefer a single scaling mechanism that lifts everything in proportion.
+
+**Fluid type adapts without hard breakpoints** — A continuous scale between a comfortable floor and ceiling reads more naturally than a sudden jump at a breakpoint. Readers don't notice a gradual increase; they notice a jarring reflow.
 
 ## Navigation principles
 
