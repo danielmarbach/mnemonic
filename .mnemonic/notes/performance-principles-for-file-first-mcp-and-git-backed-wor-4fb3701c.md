@@ -8,9 +8,14 @@ tags:
   - git
 lifecycle: permanent
 createdAt: '2026-03-14T19:50:49.199Z'
-updatedAt: '2026-03-14T19:50:49.199Z'
+updatedAt: '2026-03-14T19:51:00.934Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: mnemonic-key-design-decisions-3f2a6273
+    type: explains
+  - id: low-risk-performance-strategy-for-fs-and-git-heavy-paths-8ec31435
+    type: supersedes
 memoryVersion: 1
 ---
 General performance lessons for mnemonic (file-first MCP + git-backed behavior), linked to current architectural constraints:
