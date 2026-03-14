@@ -125,16 +125,18 @@ export class VaultManager {
   async searchOrder(cwd?: string): Promise<Vault[]> {
     const vaults: Vault[] = [];
     if (cwd) {
-      const pv = await this.getProjectVaultIfExists(cwd);
-      if (pv) {
-        const gitRoot = await findGitRoot(cwd);
-        if (gitRoot) {
+      const gitRoot = await findGitRoot(cwd);
+      if (gitRoot && !this.isMainRepo(gitRoot)) {
+        const pv = await this.loadAllVaultsForRoot(gitRoot, false);
+        if (pv) {
           const all = this.allProjectVaultsByRoot.get(path.resolve(gitRoot));
-          if (all) vaults.push(...all);
+          if (all) {
+            vaults.push(...all);
+          } else {
+            // Defensive fallback for consistency if map population ever changes.
+            vaults.push(pv);
+          }
         }
-        // allProjectVaultsByRoot is always populated when getProjectVaultIfExists returns
-        // a non-null vault, so the above branch covers the primary vault too.
-        if (vaults.length === 0) vaults.push(pv);
       }
     }
     vaults.push(this.main);
@@ -295,4 +297,3 @@ async function pathExists(p: string): Promise<boolean> {
     return false;
   }
 }
-
