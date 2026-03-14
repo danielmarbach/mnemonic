@@ -100,10 +100,10 @@ brew tap danielmarbach/mnemonic-mcp https://github.com/danielmarbach/mnemonic
 brew install mnemonic-mcp
 ```
 
-Or in a single step:
+Or in a single step (direct formula URL):
 
 ```bash
-brew install danielmarbach/mnemonic-mcp/mnemonic-mcp
+brew install --formula https://raw.githubusercontent.com/danielmarbach/mnemonic/main/Formula/mnemonic-mcp.rb
 ```
 
 ### Docker Hub
