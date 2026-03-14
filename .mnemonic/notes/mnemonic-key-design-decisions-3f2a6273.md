@@ -7,7 +7,7 @@ tags:
   - rationale
 lifecycle: permanent
 createdAt: '2026-03-07T17:59:12.124Z'
-updatedAt: '2026-03-14T15:01:27.637Z'
+updatedAt: '2026-03-14T19:51:00.920Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
@@ -29,6 +29,8 @@ relatedTo:
     type: related-to
   - id: remember-tool-checkedforexisting-is-schema-only-agent-hint-w-a2c94093
     type: related-to
+  - id: performance-principles-for-file-first-mcp-and-git-backed-wor-4fb3701c
+    type: explains
 memoryVersion: 1
 ---
 **One file per note:** Critical for git conflict isolation. Never aggregate notes into a single file.

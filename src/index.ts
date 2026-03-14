@@ -1878,6 +1878,23 @@ server.registerTool(
     const project = await resolveProject(cwd);
     const queryVec = await embed(query);
     const vaults = await vaultManager.searchOrder(cwd);
+    const noteCache = new Map<string, Note>();
+
+    const noteCacheKey = (vault: Vault, id: string): string => `${vault.storage.vaultPath}::${id}`;
+    const readCachedNote = async (vault: Vault, id: string): Promise<Note | null> => {
+      const key = noteCacheKey(vault, id);
+      const cached = noteCache.get(key);
+      if (cached) {
+        return cached;
+      }
+
+      const note = await vault.storage.readNote(id);
+      if (note) {
+        noteCache.set(key, note);
+      }
+
+      return note;
+    };
 
     for (const vault of vaults) {
       await embedMissingNotes(vault.storage).catch(() => { /* best-effort: don't block recall if Ollama is down */ });
@@ -1892,7 +1909,7 @@ server.registerTool(
         const rawScore = cosineSimilarity(queryVec, rec.embedding);
         if (rawScore < minSimilarity) continue;
 
-        const note = await vault.storage.readNote(rec.id);
+        const note = await readCachedNote(vault, rec.id);
         if (!note) continue;
 
         if (tags && tags.length > 0) {
@@ -1923,7 +1940,7 @@ server.registerTool(
 
     const sections: string[] = [];
     for (const { id, score, vault } of top) {
-      const note = await vault.storage.readNote(id);
+      const note = await readCachedNote(vault, id);
       if (note) sections.push(formatNote(note, score));
     }
 
@@ -1947,7 +1964,7 @@ server.registerTool(
         updatedAt: string;
       }> = [];
     for (const { id, score, vault, boosted } of top) {
-      const note = await vault.storage.readNote(id);
+      const note = await readCachedNote(vault, id);
       if (note) {
         structuredResults.push({
           id,
@@ -3374,22 +3391,23 @@ async function detectDuplicates(
   const checked = new Set<string>();
   let foundCount = 0;
   const duplicates: Array<{ noteA: { id: string; title: string }; noteB: { id: string; title: string }; similarity: number }> = [];
+  const embeddings = await loadEmbeddingsByNoteId(entries);
 
   for (let i = 0; i < entries.length; i++) {
     const entryA = entries[i]!;
     if (checked.has(entryA.note.id)) continue;
 
-    const embeddingA = await entryA.vault.storage.readEmbedding(entryA.note.id);
+    const embeddingA = embeddings.get(entryA.note.id);
     if (!embeddingA) continue;
 
     for (let j = i + 1; j < entries.length; j++) {
       const entryB = entries[j]!;
       if (checked.has(entryB.note.id)) continue;
 
-      const embeddingB = await entryB.vault.storage.readEmbedding(entryB.note.id);
+      const embeddingB = embeddings.get(entryB.note.id);
       if (!embeddingB) continue;
 
-      const similarity = cosineSimilarity(embeddingA.embedding, embeddingB.embedding);
+      const similarity = cosineSimilarity(embeddingA, embeddingB);
       if (similarity >= threshold) {
         foundCount++;
         lines.push(`${foundCount}. ${entryA.note.title} (${entryA.note.id})`);
@@ -3549,12 +3567,13 @@ async function suggestMerges(
     sourceIds: string[];
     similarities: Array<{ id: string; similarity: number }>;
   }> = [];
+  const embeddings = await loadEmbeddingsByNoteId(entries);
 
   for (let i = 0; i < entries.length; i++) {
     const entryA = entries[i]!;
     if (checked.has(entryA.note.id)) continue;
 
-    const embeddingA = await entryA.vault.storage.readEmbedding(entryA.note.id);
+    const embeddingA = embeddings.get(entryA.note.id);
     if (!embeddingA) continue;
 
     const similar: Array<{ entry: NoteEntry; similarity: number }> = [];
@@ -3563,10 +3582,10 @@ async function suggestMerges(
       const entryB = entries[j]!;
       if (checked.has(entryB.note.id)) continue;
 
-      const embeddingB = await entryB.vault.storage.readEmbedding(entryB.note.id);
+      const embeddingB = embeddings.get(entryB.note.id);
       if (!embeddingB) continue;
 
-      const similarity = cosineSimilarity(embeddingA.embedding, embeddingB.embedding);
+      const similarity = cosineSimilarity(embeddingA, embeddingB);
       if (similarity >= threshold) {
         similar.push({ entry: entryB, similarity });
       }
@@ -3636,6 +3655,19 @@ async function suggestMerges(
   };
 
   return { content: [{ type: "text", text: lines.join("\n") }], structuredContent };
+}
+
+async function loadEmbeddingsByNoteId(entries: NoteEntry[]): Promise<Map<string, number[]>> {
+  const embeddings = new Map<string, number[]>();
+
+  await Promise.all(entries.map(async (entry) => {
+    const record = await entry.vault.storage.readEmbedding(entry.note.id);
+    if (record) {
+      embeddings.set(entry.note.id, record.embedding);
+    }
+  }));
+
+  return embeddings;
 }
 
 async function executeMerge(

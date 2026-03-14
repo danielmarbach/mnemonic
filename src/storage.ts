@@ -169,10 +169,10 @@ export class Storage {
 
   async listNotes(filter?: { project?: string | null }): Promise<Note[]> {
     const ids = await this.listNoteIds();
+    const readNotes = await Promise.all(ids.map(async (id) => ({ id, note: await this.readNote(id) })));
     const notes: Note[] = [];
 
-    for (const id of ids) {
-      const note = await this.readNote(id);
+    for (const { note } of readNotes) {
       if (!note) continue;
 
       if (filter !== undefined) {
@@ -235,14 +235,11 @@ export class Storage {
     } catch {
       return [];
     }
-    const records: EmbeddingRecord[] = [];
-    for (const file of files) {
-      if (!file.endsWith(".json")) continue;
-      const id = file.replace(/\.json$/, "");
-      const rec = await this.readEmbedding(id);
-      if (rec) records.push(rec);
-    }
-    return records;
+    const ids = files
+      .filter((file) => file.endsWith(".json"))
+      .map((file) => file.replace(/\.json$/, ""));
+    const records = await Promise.all(ids.map((id) => this.readEmbedding(id)));
+    return records.filter((record): record is EmbeddingRecord => record !== null);
   }
 
   // ── Helpers ────────────────────────────────────────────────────────────────
