@@ -7,9 +7,12 @@ tags:
   - persistence-status
 lifecycle: permanent
 createdAt: '2026-03-09T11:32:57.609Z'
-updatedAt: '2026-03-09T12:00:28.311Z'
+updatedAt: '2026-03-14T23:40:47.420Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: parallel-consolidate-operations-can-leave-staged-local-only--e8c33780
+    type: related-to
 memoryVersion: 1
 ---
 Implementation outcome for persistence-status visibility in mutating MCP tools.
