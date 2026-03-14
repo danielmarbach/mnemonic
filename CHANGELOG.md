@@ -4,6 +4,15 @@ All notable changes to `mnemonic` will be documented in this file.
 
 The format is loosely based on Keep a Changelog and uses semver-style version headings.
 
+## [0.10.0] - 2026-03-14
+
+### Changed
+
+- Performance in hot read paths: `recall` now reuses note reads within a single request instead of re-reading the same note during scoring and formatting.
+- Consolidation analysis (`detect-duplicates`, `suggest-merges`) now preloads embeddings once per note and reuses vectors during pairwise similarity checks.
+- `Storage.listNotes` and `Storage.listEmbeddings` now load files in parallel to reduce serialized disk I/O while preserving existing output behavior.
+- `VaultManager.searchOrder` now avoids duplicate git-root resolution in a single call, reducing unnecessary git subprocess work in read-heavy flows.
+
 ## [0.9.0] - 2026-03-14
 
 ### Added
