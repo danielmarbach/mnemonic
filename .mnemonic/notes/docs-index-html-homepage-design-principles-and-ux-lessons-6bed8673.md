@@ -9,7 +9,7 @@ tags:
   - navigation
 lifecycle: permanent
 createdAt: '2026-03-12T05:20:45.016Z'
-updatedAt: '2026-03-12T05:20:45.016Z'
+updatedAt: '2026-03-14T13:17:06.223Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 memoryVersion: 1
@@ -34,6 +34,14 @@ Accumulated design principles and UX lessons for `docs/index.html`, distilled fr
 
 **Two information layers for tools** — Card surface answers "when would I use this?". Tooltip answers "how does it work?". Keeping these separate lets both be written well.
 
+## Typography principles
+
+**Design for the full range of screens, not just the smallest** — Text that feels comfortable on a phone can feel cramped and tiring on a large desktop monitor. Typography decisions should account for how the page will actually be viewed across the audience's likely devices.
+
+**Scale proportionally rather than patching individual elements** — When type feels too small, the instinct is to increase specific elements. But isolated overrides create inconsistency and maintenance burden. Prefer a single scaling mechanism that lifts everything in proportion.
+
+**Fluid type adapts without hard breakpoints** — A continuous scale between a comfortable floor and ceiling reads more naturally than a sudden jump at a breakpoint. Readers don't notice a gradual increase; they notice a jarring reflow.
+
 ## Navigation principles
 
 **Nav order must match DOM order exactly** — If a nav link points to a section that appears earlier or later than its nav position implies, it breaks the user's scroll expectation. Any mismatch is a bug.
@@ -44,4 +52,4 @@ Accumulated design principles and UX lessons for `docs/index.html`, distilled fr
 
 ## Files touched across both sessions
 
-- `docs/index.html`: tools section (card layout, tooltips, categories), setup section (install option grouping, or-dividers), nav (ordering, orphan removal), early-stage banner (plain language)
+- `docs/index.html`: tools section (card layout, tooltips, categories), setup section (install option grouping, or-dividers), nav (ordering, orphan removal), early-stage banner (plain language), root font-size fluid scaling
