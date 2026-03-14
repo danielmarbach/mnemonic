@@ -8,7 +8,7 @@ tags:
   - dogfooding
 lifecycle: permanent
 createdAt: '2026-03-14T19:57:01.350Z'
-updatedAt: '2026-03-14T19:57:05.434Z'
+updatedAt: '2026-03-14T20:15:50.075Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
@@ -16,38 +16,38 @@ relatedTo:
     type: explains
 memoryVersion: 1
 ---
-Learning from 2026-03-14 `index.lock` incident during memory `relate` operation:
+The git-failure retry contract should apply to **all mutating MCP tools**, not just `relate`.
 
-Observed behavior:
+Core problem (confirmed in the 2026-03-14 `index.lock` incident):
 
-- Mutation applied (note file updated/staged) but auto-commit failed due to git lock contention.
-- Agent could reconstruct a meaningful commit message from operation context + staged diff, but not guaranteed byte-for-byte parity with MCP's internal default commit message/body.
+- A mutation can be applied on disk (and staged) while the git commit step fails due to lock contention.
+- Without a deterministic retry payload, recovery requires reconstructing commit intent from context, which is not guaranteed byte-for-byte equivalent.
 
-Design goal restated:
+Scope decision:
 
-- On git failure, MCP should return enough deterministic data to retry commit exactly (or intentionally equivalent) without guessing.
+- Treat this as a platform-level contract for every command that can mutate notes/config/relationships and then attempt git persistence.
+- Any mutating command that reaches "mutation applied, commit failed" should emit the same retry contract shape.
 
-Recommended retry contract additions for mutating tools:
+Required retry contract on commit failure after mutation:
 
-1) Return `retry` block in structuredContent when commit fails after file mutation:
-   - `attemptedCommit.message`
-   - `attemptedCommit.body`
-   - `attemptedCommit.files` (scoped rel paths)
-   - `attemptedCommit.cwd`
-   - `attemptedCommit.vault`
-   - `attemptedCommit.error`
-2) Distinguish mutation state explicitly:
+1) `retry.attemptedCommit`:
+   - `message`
+   - `body`
+   - `files` (scoped relative paths)
+   - `cwd`
+   - `vault`
+   - `error`
+2) Mutation-state clarity:
    - `mutationApplied: true|false`
-   - `persistence.commit.status` remains failed/skipped/written etc.
-3) Provide deterministic idempotency hint:
-   - `retrySafe: true|false` + rationale (e.g., writes already on disk, only commit failed).
+   - keep `persistence.commit.status` explicit (`failed`, `skipped`, `written`, etc.)
+3) Idempotency guidance:
+   - `retrySafe: true|false`
+   - short rationale (for example: writes already persisted; only commit failed)
 
-Operational guidance:
-
-- Avoid running two MCP server instances against same repo during mutation-heavy flows; otherwise lock contention is expected.
-- If dogfooding is needed, do it in isolation window or different checkout.
+Mutating tools expected to follow this contract include: `remember`, `update`, `forget`, `move_memory`, `relate`, `unrelate`, mutating `consolidate`, `set_project_identity`, `set_project_memory_policy`, and migration execution paths that persist changes.
 
 Why this matters:
 
-- Keeps failure-recovery aligned with existing scoped-commit safety design.
-- Removes ambiguity from manual recovery and preserves audit-quality commit metadata.
+- Makes recovery deterministic and auditable across the whole surface area.
+- Avoids tool-specific recovery logic in clients/agents.
+- Preserves scoped-commit safety while reducing operational ambiguity during lock/contention failures.
