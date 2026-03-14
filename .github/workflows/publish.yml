@@ -211,7 +211,7 @@ jobs:
           git commit -m "$TITLE"
           git push -u origin "$BRANCH" --force-with-lease
 
-          PR_NUMBER=$(gh pr list --repo "${{ github.repository }}" --head "$BRANCH" --state open --json number --jq '.[0].number // empty')
+          PR_NUMBER=$(gh pr list --repo "${{ github.repository }}" --head "$BRANCH" --state open --json number --jq 'if length > 0 then .[0].number else "" end')
 
           if [ -z "$PR_NUMBER" ]; then
             BODY_FILE=$(mktemp)
@@ -223,16 +223,22 @@ jobs:
               echo "- Tarball URL: \`${{ steps.tarball.outputs.url }}\`"
             } > "$BODY_FILE"
 
-            gh pr create \
+            PR_URL=$(gh pr create \
               --repo "${{ github.repository }}" \
               --base main \
               --head "$BRANCH" \
               --title "$TITLE" \
-              --body-file "$BODY_FILE"
+              --body-file "$BODY_FILE" \
+            )
 
             rm -f "$BODY_FILE"
+            PR_NUMBER="${PR_URL##*/}"
+          fi
 
-            PR_NUMBER=$(gh pr list --repo "${{ github.repository }}" --head "$BRANCH" --state open --json number --jq '.[0].number // empty')
+          if [[ ! "$PR_NUMBER" =~ ^[1-9][0-9]*$ ]]; then
+            echo "Unable to resolve PR number for branch $BRANCH; skipping auto-merge and approval"
+            echo "pr_number=" >> "$GITHUB_OUTPUT"
+            exit 0
           fi
 
           echo "pr_number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
