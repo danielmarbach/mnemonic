@@ -4,6 +4,18 @@ All notable changes to `mnemonic` will be documented in this file.
 
 The format is loosely based on Keep a Changelog and uses semver-style version headings.
 
+## [0.9.0] - 2026-03-14
+
+### Added
+
+- `mnemonic-workflow-hint` MCP prompt: optional, on-demand workflow guidance covering the discover → inspect → modify → organize pattern, storage-label model, and `recall` → `get` → `update` preference.
+- `remember` tool gains `checkedForExisting` optional boolean field — schema-only agent hint indicating `recall` or `list` was checked before writing.
+
+### Changed
+
+- `remember` tool: tightened "Do not use when" guidance, improved `cwd` and `lifecycle` field descriptions.
+- Removed system prompt one-liner from README and website; `SYSTEM_PROMPT.md` is now the canonical agent instructions file and points to `mnemonic-workflow-hint`.
+
 ## [0.8.1] - 2026-03-14
 
 ### Changed
