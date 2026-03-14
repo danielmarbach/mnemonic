@@ -16,8 +16,6 @@ projectName: mnemonic
 relatedTo:
   - id: mnemonic-key-design-decisions-3f2a6273
     type: related-to
-  - id: git-failure-retry-contract-improvement-from-index-lock-incid-3c0f8ee7
-    type: explains
 memoryVersion: 1
 ---
 Enhanced git commit protocol with comprehensive LLM-provided summary support across multiple tools.

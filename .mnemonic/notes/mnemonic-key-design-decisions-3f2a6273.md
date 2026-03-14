@@ -29,8 +29,6 @@ relatedTo:
     type: related-to
   - id: remember-tool-checkedforexisting-is-schema-only-agent-hint-w-a2c94093
     type: related-to
-  - id: performance-principles-for-file-first-mcp-and-git-backed-wor-4fb3701c
-    type: explains
 memoryVersion: 1
 ---
 **One file per note:** Critical for git conflict isolation. Never aggregate notes into a single file.
