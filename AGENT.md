@@ -84,6 +84,13 @@ When calling `update`:
 - `ARCHITECTURE.md` is the canonical high-level map of the system; update it whenever control flow, source layout, vault behavior, data model, CI/MCP operational patterns, or major architectural decisions change
 - Keep `ARCHITECTURE.md`, `AGENT.md`, `README.md`, and `SYSTEM_PROMPT.md` aligned: architecture detail in `ARCHITECTURE.md`, agent workflow rules in `AGENT.md`, reader-facing overview links in `README.md`, and the agent system prompt in `SYSTEM_PROMPT.md`
 - When a new concept is easier to understand visually, add or refresh a Mermaid diagram in `ARCHITECTURE.md`
+
+**Changelog guidelines:**
+- Keep entries concise — 1-2 sentences max per bullet
+- Implementation details (retry logic, concurrency protection, internal parameters) belong in commit messages, not changelog
+- Match the verbosity level of existing entries (e.g., 0.7.0 uses brief 1-sentence bullets)
+- Preserve API changes as brief reference bullets
+
 - `docs/index.html` is the GitHub Pages landing page; keep it current whenever tools, features, or the dogfooding notes change:
   - Tools table in the **Tools** section must reflect the current tool inventory (same as README.md and AGENT.md)
   - The **Dogfooding** section shows real notes from `.mnemonic/notes/` — refresh card content if those notes are updated or replaced
