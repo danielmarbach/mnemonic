@@ -8,9 +8,12 @@ tags:
   - dogfooding
 lifecycle: permanent
 createdAt: '2026-03-14T19:57:01.350Z'
-updatedAt: '2026-03-14T19:57:01.350Z'
+updatedAt: '2026-03-14T19:57:05.434Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: mnemonic-git-commit-protocol-standardization-f2ee3d5e
+    type: explains
 memoryVersion: 1
 ---
 Learning from 2026-03-14 `index.lock` incident during memory `relate` operation:
