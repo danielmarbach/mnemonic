@@ -3391,22 +3391,23 @@ async function detectDuplicates(
   const checked = new Set<string>();
   let foundCount = 0;
   const duplicates: Array<{ noteA: { id: string; title: string }; noteB: { id: string; title: string }; similarity: number }> = [];
+  const embeddings = await loadEmbeddingsByNoteId(entries);
 
   for (let i = 0; i < entries.length; i++) {
     const entryA = entries[i]!;
     if (checked.has(entryA.note.id)) continue;
 
-    const embeddingA = await entryA.vault.storage.readEmbedding(entryA.note.id);
+    const embeddingA = embeddings.get(entryA.note.id);
     if (!embeddingA) continue;
 
     for (let j = i + 1; j < entries.length; j++) {
       const entryB = entries[j]!;
       if (checked.has(entryB.note.id)) continue;
 
-      const embeddingB = await entryB.vault.storage.readEmbedding(entryB.note.id);
+      const embeddingB = embeddings.get(entryB.note.id);
       if (!embeddingB) continue;
 
-      const similarity = cosineSimilarity(embeddingA.embedding, embeddingB.embedding);
+      const similarity = cosineSimilarity(embeddingA, embeddingB);
       if (similarity >= threshold) {
         foundCount++;
         lines.push(`${foundCount}. ${entryA.note.title} (${entryA.note.id})`);
@@ -3566,12 +3567,13 @@ async function suggestMerges(
     sourceIds: string[];
     similarities: Array<{ id: string; similarity: number }>;
   }> = [];
+  const embeddings = await loadEmbeddingsByNoteId(entries);
 
   for (let i = 0; i < entries.length; i++) {
     const entryA = entries[i]!;
     if (checked.has(entryA.note.id)) continue;
 
-    const embeddingA = await entryA.vault.storage.readEmbedding(entryA.note.id);
+    const embeddingA = embeddings.get(entryA.note.id);
     if (!embeddingA) continue;
 
     const similar: Array<{ entry: NoteEntry; similarity: number }> = [];
@@ -3580,10 +3582,10 @@ async function suggestMerges(
       const entryB = entries[j]!;
       if (checked.has(entryB.note.id)) continue;
 
-      const embeddingB = await entryB.vault.storage.readEmbedding(entryB.note.id);
+      const embeddingB = embeddings.get(entryB.note.id);
       if (!embeddingB) continue;
 
-      const similarity = cosineSimilarity(embeddingA.embedding, embeddingB.embedding);
+      const similarity = cosineSimilarity(embeddingA, embeddingB);
       if (similarity >= threshold) {
         similar.push({ entry: entryB, similarity });
       }
@@ -3653,6 +3655,19 @@ async function suggestMerges(
   };
 
   return { content: [{ type: "text", text: lines.join("\n") }], structuredContent };
+}
+
+async function loadEmbeddingsByNoteId(entries: NoteEntry[]): Promise<Map<string, number[]>> {
+  const embeddings = new Map<string, number[]>();
+
+  await Promise.all(entries.map(async (entry) => {
+    const record = await entry.vault.storage.readEmbedding(entry.note.id);
+    if (record) {
+      embeddings.set(entry.note.id, record.embedding);
+    }
+  }));
+
+  return embeddings;
 }
 
 async function executeMerge(
