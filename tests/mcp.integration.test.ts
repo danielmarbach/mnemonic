@@ -140,6 +140,8 @@ describe("local MCP script", () => {
       expect(git?.["commit"]).toBe("failed");
       expect(git?.["push"]).toBe("skipped");
       expect(String(git?.["commitError"] ?? "")).toContain("index.lock");
+      expect(response.text).toContain("Git commit error:");
+      expect(response.text).toContain("Retry: safe");
 
       const retry = persistence?.["retry"] as Record<string, unknown>;
       expect(retry?.["mutationApplied"]).toBe(true);
@@ -195,7 +197,8 @@ describe("local MCP script", () => {
     }, { disableGit: false });
 
     expect(response.text).toContain("defaultScope=global");
-    expect(response.text).toContain("Commit failed; retry data included");
+    expect(response.text).toContain("Git commit error:");
+    expect(response.text).toContain("Retry: safe");
     const retry = response.structuredContent?.["retry"] as Record<string, unknown>;
     expect(retry?.["mutationApplied"]).toBe(true);
     const attempted = retry?.["attemptedCommit"] as Record<string, unknown>;
@@ -203,6 +206,58 @@ describe("local MCP script", () => {
     expect(attempted?.["vault"]).toBe("main-vault");
     expect(String(attempted?.["error"] ?? "")).toContain("index.lock");
   }, 15000);
+
+  it("surfaces retry guidance in text when relate commit fails", async () => {
+    const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-vault-"));
+    tempDirs.push(vaultDir);
+    const embeddingServer = await startFakeEmbeddingServer();
+
+    try {
+      await execFileAsync("git", ["init"], { cwd: vaultDir });
+      await execFileAsync("git", ["config", "user.name", "Test User"], { cwd: vaultDir });
+      await execFileAsync("git", ["config", "user.email", "test@example.com"], { cwd: vaultDir });
+
+      const first = await callLocalMcp(vaultDir, "remember", {
+        title: "Relate retry first",
+        content: "First note for relate retry test.",
+        tags: ["integration", "retry"],
+        scope: "global",
+        summary: "Create first note for relate retry test",
+      }, { ollamaUrl: embeddingServer.url, disableGit: false });
+
+      const second = await callLocalMcp(vaultDir, "remember", {
+        title: "Relate retry second",
+        content: "Second note for relate retry test.",
+        tags: ["integration", "retry"],
+        scope: "global",
+        summary: "Create second note for relate retry test",
+      }, { ollamaUrl: embeddingServer.url, disableGit: false });
+
+      const firstId = extractRememberedId(first);
+      const secondId = extractRememberedId(second);
+
+      await writeFile(path.join(vaultDir, ".git", "index.lock"), "locked\n", "utf-8");
+
+      const response = await callLocalMcpResponse(vaultDir, "relate", {
+        fromId: firstId,
+        toId: secondId,
+      }, { ollamaUrl: embeddingServer.url, disableGit: false });
+
+      expect(response.text).toContain(`Linked \`${firstId}\` ↔ \`${secondId}\` (related-to)`);
+      expect(response.text).toContain("Git commit error:");
+      expect(response.text).toContain("Retry: safe");
+
+      const retry = response.structuredContent?.["retry"] as Record<string, unknown>;
+      expect(retry?.["mutationApplied"]).toBe(true);
+      expect(retry?.["retrySafe"]).toBe(true);
+      const attempted = retry?.["attemptedCommit"] as Record<string, unknown>;
+      expect(attempted?.["message"]).toContain("relate:");
+      expect(attempted?.["vault"]).toBe("main-vault");
+      expect(String(attempted?.["error"] ?? "")).toContain("index.lock");
+    } finally {
+      await embeddingServer.close();
+    }
+  }, 20000);
 
   it("applies project memory policy end-to-end for remember routing", async () => {
     const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-vault-"));
