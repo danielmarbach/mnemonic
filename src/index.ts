@@ -60,6 +60,7 @@ import type {
   MigrationExecuteResult,
   ConsolidateResult,
   PersistenceStatus,
+  MutationRetryContract,
 } from "./structured-content.js";
 import {
   RememberResultSchema,
@@ -799,6 +800,7 @@ function buildPersistenceStatus(args: {
   push: PushResult;
   commitMessage?: string;
   commitBody?: string;
+  retry?: MutationRetryContract;
 }): PersistenceStatus {
   return {
     notePath: args.storage.notePath(args.id),
@@ -814,10 +816,42 @@ function buildPersistenceStatus(args: {
       commitMessage: args.commitMessage,
       commitBody: args.commitBody,
       commitReason: args.commit.reason,
+      commitError: args.commit.error,
       pushReason: args.push.reason,
       pushError: args.push.error,
     },
+    retry: args.retry,
     durability: resolveDurability(args.commit, args.push),
+  };
+}
+
+function buildMutationRetryContract(args: {
+  commit: CommitResult;
+  commitMessage: string;
+  commitBody?: string;
+  files: string[];
+  cwd?: string;
+  vault: Vault;
+  mutationApplied: boolean;
+}): MutationRetryContract | undefined {
+  if (args.commit.status !== "failed") {
+    return undefined;
+  }
+
+  return {
+    attemptedCommit: {
+      message: args.commitMessage,
+      body: args.commitBody,
+      files: args.files,
+      cwd: args.cwd,
+      vault: storageLabel(args.vault),
+      error: args.commit.error ?? "Unknown git commit failure",
+    },
+    mutationApplied: args.mutationApplied,
+    retrySafe: args.mutationApplied,
+    rationale: args.mutationApplied
+      ? "Mutation is already persisted on disk; commit can be retried deterministically."
+      : "Mutation was not applied; retry may require re-running the operation.",
   };
 }
 
@@ -968,6 +1002,7 @@ async function moveNoteBetweenVaults(
   found: { note: Note; vault: Vault },
   targetVault: Vault,
   noteToWrite?: Note,
+  cwd?: string,
 ): Promise<{ note: Note; persistence: PersistenceStatus }> {
   const { note, vault: sourceVault } = found;
   const finalNote = noteToWrite ?? note;
@@ -989,7 +1024,9 @@ async function moveNoteBetweenVaults(
     noteTitle: finalNote.title,
     projectName: finalNote.projectName,
   });
-  const targetCommit = await targetVault.git.commitWithStatus(`move: ${finalNote.title}`, [vaultManager.noteRelPath(targetVault, finalNote.id)], targetCommitBody);
+  const targetCommitMessage = `move: ${finalNote.title}`;
+  const targetCommitFiles = [vaultManager.noteRelPath(targetVault, finalNote.id)];
+  const targetCommit = await targetVault.git.commitWithStatus(targetCommitMessage, targetCommitFiles, targetCommitBody);
 
   const sourceCommitBody = formatCommitBody({
     summary: `Moved to ${targetVaultLabel}`,
@@ -998,7 +1035,18 @@ async function moveNoteBetweenVaults(
     projectName: finalNote.projectName,
   });
   await sourceVault.git.commitWithStatus(`move: ${finalNote.title}`, [vaultManager.noteRelPath(sourceVault, finalNote.id)], sourceCommitBody);
-  const targetPush = await pushAfterMutation(targetVault);
+  const targetPush = targetCommit.status === "committed"
+    ? await pushAfterMutation(targetVault)
+    : { status: "skipped" as const, reason: "commit-failed" as const };
+  const retry = buildMutationRetryContract({
+    commit: targetCommit,
+    commitMessage: targetCommitMessage,
+    commitBody: targetCommitBody,
+    files: targetCommitFiles,
+    cwd,
+    vault: targetVault,
+    mutationApplied: true,
+  });
   if (sourceVault !== targetVault) {
     await pushAfterMutation(sourceVault);
   }
@@ -1011,8 +1059,9 @@ async function moveNoteBetweenVaults(
       embedding: embedding ? { status: "written" } : { status: "skipped", reason: "no-source-embedding" },
       commit: targetCommit,
       push: targetPush,
-      commitMessage: `move: ${finalNote.title}`,
+      commitMessage: targetCommitMessage,
       commitBody: targetCommitBody,
+      retry,
     }),
   };
 }
@@ -1245,12 +1294,21 @@ server.registerTool(
         `Resolved identity: ${candidateIdentity.project.id}\n` +
         `Remote: ${remoteName}`,
     });
-    await vaultManager.main.git.commit(
-      `identity: ${defaultProject.name} use remote ${remoteName}`,
-      ["config.json"],
-      commitBody
-    );
-    await pushAfterMutation(vaultManager.main);
+    const commitMessage = `identity: ${defaultProject.name} use remote ${remoteName}`;
+    const commitFiles = ["config.json"];
+    const commitStatus = await vaultManager.main.git.commitWithStatus(commitMessage, commitFiles, commitBody);
+    const pushStatus = commitStatus.status === "committed"
+      ? await pushAfterMutation(vaultManager.main)
+      : { status: "skipped" as const, reason: "commit-failed" as const };
+    const retry = buildMutationRetryContract({
+      commit: commitStatus,
+      commitMessage,
+      commitBody,
+      files: commitFiles,
+      cwd,
+      vault: vaultManager.main,
+      mutationApplied: true,
+    });
 
     const structuredContent: ProjectIdentityResult = {
       action: "project_identity_set",
@@ -1269,6 +1327,7 @@ server.registerTool(
         remoteName,
         updatedAt: now,
       },
+      retry,
     };
 
     return {
@@ -1276,7 +1335,8 @@ server.registerTool(
         type: "text",
         text:
           `Project identity override set for ${defaultProject.name}: ` +
-          `default=\`${defaultProject.id}\`, effective=\`${candidateIdentity.project.id}\`, remote=${remoteName}`,
+          `default=\`${defaultProject.id}\`, effective=\`${candidateIdentity.project.id}\`, remote=${remoteName}` +
+          `${commitStatus.status === "failed" ? `\nCommit failed; retry data included. Push status: ${pushStatus.status}.` : ""}`,
       }],
       structuredContent,
     };
@@ -1587,20 +1647,30 @@ server.registerTool(
       scope: writeScope,
       tags: tags,
     });
-    const commitStatus = await vault.git.commitWithStatus(
-      `remember: ${title}`,
-      [vaultManager.noteRelPath(vault, id)],
-      commitBody
-    );
-    const pushStatus = await pushAfterMutation(vault);
+    const commitMessage = `remember: ${title}`;
+    const commitFiles = [vaultManager.noteRelPath(vault, id)];
+    const commitStatus = await vault.git.commitWithStatus(commitMessage, commitFiles, commitBody);
+    const pushStatus = commitStatus.status === "committed"
+      ? await pushAfterMutation(vault)
+      : { status: "skipped" as const, reason: "commit-failed" as const };
+    const retry = buildMutationRetryContract({
+      commit: commitStatus,
+      commitMessage,
+      commitBody,
+      files: commitFiles,
+      cwd,
+      vault,
+      mutationApplied: true,
+    });
     const persistence = buildPersistenceStatus({
       storage: vault.storage,
       id,
       embedding: embeddingStatus,
       commit: commitStatus,
       push: pushStatus,
-      commitMessage: `remember: ${title}`,
+      commitMessage,
       commitBody,
+      retry,
     });
 
     const vaultLabel = vault.isProject ? " [project vault]" : " [main vault]";
@@ -1725,12 +1795,21 @@ server.registerTool(
           : ""
         }`,
     });
-    await vaultManager.main.git.commit(
-      `policy: ${project.name} default scope ${effectiveDefaultScope}`,
-      ["config.json"],
-      commitBody
-    );
-    await pushAfterMutation(vaultManager.main);
+    const commitMessage = `policy: ${project.name} default scope ${effectiveDefaultScope}`;
+    const commitFiles = ["config.json"];
+    const commitStatus = await vaultManager.main.git.commitWithStatus(commitMessage, commitFiles, commitBody);
+    const pushStatus = commitStatus.status === "committed"
+      ? await pushAfterMutation(vaultManager.main)
+      : { status: "skipped" as const, reason: "commit-failed" as const };
+    const retry = buildMutationRetryContract({
+      commit: commitStatus,
+      commitMessage,
+      commitBody,
+      files: commitFiles,
+      cwd,
+      vault: vaultManager.main,
+      mutationApplied: true,
+    });
 
     const structuredContent: PolicyResult = {
       action: "policy_set",
@@ -1739,7 +1818,8 @@ server.registerTool(
       consolidationMode: effectiveConsolidationMode,
       protectedBranchBehavior: effectiveProtectedBranchBehavior,
       protectedBranchPatterns: effectiveProtectedBranchPatterns,
-      timestamp: now,
+      updatedAt: now,
+      retry,
     };
 
     return {
@@ -1747,7 +1827,8 @@ server.registerTool(
         type: "text",
         text:
           `Project memory policy set for ${project.name}: defaultScope=${effectiveDefaultScope}` +
-          `${modeStr}${branchBehaviorStr}${branchPatternsStr}`,
+          `${modeStr}${branchBehaviorStr}${branchPatternsStr}` +
+          `${commitStatus.status === "failed" ? `\nCommit failed; retry data included. Push status: ${pushStatus.status}.` : ""}`,
       }],
       structuredContent,
     };
@@ -2110,16 +2191,30 @@ server.registerTool(
       projectName: updated.projectName,
       tags: updated.tags,
     });
-    const commitStatus = await vault.git.commitWithStatus(`update: ${updated.title}`, [vaultManager.noteRelPath(vault, id)], commitBody);
-    const pushStatus = await pushAfterMutation(vault);
+    const commitMessage = `update: ${updated.title}`;
+    const commitFiles = [vaultManager.noteRelPath(vault, id)];
+    const commitStatus = await vault.git.commitWithStatus(commitMessage, commitFiles, commitBody);
+    const pushStatus = commitStatus.status === "committed"
+      ? await pushAfterMutation(vault)
+      : { status: "skipped" as const, reason: "commit-failed" as const };
+    const retry = buildMutationRetryContract({
+      commit: commitStatus,
+      commitMessage,
+      commitBody,
+      files: commitFiles,
+      cwd,
+      vault,
+      mutationApplied: true,
+    });
     const persistence = buildPersistenceStatus({
       storage: vault.storage,
       id,
       embedding: embeddingStatus,
       commit: commitStatus,
       push: pushStatus,
-      commitMessage: `update: ${updated.title}`,
+      commitMessage,
       commitBody,
+      retry,
     });
 
     const structuredContent: UpdateResult = {
@@ -2214,6 +2309,7 @@ server.registerTool(
     // Always include the deleted note's path (git add on a deleted file stages the removal)
     addVaultChange(vaultChanges, noteVault, vaultManager.noteRelPath(noteVault, id));
 
+    let retry: MutationRetryContract | undefined;
     for (const [v, files] of vaultChanges) {
       const isPrimaryVault = v === noteVault;
       const summary = isPrimaryVault ? `Deleted note and cleaned up ${files.length - 1} reference(s)` : "Cleaned up dangling reference";
@@ -2223,8 +2319,22 @@ server.registerTool(
         noteTitle: note.title,
         projectName: note.projectName,
       });
-      await v.git.commit(`forget: ${note.title}`, files, commitBody);
-      await pushAfterMutation(v);
+      const commitMessage = `forget: ${note.title}`;
+      const commitStatus = await v.git.commitWithStatus(commitMessage, files, commitBody);
+      if (!retry) {
+        retry = buildMutationRetryContract({
+          commit: commitStatus,
+          commitMessage,
+          commitBody,
+          files,
+          cwd,
+          vault: v,
+          mutationApplied: true,
+        });
+      }
+      if (commitStatus.status === "committed") {
+        await pushAfterMutation(v);
+      }
     }
 
     const structuredContent: ForgetResult = {
@@ -2235,6 +2345,7 @@ server.registerTool(
       projectName: note.projectName,
       relationshipsCleaned: vaultChanges.size > 0 ? Array.from(vaultChanges.values()).reduce((sum, files) => sum + files.length - 1, 0) : 0,
       vaultsModified: Array.from(vaultChanges.keys()).map(v => storageLabel(v)),
+      retry,
     };
     
     return { content: [{ type: "text", text: `Forgotten '${id}' (${note.title})` }], structuredContent };
@@ -3013,7 +3124,7 @@ server.registerTool(
       };
     }
 
-    const moveResult = await moveNoteBetweenVaults(found, targetVault, noteToWrite);
+    const moveResult = await moveNoteBetweenVaults(found, targetVault, noteToWrite, cwd);
     const movedNote = moveResult.note;
     const associationValue = movedNote.projectName && movedNote.project
       ? `${movedNote.projectName} (${movedNote.project})`
@@ -3124,6 +3235,7 @@ server.registerTool(
     }
 
     const modifiedNoteIds: string[] = [];
+    let retry: MutationRetryContract | undefined;
     for (const [vault, files] of vaultChanges) {
       const isFromVault = vault === fromVault;
       const thisNote = isFromVault ? fromNote : toNote;
@@ -3138,8 +3250,22 @@ server.registerTool(
           type,
         },
       });
-      await vault.git.commit(`relate: ${fromNote.title} ↔ ${toNote.title}`, files, commitBody);
-      await pushAfterMutation(vault);
+      const commitMessage = `relate: ${fromNote.title} ↔ ${toNote.title}`;
+      const commitStatus = await vault.git.commitWithStatus(commitMessage, files, commitBody);
+      if (!retry) {
+        retry = buildMutationRetryContract({
+          commit: commitStatus,
+          commitMessage,
+          commitBody,
+          files,
+          cwd,
+          vault,
+          mutationApplied: true,
+        });
+      }
+      if (commitStatus.status === "committed") {
+        await pushAfterMutation(vault);
+      }
       modifiedNoteIds.push(...files.map(f => path.basename(f, '.md')));
     }
 
@@ -3151,6 +3277,7 @@ server.registerTool(
       type,
       bidirectional,
       notesModified: modifiedNoteIds,
+      retry,
     };
     
     return {
@@ -3226,6 +3353,7 @@ server.registerTool(
       return { content: [{ type: "text", text: `No relationship found between '${fromId}' and '${toId}'` }], isError: true };
     }
 
+    let retry: MutationRetryContract | undefined;
     for (const [vault, files] of vaultChanges) {
       const found = foundFrom?.vault === vault ? foundFrom : foundTo;
       const commitBody = found
@@ -3235,8 +3363,22 @@ server.registerTool(
             projectName: found.note.projectName,
           })
         : undefined;
-      await vault.git.commit(`unrelate: ${fromId} ↔ ${toId}`, files, commitBody);
-      await pushAfterMutation(vault);
+      const commitMessage = `unrelate: ${fromId} ↔ ${toId}`;
+      const commitStatus = await vault.git.commitWithStatus(commitMessage, files, commitBody);
+      if (!retry) {
+        retry = buildMutationRetryContract({
+          commit: commitStatus,
+          commitMessage,
+          commitBody,
+          files,
+          cwd,
+          vault,
+          mutationApplied: true,
+        });
+      }
+      if (commitStatus.status === "committed") {
+        await pushAfterMutation(vault);
+      }
     }
 
     const modifiedNoteIds: string[] = [];
@@ -3251,6 +3393,7 @@ server.registerTool(
       type: "related-to", // not tracked for unrelate
       bidirectional,
       notesModified: modifiedNoteIds,
+      retry,
     };
     
     return { content: [{ type: "text", text: `Removed relationship between \`${fromId}\` and \`${toId}\`` }], structuredContent };
@@ -3890,6 +4033,7 @@ async function executeMerge(
   let targetPushStatus: PushResult = { status: "skipped", reason: "no-remote" };
   let targetCommitBody: string | undefined;
   let targetCommitMessage: string | undefined;
+  let targetCommitFiles: string[] | undefined;
   for (const [vault, files] of vaultChanges) {
     const isTargetVault = vault === targetVault;
 
@@ -3929,14 +4073,29 @@ async function executeMerge(
         });
     const commitMessage = `${action}: ${targetTitle}`;
     const commitStatus = await vault.git.commitWithStatus(commitMessage, files, commitBody);
-    const pushStatus = await pushAfterMutation(vault);
+    const pushStatus = commitStatus.status === "committed"
+      ? await pushAfterMutation(vault)
+      : { status: "skipped" as const, reason: "commit-failed" as const };
     if (isTargetVault) {
       targetCommitStatus = commitStatus;
       targetPushStatus = pushStatus;
       targetCommitBody = commitBody;
       targetCommitMessage = commitMessage;
+      targetCommitFiles = [...files];
     }
   }
+
+  const retry = targetCommitMessage && targetCommitFiles
+    ? buildMutationRetryContract({
+        commit: targetCommitStatus,
+        commitMessage: targetCommitMessage,
+        commitBody: targetCommitBody,
+        files: targetCommitFiles,
+        cwd,
+        vault: targetVault,
+        mutationApplied: true,
+      })
+    : undefined;
 
   const persistence = buildPersistenceStatus({
     storage: targetVault.storage,
@@ -3946,6 +4105,7 @@ async function executeMerge(
     push: targetPushStatus,
     commitMessage: targetCommitMessage,
     commitBody: targetCommitBody,
+    retry,
   });
 
   const lines: string[] = [];
@@ -3979,6 +4139,7 @@ async function executeMerge(
     notesProcessed: entries.length,
     notesModified: vaultChanges.size,
     persistence,
+    retry,
   };
 
   return { content: [{ type: "text", text: lines.join("\n") }], structuredContent };
@@ -4136,14 +4297,29 @@ async function pruneSuperseded(
   }
 
   // Commit changes per vault
+  let retry: MutationRetryContract | undefined;
   for (const [vault, files] of vaultChanges) {
     const prunedIds = files.map((f) => f.replace(/\.mnemonic\/notes\/(.+)\.md$/, "$1").replace(/notes\/(.+)\.md$/, "$1"));
     const commitBody = formatCommitBody({
       noteIds: prunedIds,
       description: `Pruned ${prunedIds.length} superseded note(s)\nNotes: ${prunedIds.join(", ")}`,
     });
-    await vault.git.commit(`prune: removed ${files.length} superseded note(s)`, files, commitBody);
-    await pushAfterMutation(vault);
+    const commitMessage = `prune: removed ${files.length} superseded note(s)`;
+    const commitStatus = await vault.git.commitWithStatus(commitMessage, files, commitBody);
+    if (!retry) {
+      retry = buildMutationRetryContract({
+        commit: commitStatus,
+        commitMessage,
+        commitBody,
+        files,
+        cwd,
+        vault,
+        mutationApplied: true,
+      });
+    }
+    if (commitStatus.status === "committed") {
+      await pushAfterMutation(vault);
+    }
   }
 
   lines.push("");
@@ -4156,6 +4332,7 @@ async function pruneSuperseded(
     projectName: project?.name,
     notesProcessed: entries.length,
     notesModified: vaultChanges.size,
+    retry,
   };
 
   return { content: [{ type: "text", text: lines.join("\n") }], structuredContent };

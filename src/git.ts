@@ -19,13 +19,14 @@ export interface SyncResult {
 }
 
 export interface CommitResult {
-  status: "committed" | "skipped";
-  reason?: "git-disabled" | "no-changes";
+  status: "committed" | "skipped" | "failed";
+  reason?: "git-disabled" | "no-changes" | "error";
+  error?: string;
 }
 
 export interface PushResult {
   status: "pushed" | "skipped" | "failed";
-  reason?: "git-disabled" | "no-remote" | "auto-push-disabled";
+  reason?: "git-disabled" | "no-remote" | "auto-push-disabled" | "commit-failed";
   error?: string;
 }
 
@@ -78,6 +79,9 @@ export class GitOps {
    */
   async commit(message: string, files: string[], body?: string): Promise<boolean> {
     const result = await this.commitWithStatus(message, files, body);
+    if (result.status === "failed") {
+      throw new GitOperationError("commit", result.error ?? "unknown commit failure");
+    }
     return result.status === "committed";
   }
 
@@ -100,8 +104,9 @@ export class GitOps {
       console.error(`[git] Committed: ${displayMessage}`);
       return { status: "committed" };
     } catch (err) {
-      console.error(`[git] Commit failed: ${err}`);
-      throw new GitOperationError("commit", err);
+      const message = err instanceof Error ? err.message : String(err);
+      console.error(`[git] Commit failed: ${message}`);
+      return { status: "failed", reason: "error", error: message };
     }
   }
 

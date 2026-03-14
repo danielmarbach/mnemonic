@@ -11,15 +11,31 @@ export interface PersistenceStatus {
     reason?: string;
   };
   git: {
-    commit: "committed" | "skipped";
+    commit: "committed" | "skipped" | "failed";
     push: "pushed" | "skipped" | "failed";
     commitMessage?: string;
     commitBody?: string;
     commitReason?: string;
+    commitError?: string;
     pushReason?: string;
     pushError?: string;
   };
+  retry?: MutationRetryContract;
   durability: "local-only" | "committed" | "pushed";
+}
+
+export interface MutationRetryContract {
+  attemptedCommit: {
+    message: string;
+    body?: string;
+    files: string[];
+    cwd?: string;
+    vault: string;
+    error: string;
+  };
+  mutationApplied: boolean;
+  retrySafe: boolean;
+  rationale: string;
 }
 
 export interface StructuredResponse {
@@ -109,6 +125,7 @@ export interface RelateResult extends Record<string, unknown> {
   type: RelationshipType;
   bidirectional: boolean;
   notesModified: string[];
+  retry?: MutationRetryContract;
 }
 
 export interface MoveResult extends Record<string, unknown> {
@@ -142,6 +159,7 @@ export interface ForgetResult extends Record<string, unknown> {
   projectName?: string;
   relationshipsCleaned: number;
   vaultsModified: string[];
+  retry?: MutationRetryContract;
 }
 
 export interface SyncResult extends Record<string, unknown> {
@@ -175,6 +193,7 @@ export interface ConsolidateResult extends Record<string, unknown> {
   notesModified: number;
   warnings?: string[];
   persistence?: PersistenceStatus;
+  retry?: MutationRetryContract;
 }
 
 export interface ProjectIdentityResult extends Record<string, unknown> {
@@ -182,6 +201,7 @@ export interface ProjectIdentityResult extends Record<string, unknown> {
   project?: { id: string; name: string; source: string; remoteName?: string };
   identityOverride?: { remoteName: string; updatedAt: string };
   defaultProject?: { id: string; name: string; remoteName?: string };
+  retry?: MutationRetryContract;
 }
 
 export interface MigrationListResult extends Record<string, unknown> {
@@ -218,6 +238,7 @@ export interface PolicyResult extends Record<string, unknown> {
   protectedBranchPatterns?: string[];
   protectedBranchBehavior?: string;
   updatedAt?: string;
+  retry?: MutationRetryContract;
 }
 
 export interface WhereIsResult extends Record<string, unknown> {
@@ -301,14 +322,28 @@ export const PersistenceStatusSchema = z.object({
     reason: z.string().optional(),
   }),
   git: z.object({
-    commit: z.enum(["committed", "skipped"]),
+    commit: z.enum(["committed", "skipped", "failed"]),
     push: z.enum(["pushed", "skipped", "failed"]),
     commitMessage: z.string().optional(),
     commitBody: z.string().optional(),
     commitReason: z.string().optional(),
+    commitError: z.string().optional(),
     pushReason: z.string().optional(),
     pushError: z.string().optional(),
   }),
+  retry: z.object({
+    attemptedCommit: z.object({
+      message: z.string(),
+      body: z.string().optional(),
+      files: z.array(z.string()),
+      cwd: z.string().optional(),
+      vault: _VaultLabel,
+      error: z.string(),
+    }),
+    mutationApplied: z.boolean(),
+    retrySafe: z.boolean(),
+    rationale: z.string(),
+  }).optional(),
   durability: z.enum(["local-only", "committed", "pushed"]),
 });
 
@@ -388,6 +423,7 @@ export const ForgetResultSchema = z.object({
   projectName: z.string().optional(),
   relationshipsCleaned: z.number(),
   vaultsModified: z.array(z.string()),
+  retry: PersistenceStatusSchema.shape.retry,
 });
 
 export const MoveResultSchema = z.object({
@@ -408,6 +444,7 @@ export const RelateResultSchema = z.object({
   type: _RelationshipType,
   bidirectional: z.boolean(),
   notesModified: z.array(z.string()),
+  retry: PersistenceStatusSchema.shape.retry,
 });
 
 export const RecentResultSchema = z.object({
@@ -520,6 +557,7 @@ export const ConsolidateResultSchema = z.object({
   notesModified: z.number(),
   warnings: z.array(z.string()).optional(),
   persistence: PersistenceStatusSchema.optional(),
+  retry: PersistenceStatusSchema.shape.retry,
 });
 
 export const ProjectIdentityResultSchema = z.object({
@@ -539,6 +577,7 @@ export const ProjectIdentityResultSchema = z.object({
     name: z.string(),
     remoteName: z.string().optional(),
   }).optional(),
+  retry: PersistenceStatusSchema.shape.retry,
 });
 
 export const MigrationListResultSchema = z.object({
@@ -575,4 +614,5 @@ export const PolicyResultSchema = z.object({
   protectedBranchPatterns: z.array(z.string()).optional(),
   protectedBranchBehavior: z.string().optional(),
   updatedAt: z.string().optional(),
+  retry: PersistenceStatusSchema.shape.retry,
 });
