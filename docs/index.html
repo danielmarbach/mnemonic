@@ -1802,14 +1802,7 @@ VAULT_PATH = <span class="str">"/Users/you/mnemonic-vault"</span></pre>
     <div class="agent-snippet fade-up">
       <h3>No system prompt required</h3>
       <p>Mnemonic's tools are self-describing — each includes "use when" / "do not use when" guidance, behavioral annotations, and typed schemas. Most models will use them correctly from tool metadata alone.</p>
-      <p>If your model isn't picking up the tools proactively, add this single line to your <code style="font-family:JetBrains Mono,monospace;font-size:0.85em;color:var(--cyan-lt)">AGENT.md</code> or system prompt:</p>
-      <div class="code-block" style="margin:0">
-        <div class="code-block-header">
-          <span class="code-label">AGENT.md (optional one-liner)</span>
-          <button class="copy-btn" onclick="copyCode(this)">copy</button>
-        </div>
-        <pre>You have access to a long-term memory system via the `mnemonic` MCP server. Use it proactively — don't wait to be asked.</pre>
-      </div>
+      <p>For on-demand workflow guidance, use the <code style="font-family:JetBrains Mono,monospace;font-size:0.85em;color:var(--cyan-lt)">mnemonic-workflow-hint</code> MCP prompt. It covers the discover → inspect → modify → organize pattern, the storage-label model, and the <code style="font-family:JetBrains Mono,monospace;font-size:0.85em;color:var(--cyan-lt)">recall</code> → <code style="font-family:JetBrains Mono,monospace;font-size:0.85em;color:var(--cyan-lt)">get</code> → <code style="font-family:JetBrains Mono,monospace;font-size:0.85em;color:var(--cyan-lt)">update</code> preference.</p>
     </div>
   </div>
 </section>

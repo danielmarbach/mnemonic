@@ -1465,7 +1465,7 @@ server.registerTool(
       "- A decision, preference, bug fix, or durable context should survive beyond this session\n" +
       "- No existing note already covers the topic\n\n" +
       "Do not use this when:\n" +
-      "- You are unsure whether the memory already exists; use `recall` first\n" +
+      "- A memory may already exist; use `recall` first to check\n" +
       "- You need to change an existing memory; use `update`\n" +
       "- Several overlapping notes should be merged; use `consolidate`\n\n" +
       "Returns:\n" +
@@ -1489,13 +1489,18 @@ server.registerTool(
         .enum(NOTE_LIFECYCLES)
         .optional()
         .describe(
-          "Choose 'temporary' for working-state notes (plans, WIP, investigation state) that lose value once work completes. " +
-          "Choose 'permanent' for durable knowledge (decisions, constraints, lessons, bug causes). Default: permanent."
+          "Memory lifetime. Use `temporary` for short-lived working context such as active investigations or transient status. " +
+          "Use `permanent` for durable knowledge such as decisions, fixes, patterns, and preferences."
         ),
       summary: z.string().optional().describe(
         "Git commit summary only. Imperative mood, concise, and focused on why the change matters."
       ),
-      cwd: projectParam,
+      cwd: z
+        .string()
+        .optional()
+        .describe(
+          "Absolute project working directory. Pass this whenever the task is related to a repository so routing, search boosting, policy lookup, and vault selection work correctly."
+        ),
       scope: z
         .enum(WRITE_SCOPES)
         .optional()
@@ -1510,6 +1515,12 @@ server.registerTool(
         .describe(
           "One-time override for protected branch checks. " +
           "When true, remember can commit on a protected branch without changing project policy."
+        ),
+      checkedForExisting: z
+        .boolean()
+        .optional()
+        .describe(
+          "Optional agent hint indicating that `recall` or `list` was already used to check for an existing memory on this topic."
         ),
     }),
     outputSchema: RememberResultSchema,
@@ -4187,6 +4198,53 @@ async function warnAboutPendingMigrationsOnStartup(): Promise<void> {
     console.error(`[mnemonic]   ${detail}`);
   }
 }
+
+// ── mnemonic-workflow-hint prompt ─────────────────────────────────────────────
+server.registerPrompt(
+  "mnemonic-workflow-hint",
+  {
+    title: "Mnemonic Workflow Hints",
+    description: "Optional workflow hints for using the mnemonic memory tools effectively.",
+  },
+  async () => ({
+    messages: [
+      {
+        role: "user",
+        content: {
+          type: "text",
+          text:
+            "## Mnemonic MCP workflow hints\n\n" +
+            "Mnemonic stores durable knowledge as markdown notes with embeddings.\n\n" +
+            "### Typical memory workflow\n\n" +
+            "1. **Discover**\n" +
+            "   Use `recall` to semantically search for existing memories related to a topic.\n\n" +
+            "2. **Inspect**\n" +
+            "   Use `get` to read the full contents of a memory returned by `recall`, `list`, or `recent_memories`.\n\n" +
+            "3. **Modify or store**\n" +
+            "   Use `update` to refine an existing memory.\n" +
+            "   Use `remember` to create a new memory only when no existing memory already covers the topic.\n\n" +
+            "4. **Organize**\n" +
+            "   Use `relate` to connect related memories.\n" +
+            "   Use `consolidate` when several memories overlap.\n" +
+            "   Use `move` when a memory is stored in the wrong place.\n\n" +
+            "### Storage model\n\n" +
+            "Memories can live in:\n" +
+            "- `main-vault` for global knowledge\n" +
+            "- `project-vault` as the broad project-level filter\n" +
+            "- `sub-vault:<folder>` for a specific project sub-vault such as `sub-vault:.mnemonic-lib`\n\n" +
+            "Passing `cwd` enables:\n" +
+            "- project memory routing\n" +
+            "- project-aware recall ranking\n" +
+            "- project memory policy lookup\n\n" +
+            "### General guideline\n\n" +
+            "Prefer:\n" +
+            "`recall` -> `get` -> `update`\n\n" +
+            "over creating duplicate memories with `remember`.",
+        },
+      },
+    ],
+  })
+);
 
 // ── start ─────────────────────────────────────────────────────────────────────
 await warnAboutPendingMigrationsOnStartup();

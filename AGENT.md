@@ -220,6 +220,12 @@ Keep these high-level anchors in mind:
 - `src/migration.ts` owns schema evolution and dry-run-first migration flow
 - `src/recall.ts` and `src/consolidate.ts` hold behavior that intentionally stays lightweight instead of introducing heavier runtime state
 
+## Prompts
+
+| Prompt | Description |
+|--------|-------------|
+| `mnemonic-workflow-hint` | Optional. Returns compact multi-step workflow guidance (discover → inspect → modify → organize), storage-label model, and the `recall` → `get` → `update` preference. Not auto-injected — clients request it on demand. |
+
 ## Tools
 
 ⚠️ **When adding new tools**: Always document them in both the Tools table below AND in README.md. Keep the tables in sync and sorted alphabetically.
