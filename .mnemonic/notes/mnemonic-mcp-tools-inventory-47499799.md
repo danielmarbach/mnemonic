@@ -6,7 +6,7 @@ tags:
   - api
 lifecycle: permanent
 createdAt: '2026-03-07T17:59:25.498Z'
-updatedAt: '2026-03-14T15:02:03.380Z'
+updatedAt: '2026-03-14T15:02:17.433Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
@@ -15,6 +15,8 @@ relatedTo:
   - id: mnemonic-consolidate-tool-design-b9cbac6a
     type: explains
   - id: mcp-prompt-for-cross-tool-workflow-guidance-instead-of-syste-d090a839
+    type: related-to
+  - id: remember-tool-checkedforexisting-is-schema-only-agent-hint-w-a2c94093
     type: related-to
 memoryVersion: 1
 ---

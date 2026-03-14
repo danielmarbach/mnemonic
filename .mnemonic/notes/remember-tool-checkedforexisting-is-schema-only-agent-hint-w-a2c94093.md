@@ -9,11 +9,13 @@ tags:
   - decision
 lifecycle: permanent
 createdAt: '2026-03-14T14:45:28.775Z'
-updatedAt: '2026-03-14T15:01:27.637Z'
+updatedAt: '2026-03-14T15:02:17.433Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
   - id: mnemonic-key-design-decisions-3f2a6273
+    type: related-to
+  - id: mnemonic-mcp-tools-inventory-47499799
     type: related-to
 memoryVersion: 1
 ---
