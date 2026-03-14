@@ -8,7 +8,7 @@ tags:
   - npm
 lifecycle: permanent
 createdAt: '2026-03-07T20:29:20.704Z'
-updatedAt: '2026-03-07T20:51:25.054Z'
+updatedAt: '2026-03-14T13:29:12.762Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
@@ -19,6 +19,8 @@ relatedTo:
   - id: npm-package-renamed-to-mnemonic-mcp-54a86ad6
     type: related-to
   - id: dynamic-project-context-loading-plan-9f2ed29c
+    type: related-to
+  - id: publish-workflow-routes-homebrew-formula-updates-through-prs-3ce3a188
     type: related-to
 memoryVersion: 1
 ---
