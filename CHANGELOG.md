@@ -12,6 +12,8 @@ The format is loosely based on Keep a Changelog and uses semver-style version he
 - Consolidation analysis (`detect-duplicates`, `suggest-merges`) now preloads embeddings once per note and reuses vectors during pairwise similarity checks.
 - `Storage.listNotes` and `Storage.listEmbeddings` now load files in parallel to reduce serialized disk I/O while preserving existing output behavior.
 - `VaultManager.searchOrder` now avoids duplicate git-root resolution in a single call, reducing unnecessary git subprocess work in read-heavy flows.
+- Mutating tools now return deterministic retry metadata when a git commit fails after the mutation is already written, including attempted commit message/body/files and retry safety hints.
+- Commit persistence reporting now includes explicit commit-failure details (`git.commit=failed` with `commitError`) so recovery can be automated without reconstructing commit intent.
 
 ## [0.9.0] - 2026-03-14
 
