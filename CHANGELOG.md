@@ -4,6 +4,13 @@ All notable changes to `mnemonic` will be documented in this file.
 
 The format is loosely based on Keep a Changelog and uses semver-style version headings.
 
+## [0.11.1] - 2026-03-15
+
+### Fixed
+
+- Mutating MCP tools now surface actionable git failure details more consistently when persistence only reaches local disk or the staged index. Text responses now include commit errors and retry guidance instead of vague `local-only` outcomes.
+- `relate` and `unrelate` now expose the same retry visibility pattern as other mutating tools, making partial-persistence failures easier to diagnose and recover from in local MCP flows.
+
 ## [0.11.0] - 2026-03-15
 
 ### Added
