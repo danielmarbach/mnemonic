@@ -6,6 +6,10 @@ The format is loosely based on Keep a Changelog and uses semver-style version he
 
 ## [Unreleased]
 
+### Changed
+
+- All MCP tool descriptions rewritten for self-contained routing and sub-vault awareness.
+
 ### Added
 
 - Homebrew tap support: Formula file (`Formula/mnemonic-mcp.rb`) published to the repository tap, enabling `brew install danielmarbach/mnemonic/mnemonic-mcp`. The publishing workflow includes retry logic for npm CDN propagation, concurrency protection to prevent parallel releases, and explicit token handling for branch protection rules.
