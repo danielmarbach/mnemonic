@@ -11,15 +11,31 @@ export interface PersistenceStatus {
     reason?: string;
   };
   git: {
-    commit: "committed" | "skipped";
+    commit: "committed" | "skipped" | "failed";
     push: "pushed" | "skipped" | "failed";
     commitMessage?: string;
     commitBody?: string;
     commitReason?: string;
+    commitError?: string;
     pushReason?: string;
     pushError?: string;
   };
+  retry?: MutationRetryContract;
   durability: "local-only" | "committed" | "pushed";
+}
+
+export interface MutationRetryContract {
+  attemptedCommit: {
+    message: string;
+    body?: string;
+    files: string[];
+    cwd?: string;
+    vault: string;
+    error: string;
+  };
+  mutationApplied: boolean;
+  retrySafe: boolean;
+  rationale: string;
 }
 
 export interface StructuredResponse {
@@ -301,14 +317,28 @@ export const PersistenceStatusSchema = z.object({
     reason: z.string().optional(),
   }),
   git: z.object({
-    commit: z.enum(["committed", "skipped"]),
+    commit: z.enum(["committed", "skipped", "failed"]),
     push: z.enum(["pushed", "skipped", "failed"]),
     commitMessage: z.string().optional(),
     commitBody: z.string().optional(),
     commitReason: z.string().optional(),
+    commitError: z.string().optional(),
     pushReason: z.string().optional(),
     pushError: z.string().optional(),
   }),
+  retry: z.object({
+    attemptedCommit: z.object({
+      message: z.string(),
+      body: z.string().optional(),
+      files: z.array(z.string()),
+      cwd: z.string().optional(),
+      vault: _VaultLabel,
+      error: z.string(),
+    }),
+    mutationApplied: z.boolean(),
+    retrySafe: z.boolean(),
+    rationale: z.string(),
+  }).optional(),
   durability: z.enum(["local-only", "committed", "pushed"]),
 });
 
