@@ -9,9 +9,12 @@ tags:
   - decision
 lifecycle: permanent
 createdAt: '2026-03-14T00:23:48.222Z'
-updatedAt: '2026-03-14T00:23:48.222Z'
+updatedAt: '2026-03-14T00:24:21.751Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: vault-creation-audit-which-tools-can-create-mnemonic-and-whi-d0388691
+    type: related-to
 memoryVersion: 1
 ---
 Added support for multiple vault folders per project git root. A project can now have `.mnemonic` (primary) alongside any number of `.mnemonic-<name>` sub-vault folders. All share the same git root and embeddings directory. The vault label for sub-vault folders is `sub-vault:<folder>` (e.g. `sub-vault:.mnemonic-lib`).
