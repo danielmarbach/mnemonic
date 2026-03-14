@@ -8,11 +8,13 @@ tags:
   - testing
 lifecycle: permanent
 createdAt: '2026-03-12T15:41:29.294Z'
-updatedAt: '2026-03-12T15:41:39.192Z'
+updatedAt: '2026-03-14T00:24:21.751Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
   - id: project-memory-policy-defaults-storage-location-f563f634
+    type: related-to
+  - id: multi-vault-architecture-mnemonic-name-sub-vault-support-f0e0320a
     type: related-to
 memoryVersion: 1
 ---

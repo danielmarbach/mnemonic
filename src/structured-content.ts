@@ -33,7 +33,7 @@ export interface RememberResult extends Record<string, unknown> {
   title: string;
   project?: { id: string; name: string };
   scope: "project" | "global";
-  vault: "project-vault" | "main-vault";
+  vault: string;
   tags: string[];
   lifecycle: NoteLifecycle;
   timestamp: string;
@@ -51,7 +51,7 @@ export interface RecallResult extends Record<string, unknown> {
     boosted: number;
     project?: string;
     projectName?: string;
-    vault: "project-vault" | "main-vault";
+    vault: string;
     tags: string[];
     lifecycle: NoteLifecycle;
     updatedAt: string;
@@ -71,7 +71,7 @@ export interface ListResult extends Record<string, unknown> {
     projectName?: string;
     tags: string[];
     lifecycle: NoteLifecycle;
-    vault: "project-vault" | "main-vault";
+    vault: string;
     updatedAt: string;
     hasRelated?: boolean;
   }>;
@@ -97,7 +97,7 @@ export interface GetResult extends Record<string, unknown> {
     relatedTo?: Array<{ id: string; type: RelationshipType }>;
     createdAt: string;
     updatedAt: string;
-    vault: "project-vault" | "main-vault";
+    vault: string;
   }>;
   notFound: string[];
 }
@@ -114,8 +114,8 @@ export interface RelateResult extends Record<string, unknown> {
 export interface MoveResult extends Record<string, unknown> {
   action: "moved";
   id: string;
-  fromVault: "project-vault" | "main-vault";
-  toVault: "project-vault" | "main-vault";
+  fromVault: string;
+  toVault: string;
   projectAssociation: string;
   title: string;
   metadataRewritten?: boolean;
@@ -226,7 +226,7 @@ export interface WhereIsResult extends Record<string, unknown> {
   title: string;
   project?: string;
   projectName?: string;
-  vault: "project-vault" | "main-vault";
+  vault: string;
   updatedAt: string;
   relatedCount: number;
 }
@@ -257,7 +257,7 @@ export interface RecentResult extends Record<string, unknown> {
     projectName?: string;
     tags: string[];
     lifecycle: NoteLifecycle;
-    vault: "project-vault" | "main-vault";
+    vault: string;
     updatedAt: string;
     preview?: string;
   }>;
@@ -284,7 +284,13 @@ export interface ProjectSummaryResult extends Record<string, unknown> {
 
 const _NoteLifecycle = z.enum(["temporary", "permanent"]);
 const _RelationshipType = z.enum(["related-to", "explains", "example-of", "supersedes"]);
-const _VaultLabel = z.enum(["project-vault", "main-vault"]);
+/**
+ * Vault label used in structured output.
+ * - "main-vault" for the main (global) vault.
+ * - "project-vault" for the primary project vault (.mnemonic/).
+ * - "sub-vault:.mnemonic-<name>" for submodule-specific project vaults.
+ */
+const _VaultLabel = z.string();
 
 export const PersistenceStatusSchema = z.object({
   notePath: z.string(),

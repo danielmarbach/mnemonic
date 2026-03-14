@@ -17,20 +17,35 @@ export interface Vault {
   notesRelDir: string;
   /** True when this vault lives inside a project repo (.mnemonic/). */
   isProject: boolean;
+  /**
+   * Vault folder name relative to the git root.
+   * - "" for the main vault (it is its own standalone git repo).
+   * - ".mnemonic" for the primary project vault.
+   * - ".mnemonic-<name>" for submodule-specific project vaults.
+   */
+  vaultFolderName: string;
 }
 
 // ── VaultManager ─────────────────────────────────────────────────────────────
 
 export class VaultManager {
   readonly main: Vault;
-  /** Project vaults loaded this session, keyed by resolved git root. */
-  private projectVaults = new Map<string, Vault>();
+  /**
+   * Primary project vaults (`.mnemonic/`) loaded this session, keyed by resolved git root.
+   * Used for backwards-compatible single-vault access.
+   */
+  private primaryProjectVaults = new Map<string, Vault>();
+  /**
+   * All project vaults per git root (primary + submodule vaults), keyed by resolved git root.
+   * The first entry in the array is always the primary `.mnemonic` vault.
+   */
+  private allProjectVaultsByRoot = new Map<string, Vault[]>();
   /** Git root of the main vault — set after initMain(). */
   private mainGitRoot = "";
 
   constructor(mainVaultPath: string) {
     const resolved = path.resolve(mainVaultPath);
-    this.main = makeVault(resolved, resolved, "notes", false);
+    this.main = makeVault(resolved, resolved, "notes", false, "");
   }
 
   async initMain(): Promise<void> {
@@ -41,24 +56,44 @@ export class VaultManager {
   }
 
   /**
-   * Get or create the project vault for the given cwd.
+   * Get or create the primary project vault for the given cwd.
    * Creates <git-root>/.mnemonic/ if it does not exist yet.
+   * Also discovers and loads any existing `.mnemonic-*` submodule vaults at the same root.
    * Returns null when cwd is not inside a git repo or belongs to the main vault's repo.
    */
   async getOrCreateProjectVault(cwd: string): Promise<Vault | null> {
     const gitRoot = await findGitRoot(cwd);
     if (!gitRoot || this.isMainRepo(gitRoot)) return null;
-    return this.loadProjectVault(gitRoot, true);
+    return this.loadAllVaultsForRoot(gitRoot, true);
   }
 
   /**
-   * Return the project vault only if .mnemonic/ already exists — never creates.
+   * Return the primary project vault only if .mnemonic/ already exists — never creates.
+   * Also discovers and loads any existing `.mnemonic-*` submodule vaults at the same root.
    * Returns null when the vault does not exist yet.
    */
   async getProjectVaultIfExists(cwd: string): Promise<Vault | null> {
     const gitRoot = await findGitRoot(cwd);
     if (!gitRoot || this.isMainRepo(gitRoot)) return null;
-    return this.loadProjectVault(gitRoot, false);
+    return this.loadAllVaultsForRoot(gitRoot, false);
+  }
+
+  /**
+   * Return a specific project vault by its vault folder name (e.g. ".mnemonic-submodule1")
+   * within the git root for the given cwd.
+   * Returns null when the vault folder does not exist or cwd is not in a git repo.
+   */
+  async getVaultByFolder(cwd: string, folderName: string): Promise<Vault | null> {
+    const gitRoot = await findGitRoot(cwd);
+    if (!gitRoot || this.isMainRepo(gitRoot)) return null;
+    const resolved = path.resolve(gitRoot);
+
+    // Ensure vaults are loaded for this root (don't create the primary vault)
+    if (!this.allProjectVaultsByRoot.has(resolved)) {
+      await this.loadAllVaultsForRoot(gitRoot, false);
+    }
+
+    return this.allProjectVaultsByRoot.get(resolved)?.find(v => v.vaultFolderName === folderName) ?? null;
   }
 
   /**
@@ -73,20 +108,34 @@ export class VaultManager {
     return null;
   }
 
-  /** All vaults currently loaded in this session (main + project vaults). */
+  /** All vaults currently loaded in this session (main + all project vaults including submodule). */
   allKnownVaults(): Vault[] {
-    return [this.main, ...this.projectVaults.values()];
+    const all: Vault[] = [this.main];
+    for (const vaults of this.allProjectVaultsByRoot.values()) {
+      all.push(...vaults);
+    }
+    return all;
   }
 
   /**
    * Ordered list of vaults for recall / list operations.
-   * Project vault (if found) comes first, main vault last.
+   * All project vaults for the cwd's git root come first (primary, then submodule),
+   * followed by the main vault.
    */
   async searchOrder(cwd?: string): Promise<Vault[]> {
     const vaults: Vault[] = [];
     if (cwd) {
       const pv = await this.getProjectVaultIfExists(cwd);
-      if (pv) vaults.push(pv);
+      if (pv) {
+        const gitRoot = await findGitRoot(cwd);
+        if (gitRoot) {
+          const all = this.allProjectVaultsByRoot.get(path.resolve(gitRoot));
+          if (all) vaults.push(...all);
+        }
+        // allProjectVaultsByRoot is always populated when getProjectVaultIfExists returns
+        // a non-null vault, so the above branch covers the primary vault too.
+        if (vaults.length === 0) vaults.push(pv);
+      }
     }
     vaults.push(this.main);
     return vaults;
@@ -103,20 +152,25 @@ export class VaultManager {
     return path.resolve(gitRoot) === path.resolve(this.mainGitRoot);
   }
 
-  private async loadProjectVault(gitRoot: string, create: boolean): Promise<Vault | null> {
+  /**
+   * Load the primary project vault and discover any submodule vaults at the same git root.
+   * Submodule vaults use the primary vault's embeddings directory so that all embeddings
+   * for a project live in one place (.mnemonic/embeddings/).
+   */
+  private async loadAllVaultsForRoot(gitRoot: string, create: boolean): Promise<Vault | null> {
     const resolved = path.resolve(gitRoot);
 
-    if (this.projectVaults.has(resolved)) {
-      return this.projectVaults.get(resolved)!;
+    if (this.primaryProjectVaults.has(resolved)) {
+      return this.primaryProjectVaults.get(resolved)!;
     }
 
     const mnemonicPath = path.join(resolved, ".mnemonic");
 
     if (!create && !(await pathExists(mnemonicPath))) return null;
 
-    const vault = makeVault(mnemonicPath, resolved, ".mnemonic/notes", true);
-    await vault.storage.init();
-    await vault.git.init();
+    const primaryVault = makeVault(mnemonicPath, resolved, ".mnemonic/notes", true, ".mnemonic");
+    await primaryVault.storage.init();
+    await primaryVault.git.init();
 
     const gitignorePath = path.join(mnemonicPath, ".gitignore");
     const isNew = !(await pathExists(gitignorePath));
@@ -124,11 +178,35 @@ export class VaultManager {
 
     if (isNew) {
       // Commit the .gitignore so collaborators also ignore embeddings/
-      await vault.git.commit("chore: initialize .mnemonic vault", [".mnemonic/.gitignore"]);
+      await primaryVault.git.commit("chore: initialize .mnemonic vault", [".mnemonic/.gitignore"]);
     }
 
-    this.projectVaults.set(resolved, vault);
-    return vault;
+    this.primaryProjectVaults.set(resolved, primaryVault);
+
+    // Discover and load submodule vaults (.mnemonic-* directories at the git root).
+    // Submodule vault embeddings are stored in the primary vault's embeddings directory
+    // so all embeddings for the project stay in one place.
+    const allVaults: Vault[] = [primaryVault];
+    const submoduleFolderNames = await discoverSubmoduleVaultFolders(resolved);
+    for (const folderName of submoduleFolderNames) {
+      const subVaultPath = path.join(resolved, folderName);
+      if (!(await pathExists(subVaultPath))) continue;
+      const notesRelDir = `${folderName}/notes`;
+      const subVault = makeVault(
+        subVaultPath,
+        resolved,
+        notesRelDir,
+        true,
+        folderName,
+        primaryVault.storage.embeddingsDir,
+      );
+      await subVault.storage.init();
+      await subVault.git.init();
+      allVaults.push(subVault);
+    }
+
+    this.allProjectVaultsByRoot.set(resolved, allVaults);
+    return primaryVault;
   }
 }
 
@@ -139,13 +217,33 @@ function makeVault(
   gitRoot: string,
   notesRelDir: string,
   isProject: boolean,
+  vaultFolderName: string,
+  embeddingsDirOverride?: string,
 ): Vault {
   return {
-    storage: new Storage(vaultPath),
+    storage: new Storage(vaultPath, embeddingsDirOverride),
     git: new GitOps(gitRoot, notesRelDir),
     notesRelDir,
     isProject,
+    vaultFolderName,
   };
+}
+
+/**
+ * Discover submodule vault folder names (`.mnemonic-*`) at the git root.
+ * These are siblings of the primary `.mnemonic` vault and provide separate note
+ * namespaces for submodule-specific context while sharing the same git history.
+ */
+async function discoverSubmoduleVaultFolders(gitRoot: string): Promise<string[]> {
+  try {
+    const entries = await fs.readdir(gitRoot, { withFileTypes: true });
+    return entries
+      .filter(e => e.isDirectory() && e.name.startsWith(".mnemonic-"))
+      .map(e => e.name)
+      .sort();
+  } catch {
+    return [];
+  }
 }
 
 async function findGitRoot(cwd: string, visited: Set<string> = new Set()): Promise<string | null> {
@@ -197,3 +295,4 @@ async function pathExists(p: string): Promise<boolean> {
     return false;
   }
 }
+

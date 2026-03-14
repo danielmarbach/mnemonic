@@ -43,11 +43,20 @@ export class Storage {
   private stagedNotesDir?: string;
   private stagedDeletedNoteIds = new Set<string>();
 
-  constructor(vaultPath: string) {
+  /**
+   * @param vaultPath - Absolute path to the vault directory.
+   * @param embeddingsDirOverride - Optional override for the embeddings directory.
+   *   Used by submodule vaults to share the primary project vault's embeddings directory
+   *   so that all embeddings for a project (including submodule notes) live in one place.
+   */
+  constructor(vaultPath: string, embeddingsDirOverride?: string) {
     this.vaultPath = path.resolve(vaultPath);
     this.notesDir = path.join(this.vaultPath, "notes");
-    // Embeddings are local-only — kept outside the synced notes tree
-    this.embeddingsDir = path.join(this.vaultPath, "embeddings");
+    // Embeddings are local-only — kept outside the synced notes tree.
+    // Submodule vaults may redirect embeddings to the primary project vault's directory.
+    this.embeddingsDir = embeddingsDirOverride
+      ? path.resolve(embeddingsDirOverride)
+      : path.join(this.vaultPath, "embeddings");
   }
 
   async init(): Promise<void> {

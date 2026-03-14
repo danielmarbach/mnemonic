@@ -869,8 +869,23 @@ type NoteEntry = {
   vault: Vault;
 };
 
-function storageLabel(vault: Vault): "project-vault" | "main-vault" {
-  return vault.isProject ? "project-vault" : "main-vault";
+function storageLabel(vault: Vault): string {
+  if (!vault.isProject) return "main-vault";
+  // Primary project vault uses the conventional label for backward compatibility.
+  if (vault.vaultFolderName === ".mnemonic") return "project-vault";
+  // Submodule vaults use a "sub-vault:<folder>" label so the type and folder are both clear.
+  return `sub-vault:${vault.vaultFolderName}`;
+}
+
+/**
+ * Check whether a vault matches a storage scope filter.
+ * "project-vault" matches all project vaults including submodule vaults.
+ */
+function vaultMatchesStorageScope(vault: Vault, storedIn: StorageScope): boolean {
+  if (storedIn === "any") return true;
+  if (storedIn === "main-vault") return !vault.isProject;
+  // "project-vault" covers the primary project vault and all submodule vaults.
+  return vault.isProject;
 }
 
 async function collectVisibleNotes(
@@ -903,7 +918,7 @@ async function collectVisibleNotes(
           continue;
         }
       }
-      if (storedIn !== "any" && storageLabel(vault) !== storedIn) {
+      if (storedIn !== "any" && !vaultMatchesStorageScope(vault, storedIn)) {
         continue;
       }
       seen.add(note.id);
@@ -968,8 +983,8 @@ async function moveNoteBetweenVaults(
 
   await sourceVault.storage.deleteNote(note.id);
 
-  const sourceVaultLabel = sourceVault.isProject ? "project-vault" : "main-vault";
-  const targetVaultLabel = targetVault.isProject ? "project-vault" : "main-vault";
+  const sourceVaultLabel = storageLabel(sourceVault);
+  const targetVaultLabel = storageLabel(targetVault);
 
   const targetCommitBody = formatCommitBody({
     summary: `Moved from ${sourceVaultLabel} to ${targetVaultLabel}`,
@@ -1568,7 +1583,7 @@ server.registerTool(
       title,
       project: project ? { id: project.id, name: project.name } : undefined,
       scope: writeScope,
-      vault: vault.isProject ? "project-vault" : "main-vault",
+      vault: storageLabel(vault),
       tags: tags || [],
       lifecycle: note.lifecycle,
       timestamp: now,
@@ -1887,7 +1902,7 @@ server.registerTool(
         boosted: number;
         project?: string;
         projectName?: string;
-        vault: "project-vault" | "main-vault";
+        vault: string;
         tags: string[];
         lifecycle: NoteLifecycle;
         updatedAt: string;
@@ -1902,7 +1917,7 @@ server.registerTool(
           boosted,
           project: note.project,
           projectName: note.projectName,
-          vault: vault.isProject ? "project-vault" : "main-vault",
+          vault: storageLabel(vault),
           tags: note.tags,
           lifecycle: note.lifecycle,
           updatedAt: note.updatedAt,
@@ -2159,7 +2174,7 @@ server.registerTool(
       project: note.project,
       projectName: note.projectName,
       relationshipsCleaned: vaultChanges.size > 0 ? Array.from(vaultChanges.values()).reduce((sum, files) => sum + files.length - 1, 0) : 0,
-      vaultsModified: Array.from(vaultChanges.keys()).map(v => v.isProject ? "project-vault" : "main-vault"),
+      vaultsModified: Array.from(vaultChanges.keys()).map(v => storageLabel(v)),
     };
     
     return { content: [{ type: "text", text: `Forgotten '${id}' (${note.title})` }], structuredContent };
@@ -2369,7 +2384,7 @@ server.registerTool(
       projectName?: string;
       tags: string[];
       lifecycle: NoteLifecycle;
-      vault: "project-vault" | "main-vault";
+      vault: string;
       updatedAt: string;
       hasRelated?: boolean;
     }> = entries.map(({ note, vault }) => ({
@@ -2379,7 +2394,7 @@ server.registerTool(
       projectName: note.projectName,
       tags: note.tags,
       lifecycle: note.lifecycle,
-      vault: vault.isProject ? "project-vault" : "main-vault",
+      vault: storageLabel(vault),
       updatedAt: note.updatedAt,
       hasRelated: note.relatedTo && note.relatedTo.length > 0,
     }));
@@ -2462,7 +2477,7 @@ server.registerTool(
         projectName: note.projectName,
         tags: note.tags,
         lifecycle: note.lifecycle,
-        vault: vault.isProject ? "project-vault" : "main-vault",
+        vault: storageLabel(vault),
         updatedAt: note.updatedAt,
         preview: includePreview && note.content ? note.content.substring(0, 100) + (note.content.length > 100 ? "..." : "") : undefined,
     }));
@@ -2473,17 +2488,7 @@ server.registerTool(
       projectName: project?.name,
       count: recent.length,
       limit: limit || 5,
-      notes: structuredNotes as Array<{
-        id: string;
-          title: string;
-          project?: string;
-          projectName?: string;
-          tags: string[];
-          lifecycle: NoteLifecycle;
-          vault: "project-vault" | "main-vault";
-          updatedAt: string;
-          preview?: string;
-      }>,
+      notes: structuredNotes,
     };
     
     return { content: [{ type: "text", text: textContent }], structuredContent };
@@ -2779,15 +2784,17 @@ server.registerTool(
   {
     title: "Move Memory",
     description:
-      "Move a memory between the main vault and the project vault without changing its id.\n\n" +
+      "Move a memory between the main vault and a project vault without changing its id.\n\n" +
       "Use this when:\n" +
       "- A note was stored in the wrong vault and needs to be relocated\n" +
-      "- A private note (main vault) should become shared (project vault) or vice versa\n\n" +
+      "- A private note (main vault) should become shared (project vault) or vice versa\n" +
+      "- Moving a note between the primary project vault and a submodule vault\n\n" +
       "Do not use this when:\n" +
       "- You want to change the note's content — use `update` instead\n" +
       "- You want to delete the note — use `forget` instead\n\n" +
       "When moving to project vault, project metadata is rewritten from `cwd`. " +
       "When moving to main vault, existing project association is preserved. " +
+      "Use `vaultFolder` to target a specific submodule vault (e.g. '.mnemonic-submodule1') instead of the primary project vault. " +
       "Side effects: writes to target vault, deletes from source vault, git commits per vault. " +
       "On protected branches, project-vault commits follow policy and may ask or block unless overridden.",
     annotations: {
@@ -2799,6 +2806,14 @@ server.registerTool(
     inputSchema: z.object({
       id: z.string().describe("Memory id to move"),
       target: z.enum(["main-vault", "project-vault"]).describe("Destination: 'main-vault' for private storage, 'project-vault' for shared project storage"),
+      vaultFolder: z
+        .string()
+        .optional()
+        .describe(
+          "Specific vault folder to target when moving to 'project-vault'. " +
+          "Use the folder name (e.g. '.mnemonic-submodule1') to move into a submodule vault. " +
+          "When omitted, the primary project vault (.mnemonic) is used."
+        ),
       cwd: projectParam,
       allowProtectedBranch: z
         .boolean()
@@ -2810,16 +2825,13 @@ server.registerTool(
     }),
     outputSchema: MoveResultSchema,
   },
-  async ({ id, target, cwd, allowProtectedBranch = false }) => {
+  async ({ id, target, vaultFolder, cwd, allowProtectedBranch = false }) => {
     const found = await vaultManager.findNote(id, cwd);
     if (!found) {
       return { content: [{ type: "text", text: `No memory found with id '${id}'` }], isError: true };
     }
 
     const currentStorage = storageLabel(found.vault);
-    if (currentStorage === target) {
-      return { content: [{ type: "text", text: `Memory '${id}' is already stored in ${target}.` }], isError: true };
-    }
 
     let targetVault: Vault;
     let targetProject: Awaited<ReturnType<typeof resolveProject>> | undefined;
@@ -2835,15 +2847,36 @@ server.registerTool(
           isError: true,
         };
       }
-      const projectVault = await vaultManager.getOrCreateProjectVault(cwd);
-      if (!projectVault) {
-        return { content: [{ type: "text", text: `Could not resolve a project vault for: ${cwd}` }], isError: true };
+
+      if (vaultFolder) {
+        // Target a specific submodule vault by folder name.
+        const subVault = await vaultManager.getVaultByFolder(cwd, vaultFolder);
+        if (!subVault) {
+          return {
+            content: [{ type: "text", text: `Vault folder '${vaultFolder}' not found under the git root for: ${cwd}` }],
+            isError: true,
+          };
+        }
+        targetVault = subVault;
+      } else {
+        // Default: primary project vault (.mnemonic).
+        const projectVault = await vaultManager.getOrCreateProjectVault(cwd);
+        if (!projectVault) {
+          return { content: [{ type: "text", text: `Could not resolve a project vault for: ${cwd}` }], isError: true };
+        }
+        targetVault = projectVault;
       }
+
       targetProject = await resolveProject(cwd);
       if (!targetProject) {
         return { content: [{ type: "text", text: `Could not detect a project for: ${cwd}` }], isError: true };
       }
-      targetVault = projectVault;
+    }
+
+    // Check if the note is already in the target vault.
+    if (found.vault.storage.vaultPath === targetVault.storage.vaultPath) {
+      const targetLabel = storageLabel(targetVault);
+      return { content: [{ type: "text", text: `Memory '${id}' is already stored in ${targetLabel}.` }], isError: true };
     }
 
     if (found.vault.isProject || targetVault.isProject) {
@@ -2870,9 +2903,10 @@ server.registerTool(
       }
     }
 
+    const targetLabel = storageLabel(targetVault);
     const existing = await targetVault.storage.readNote(id);
     if (existing) {
-      return { content: [{ type: "text", text: `Cannot move '${id}' because a note with that id already exists in ${target}.` }], isError: true };
+      return { content: [{ type: "text", text: `Cannot move '${id}' because a note with that id already exists in ${targetLabel}.` }], isError: true };
     }
 
     let noteToWrite = found.note;
@@ -2898,8 +2932,8 @@ server.registerTool(
     const structuredContent: MoveResult = {
       action: "moved",
       id,
-      fromVault: currentStorage as "project-vault" | "main-vault",
-      toVault: target,
+      fromVault: currentStorage,
+      toVault: targetLabel,
       projectAssociation: associationValue,
       title: movedNote.title,
       metadataRewritten,
@@ -2913,7 +2947,7 @@ server.registerTool(
     return {
       content: [{
         type: "text",
-        text: `Moved '${id}' from ${currentStorage} to ${target}. ${associationText}\n${formatPersistenceSummary(moveResult.persistence)}`,
+        text: `Moved '${id}' from ${currentStorage} to ${targetLabel}. ${associationText}\n${formatPersistenceSummary(moveResult.persistence)}`,
       }],
       structuredContent,
     };
@@ -3813,7 +3847,7 @@ async function executeMerge(
   const lines: string[] = [];
   lines.push(`Consolidated ${sourceIds.length} notes into '${targetId}'`);
   lines.push(`Mode: ${consolidationMode}`);
-  lines.push(`Stored in: ${targetVault.isProject ? "project-vault" : "main-vault"}`);
+  lines.push(`Stored in: ${storageLabel(targetVault)}`);
   if (existingTargetEntry) {
     lines.push("Idempotency: reused existing target note.");
   }
