@@ -122,7 +122,7 @@ Examples:
   mnemonic migrate --dry-run --cwd=/path/to/project
   mnemonic migrate --cwd=/path/to/project
 `);
-      return;
+      process.exit(0);
     }
     
     const dryRun = argv.includes("--dry-run");
