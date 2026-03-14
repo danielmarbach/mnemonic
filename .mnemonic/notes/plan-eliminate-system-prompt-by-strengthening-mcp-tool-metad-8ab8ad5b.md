@@ -7,7 +7,7 @@ tags:
   - system-prompt
 lifecycle: temporary
 createdAt: '2026-03-11T22:15:05.636Z'
-updatedAt: '2026-03-12T05:00:23.332Z'
+updatedAt: '2026-03-14T14:45:45.999Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 memoryVersion: 1
@@ -47,6 +47,12 @@ Reduced from 141 lines to 26 lines (82% reduction). Keeps only:
 - README.md: updated to note tools are self-describing, system prompt is optional
 - docs/index.html: website snippet updated to match new minimal SYSTEM_PROMPT.md, marked as optional
 - SYSTEM_PROMPT.md: rewritten to 26 lines
+
+### Step 6: Follow-up workflow guidance pass — DONE (2026-03-14)
+
+- Added `mnemonic-workflow-hint` MCP prompt for opt-in cross-tool workflow guidance
+- remember tool: tightened "Do not use when" bullet, updated cwd and lifecycle descriptions, added `checkedForExisting` schema-only agent hint
+- See notes: mcp-prompt-for-cross-tool-workflow-guidance-instead-of-syste-d090a839 and remember-tool-checkedforexisting-is-schema-only-agent-hint-w-a2c94093
 
 ## Remaining
 
