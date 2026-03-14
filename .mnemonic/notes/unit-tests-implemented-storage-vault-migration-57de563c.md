@@ -7,9 +7,12 @@ tags:
   - p0
 lifecycle: permanent
 createdAt: '2026-03-08T17:33:40.111Z'
-updatedAt: '2026-03-08T17:33:40.111Z'
+updatedAt: '2026-03-14T23:34:13.867Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: unit-tests-for-storage-vault-and-migration-consolidated-ffd87a3c
+    type: supersedes
 memoryVersion: 1
 ---
 Consolidated the brief duplicate note with the detailed project-scoped implementation record to keep a single canonical memory for the test work.

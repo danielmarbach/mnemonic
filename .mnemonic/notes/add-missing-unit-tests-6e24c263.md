@@ -7,9 +7,12 @@ tags:
   - p0-immediate
 lifecycle: permanent
 createdAt: '2026-03-08T14:25:52.432Z'
-updatedAt: '2026-03-08T14:25:52.432Z'
+updatedAt: '2026-03-14T23:34:13.867Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: unit-tests-for-storage-vault-and-migration-consolidated-ffd87a3c
+    type: supersedes
 memoryVersion: 1
 ---
 ## Priority P0 - Add Critical Unit Tests
