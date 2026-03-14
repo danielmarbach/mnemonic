@@ -235,14 +235,11 @@ export class Storage {
     } catch {
       return [];
     }
-    const records: EmbeddingRecord[] = [];
-    for (const file of files) {
-      if (!file.endsWith(".json")) continue;
-      const id = file.replace(/\.json$/, "");
-      const rec = await this.readEmbedding(id);
-      if (rec) records.push(rec);
-    }
-    return records;
+    const ids = files
+      .filter((file) => file.endsWith(".json"))
+      .map((file) => file.replace(/\.json$/, ""));
+    const records = await Promise.all(ids.map((id) => this.readEmbedding(id)));
+    return records.filter((record): record is EmbeddingRecord => record !== null);
   }
 
   // ── Helpers ────────────────────────────────────────────────────────────────
