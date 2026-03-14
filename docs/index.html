@@ -29,7 +29,12 @@
       --radius-sm:   8px;
     }
 
-    html { scroll-behavior: smooth; }
+    html {
+      scroll-behavior: smooth;
+      /* Fluid base: 15px on mobile → 18px on wide screens.
+         All rem values scale proportionally — no other changes needed. */
+      font-size: clamp(15px, 0.625vw + 12px, 18px);
+    }
 
     body {
       font-family: 'Inter', system-ui, sans-serif;
