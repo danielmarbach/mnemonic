@@ -109,6 +109,55 @@ describe("GitOps", () => {
     expect(result.error).toContain("network down");
   });
 
+  it("retries git.add() on transient index.lock errors", async () => {
+    const { GitOps } = await import("../src/git.js");
+    const git = new GitOps("/tmp/repo");
+    await git.init();
+
+    // First add() call fails with index.lock, second succeeds
+    add.mockRejectedValueOnce(new Error("Unable to create '.git/index.lock': File exists"));
+    add.mockResolvedValueOnce(undefined);
+    status.mockResolvedValueOnce({ staged: ["notes/test.md"] });
+    commit.mockResolvedValueOnce(undefined);
+
+    const result = await git.commitWithStatus("remember: test", ["notes/test.md"]);
+
+    expect(result.status).toBe("committed");
+    expect(add).toHaveBeenCalledTimes(2);
+  });
+
+  it("returns add failure with operation='add' when all retries exhausted", async () => {
+    const { GitOps } = await import("../src/git.js");
+    const git = new GitOps("/tmp/repo");
+    await git.init();
+
+    // All add() calls fail with index.lock
+    add.mockRejectedValue(new Error("Unable to create '.git/index.lock': File exists"));
+
+    const result = await git.commitWithStatus("remember: test", ["notes/test.md"]);
+
+    expect(result.status).toBe("failed");
+    expect(result.operation).toBe("add");
+    expect(result.error).toContain("index.lock");
+    expect(commit).not.toHaveBeenCalled();
+  });
+
+  it("returns commit failure with operation='commit' when commit fails after successful add", async () => {
+    const { GitOps } = await import("../src/git.js");
+    const git = new GitOps("/tmp/repo");
+    await git.init();
+
+    add.mockResolvedValueOnce(undefined);
+    status.mockResolvedValueOnce({ staged: ["notes/test.md"] });
+    commit.mockRejectedValueOnce(new Error("signing failed"));
+
+    const result = await git.commitWithStatus("remember: test", ["notes/test.md"]);
+
+    expect(result.status).toBe("failed");
+    expect(result.operation).toBe("commit");
+    expect(result.error).toContain("signing failed");
+  });
+
   describe("sync", () => {
     it("returns hasRemote:false when no remotes configured", async () => {
       const { GitOps } = await import("../src/git.js");

@@ -843,6 +843,7 @@ function buildPersistenceStatus(args: {
     git: {
       commit: args.commit.status,
       push: args.push.status,
+      commitOperation: args.commit.operation,
       commitMessage: args.commitMessage,
       commitBody: args.commitBody,
       commitReason: args.commit.reason,
@@ -876,6 +877,7 @@ function buildMutationRetryContract(args: {
       cwd: args.cwd,
       vault: storageLabel(args.vault),
       error: args.commit.error ?? "Unknown git commit failure",
+      operation: args.commit.operation,
     },
     mutationApplied: args.mutationApplied,
     retrySafe: args.mutationApplied,
@@ -891,9 +893,11 @@ function formatRetrySummary(retry?: MutationRetryContract): string | undefined {
   }
 
   const safety = retry.retrySafe ? "safe" : "requires review";
+  const opLabel = retry.attemptedCommit.operation === "add" ? "add" : "commit";
+  const error = retry.attemptedCommit.error;
   return [
     `Retry: ${safety} | vault=${retry.attemptedCommit.vault} | files=${retry.attemptedCommit.files.length}`,
-    `Git commit error: ${retry.attemptedCommit.error}`,
+    `Git ${opLabel} error: ${error}`,
   ].join("\n");
 }
 
@@ -910,7 +914,8 @@ function formatPersistenceSummary(persistence: PersistenceStatus): string {
   }
 
   if (persistence.git.commit === "failed" && persistence.git.commitError) {
-    lines.push(`Git commit error: ${persistence.git.commitError}`);
+    const opLabel = persistence.git.commitOperation === "add" ? "add" : "commit";
+    lines.push(`Git ${opLabel} error: ${persistence.git.commitError}`);
   }
 
   if (persistence.git.push === "failed" && persistence.git.pushError) {

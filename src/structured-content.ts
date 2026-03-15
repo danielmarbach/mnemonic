@@ -15,9 +15,15 @@ export interface PersistenceStatus {
     push: "pushed" | "skipped" | "failed";
     commitMessage?: string;
     commitBody?: string;
+    /** Reason when commit is skipped: "git-disabled" | "no-changes" */
     commitReason?: string;
+    /** Error when commit failed. Source depends on commitOperation. */
     commitError?: string;
+    /** Which operation failed when commit is "failed". "add" = files never staged. */
+    commitOperation?: "add" | "commit";
+    /** Reason when push is skipped */
     pushReason?: string;
+    /** Error when push failed. */
     pushError?: string;
   };
   retry?: MutationRetryContract;
@@ -32,6 +38,8 @@ export interface MutationRetryContract {
     cwd?: string;
     vault: string;
     error: string;
+    /** Which operation failed. "add" = files never staged. */
+    operation?: "add" | "commit";
   };
   mutationApplied: boolean;
   retrySafe: boolean;
@@ -330,6 +338,7 @@ export const PersistenceStatusSchema = z.object({
     commitBody: z.string().optional(),
     commitReason: z.string().optional(),
     commitError: z.string().optional(),
+    commitOperation: z.enum(["add", "commit"]).optional(),
     pushReason: z.string().optional(),
     pushError: z.string().optional(),
   }),
@@ -341,6 +350,7 @@ export const PersistenceStatusSchema = z.object({
       cwd: z.string().optional(),
       vault: _VaultLabel,
       error: z.string(),
+      operation: z.enum(["add", "commit"]).optional(),
     }),
     mutationApplied: z.boolean(),
     retrySafe: z.boolean(),

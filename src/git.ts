@@ -1,7 +1,7 @@
 import { simpleGit, SimpleGit } from "simple-git";
 
 export class GitOperationError extends Error {
-  constructor(operation: "commit" | "push", cause: unknown) {
+  constructor(operation: "add" | "commit" | "push", cause: unknown) {
     const detail = cause instanceof Error ? cause.message : String(cause);
     super(`Git ${operation} failed: ${detail}`);
     this.name = "GitOperationError";
@@ -21,6 +21,8 @@ export interface SyncResult {
 export interface CommitResult {
   status: "committed" | "skipped" | "failed";
   reason?: "git-disabled" | "no-changes" | "error";
+  /** Which operation failed, when status is "failed" */
+  operation?: "add" | "commit";
   error?: string;
 }
 
@@ -87,12 +89,22 @@ export class GitOps {
 
   async commitWithStatus(message: string, files: string[], body?: string): Promise<CommitResult> {
     if (!this.enabled) return { status: "skipped", reason: "git-disabled" };
+
+    // Scope every add+commit to only the paths mnemonic manages.
+    // Never commit files outside the vault — e.g. src/ or test/ changes
+    // that happen to be staged in the same repo.
+    const scopedFiles = files.length > 0 ? files : [`${this.notesRelDir}/`];
+
+    // Retry git.add() with exponential backoff for transient index.lock errors.
+    // git.add() can fail with "Unable to create '.git/index.lock': File exists"
+    // when concurrent git operations race for the index. This is recoverable
+    // by retrying after a short delay.
+    const addResult = await this.addWithRetry(scopedFiles);
+    if (addResult.status === "failed") {
+      return addResult;
+    }
+
     try {
-      // Scope every add+commit to only the paths mnemonic manages.
-      // Never commit files outside the vault — e.g. src/ or test/ changes
-      // that happen to be staged in the same repo.
-      const scopedFiles = files.length > 0 ? files : [`${this.notesRelDir}/`];
-      await this.git.add(scopedFiles);
       const status = await this.git.status();
       if (status.staged.length === 0) return { status: "skipped", reason: "no-changes" };
 
@@ -106,8 +118,40 @@ export class GitOps {
     } catch (err) {
       const errMessage = err instanceof Error ? err.message : String(err);
       console.error(`[git] Commit failed: ${errMessage}`);
-      return { status: "failed", reason: "error", error: errMessage };
+      return { status: "failed", reason: "error", operation: "commit", error: errMessage };
     }
+  }
+
+  /**
+   * Retry git.add() with exponential backoff for transient index.lock errors.
+   * Returns a CommitResult-like object for add failures.
+   */
+  private async addWithRetry(files: string[]): Promise<CommitResult> {
+    const maxRetries = 3;
+    const baseDelayMs = 50;
+
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        await this.git.add(files);
+        return { status: "committed" };
+      } catch (err) {
+        const errMessage = err instanceof Error ? err.message : String(err);
+        const isLockError = errMessage.includes("index.lock") || errMessage.includes("File exists");
+
+        if (isLockError && attempt < maxRetries - 1) {
+          const delayMs = baseDelayMs * Math.pow(2, attempt);
+          console.error(`[git] add() lock contention, retrying in ${delayMs}ms (attempt ${attempt + 1}/${maxRetries})`);
+          await new Promise((resolve) => setTimeout(resolve, delayMs));
+          continue;
+        }
+
+        console.error(`[git] add() failed: ${errMessage}`);
+        return { status: "failed", reason: "error", operation: "add", error: errMessage };
+      }
+    }
+
+    // Should be unreachable, but TypeScript needs a return
+    return { status: "failed", reason: "error", operation: "add", error: "max retries exceeded" };
   }
 
   /**

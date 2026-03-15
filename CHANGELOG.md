@@ -4,6 +4,13 @@ All notable changes to `mnemonic` will be documented in this file.
 
 The format is loosely based on Keep a Changelog and uses semver-style version headings.
 
+## [0.11.3] - 2026-03-15
+
+### Fixed
+
+- `git.add()` index.lock errors now retry with exponential backoff before failing, matching the retry behavior for `git.commit()` failures.
+- Retry contract now includes `operation` field indicating whether add or commit failed, so clients can retry appropriately.
+
 ## [0.11.2] - 2026-03-15
 
 ### Fixed
