@@ -4,18 +4,18 @@ tags:
   - bug
   - git
   - retry
-  - contract-gap
+  - fixed
   - index-lock
-lifecycle: temporary
+lifecycle: permanent
 createdAt: '2026-03-15T13:58:33.326Z'
-updatedAt: '2026-03-15T13:58:33.326Z'
+updatedAt: '2026-03-15T14:28:08.150Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 memoryVersion: 1
 ---
 ## Problem
 
-Git retry contract handles `git.commit()` failures but not `git.add()` failures. When `git.add()` hits index.lock, file mutations succeed but git operations fail before retry contract builds.
+Git retry contract handled `git.commit()` failures but not `git.add()` failures. When `git.add()` hit index.lock, file mutations succeeded but git operations failed before retry contract built.
 
 ## Incident
 
@@ -34,45 +34,62 @@ What happened:
 GitOps.commitWithStatus() (src/git.ts:88-111):
 
 - git.add() at line 95 ← LOCK ERROR HERE
-- git.commit() at line 101 ← RETRY ONLY COVERS THIS
-- buildMutationRetryContract() captures commitWithStatus() return value
-- But error thrown before return prevents retry contract creation
+- git.commit() at line 101 ← RETRY ONLY COVERED THIS
+- buildMutationRetryContract() captured commitWithStatus() return value
+- But error thrown before return prevented retry contract creation
 
-Previous retry cases worked because:
+## Solution Implemented
 
-- git.commit() failed after git.add() succeeded
-- commitWithStatus() caught error, returned {status: "failed"}
-- Then retry contract built
-- This case: error during git.add(), before commitWithStatus() can catch
+### 1. Retry logic for git.add()
 
-## Design Gap
+Added `addWithRetry()` private method with:
 
-Current model: "Mutation succeeded but commit failed" → retry commit only  
-This case: "Mutation succeeded but add failed" → need add retry or wrap entire operation
+- 3 retry attempts for index.lock errors
+- Exponential backoff: 50ms → 100ms → 200ms
+- Transient lock errors self-heal without user intervention
+- Persistent locks still fail gracefully after 3 attempts
+
+### 2. CommitResult.operation field
+
+Extended `CommitResult` interface to track which operation failed:
+
+```typescript
+interface CommitResult {
+  status: "committed" | "skipped" | "failed";
+  operation?: "add" | "commit";  // which op failed
+  error?: string;
+}
+```
+
+### 3. PersistenceStatus.commitOperation
+
+Added `commitOperation` to structured output for client visibility:
+
+- `commitOperation: "add"` — files never staged, retry needs to re-add
+- `commitOperation: "commit"` — files staged, retry only re-commits
+
+### 4. Consistent naming
+
+- `commitError` mirrors `pushError` (both have `Error` suffix)
+- `commitOperation` clearly indicates which git command failed
+
+## Files Changed
+
+- `src/git.ts` — addWithRetry(), CommitResult.operation
+- `src/structured-content.ts` — PersistenceStatus.commitOperation
+- `src/index.ts` — buildPersistenceStatus includes operation
+- `tests/git.test.ts` — retry tests for add failures
+- `tests/mcp.integration.test.ts` — verify commitOperation in output
 
 ## Impact
 
-Affected: remember, update, forget, move_memory, relate, unrelate, consolidate  
-Severity: Medium - FS mutation succeeds, git fails, human can recover, agent cannot auto-retry
+Affected tools: remember, update, forget, move_memory, relate, unrelate, consolidate
 
-## Solutions
+Before: `git.add()` lock errors left orphan mutations with no retry guidance  
+After: Transient lock errors self-heal; persistent failures return actionable retry contract
 
-Option 1: Retry git.add() in commitWithStatus()
-Option 2: Try-catch git.add(), convert to return value
-Option 3: Wrap entire commit operation with retry
+## Lessons
 
-## Next Steps
-
-1. Decide retry strategy for git.add()
-2. Implement consistent retry
-3. Test with simulated index.lock
-4. Update retry contract docs
-5. Check git.rm(), git.mv() for similar issues
-
-## Metadata
-
-Date: 2026-03-15  
-Tool: forget  
-File: performance-review-plan-for-typescript-file-and-git-i-o-path-05f563ef.md  
-Git operation: git.add()  
-Result: File deleted, staged, commit not executed
+- Multi-agent sessions amplify index.lock probability (see related note)
+- Wrap entire git operation sequence that can fail, not just the final step
+- `operation` field clients understand which sub-step needs retry
