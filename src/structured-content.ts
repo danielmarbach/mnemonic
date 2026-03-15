@@ -192,6 +192,8 @@ export interface ConsolidateResult extends Record<string, unknown> {
   notesProcessed: number;
   notesModified: number;
   warnings?: string[];
+  themeGroups?: Array<{ name: string; count: number; examples: string[] }>;
+  relationshipClusters?: Array<{ hub: { id: string; title: string }; notes: { id: string; title: string }[] }>;
   persistence?: PersistenceStatus;
   retry?: MutationRetryContract;
 }
@@ -556,6 +558,21 @@ export const ConsolidateResultSchema = z.object({
   notesProcessed: z.number(),
   notesModified: z.number(),
   warnings: z.array(z.string()).optional(),
+  themeGroups: z.array(z.object({
+    name: z.string(),
+    count: z.number(),
+    examples: z.array(z.string()),
+  })).optional(),
+  relationshipClusters: z.array(z.object({
+    hub: z.object({
+      id: z.string(),
+      title: z.string(),
+    }),
+    notes: z.array(z.object({
+      id: z.string(),
+      title: z.string(),
+    })),
+  })).optional(),
   persistence: PersistenceStatusSchema.optional(),
   retry: PersistenceStatusSchema.shape.retry,
 });

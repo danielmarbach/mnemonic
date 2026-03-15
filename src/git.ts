@@ -104,9 +104,9 @@ export class GitOps {
       console.error(`[git] Committed: ${displayMessage}`);
       return { status: "committed" };
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      console.error(`[git] Commit failed: ${message}`);
-      return { status: "failed", reason: "error", error: message };
+      const errMessage = err instanceof Error ? err.message : String(err);
+      console.error(`[git] Commit failed: ${errMessage}`);
+      return { status: "failed", reason: "error", error: errMessage };
     }
   }
 
