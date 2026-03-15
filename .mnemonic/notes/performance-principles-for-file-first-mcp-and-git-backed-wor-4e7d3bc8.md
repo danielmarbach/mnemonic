@@ -1,14 +1,15 @@
 ---
-title: Performance principles for file-first MCP and git-backed workflows
+title: Performance principles and completed optimizations
 tags:
   - performance
   - io
   - git
   - design
   - principles
+  - completed
 lifecycle: permanent
 createdAt: '2026-03-14T22:14:46.759Z'
-updatedAt: '2026-03-14T22:14:51.593Z'
+updatedAt: '2026-03-15T13:45:02.169Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
@@ -16,26 +17,61 @@ relatedTo:
     type: related-to
 memoryVersion: 1
 ---
-Durable performance lessons for mnemonic's file-first MCP and git-backed architecture.
+## Durable Performance Principles
 
 Core principles:
 
-- Favor low-risk optimizations that preserve behavior and safety over broad rewrites.
-- Optimize hot paths by reusing already-available data in-memory before adding new I/O.
-- Keep git subprocess usage minimal, especially on successful mutation paths.
-- Prefer bounded parallel file reads for independent files while preserving output stability and ordering contracts.
-- Keep retry/recovery metadata construction constant-time from existing context.
+- Favor low-risk optimizations that preserve behavior and safety over broad rewrites
+- Optimize hot paths by reusing already-available data in-memory before adding new I/O
+- Keep git subprocess usage minimal, especially on successful mutation paths
+- Prefer bounded parallel file reads for independent files while preserving output stability and ordering contracts
+- Keep retry/recovery metadata construction constant-time from existing context
 
-Applied examples:
+## Completed Optimizations
 
-- Added per-request note caching in recall to avoid duplicate note reads.
-- Reused loaded embeddings during consolidate analysis instead of re-reading per comparison.
-- Parallelized `Storage.listNotes` and `Storage.listEmbeddings` file reads with stable behavior.
-- Reduced duplicate git-root resolution in vault search-order calculation.
-- For commit-failure retry contracts, used existing attempted commit context rather than extra filesystem or git lookups.
+Low-hanging performance improvements (March 2024):
 
-Design guardrails:
+### 1. Recall per-request note cache
 
-- Avoid full-vault scans in mutation hot paths.
-- Avoid adding extra git calls on successful commit/push flows.
-- Keep correctness and recoverability explicit in structured outputs.
+- Added caching to avoid duplicate note reads during recall operations
+- Commit: `perf: cache recall note reads per request`
+- Validation: `npm test -- tests/recall.test.ts`
+
+### 2. Consolidate analysis embedding reuse  
+
+- Reuse loaded embeddings during consolidate analysis instead of re-reading per comparison
+- Commit: `perf: reuse embeddings in consolidate analysis`
+- Validation: `npm test -- tests/consolidate.test.ts`
+
+### 3. Storage.listNotes parallel file reads
+
+- Parallelized file reads with preserved order
+- Commit: `perf: parallelize Storage.listNotes reads`
+- Validation: `npm test -- tests/storage.test.ts tests/recall.test.ts tests/project-introspection.test.ts`
+
+### 4. Storage.listEmbeddings parallel file reads
+
+- Parallelized embeddings file reads
+- Commit: `perf: parallelize Storage.listEmbeddings reads`
+- Validation: `npm test -- tests/embeddings.test.ts tests/recall.test.ts tests/consolidate.test.ts`
+
+### 5. VaultManager.searchOrder duplicate resolution
+
+- Avoid duplicate git-root lookup in searchOrder
+- Commit: `perf: avoid duplicate git-root lookup in searchOrder`
+- Validation: `npm test -- tests/vault.test.ts tests/project.test.ts tests/project-introspection.test.ts`
+
+## Design Guardrails
+
+- Avoid full-vault scans in mutation hot paths
+- Avoid adding extra git calls on successful commit/push flows
+- Keep correctness and recoverability explicit in structured outputs
+
+## Future Performance Work
+
+When adding new features, apply these principles:
+
+1. Measure before optimizing
+2. Prefer in-memory reuse over new I/O
+3. Keep hot paths lean
+4. Maintain test coverage for performance-critical paths
