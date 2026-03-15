@@ -6,9 +6,10 @@ tags:
   - discover_tags
   - performance
   - consolidated
+  - implemented
 lifecycle: permanent
 createdAt: '2026-03-15T13:43:54.754Z'
-updatedAt: '2026-03-15T13:44:29.813Z'
+updatedAt: '2026-03-15T15:05:48.647Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 memoryVersion: 1
@@ -16,6 +17,18 @@ memoryVersion: 1
 ## Current State
 
 The labeling system in mnemonic currently uses vault labels and note tags in an ad-hoc manner. Tagging success depends on consistent terminology across sessions (e.g., "bug" vs "bugs" vs "bugfix").
+
+## Implementation Status
+
+**Phase 1: IMPLEMENTED** ✅
+
+The `discover_tags` MCP tool is now available in `src/index.ts` with:
+
+- Input parameters: `cwd`, `scope`, `storedIn` (matching `list` tool semantics)
+- Output: Tags sorted by usageCount with examples, lifecycleTypes, and isTemporaryOnly flag
+- structuredContent schema in `src/structured-content.ts`
+- Integration test coverage in `tests/mcp.integration.test.ts`
+- Performance telemetry: `durationMs` in response
 
 ## Performance-Safe Design Decisions
 
@@ -73,30 +86,37 @@ Performance data:
 - Example: discover shows "bug", "bugs", "bugfix" used → agent queries all three
 - Preserves simple recall algorithm
 
-## Implementation: Phase 1 (Now)
+## Implementation: Phase 1 (Now) ✅
 
 ### New MCP Tool: discover_tags
 
 ```typescript
 server.registerTool("discover_tags", {
-  title: "Discover Available Tags",
-  description: "Discover existing tags across vaults with usage statistics.",
+  title: "Discover Tags",
+  description:
+    "Discover existing tags across vaults with usage statistics and examples.\n\n" +
+    "Use this when:\n" +
+    "- Before `remember` to find canonical tag names for consistent terminology\n" +
+    "- Starting a new topic and unsure which tags exist (e.g., 'bug' vs 'bugs')\n" +
+    "- Identifying tags only on temporary notes (cleanup candidates)\n\n" +
+    "Do not use this when:\n" +
+    "- You need to browse notes by tag; use `list` with `tags` filter instead\n" +
+    "- You already know the exact tags you want to use\n\n" +
+    "Returns:\n" +
+    "- Tags sorted by usageCount (canonical tags first)\n" +
+    "- Example note titles (up to 3 per tag) showing usage context\n" +
+    "- lifecycleTypes showing temporary vs permanent distribution\n" +
+    "- isTemporaryOnly flag identifying cleanup candidates\n\n" +
+    "Typical next step:\n" +
+    "- Use canonical tags from discover_tags when appropriate, or create new tags when genuinely novel.\n\n" +
+    "Performance: O(n) where n = total notes scanned. Expect 100-200ms for 500 notes.\n\n" +
+    "Read-only.",
   inputSchema: z.object({
     cwd: projectParam,
-    includeStatistics: z.boolean().optional().default(true)
+    scope: z.enum(["project", "global", "all"]).optional().default("all"),
+    storedIn: z.enum(["project-vault", "main-vault", "any"]).optional().default("any"),
   }),
-  outputSchema: z.object({
-    tags: z.array(z.object({
-      tag: z.string(),
-      usageCount: z.number(),
-      examples: z.array(z.string()).max(3),
-      lifecycleTypes: z.array(z.enum(NOTE_LIFECYCLES)),
-      isTemporaryOnly: z.boolean()
-    })),
-    totalTags: z.number(),
-    vaultsSearched: z.number(),
-    durationMs: z.number()
-  })
+  outputSchema: DiscoverTagsResultSchema,
 });
 ```
 
@@ -108,51 +128,18 @@ Workflow integration:
 
 Returns duration metric for performance monitoring.
 
-### Implementation Plan
+### Implemented Features
 
-**discover_tags workflow**:
+**discover_tags workflow** (implemented in `src/index.ts`):
 
-1. Query all notes from relevant vaults (respecting scope)
+1. Query all notes from relevant vaults (respecting scope and storedIn)
 2. Extract and count tag usage with stats:
    - usageCount: how many notes use this tag
    - examples: 2-3 note titles for context
    - lifecycleTypes: temporary vs permanent distribution
    - isTemporaryOnly: true if tag only appears on temporary notes
 3. Sort by usageCount descending
-4. Return with performance telemetry
-
-**Code outline**:
-
-```typescript
-async function discoverExistingTags(cwd?: string): Promise<TagDiscoveryResult> {
-  const vaults = await vaultManager.searchOrder(cwd);
-  const allNotes = await Promise.all(vaults.map(v => v.storage.listNotes()));
-  
-  const tagStats = new Map<string, { count: number; examples: string[]; lifecycle: Set<NoteLifecycle> }>();
-  
-  for (const notes of allNotes) {
-    for (const note of notes) {
-      for (const tag of note.tags) {
-        const stats = tagStats.get(tag) || { count: 0, examples: [], lifecycle: new Set() };
-        stats.count++;
-        if (stats.examples.length < 3) stats.examples.push(note.title);
-        stats.lifecycle.add(note.lifecycle);
-        tagStats.set(tag, stats);
-      }
-    }
-  }
-  
-  return {
-    tags: Array.from(tagStats.entries()).map(([tag, stats]) => ({
-      tag,
-      usageCount: stats.count,
-      examples: stats.examples,
-      lifecycleTypes: Array.from(stats.lifecycle),
-      isTemporaryOnly: stats.lifecycle.size === 1 && stats.lifecycle.has("temporary")
-    })).sort((a, b) => b.usageCount - a.usageCount)
-  };
-}
-```
+4. Return with performance telemetry (durationMs)
 
 Performance characteristics:
 
@@ -273,9 +260,9 @@ Extended discover_tags to include category hints when available, helping agents 
 
 Add telemetry to discover_tags:
 
-- notes_scanned: counter
-- duration_ms: timer  
-- unique_tags_found: gauge
+- notes_scanned: counter (via totalNotes in response)
+- duration_ms: timer (via durationMs in response)  
+- unique_tags_found: gauge (via totalTags in response)
 
 **Thresholds**:
 
