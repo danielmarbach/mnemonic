@@ -153,6 +153,7 @@ describe("local MCP script", () => {
       const attemptedCommit = retry?.["attemptedCommit"] as Record<string, unknown>;
       expect(attemptedCommit?.["message"]).toBe("remember: Retry contract remember test");
       expect(attemptedCommit?.["vault"]).toBe("main-vault");
+      expect(attemptedCommit?.["operation"]).toBe("add");
       expect((attemptedCommit?.["files"] as string[])).toHaveLength(1);
       expect(String(attemptedCommit?.["error"] ?? "")).toContain("index.lock");
     } finally {
@@ -201,7 +202,7 @@ describe("local MCP script", () => {
     }, { disableGit: false });
 
     expect(response.text).toContain("defaultScope=global");
-    expect(response.text).toContain("Git commit error:");
+    expect(response.text).toContain("Git add error:");
     expect(response.text).toContain("Retry: safe");
     const retry = response.structuredContent?.["retry"] as Record<string, unknown>;
     expect(retry?.["mutationApplied"]).toBe(true);
@@ -248,7 +249,7 @@ describe("local MCP script", () => {
       }, { ollamaUrl: embeddingServer.url, disableGit: false });
 
       expect(response.text).toContain(`Linked \`${firstId}\` ↔ \`${secondId}\` (related-to)`);
-      expect(response.text).toContain("Git commit error:");
+      expect(response.text).toContain("Git add error:");
       expect(response.text).toContain("Retry: safe");
 
       const retry = response.structuredContent?.["retry"] as Record<string, unknown>;

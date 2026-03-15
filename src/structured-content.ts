@@ -38,6 +38,8 @@ export interface MutationRetryContract {
     cwd?: string;
     vault: string;
     error: string;
+    /** Which operation failed. "add" = files never staged. */
+    operation?: "add" | "commit";
   };
   mutationApplied: boolean;
   retrySafe: boolean;
@@ -348,6 +350,7 @@ export const PersistenceStatusSchema = z.object({
       cwd: z.string().optional(),
       vault: _VaultLabel,
       error: z.string(),
+      operation: z.enum(["add", "commit"]).optional(),
     }),
     mutationApplied: z.boolean(),
     retrySafe: z.boolean(),

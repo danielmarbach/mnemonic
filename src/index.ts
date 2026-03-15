@@ -877,6 +877,7 @@ function buildMutationRetryContract(args: {
       cwd: args.cwd,
       vault: storageLabel(args.vault),
       error: args.commit.error ?? "Unknown git commit failure",
+      operation: args.commit.operation,
     },
     mutationApplied: args.mutationApplied,
     retrySafe: args.mutationApplied,
@@ -892,9 +893,11 @@ function formatRetrySummary(retry?: MutationRetryContract): string | undefined {
   }
 
   const safety = retry.retrySafe ? "safe" : "requires review";
+  const opLabel = retry.attemptedCommit.operation === "add" ? "add" : "commit";
+  const error = retry.attemptedCommit.error;
   return [
     `Retry: ${safety} | vault=${retry.attemptedCommit.vault} | files=${retry.attemptedCommit.files.length}`,
-    `Git commit error: ${retry.attemptedCommit.error}`,
+    `Git ${opLabel} error: ${error}`,
   ].join("\n");
 }
 
