@@ -116,13 +116,15 @@ describe("local MCP script", () => {
     expect(persistence?.["durability"]).toBe("local-only");
   }, 15000);
 
-  it("returns deterministic retry metadata when commit fails after remember mutation", async () => {
+  it("returns deterministic retry metadata when git.add fails after remember mutation", async () => {
     const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-vault-"));
     tempDirs.push(vaultDir);
     const embeddingServer = await startFakeEmbeddingServer();
 
     try {
       await execFileAsync("git", ["init"], { cwd: vaultDir });
+      // Create a persistent index.lock - this will cause git.add() to fail
+      // and our retry logic will exhaust 3 attempts before giving up.
       await writeFile(path.join(vaultDir, ".git", "index.lock"), "locked\n", "utf-8");
 
       const response = await callLocalMcpResponse(vaultDir, "remember", {
@@ -139,9 +141,10 @@ describe("local MCP script", () => {
       const persistence = response.structuredContent?.["persistence"] as Record<string, unknown>;
       const git = persistence?.["git"] as Record<string, unknown>;
       expect(git?.["commit"]).toBe("failed");
+      expect(git?.["commitOperation"]).toBe("add");
       expect(git?.["push"]).toBe("skipped");
       expect(String(git?.["commitError"] ?? "")).toContain("index.lock");
-      expect(response.text).toContain("Git commit error:");
+      expect(response.text).toContain("Git add error:");
       expect(response.text).toContain("Retry: safe");
 
       const retry = persistence?.["retry"] as Record<string, unknown>;
