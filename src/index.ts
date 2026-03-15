@@ -843,6 +843,7 @@ function buildPersistenceStatus(args: {
     git: {
       commit: args.commit.status,
       push: args.push.status,
+      commitOperation: args.commit.operation,
       commitMessage: args.commitMessage,
       commitBody: args.commitBody,
       commitReason: args.commit.reason,
@@ -910,7 +911,8 @@ function formatPersistenceSummary(persistence: PersistenceStatus): string {
   }
 
   if (persistence.git.commit === "failed" && persistence.git.commitError) {
-    lines.push(`Git commit error: ${persistence.git.commitError}`);
+    const opLabel = persistence.git.commitOperation === "add" ? "add" : "commit";
+    lines.push(`Git ${opLabel} error: ${persistence.git.commitError}`);
   }
 
   if (persistence.git.push === "failed" && persistence.git.pushError) {
