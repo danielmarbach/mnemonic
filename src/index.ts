@@ -4666,6 +4666,10 @@ server.registerPrompt(
             "   Use `relate` to connect related memories.\n" +
             "   Use `consolidate` when several memories overlap.\n" +
             "   Use `move` when a memory is stored in the wrong place.\n\n" +
+            "### Consistent tag terminology\n\n" +
+            "Before `remember`, call `discover_tags` to find canonical tag names already in use.\n" +
+            "This keeps terminology consistent across sessions (e.g., preferring 'bug' over 'bugs').\n" +
+            "Use high-usage tags as the canonical forms, and avoid tags marked `isTemporaryOnly`.\n\n" +
             "### Storage model\n\n" +
             "Memories can live in:\n" +
             "- `main-vault` for global knowledge\n" +
