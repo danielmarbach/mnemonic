@@ -8,7 +8,7 @@ tags:
   - index-lock
 lifecycle: permanent
 createdAt: '2026-03-15T13:58:33.326Z'
-updatedAt: '2026-03-15T14:28:08.150Z'
+updatedAt: '2026-03-15T14:47:39.153Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 memoryVersion: 1
@@ -68,28 +68,34 @@ Added `commitOperation` to structured output for client visibility:
 - `commitOperation: "add"` — files never staged, retry needs to re-add
 - `commitOperation: "commit"` — files staged, retry only re-commits
 
-### 4. Consistent naming
+### 4. MutationRetryContract.attemptedCommit.operation
+
+Added `operation` to retry contract so clients know whether to retry add+commit or just commit.
+
+### 5. Consistent naming and text output
 
 - `commitError` mirrors `pushError` (both have `Error` suffix)
 - `commitOperation` clearly indicates which git command failed
+- Text output shows "Git add error:" or "Git commit error:" appropriately
 
 ## Files Changed
 
-- `src/git.ts` — addWithRetry(), CommitResult.operation
-- `src/structured-content.ts` — PersistenceStatus.commitOperation
-- `src/index.ts` — buildPersistenceStatus includes operation
-- `tests/git.test.ts` — retry tests for add failures
-- `tests/mcp.integration.test.ts` — verify commitOperation in output
+- `src/git.ts` — addWithRetry(), CommitResult.operation, GitOperationError includes "add"
+- `src/structured-content.ts` — PersistenceStatus.commitOperation, MutationRetryContract.operation
+- `src/index.ts` — buildPersistenceStatus includes operation, buildMutationRetryContract includes operation, formatRetrySummary uses correct label
+- `tests/git.test.ts` — retry tests for add failures, commit failures after successful add
+- `tests/mcp.integration.test.ts` — verify commitOperation in structured output, operation in retry contract
 
 ## Impact
 
 Affected tools: remember, update, forget, move_memory, relate, unrelate, consolidate
 
 Before: `git.add()` lock errors left orphan mutations with no retry guidance  
-After: Transient lock errors self-heal; persistent failures return actionable retry contract
+After: Transient lock errors self-heal; persistent failures return actionable retry contract with `operation` field
 
 ## Lessons
 
 - Multi-agent sessions amplify index.lock probability (see related note)
 - Wrap entire git operation sequence that can fail, not just the final step
-- `operation` field clients understand which sub-step needs retry
+- Both text output AND structuredContent must accurately represent the failure (structuredContent design principle)
+- `operation` field lets clients understand which sub-step needs retry
