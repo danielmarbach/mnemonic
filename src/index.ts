@@ -200,13 +200,11 @@ Examples:
     }
   }
 
-  runMigrationCli().catch(err => {
+  await runMigrationCli().catch(err => {
     console.error("Migration failed:", err);
     process.exit(1);
   });
-
-  // Wait for async operations to complete
-  await new Promise(() => {});
+  process.exit(0);
 }
 
 // ── CLI: import-claude-memory ─────────────────────────────────────────────────
@@ -368,13 +366,11 @@ Examples:
     process.exit(0);
   }
 
-  runImportCli().catch(err => {
+  await runImportCli().catch(err => {
     console.error("Import failed:", err);
     process.exit(1);
   });
-
-  // Wait for async operations to complete
-  await new Promise(() => {});
+  process.exit(0);
 }
 
 // ── Config ────────────────────────────────────────────────────────────────────
@@ -2092,34 +2088,27 @@ server.registerTool(
       return { content: [{ type: "text", text: "No memories found matching that query." }], structuredContent };
     }
 
-    const sections: string[] = [];
-    for (const { id, score, vault } of top) {
-      const note = await readCachedNote(vault, id);
-      if (note) sections.push(formatNote(note, score));
-    }
-
     const header = project
       ? `Recall results for project **${project.name}** (scope: ${scope}):`
       : `Recall results (global):`;
 
-    const textContent = `${header}\n\n${sections.join("\n\n---\n\n")}`;
-    
-    // Build structured results array
-      const structuredResults: Array<{
-        id: string;
-        title: string;
-        score: number;
-        boosted: number;
-        project?: string;
-        projectName?: string;
-        vault: string;
-        tags: string[];
-        lifecycle: NoteLifecycle;
-        updatedAt: string;
-      }> = [];
+    const sections: string[] = [];
+    const structuredResults: Array<{
+      id: string;
+      title: string;
+      score: number;
+      boosted: number;
+      project?: string;
+      projectName?: string;
+      vault: string;
+      tags: string[];
+      lifecycle: NoteLifecycle;
+      updatedAt: string;
+    }> = [];
     for (const { id, score, vault, boosted } of top) {
       const note = await readCachedNote(vault, id);
       if (note) {
+        sections.push(formatNote(note, score));
         structuredResults.push({
           id,
           title: note.title,
@@ -2134,7 +2123,8 @@ server.registerTool(
         });
       }
     }
-    
+
+    const textContent = `${header}\n\n${sections.join("\n\n---\n\n")}`;
     const structuredContent: RecallResult = {
       action: "recalled",
       query,
@@ -3752,24 +3742,20 @@ function findClusters(
   }
 
   // Output theme groups
-  const themeGroups: Array<{ name: string; count: number; examples: string[] }> = [];
   lines.push("By Theme:");
   for (const [theme, bucket] of themed) {
     if (bucket.length > 1) {
       lines.push(`  ${titleCaseTheme(theme)} (${bucket.length} notes)`);
-      const examples = bucket.slice(0, 3).map((entry) => entry.note.title);
       for (const entry of bucket.slice(0, 3)) {
         lines.push(`    - ${entry.note.title}`);
       }
       if (bucket.length > 3) {
         lines.push(`    ... and ${bucket.length - 3} more`);
       }
-      themeGroups.push({ name: theme, count: bucket.length, examples });
     }
   }
 
   // Output relationship clusters
-  const relationshipClusters: Array<{ hub: { id: string; title: string }; notes: { id: string; title: string }[] }> = [];
   if (clusters.length > 0) {
     lines.push("");
     lines.push("Connected Clusters (via relationships):");
@@ -3780,17 +3766,11 @@ function findClusters(
         (e.note.relatedTo?.length ?? 0) > (max.note.relatedTo?.length ?? 0) ? e : max
       );
       lines.push(`    Hub: ${hub.note.title}`);
-      const clusterNotes: { id: string; title: string }[] = [];
       for (const entry of cluster) {
         if (entry.note.id !== hub.note.id) {
           lines.push(`    - ${entry.note.title}`);
-          clusterNotes.push({ id: entry.note.id, title: entry.note.title });
         }
       }
-      relationshipClusters.push({
-        hub: { id: hub.note.id, title: hub.note.title },
-        notes: clusterNotes,
-      });
     }
   }
 
