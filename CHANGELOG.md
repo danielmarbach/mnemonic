@@ -4,6 +4,12 @@ All notable changes to `mnemonic` will be documented in this file.
 
 The format is loosely based on Keep a Changelog and uses semver-style version headings.
 
+## [Unreleased]
+
+### Fixed
+
+- `consolidate` with `strategy: "find-clusters"` now includes computed `themeGroups` and `relationshipClusters` in structured output. These fields were previously calculated but not returned in `ConsolidateResult`.
+
 ## [0.11.1] - 2026-03-15
 
 ### Fixed

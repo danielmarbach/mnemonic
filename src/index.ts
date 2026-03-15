@@ -3801,6 +3801,8 @@ function findClusters(
     projectName: project?.name,
     notesProcessed: entries.length,
     notesModified: 0,
+    themeGroups,
+    relationshipClusters,
   };
 
   return { content: [{ type: "text", text: lines.join("\n") }], structuredContent };
