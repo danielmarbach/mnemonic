@@ -200,13 +200,11 @@ Examples:
     }
   }
 
-  runMigrationCli().catch(err => {
+  await runMigrationCli().catch(err => {
     console.error("Migration failed:", err);
     process.exit(1);
   });
-
-  // Wait for async operations to complete
-  await new Promise(() => {});
+  process.exit(0);
 }
 
 // ── CLI: import-claude-memory ─────────────────────────────────────────────────
@@ -368,13 +366,11 @@ Examples:
     process.exit(0);
   }
 
-  runImportCli().catch(err => {
+  await runImportCli().catch(err => {
     console.error("Import failed:", err);
     process.exit(1);
   });
-
-  // Wait for async operations to complete
-  await new Promise(() => {});
+  process.exit(0);
 }
 
 // ── Config ────────────────────────────────────────────────────────────────────
@@ -2092,34 +2088,27 @@ server.registerTool(
       return { content: [{ type: "text", text: "No memories found matching that query." }], structuredContent };
     }
 
-    const sections: string[] = [];
-    for (const { id, score, vault } of top) {
-      const note = await readCachedNote(vault, id);
-      if (note) sections.push(formatNote(note, score));
-    }
-
     const header = project
       ? `Recall results for project **${project.name}** (scope: ${scope}):`
       : `Recall results (global):`;
 
-    const textContent = `${header}\n\n${sections.join("\n\n---\n\n")}`;
-    
-    // Build structured results array
-      const structuredResults: Array<{
-        id: string;
-        title: string;
-        score: number;
-        boosted: number;
-        project?: string;
-        projectName?: string;
-        vault: string;
-        tags: string[];
-        lifecycle: NoteLifecycle;
-        updatedAt: string;
-      }> = [];
+    const sections: string[] = [];
+    const structuredResults: Array<{
+      id: string;
+      title: string;
+      score: number;
+      boosted: number;
+      project?: string;
+      projectName?: string;
+      vault: string;
+      tags: string[];
+      lifecycle: NoteLifecycle;
+      updatedAt: string;
+    }> = [];
     for (const { id, score, vault, boosted } of top) {
       const note = await readCachedNote(vault, id);
       if (note) {
+        sections.push(formatNote(note, score));
         structuredResults.push({
           id,
           title: note.title,
@@ -2134,6 +2123,8 @@ server.registerTool(
         });
       }
     }
+
+    const textContent = `${header}\n\n${sections.join("\n\n---\n\n")}`;
     
     const structuredContent: RecallResult = {
       action: "recalled",
