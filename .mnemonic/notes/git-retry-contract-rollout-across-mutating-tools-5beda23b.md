@@ -11,7 +11,7 @@ tags:
   - persistence
 lifecycle: permanent
 createdAt: '2026-03-14T22:11:19.937Z'
-updatedAt: '2026-03-14T23:40:47.398Z'
+updatedAt: '2026-03-15T14:51:26.688Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
@@ -19,6 +19,8 @@ relatedTo:
     type: explains
   - id: parallel-consolidate-operations-can-leave-staged-local-only--e8c33780
     type: example-of
+  - id: git-retry-contract-across-mutating-tools-1b107c06
+    type: supersedes
 memoryVersion: 1
 ---
 Deterministic git retry metadata applies across mutating MCP tools when mutation succeeds but commit fails.

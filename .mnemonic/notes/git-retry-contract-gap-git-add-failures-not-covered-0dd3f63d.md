@@ -8,9 +8,12 @@ tags:
   - index-lock
 lifecycle: permanent
 createdAt: '2026-03-15T13:58:33.326Z'
-updatedAt: '2026-03-15T14:47:39.153Z'
+updatedAt: '2026-03-15T14:51:26.688Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: git-retry-contract-across-mutating-tools-1b107c06
+    type: supersedes
 memoryVersion: 1
 ---
 ## Problem
