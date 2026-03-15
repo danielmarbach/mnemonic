@@ -10,9 +10,12 @@ tags:
   - git-lock
 lifecycle: permanent
 createdAt: '2026-03-15T14:05:54.076Z'
-updatedAt: '2026-03-15T14:05:54.076Z'
+updatedAt: '2026-03-15T14:05:56.762Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: git-index-lock-frequency-analysis-zombie-processes-and-tool--28e0790b
+    type: explains
 memoryVersion: 1
 ---
 ## Design Context

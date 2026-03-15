@@ -8,9 +8,12 @@ tags:
   - concurrency
 lifecycle: temporary
 createdAt: '2026-03-15T14:01:48.412Z'
-updatedAt: '2026-03-15T14:01:48.412Z'
+updatedAt: '2026-03-15T14:05:56.762Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: git-retry-design-necessity-multi-agent-sessions-amplify-inde-4ca82e4f
+    type: explains
 memoryVersion: 1
 ---
 ## Observation
