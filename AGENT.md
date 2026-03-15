@@ -23,7 +23,11 @@ Before doing any substantive work:
 ### Before capturing
 
 Before calling `remember`:
-1. `recall` first — if a related note exists, call `update` instead to avoid fragmentation.
+1. **Discover canonical tags** — call `discover_tags` with `cwd` to find existing tag terminology (e.g., is "bug" or "bugs" canonical in this project?).
+   - Use high-usageCount tags for consistency.
+   - Use `isTemporaryOnly: true` tags cautiously — they may be cleanup candidates.
+   - Create new tags when genuinely novel, but prefer canonical forms when they exist.
+2. `recall` first — if a related note exists, call `update` instead to avoid fragmentation.
 2. If you've made several closely-related captures in this session, consider `consolidate` before wrapping up.
 3. Write the note summary-first: put the main fact, decision, or outcome in the opening sentences, then follow with supporting detail.
 4. Pass `cwd` for anything about the current repo, even if you intend to store it in the main vault with `scope: "global"`.
@@ -234,6 +238,7 @@ Keep these high-level anchors in mind:
 |------|-------------|
 | `consolidate` | Merge multiple notes into one with relationship to sources |
 | `detect_project` | Resolve `cwd` to stable project id via git remote URL |
+| `discover_tags` | List existing tags with usage counts and examples for consistent terminology |
 | `execute_migration` | Execute a named migration (supports dry-run) |
 | `forget` | Delete note + embedding, git commit + push, cleanup relationships |
 | `get` | Fetch one or more notes by exact id |

@@ -410,6 +410,7 @@ Imported notes are written to the main vault with `lifecycle: permanent` and `sc
 |-----------------------------|--------------------------------------------------------------------------|
 | `consolidate`               | Merge multiple notes into one with relationship to sources               |
 | `detect_project`            | Resolve `cwd` to stable project id via git remote URL                   |
+| `discover_tags`            | List existing tags with usage counts and examples for consistent terminology |
 | `execute_migration`         | Execute a named migration (supports dry-run)                             |
 | `forget`                    | Delete note + embedding, git commit + push, cleanup relationships        |
 | `get`                       | Fetch one or more notes by exact id                                      |

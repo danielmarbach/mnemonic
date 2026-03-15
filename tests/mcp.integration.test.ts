@@ -1679,6 +1679,85 @@ describe("local MCP script", () => {
     }
   }, 15000);
 
+  it("discovers tags with usage statistics and lifecycle distribution", async () => {
+    const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-vault-"));
+    tempDirs.push(vaultDir);
+    const embeddingServer = await startFakeEmbeddingServer();
+
+    try {
+      // Create notes with different tags and lifecycles
+      await callLocalMcp(vaultDir, "remember", {
+        title: "Tag discovery test note one",
+        content: "First note for tag discovery with permanent lifecycle.",
+        tags: ["test-tag", "permanent-only", "discovery"],
+        lifecycle: "permanent",
+        scope: "global",
+        summary: "Create first note for tag discovery test",
+      }, embeddingServer.url);
+
+      await callLocalMcp(vaultDir, "remember", {
+        title: "Tag discovery test note two",
+        content: "Second note for tag discovery also using test-tag.",
+        tags: ["test-tag", "mixed-lifecycle", "discovery"],
+        lifecycle: "permanent",
+        scope: "global",
+        summary: "Create second note for tag discovery test",
+      }, embeddingServer.url);
+
+      await callLocalMcp(vaultDir, "remember", {
+        title: "Temporary tag discovery note",
+        content: "Temporary note with temp-only tag.",
+        tags: ["temp-only", "discovery"],
+        lifecycle: "temporary",
+        scope: "global",
+        summary: "Create temporary note for tag discovery test",
+      }, embeddingServer.url);
+
+      const response = await callLocalMcpResponse(vaultDir, "discover_tags", {
+        scope: "global",
+      }, embeddingServer.url);
+
+      const structured = response.structuredContent;
+      expect(structured?.["action"]).toBe("tags_discovered");
+      expect(structured?.["totalTags"]).toBeGreaterThan(0);
+      expect(structured?.["totalNotes"]).toBe(3);
+
+      const tags = structured?.["tags"] as Array<Record<string, unknown>>;
+      expect(Array.isArray(tags)).toBe(true);
+
+      // Find the test-tag (should have usageCount 2)
+      const testTag = tags.find((t) => t["tag"] === "test-tag");
+      expect(testTag).toBeDefined();
+      expect(testTag?.["usageCount"]).toBe(2);
+      expect(testTag?.["examples"]).toBeDefined();
+      expect((testTag?.["examples"] as string[]).length).toBeGreaterThan(0);
+      expect(testTag?.["isTemporaryOnly"]).toBe(false);
+      expect((testTag?.["lifecycleTypes"] as string[])).toContain("permanent");
+
+      // Find the temp-only tag (should have isTemporaryOnly true)
+      const tempTag = tags.find((t) => t["tag"] === "temp-only");
+      expect(tempTag).toBeDefined();
+      expect(tempTag?.["isTemporaryOnly"]).toBe(true);
+      expect((tempTag?.["lifecycleTypes"] as string[])).toContain("temporary");
+      expect((tempTag?.["lifecycleTypes"] as string[])).not.toContain("permanent");
+
+      // Find the discovery tag (should have mixed lifecycles)
+      const discoveryTag = tags.find((t) => t["tag"] === "discovery");
+      expect(discoveryTag).toBeDefined();
+      expect(discoveryTag?.["usageCount"]).toBe(3);
+      expect(discoveryTag?.["isTemporaryOnly"]).toBe(false);
+      expect((discoveryTag?.["lifecycleTypes"] as string[])).toContain("permanent");
+      expect((discoveryTag?.["lifecycleTypes"] as string[])).toContain("temporary");
+
+      // Verify response text contains useful information
+      expect(response.text).toContain("Tags (scope: global)");
+      expect(response.text).toContain("test-tag");
+      expect(response.text).toContain("discovery");
+    } finally {
+      await embeddingServer.close();
+    }
+  }, 15000);
+
   it("merges a global note and a project-associated note in a single execute-merge call", async () => {
     const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-vault-"));
     const repoDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-project-"));

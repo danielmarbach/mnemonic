@@ -4,6 +4,12 @@ All notable changes to `mnemonic` will be documented in this file.
 
 The format is loosely based on Keep a Changelog and uses semver-style version headings.
 
+## [0.12.0] - 2026-03-15
+
+### Added
+
+- `discover_tags` MCP tool: lists existing tags with usage counts, example note titles, lifecycle distribution, and `isTemporaryOnly` flags for consistent tag terminology across sessions.
+
 ## [0.11.3] - 2026-03-15
 
 ### Fixed
