@@ -6,7 +6,7 @@ tags:
   - api
 lifecycle: permanent
 createdAt: '2026-03-07T17:59:25.498Z'
-updatedAt: '2026-03-14T15:02:51.665Z'
+updatedAt: '2026-03-15T15:06:48.181Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
@@ -26,6 +26,7 @@ Tools registered in `src/index.ts`:
 | ---- | ----------- |
 | `consolidate` | Analyze and consolidate memories — detect duplicates, suggest merges, execute with `supersedes` or `delete` mode |
 | `detect_project` | Resolve `cwd` to stable project id via git remote URL; includes current write policy |
+| `discover_tags` | List existing tags with usage counts and examples for consistent terminology |
 | `execute_migration` | Execute a named migration (supports dry-run) |
 | `forget` | Delete note + embedding, commit; cleans up dangling `relatedTo` references |
 | `get` | Fetch one or more notes by exact id — returns full content, metadata, and relationships |

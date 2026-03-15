@@ -62,6 +62,7 @@ import type {
   ConsolidateResult,
   PersistenceStatus,
   MutationRetryContract,
+  DiscoverTagsResult,
 } from "./structured-content.js";
 import {
   RememberResultSchema,
@@ -82,6 +83,7 @@ import {
   MigrationListResultSchema,
   MigrationExecuteResultSchema,
   PolicyResultSchema,
+  DiscoverTagsResultSchema,
 } from "./structured-content.js";
 
 // ── CLI Migration Command ─────────────────────────────────────────────────────
@@ -2694,6 +2696,121 @@ server.registerTool(
   }
 );
 
+// ── discover_tags ───────────────────────────────────────────────────────────
+server.registerTool(
+  "discover_tags",
+  {
+    title: "Discover Tags",
+    description:
+      "Discover existing tags across vaults with usage statistics and examples.\n\n" +
+      "Use this when:\n" +
+      "- Before `remember` to find canonical tag names for consistent terminology\n" +
+      "- Starting a new topic and unsure which tags exist (e.g., 'bug' vs 'bugs')\n" +
+      "- Identifying tags only on temporary notes (cleanup candidates)\n\n" +
+      "Do not use this when:\n" +
+      "- You need to browse notes by tag; use `list` with `tags` filter instead\n" +
+      "- You already know the exact tags you want to use\n\n" +
+      "Returns:\n" +
+      "- Tags sorted by usageCount (canonical tags first)\n" +
+      "- Example note titles (up to 3 per tag) showing usage context\n" +
+      "- lifecycleTypes showing temporary vs permanent distribution\n" +
+      "- isTemporaryOnly flag identifying cleanup candidates\n\n" +
+      "Typical next step:\n" +
+      "- Use canonical tags from discover_tags when appropriate, or create new tags when genuinely novel.\n\n" +
+      "Performance: O(n) where n = total notes scanned. Expect 100-200ms for 500 notes.\n\n" +
+      "Read-only.",
+    annotations: {
+      readOnlyHint: true,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    inputSchema: z.object({
+      cwd: projectParam,
+      scope: z
+        .enum(["project", "global", "all"])
+        .optional()
+        .default("all")
+        .describe(
+          "'project' = only this project's memories; " +
+          "'global' = only unscoped memories; " +
+          "'all' = everything visible (default)"
+        ),
+      storedIn: z
+        .enum(["project-vault", "main-vault", "any"])
+        .optional()
+        .default("any")
+        .describe("Filter by vault storage label like list tool."),
+    }),
+    outputSchema: DiscoverTagsResultSchema,
+  },
+  async ({ cwd, scope, storedIn }) => {
+    await ensureBranchSynced(cwd);
+    const startTime = Date.now();
+
+    const { project, entries } = await collectVisibleNotes(cwd, scope, undefined, storedIn);
+
+    const tagStats = new Map<string, { count: number; examples: string[]; lifecycles: Set<NoteLifecycle> }>();
+
+    for (const { note } of entries) {
+      for (const tag of note.tags) {
+        const stats = tagStats.get(tag) || { count: 0, examples: [], lifecycles: new Set<NoteLifecycle>() };
+        stats.count++;
+        if (stats.examples.length < 3) {
+          stats.examples.push(note.title);
+        }
+        stats.lifecycles.add(note.lifecycle);
+        tagStats.set(tag, stats);
+      }
+    }
+
+    const tags = Array.from(tagStats.entries())
+      .map(([tag, stats]) => ({
+        tag,
+        usageCount: stats.count,
+        examples: stats.examples,
+        lifecycleTypes: Array.from(stats.lifecycles) as NoteLifecycle[],
+        isTemporaryOnly: stats.lifecycles.size === 1 && stats.lifecycles.has("temporary"),
+      }))
+      .sort((a, b) => b.usageCount - a.usageCount);
+
+    const durationMs = Date.now() - startTime;
+
+    const lines: string[] = [];
+    if (project && scope !== "global") {
+      lines.push(`Tags for ${project.name} (scope: ${scope}):`);
+    } else {
+      lines.push(`Tags (scope: ${scope}):`);
+    }
+    lines.push("");
+    lines.push(`Total: ${tags.length} unique tags across ${entries.length} notes (${durationMs}ms)`);
+    lines.push("");
+    lines.push("Tags sorted by usage:");
+    for (const t of tags.slice(0, 20)) {
+      const lifecycleMark = t.isTemporaryOnly ? " [temp-only]" : "";
+      lines.push(`  ${t.tag} (${t.usageCount})${lifecycleMark}`);
+      if (t.examples.length > 0) {
+        lines.push(`    Example: "${t.examples[0]}"`);
+      }
+    }
+    if (tags.length > 20) {
+      lines.push(`  ... and ${tags.length - 20} more`);
+    }
+
+    const structuredContent: DiscoverTagsResult = {
+      action: "tags_discovered",
+      project: project ? { id: project.id, name: project.name } : undefined,
+      scope: scope || "all",
+      tags,
+      totalTags: tags.length,
+      totalNotes: entries.length,
+      vaultsSearched: new Set(entries.map(e => storageLabel(e.vault))).size,
+      durationMs,
+    };
+
+    return { content: [{ type: "text", text: lines.join("\n") }], structuredContent };
+  }
+);
+
 // ── recent_memories ───────────────────────────────────────────────────────────
 server.registerTool(
   "recent_memories",
@@ -4549,6 +4666,10 @@ server.registerPrompt(
             "   Use `relate` to connect related memories.\n" +
             "   Use `consolidate` when several memories overlap.\n" +
             "   Use `move` when a memory is stored in the wrong place.\n\n" +
+            "### Consistent tag terminology\n\n" +
+            "Before `remember`, call `discover_tags` to find canonical tag names already in use.\n" +
+            "This keeps terminology consistent across sessions (e.g., preferring 'bug' over 'bugs').\n" +
+            "Use high-usage tags as the canonical forms, and avoid tags marked `isTemporaryOnly`.\n\n" +
             "### Storage model\n\n" +
             "Memories can live in:\n" +
             "- `main-vault` for global knowledge\n" +

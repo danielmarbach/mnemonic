@@ -643,3 +643,37 @@ export const PolicyResultSchema = z.object({
   updatedAt: z.string().optional(),
   retry: PersistenceStatusSchema.shape.retry,
 });
+
+export interface DiscoverTagsResult extends Record<string, unknown> {
+  action: "tags_discovered";
+  project?: { id: string; name: string };
+  scope: "project" | "global" | "all";
+  tags: Array<{
+    tag: string;
+    usageCount: number;
+    examples: string[];
+    lifecycleTypes: NoteLifecycle[];
+    isTemporaryOnly: boolean;
+  }>;
+  totalTags: number;
+  totalNotes: number;
+  vaultsSearched: number;
+  durationMs: number;
+}
+
+export const DiscoverTagsResultSchema = z.object({
+  action: z.literal("tags_discovered"),
+  project: z.object({ id: z.string(), name: z.string() }).optional(),
+  scope: z.enum(["project", "global", "all"]),
+  tags: z.array(z.object({
+    tag: z.string(),
+    usageCount: z.number(),
+    examples: z.array(z.string()),
+    lifecycleTypes: z.array(_NoteLifecycle),
+    isTemporaryOnly: z.boolean(),
+  })),
+  totalTags: z.number(),
+  totalNotes: z.number(),
+  vaultsSearched: z.number(),
+  durationMs: z.number(),
+});
