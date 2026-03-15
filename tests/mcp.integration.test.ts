@@ -9,6 +9,7 @@ import { promisify } from "util";
 import { execFile } from "child_process";
 
 import {
+  ConsolidateResultSchema,
   MemoryGraphResultSchema,
   MigrationExecuteResultSchema,
   MigrationListResultSchema,
@@ -1435,6 +1436,54 @@ describe("local MCP script", () => {
       const memoryGraph = await callLocalMcpResponse(vaultDir, "memory_graph", {});
       const graph = MemoryGraphResultSchema.parse(memoryGraph.structuredContent);
       expect(Array.isArray(graph.nodes)).toBe(true);
+    } finally {
+      await embeddingServer.close();
+    }
+  }, 15000);
+
+  it("validates consolidate find-clusters structured output includes themeGroups and relationshipClusters", async () => {
+    const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-vault-"));
+    tempDirs.push(vaultDir);
+    const embeddingServer = await startFakeEmbeddingServer();
+
+    try {
+      const remember1 = await callLocalMcpResponse(vaultDir, "remember", {
+        title: "Consolidate cluster note A",
+        content: "First note for cluster analysis testing with similar content.",
+        tags: ["cluster-test"],
+        scope: "global",
+        summary: "Create first note for consolidate cluster test",
+      }, embeddingServer.url);
+      const remember2 = await callLocalMcpResponse(vaultDir, "remember", {
+        title: "Consolidate cluster note B",
+        content: "Second note for cluster analysis testing with similar content.",
+        tags: ["cluster-test"],
+        scope: "global",
+        summary: "Create second note for consolidate cluster test",
+      }, embeddingServer.url);
+
+      extractRememberedId(remember1.text);
+      extractRememberedId(remember2.text);
+
+      const consolidateResult = await callLocalMcpResponse(vaultDir, "consolidate", {
+        strategy: "find-clusters",
+      });
+
+      const result = ConsolidateResultSchema.parse(consolidateResult.structuredContent);
+
+      expect(result.strategy).toBe("find-clusters");
+      expect(Array.isArray(result.themeGroups)).toBe(true);
+      expect(Array.isArray(result.relationshipClusters)).toBe(true);
+
+      expect(result.themeGroups?.length).toBeGreaterThan(0);
+      if (result.themeGroups && result.themeGroups.length > 0) {
+        const group = result.themeGroups[0]!;
+        expect(typeof group.name).toBe("string");
+        expect(typeof group.count).toBe("number");
+        expect(Array.isArray(group.examples)).toBe(true);
+      }
+
+      expect(result.relationshipClusters?.length).toBeGreaterThanOrEqual(0);
     } finally {
       await embeddingServer.close();
     }
