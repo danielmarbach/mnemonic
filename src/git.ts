@@ -1,3 +1,5 @@
+import { access } from "fs/promises";
+import path from "path";
 import { simpleGit, SimpleGit } from "simple-git";
 
 export class GitOperationError extends Error {
@@ -8,6 +10,16 @@ export class GitOperationError extends Error {
   }
 }
 
+export interface SyncGitError {
+  /** Which git operation failed */
+  phase: "fetch" | "pull" | "push";
+  message: string;
+  /** True when the failure is a merge/rebase conflict requiring manual resolution */
+  isConflict: boolean;
+  /** Files with conflict markers, when detectable */
+  conflictFiles?: string[];
+}
+
 export interface SyncResult {
   hasRemote: boolean;
   /** Note ids that arrived or changed during pull (need re-embedding) */
@@ -16,6 +28,8 @@ export interface SyncResult {
   deletedNoteIds: string[];
   /** Number of local commits pushed to remote */
   pushedCommits: number;
+  /** Set when any git operation in the sync sequence failed */
+  gitError?: SyncGitError;
 }
 
 export interface CommitResult {
@@ -172,20 +186,99 @@ export class GitOps {
     const remotes = await this.git.getRemotes();
     if (remotes.length === 0) return empty;
 
+    const withRemote: Pick<SyncResult, "hasRemote" | "pulledNoteIds" | "deletedNoteIds" | "pushedCommits"> = {
+      hasRemote: true,
+      pulledNoteIds: [],
+      deletedNoteIds: [],
+      pushedCommits: 0,
+    };
+
+    // Phase 1: fetch
     try {
       await this.git.fetch();
-      const unpushed = await this.countUnpushedCommits();
-      const localHead = await this.currentHead();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error(`[git] Sync fetch failed: ${message}`);
+      return { ...withRemote, gitError: { phase: "fetch", message, isConflict: false } };
+    }
+
+    const unpushed = await this.countUnpushedCommits();
+    const localHead = await this.currentHead();
+
+    // Phase 2: pull (rebase)
+    try {
       await this.git.pull(["--rebase"]);
       console.error("[git] Pulled (rebase)");
-      const { pulledNoteIds, deletedNoteIds } = await this.diffNotesSince(localHead);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error(`[git] Sync pull failed: ${message}`);
+      // Use language-independent checks: conflicted files from git status (porcelain codes,
+      // not localized) and git internal state files (.git/rebase-merge, .git/rebase-apply,
+      // .git/MERGE_HEAD) rather than error message keywords.
+      const conflictFiles = await this.getConflictFiles();
+      const isConflict = conflictFiles.length > 0 || await this.isConflictInProgress();
+      return {
+        ...withRemote,
+        gitError: {
+          phase: "pull",
+          message,
+          isConflict,
+          conflictFiles: conflictFiles.length > 0 ? conflictFiles : undefined,
+        },
+      };
+    }
+
+    const { pulledNoteIds, deletedNoteIds } = await this.diffNotesSince(localHead);
+
+    // Phase 3: push
+    try {
       await this.git.push();
       console.error(`[git] Pushed ${unpushed} local commit(s)`);
-      return { hasRemote: true, pulledNoteIds, deletedNoteIds, pushedCommits: unpushed };
     } catch (err) {
-      console.error(`[git] Sync failed: ${err}`);
-      return { hasRemote: true, pulledNoteIds: [], deletedNoteIds: [], pushedCommits: 0 };
+      const message = err instanceof Error ? err.message : String(err);
+      console.error(`[git] Sync push failed: ${message}`);
+      // Pull succeeded — return partial success with the pulled notes and the push error
+      return {
+        hasRemote: true,
+        pulledNoteIds,
+        deletedNoteIds,
+        pushedCommits: 0,
+        gitError: { phase: "push", message, isConflict: false },
+      };
     }
+
+    return { hasRemote: true, pulledNoteIds, deletedNoteIds, pushedCommits: unpushed };
+  }
+
+  private async getConflictFiles(): Promise<string[]> {
+    try {
+      const status = await this.git.status();
+      return status.conflicted;
+    } catch {
+      return [];
+    }
+  }
+
+  /**
+   * Checks git's internal state files to detect an in-progress rebase or merge conflict.
+   * Language-independent: these paths are git internals, not localized error messages.
+   */
+  private async isConflictInProgress(): Promise<boolean> {
+    const gitDir = path.join(this.gitRoot, ".git");
+    const statePaths = [
+      path.join(gitDir, "rebase-merge"),   // interactive / --merge rebase
+      path.join(gitDir, "rebase-apply"),   // --apply strategy rebase
+      path.join(gitDir, "MERGE_HEAD"),     // plain merge conflict
+    ];
+    for (const p of statePaths) {
+      try {
+        await access(p);
+        return true;
+      } catch {
+        // not present — try next
+      }
+    }
+    return false;
   }
 
   /** Push only — used after individual remember/update/forget commits */

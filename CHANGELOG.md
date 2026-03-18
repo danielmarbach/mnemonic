@@ -4,6 +4,14 @@ All notable changes to `mnemonic` will be documented in this file.
 
 The format is loosely based on Keep a Changelog and uses semver-style version headings.
 
+## [0.13.0] - 2026-03-18
+
+### Fixed
+
+- `sync` now surfaces git failures as structured, per-phase errors (`fetch`, `pull`, `push`) instead of silently returning empty results. Merge conflicts set `isConflict: true` with conflicted file paths and an actionable resolution hint in the text output.
+- Conflict detection uses language-independent signals: `git status --porcelain` conflict codes and git internal state files (`.git/rebase-merge`, `.git/rebase-apply`, `.git/MERGE_HEAD`) rather than localized error message keywords.
+- `SyncResult` structured output now includes a `gitError` field per vault so MCP clients can distinguish a clean no-op sync from a failed one.
+
 ## [0.12.0] - 2026-03-15
 
 ### Added

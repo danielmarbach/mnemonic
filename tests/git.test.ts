@@ -12,6 +12,13 @@ const raw = vi.fn();
 const fetch = vi.fn();
 const pull = vi.fn();
 
+// fs/promises access mock — controls which git state paths appear to exist
+const fsAccess = vi.fn();
+
+vi.mock("fs/promises", () => ({
+  access: fsAccess,
+}));
+
 vi.mock("simple-git", () => ({
   simpleGit: vi.fn(() => ({
     add,
@@ -42,10 +49,13 @@ describe("GitOps", () => {
     raw.mockReset();
     fetch.mockReset();
     pull.mockReset();
+    fsAccess.mockReset();
 
     checkIsRepo.mockResolvedValue(true);
     status.mockResolvedValue({ staged: ["notes/test.md"] });
     getRemotes.mockResolvedValue([{ name: "origin" }]);
+    // Default: no git conflict state files present
+    fsAccess.mockRejectedValue(new Error("ENOENT"));
   });
 
   it("throws when commit fails", async () => {
@@ -268,7 +278,7 @@ describe("GitOps", () => {
       expect(result.pulledNoteIds).toEqual(["note"]);
     });
 
-    it("returns hasRemote:true with empty arrays when sync throws", async () => {
+    it("returns gitError with phase:fetch when fetch fails", async () => {
       const { GitOps } = await import("../src/git.js");
       const git = new GitOps("/tmp/repo");
       await git.init();
@@ -277,7 +287,90 @@ describe("GitOps", () => {
 
       const result = await git.sync();
 
-      expect(result).toEqual({ hasRemote: true, pulledNoteIds: [], deletedNoteIds: [], pushedCommits: 0 });
+      expect(result.hasRemote).toBe(true);
+      expect(result.pulledNoteIds).toEqual([]);
+      expect(result.deletedNoteIds).toEqual([]);
+      expect(result.pushedCommits).toBe(0);
+      expect(result.gitError).toEqual({ phase: "fetch", message: "remote unreachable", isConflict: false });
+    });
+
+    it("returns gitError with isConflict:true when pull fails and status shows conflicted files", async () => {
+      const { GitOps } = await import("../src/git.js");
+      const git = new GitOps("/tmp/repo");
+      await git.init();
+
+      fetch.mockResolvedValueOnce(undefined);
+      raw.mockResolvedValueOnce("0\n"); // countUnpushedCommits
+      log.mockResolvedValueOnce({ latest: { hash: "deadbeef" } }); // currentHead
+      pull.mockRejectedValueOnce(new Error("pull failed"));
+      // getConflictFiles calls status()
+      status.mockResolvedValueOnce({ staged: [], conflicted: ["notes/foo.md", "notes/bar.md"] });
+
+      const result = await git.sync();
+
+      expect(result.gitError?.phase).toBe("pull");
+      expect(result.gitError?.isConflict).toBe(true);
+      expect(result.gitError?.conflictFiles).toEqual(["notes/foo.md", "notes/bar.md"]);
+    });
+
+    it("returns gitError with isConflict:true when git state files indicate rebase in progress", async () => {
+      const { GitOps } = await import("../src/git.js");
+      const git = new GitOps("/tmp/repo");
+      await git.init();
+
+      fetch.mockResolvedValueOnce(undefined);
+      raw.mockResolvedValueOnce("0\n");
+      log.mockResolvedValueOnce({ latest: { hash: "deadbeef" } });
+      pull.mockRejectedValueOnce(new Error("error: could not apply abc1234"));
+      // git status shows no conflicted files (edge case) but rebase-merge dir exists
+      status.mockResolvedValueOnce({ staged: [], conflicted: [] });
+      // First access call (.git/rebase-merge) resolves → rebase in progress
+      fsAccess.mockResolvedValueOnce(undefined);
+
+      const result = await git.sync();
+
+      expect(result.gitError?.phase).toBe("pull");
+      expect(result.gitError?.isConflict).toBe(true);
+    });
+
+    it("returns gitError with isConflict:false when pull fails for non-conflict reasons", async () => {
+      const { GitOps } = await import("../src/git.js");
+      const git = new GitOps("/tmp/repo");
+      await git.init();
+
+      fetch.mockResolvedValueOnce(undefined);
+      raw.mockResolvedValueOnce("0\n");
+      log.mockResolvedValueOnce({ latest: { hash: "deadbeef" } });
+      pull.mockRejectedValueOnce(new Error("fatal: repository not found"));
+      // No conflicted files, no git state files
+      status.mockResolvedValueOnce({ staged: [], conflicted: [] });
+      fsAccess.mockRejectedValue(new Error("ENOENT")); // no state files
+
+      const result = await git.sync();
+
+      expect(result.gitError?.phase).toBe("pull");
+      expect(result.gitError?.isConflict).toBe(false);
+    });
+
+    it("returns partial success with gitError when push fails after successful pull", async () => {
+      const { GitOps } = await import("../src/git.js");
+      const git = new GitOps("/tmp/repo");
+      await git.init();
+
+      fetch.mockResolvedValueOnce(undefined);
+      raw.mockResolvedValueOnce("1\n"); // countUnpushedCommits
+      log.mockResolvedValueOnce({ latest: { hash: "aabbccdd" } }); // currentHead
+      pull.mockResolvedValueOnce(undefined);
+      raw.mockResolvedValueOnce("A\tnotes/synced-note.md\n"); // diffNotesSince
+      push.mockRejectedValueOnce(new Error("rejected: non-fast-forward"));
+
+      const result = await git.sync();
+
+      // Pull succeeded — pulled notes should be present
+      expect(result.hasRemote).toBe(true);
+      expect(result.pulledNoteIds).toEqual(["synced-note"]);
+      expect(result.pushedCommits).toBe(0);
+      expect(result.gitError).toEqual({ phase: "push", message: "rejected: non-fast-forward", isConflict: false });
     });
 
     it("uses custom notesRelDir when diffing notes", async () => {
