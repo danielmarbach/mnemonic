@@ -170,6 +170,13 @@ export interface ForgetResult extends Record<string, unknown> {
   retry?: MutationRetryContract;
 }
 
+export interface SyncVaultGitError {
+  phase: "fetch" | "pull" | "push";
+  message: string;
+  isConflict: boolean;
+  conflictFiles?: string[];
+}
+
 export interface SyncResult extends Record<string, unknown> {
   action: "synced";
   vaults: Array<{
@@ -179,7 +186,10 @@ export interface SyncResult extends Record<string, unknown> {
     deleted: number;
     pushed: number;
     embedded: number;
+    /** Embedding failures — note ids that could not be re-embedded */
     failed: string[];
+    /** Set when a git operation (fetch/pull/push) failed during sync */
+    gitError?: SyncVaultGitError;
   }>;
 }
 
@@ -518,6 +528,12 @@ export const SyncResultSchema = z.object({
     pushed: z.number(),
     embedded: z.number(),
     failed: z.array(z.string()),
+    gitError: z.object({
+      phase: z.enum(["fetch", "pull", "push"]),
+      message: z.string(),
+      isConflict: z.boolean(),
+      conflictFiles: z.array(z.string()).optional(),
+    }).optional(),
   })),
 });
 

@@ -13,6 +13,7 @@ import {
   MemoryGraphResultSchema,
   MigrationExecuteResultSchema,
   MigrationListResultSchema,
+  SyncResultSchema,
 } from "../src/structured-content.js";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -1858,6 +1859,33 @@ describe("local MCP script", () => {
       const after = await readFile(embeddingPath, "utf-8");
       expect(after).not.toBe("");
       expect(before).not.toBe("");
+    } finally {
+      await embeddingServer.close();
+    }
+  }, 15000);
+
+  it("keeps sync structured output aligned with SyncResultSchema", async () => {
+    const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-vault-"));
+    tempDirs.push(vaultDir);
+    const embeddingServer = await startFakeEmbeddingServer();
+
+    try {
+      await callLocalMcp(vaultDir, "remember", {
+        title: "Schema audit sync note",
+        content: "Used to validate SyncResultSchema alignment.",
+        scope: "global",
+        summary: "Seed note for sync schema audit",
+      }, embeddingServer.url);
+
+      const response = await callLocalMcpResponse(vaultDir, "sync", {}, embeddingServer.url);
+
+      // Must parse without throwing — validates gitError optional field is included correctly
+      const parsed = SyncResultSchema.parse(response.structuredContent);
+      expect(parsed.action).toBe("synced");
+      expect(parsed.vaults).toHaveLength(1);
+      expect(parsed.vaults[0]?.vault).toBe("main");
+      // No remote configured so gitError should be absent
+      expect(parsed.vaults[0]?.gitError).toBeUndefined();
     } finally {
       await embeddingServer.close();
     }

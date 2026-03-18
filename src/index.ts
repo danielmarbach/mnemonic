@@ -798,9 +798,28 @@ async function removeStaleEmbeddings(storage: Storage, noteIds: string[]): Promi
   }
 }
 
-function formatSyncResult(result: SyncResult, label: string): string[] {
+function formatSyncResult(result: SyncResult, label: string, vaultPath?: string): string[] {
   if (!result.hasRemote) return [`${label}: no remote configured — git sync skipped.`];
   const lines: string[] = [];
+
+  if (result.gitError) {
+    const { phase, message, isConflict, conflictFiles } = result.gitError;
+    if (isConflict) {
+      lines.push(`${label}: ✗ merge conflict during ${phase}.`);
+      if (conflictFiles && conflictFiles.length > 0) {
+        lines.push(`${label}: conflicted files: ${conflictFiles.join(", ")}`);
+      }
+      const where = vaultPath ?? label;
+      lines.push(`${label}: resolve conflicts in ${where}, then run sync again.`);
+    } else {
+      lines.push(`${label}: ✗ git ${phase} failed: ${message}`);
+    }
+    // Still report any partial pull results that came through before the failure
+    if (result.pulledNoteIds.length > 0)
+      lines.push(`${label}: ↓ ${result.pulledNoteIds.length} note(s) pulled before failure.`);
+    return lines;
+  }
+
   lines.push(result.pushedCommits > 0
     ? `${label}: ↑ pushed ${result.pushedCommits} commit(s).`
     : `${label}: ↑ nothing to push.`);
@@ -3129,11 +3148,12 @@ server.registerTool(
   },
   async ({ cwd, force }) => {
     const lines: string[] = [];
-    const vaultResults: Array<{ vault: "main" | "project"; hasRemote: boolean; pulled: number; deleted: number; pushed: number; embedded: number; failed: string[] }> = [];
+    const vaultResults: Array<StructuredSyncResult["vaults"][number]> = [];
 
     // Always sync main vault
+    const mainVaultPath = vaultManager.main.storage.vaultPath;
     const mainResult = await vaultManager.main.git.sync();
-    lines.push(...formatSyncResult(mainResult, "main vault"));
+    lines.push(...formatSyncResult(mainResult, "main vault", mainVaultPath));
     let mainEmbedded = 0;
     let mainFailed: string[] = [];
     const mainBackfill = await backfillEmbeddingsAfterSync(vaultManager.main.storage, "main vault", lines, force);
@@ -3150,14 +3170,16 @@ server.registerTool(
       pushed: mainResult.pushedCommits,
       embedded: mainEmbedded,
       failed: mainFailed,
+      gitError: mainResult.gitError,
     });
 
     // Optionally sync project vault
     if (cwd) {
       const projectVault = await vaultManager.getProjectVaultIfExists(cwd);
       if (projectVault) {
+        const projectVaultPath = projectVault.storage.vaultPath;
         const projectResult = await projectVault.git.sync();
-        lines.push(...formatSyncResult(projectResult, "project vault"));
+        lines.push(...formatSyncResult(projectResult, "project vault", projectVaultPath));
         let projEmbedded = 0;
         let projFailed: string[] = [];
         const projectBackfill = await backfillEmbeddingsAfterSync(projectVault.storage, "project vault", lines, force);
@@ -3174,6 +3196,7 @@ server.registerTool(
           pushed: projectResult.pushedCommits,
           embedded: projEmbedded,
           failed: projFailed,
+          gitError: projectResult.gitError,
         });
       } else {
         lines.push("project vault: no .mnemonic/ found — skipped.");

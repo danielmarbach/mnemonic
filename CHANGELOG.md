@@ -4,6 +4,13 @@ All notable changes to `mnemonic` will be documented in this file.
 
 The format is loosely based on Keep a Changelog and uses semver-style version headings.
 
+## [0.12.1] - 2026-03-18
+
+### Fixed
+
+- `sync` now surfaces git failures as structured per-phase errors (`fetch`, `pull`, `push`) instead of silently swallowing them — merge conflicts include conflicted file paths and an actionable resolution hint.
+- `SyncResult` structured output gains a `gitError` field per vault so callers can distinguish a clean no-op from a failed sync.
+
 ## [0.12.0] - 2026-03-15
 
 ### Added
