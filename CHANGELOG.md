@@ -4,7 +4,7 @@ All notable changes to `mnemonic` will be documented in this file.
 
 The format is loosely based on Keep a Changelog and uses semver-style version headings.
 
-## [0.13.0] - 2026-03-18
+## [0.12.1] - 2026-03-18
 
 ### Fixed
 
