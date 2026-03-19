@@ -4,6 +4,13 @@ All notable changes to `mnemonic` will be documented in this file.
 
 The format is loosely based on Keep a Changelog and uses semver-style version headings.
 
+## [0.13.0] - 2026-03-19
+
+### Changed
+
+- `mnemonic-workflow-hint` is now written as an imperative decision protocol aimed at weaker models: recall first, inspect with `get`, prefer `update` for existing memories, and only `remember` when nothing relevant matches.
+- Phase-aware tool descriptions now front-load prerequisite wording for `remember`, `get`, `update`, `relate`, `consolidate`, and `move_memory` so models do less workflow inference from negative wording alone.
+
 ## [0.12.2] - 2026-03-19
 
 ### Fixed
