@@ -132,6 +132,28 @@ describe("VaultManager", () => {
       
       expect(vault1).toBe(vault2); // Same instance
     });
+
+    it("should not create or commit gitignore when loading existing project vault (getProjectVaultIfExists)", async () => {
+      const projectDir = path.join(tempDir, "project-gitignore-bug");
+      await fs.mkdir(projectDir, { recursive: true });
+      await initGitRepo(projectDir, "# Project Gitignore Bug");
+      
+      const mnemonicDir = path.join(projectDir, ".mnemonic");
+      await fs.mkdir(mnemonicDir, { recursive: true });
+      await fs.mkdir(path.join(mnemonicDir, "notes"), { recursive: true });
+      await fs.mkdir(path.join(mnemonicDir, "embeddings"), { recursive: true });
+      
+      // NO .gitignore file created initially
+      
+      // Load the existing project vault (create: false)
+      const vault = await vaultManager.getProjectVaultIfExists(projectDir);
+      expect(vault).toBeTruthy();
+      
+      // Bug fix verification: gitignore should NOT be created when just loading an existing vault
+      const gitignorePath = path.join(mnemonicDir, ".gitignore");
+      const gitignoreExists = await fs.stat(gitignorePath).then(() => true).catch(() => false);
+      expect(gitignoreExists).toBe(false);
+    });
   });
 
   describe("Note Resolution", () => {
