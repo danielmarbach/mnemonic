@@ -174,13 +174,15 @@ export class VaultManager {
     await primaryVault.storage.init();
     await primaryVault.git.init();
 
-    const gitignorePath = path.join(mnemonicPath, ".gitignore");
-    const isNew = !(await pathExists(gitignorePath));
-    await ensureGitignore(gitignorePath);
+    if (create) {
+      const gitignorePath = path.join(mnemonicPath, ".gitignore");
+      const isNew = !(await pathExists(gitignorePath));
+      await ensureGitignore(gitignorePath);
 
-    if (isNew) {
-      // Commit the .gitignore so collaborators also ignore embeddings/
-      await primaryVault.git.commit("chore: initialize .mnemonic vault", [".mnemonic/.gitignore"]);
+      if (isNew) {
+        // Commit the .gitignore so collaborators also ignore embeddings/
+        await primaryVault.git.commit("chore: initialize .mnemonic vault", [".mnemonic/.gitignore"]);
+      }
     }
 
     this.primaryProjectVaults.set(resolved, primaryVault);
