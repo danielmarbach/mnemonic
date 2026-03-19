@@ -1608,6 +1608,7 @@ server.registerTool(
   {
     title: "Remember",
     description:
+      "REQUIRES: Call `recall` or `list` first to check whether this memory already exists.\n\n" +
       "Create a new memory as a markdown note with embeddings for future recall.\n\n" +
       "Use this when:\n" +
       "- A decision, preference, bug fix, or durable context should survive beyond this session\n" +
@@ -2172,6 +2173,7 @@ server.registerTool(
   {
     title: "Update Memory",
     description:
+      "Use after `recall` + `get` when an existing memory should be refined instead of creating a duplicate.\n\n" +
       "Modify an existing memory by id.\n\n" +
       "Use this when:\n" +
       "- A stored memory is stale, incomplete, or wrong\n" +
@@ -2459,6 +2461,7 @@ server.registerTool(
   {
     title: "Get Memory",
     description:
+      "Use after `recall`, `list`, or `recent_memories` when you need the full note content.\n\n" +
       "Fetch one or more memories by exact id.\n\n" +
       "Use this when:\n" +
       "- You already know the memory id and need the full note content\n" +
@@ -3218,6 +3221,7 @@ server.registerTool(
   {
     title: "Move Memory",
     description:
+      "Use after `where_is_memory` or `get` confirms a memory is stored in the wrong place.\n\n" +
       "Move a memory between main storage and project storage, optionally targeting a specific sub-vault folder.\n\n" +
       "Use this when:\n" +
       "- A note is stored in the wrong place\n" +
@@ -3402,6 +3406,7 @@ server.registerTool(
   {
     title: "Relate Memories",
     description:
+      "Use after you have identified the exact memories to connect.\n\n" +
       "Create a typed bidirectional relationship between two memories.\n\n" +
       "Use this when:\n" +
       "- A newly stored or updated note meaningfully connects to another note\n" +
@@ -3655,6 +3660,7 @@ server.registerTool(
   {
     title: "Consolidate Memories",
     description:
+      "Use after `recall`, `list`, or `memory_graph` shows overlap that should be merged or cleaned up.\n\n" +
       "Merge overlapping memories into a cleaner canonical note and retire the sources.\n\n" +
       "Use this when:\n" +
       "- Multiple notes cover the same decision, fix, or concept\n" +
@@ -4676,23 +4682,24 @@ server.registerPrompt(
           type: "text",
           text:
             "## Mnemonic MCP workflow hints\n\n" +
-            "Mnemonic stores durable knowledge as markdown notes with embeddings.\n\n" +
-            "### Typical memory workflow\n\n" +
-            "1. **Discover**\n" +
-            "   Use `recall` to semantically search for existing memories related to a topic.\n\n" +
-            "2. **Inspect**\n" +
-            "   Use `get` to read the full contents of a memory returned by `recall`, `list`, or `recent_memories`.\n\n" +
-            "3. **Modify or store**\n" +
-            "   Use `update` to refine an existing memory.\n" +
-            "   Use `remember` to create a new memory only when no existing memory already covers the topic.\n\n" +
-            "4. **Organize**\n" +
-            "   Use `relate` to connect related memories.\n" +
-            "   Use `consolidate` when several memories overlap.\n" +
-            "   Use `move` when a memory is stored in the wrong place.\n\n" +
-            "### Consistent tag terminology\n\n" +
-            "Before `remember`, call `discover_tags` to find canonical tag names already in use.\n" +
-            "This keeps terminology consistent across sessions (e.g., preferring 'bug' over 'bugs').\n" +
-            "Use high-usage tags as the canonical forms, and avoid tags marked `isTemporaryOnly`.\n\n" +
+            "Avoid duplicate memories. Prefer inspecting and updating existing memories before creating new ones.\n\n" +
+            "### Hard rules\n\n" +
+            "- REQUIRES: Before `remember`, call `recall` or `list` first.\n" +
+            "- If `recall` or `list` returns a plausible match, call `get` before deciding whether to `update` or `remember`.\n" +
+            "- If an existing memory already covers the topic, use `update`, not `remember`.\n" +
+            "- When unsure, prefer `recall` over `remember`.\n" +
+            "- For repo-related tasks, pass `cwd` so mnemonic can route project memories correctly.\n\n" +
+            "### Decision protocol\n\n" +
+            "1. Need to store, refine, or connect knowledge about a topic? Start with `recall`, or use `list` when you need deterministic browsing by scope, storage, or tags.\n" +
+            "2. If `recall` or `list` returns matching ids, use `get` to inspect the best match.\n" +
+            "3. If one memory should be refined, call `update`.\n" +
+            "4. If no memory covers the topic, call `discover_tags` if tags matter, then call `remember`.\n" +
+            "5. After storing or updating, use `relate` for strong connections, `consolidate` for overlap, and `move_memory` for wrong storage location.\n\n" +
+            "### Anti-patterns\n\n" +
+            "- Bad: call `remember` immediately because the user said 'remember'.\n" +
+            "- Good: `recall` or `list` first, then `get`, then `update` or `remember`.\n" +
+            "- Bad: create another note when `recall` or `list` already found the same decision.\n" +
+            "- Good: `update` the existing memory and relate it if needed.\n\n" +
             "### Storage model\n\n" +
             "Memories can live in:\n" +
             "- `main-vault` for global knowledge\n" +
@@ -4702,10 +4709,10 @@ server.registerPrompt(
             "- project memory routing\n" +
             "- project-aware recall ranking\n" +
             "- project memory policy lookup\n\n" +
-            "### General guideline\n\n" +
-            "Prefer:\n" +
-            "`recall` -> `get` -> `update`\n\n" +
-            "over creating duplicate memories with `remember`.",
+            "### Tiny examples\n\n" +
+            "- Existing bug note found by `recall` -> inspect with `get` -> refine with `update`.\n" +
+            "- No matching note found by `recall` -> optional `discover_tags` -> create with `remember`.\n" +
+            "- Two notes overlap heavily -> inspect -> clean up with `consolidate`.",
         },
       },
     ],

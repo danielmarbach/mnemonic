@@ -228,7 +228,7 @@ Keep these high-level anchors in mind:
 
 | Prompt | Description |
 |--------|-------------|
-| `mnemonic-workflow-hint` | Optional. Returns compact multi-step workflow guidance (discover → inspect → modify → organize), storage-label model, and the `recall` → `get` → `update` preference. Not auto-injected — clients request it on demand. |
+| `mnemonic-workflow-hint` | Optional. Returns an imperative decision protocol for weaker and stronger models: use `recall` or `list` first, inspect with `get`, update existing memories, remember only when nothing matches, then organize with `relate`, `consolidate`, or `move_memory`. Not auto-injected — clients request it on demand. |
 
 ## Tools
 
