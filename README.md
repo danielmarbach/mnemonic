@@ -402,7 +402,7 @@ Imported notes are written to the main vault with `lifecycle: permanent` and `sc
 
 | Prompt | Description |
 |--------|-------------|
-| `mnemonic-workflow-hint` | Optional. Returns compact workflow guidance: discover → inspect → modify → organize, storage-label model, and the `recall` → `get` → `update` preference. Not auto-injected — request it on demand. |
+| `mnemonic-workflow-hint` | Optional. Returns an imperative decision protocol for weaker and stronger models: recall first, inspect with get, update existing memories, remember only when nothing matches, then organize with relate/consolidate/move_memory. Not auto-injected — request it on demand. |
 
 ## Tools
 
