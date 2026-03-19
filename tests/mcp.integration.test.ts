@@ -36,6 +36,34 @@ beforeAll(async () => {
 }, 120000);
 
 describe("local MCP script", () => {
+  it("exposes workflow-hint prompt as an imperative decision protocol", async () => {
+    const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-vault-"));
+    tempDirs.push(vaultDir);
+
+    const promptText = await callLocalMcpPrompt(vaultDir, "mnemonic-workflow-hint");
+
+    expect(promptText).toContain("Avoid duplicate memories.");
+    expect(promptText).toContain("REQUIRES: Before `remember`, call `recall` first.");
+    expect(promptText).toContain("If `recall` returns a plausible match, call `get` before deciding whether to `update` or `remember`.");
+    expect(promptText).toContain("When unsure, prefer `recall` over `remember`.");
+    expect(promptText).toContain("Bad: call `remember` immediately because the user said 'remember'.");
+  }, 15000);
+
+  it("surfaces prerequisite-first workflow wording in phase-aware tool descriptions", async () => {
+    const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-vault-"));
+    tempDirs.push(vaultDir);
+
+    const tools = await listLocalMcpTools(vaultDir);
+    const byName = new Map(tools.map((tool) => [tool.name, tool.description ?? ""]));
+
+    expect(byName.get("remember")).toContain("REQUIRES: Call `recall` or `list` first to check whether this memory already exists.");
+    expect(byName.get("get")).toContain("Use after `recall`, `list`, or `recent_memories` when you need the full note content.");
+    expect(byName.get("update")).toContain("Use after `recall` + `get` when an existing memory should be refined instead of creating a duplicate.");
+    expect(byName.get("relate")).toContain("Use after you have identified the exact memories to connect.");
+    expect(byName.get("consolidate")).toContain("Use after `recall`, `list`, or `memory_graph` shows overlap that should be merged or cleaned up.");
+    expect(byName.get("move_memory")).toContain("Use after `where_is_memory` or `get` confirms a memory is stored in the wrong place.");
+  }, 15000);
+
   it("supports global remember and forget with git disabled", async () => {
     const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-vault-"));
     tempDirs.push(vaultDir);
@@ -1986,6 +2014,27 @@ async function callLocalMcp(
   return response.text;
 }
 
+async function callLocalMcpPrompt(vaultDir: string, promptName: string): Promise<string> {
+  const response = await callLocalMcpMethod(vaultDir, 1, "prompts/get", { name: promptName });
+  const messages = response?.result?.messages as Array<{ content?: { text?: string } }> | undefined;
+  const text = messages?.[0]?.content?.text;
+  if (!text) {
+    throw new Error(`Missing prompt response for ${promptName}`);
+  }
+
+  return text;
+}
+
+async function listLocalMcpTools(vaultDir: string): Promise<Array<{ name: string; description?: string }>> {
+  const response = await callLocalMcpMethod(vaultDir, 1, "tools/list", {});
+  const tools = response?.result?.tools as Array<{ name: string; description?: string }> | undefined;
+  if (!tools) {
+    throw new Error("Missing tools/list response");
+  }
+
+  return tools;
+}
+
 async function callLocalMcpResponse(
   vaultDir: string,
   toolName: string,
@@ -1993,6 +2042,25 @@ async function callLocalMcpResponse(
   options?: string | { ollamaUrl?: string; disableGit?: boolean },
 ): Promise<{ text: string; structuredContent?: Record<string, unknown> }> {
   const resolvedOptions = typeof options === "string" ? { ollamaUrl: options } : options;
+  const response = await callLocalMcpMethod(vaultDir, 1, "tools/call", {
+    name: toolName,
+    arguments: arguments_,
+  }, resolvedOptions);
+  const text = response?.result?.content?.[0]?.text;
+  if (!text) {
+    throw new Error(`Missing tool response for ${toolName}`);
+  }
+
+  return { text, structuredContent: response?.result?.structuredContent as Record<string, unknown> | undefined };
+}
+
+async function callLocalMcpMethod(
+  vaultDir: string,
+  id: number,
+  method: string,
+  params: Record<string, unknown>,
+  options?: { ollamaUrl?: string; disableGit?: boolean },
+): Promise<{ id?: number; result?: Record<string, unknown> }> {
   const messages = [
     {
       jsonrpc: "2.0",
@@ -2006,12 +2074,9 @@ async function callLocalMcpResponse(
     },
     {
       jsonrpc: "2.0",
-      id: 1,
-      method: "tools/call",
-      params: {
-        name: toolName,
-        arguments: arguments_,
-      },
+      id,
+      method,
+      params,
     },
   ];
 
@@ -2020,9 +2085,9 @@ async function callLocalMcpResponse(
       cwd: repoRoot,
       env: {
         ...process.env,
-        DISABLE_GIT: resolvedOptions?.disableGit === false ? "false" : "true",
+        DISABLE_GIT: options?.disableGit === false ? "false" : "true",
         VAULT_PATH: vaultDir,
-        ...(resolvedOptions?.ollamaUrl ? { OLLAMA_URL: resolvedOptions.ollamaUrl } : {}),
+        ...(options?.ollamaUrl ? { OLLAMA_URL: options.ollamaUrl } : {}),
       },
       stdio: ["pipe", "pipe", "pipe"],
     });
@@ -2050,15 +2115,10 @@ async function callLocalMcpResponse(
 
   const lines = stdout.trim().split("\n").filter(Boolean).map((line) => JSON.parse(line) as {
     id?: number;
-    result?: { content?: Array<{ text?: string }>; structuredContent?: Record<string, unknown> };
+    result?: Record<string, unknown>;
   });
-  const response = lines.find((line) => line.id === 1);
-  const text = response?.result?.content?.[0]?.text;
-  if (!text) {
-    throw new Error(`Missing tool response for ${toolName}`);
-  }
 
-  return { text, structuredContent: response?.result?.structuredContent };
+  return lines.find((line) => line.id === id) ?? {};
 }
 
 function extractRememberedId(text: string): string {
