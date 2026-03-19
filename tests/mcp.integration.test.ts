@@ -43,8 +43,8 @@ describe("local MCP script", () => {
     const promptText = await callLocalMcpPrompt(vaultDir, "mnemonic-workflow-hint");
 
     expect(promptText).toContain("Avoid duplicate memories.");
-    expect(promptText).toContain("REQUIRES: Before `remember`, call `recall` first.");
-    expect(promptText).toContain("If `recall` returns a plausible match, call `get` before deciding whether to `update` or `remember`.");
+    expect(promptText).toContain("REQUIRES: Before `remember`, call `recall` or `list` first.");
+    expect(promptText).toContain("If `recall` or `list` returns a plausible match, call `get` before deciding whether to `update` or `remember`.");
     expect(promptText).toContain("When unsure, prefer `recall` over `remember`.");
     expect(promptText).toContain("Bad: call `remember` immediately because the user said 'remember'.");
   }, 15000);

@@ -4684,21 +4684,21 @@ server.registerPrompt(
             "## Mnemonic MCP workflow hints\n\n" +
             "Avoid duplicate memories. Prefer inspecting and updating existing memories before creating new ones.\n\n" +
             "### Hard rules\n\n" +
-            "- REQUIRES: Before `remember`, call `recall` first.\n" +
-            "- If `recall` returns a plausible match, call `get` before deciding whether to `update` or `remember`.\n" +
+            "- REQUIRES: Before `remember`, call `recall` or `list` first.\n" +
+            "- If `recall` or `list` returns a plausible match, call `get` before deciding whether to `update` or `remember`.\n" +
             "- If an existing memory already covers the topic, use `update`, not `remember`.\n" +
             "- When unsure, prefer `recall` over `remember`.\n" +
             "- For repo-related tasks, pass `cwd` so mnemonic can route project memories correctly.\n\n" +
             "### Decision protocol\n\n" +
-            "1. Need to store, refine, or connect knowledge about a topic? Start with `recall`.\n" +
-            "2. If `recall` returns matching ids, use `get` to inspect the best match.\n" +
+            "1. Need to store, refine, or connect knowledge about a topic? Start with `recall`, or use `list` when you need deterministic browsing by scope, storage, or tags.\n" +
+            "2. If `recall` or `list` returns matching ids, use `get` to inspect the best match.\n" +
             "3. If one memory should be refined, call `update`.\n" +
             "4. If no memory covers the topic, call `discover_tags` if tags matter, then call `remember`.\n" +
             "5. After storing or updating, use `relate` for strong connections, `consolidate` for overlap, and `move_memory` for wrong storage location.\n\n" +
             "### Anti-patterns\n\n" +
             "- Bad: call `remember` immediately because the user said 'remember'.\n" +
-            "- Good: `recall` first, then `get`, then `update` or `remember`.\n" +
-            "- Bad: create another note when `recall` already found the same decision.\n" +
+            "- Good: `recall` or `list` first, then `get`, then `update` or `remember`.\n" +
+            "- Bad: create another note when `recall` or `list` already found the same decision.\n" +
             "- Good: `update` the existing memory and relate it if needed.\n\n" +
             "### Storage model\n\n" +
             "Memories can live in:\n" +
