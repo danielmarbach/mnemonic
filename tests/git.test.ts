@@ -389,5 +389,51 @@ describe("GitOps", () => {
 
       expect(result.pulledNoteIds).toEqual(["proj-note"]);
     });
+
+    it("returns staged and modified files from status()", async () => {
+      const { GitOps } = await import("../src/git.js");
+      const git = new GitOps("/tmp/repo");
+      await git.init();
+
+      status.mockResolvedValueOnce({
+        staged: ["notes/note1.md", "notes/note2.md"],
+        modified: ["notes/note3.md"],
+        conflicted: [],
+      });
+
+      const result = await git.status();
+
+      expect(result.staged).toEqual(["notes/note1.md", "notes/note2.md"]);
+      expect(result.modified).toEqual(["notes/note3.md"]);
+    });
+
+    it("returns empty arrays when git is disabled", async () => {
+      process.env.DISABLE_GIT = "true";
+      vi.resetModules();
+
+      const { GitOps } = await import("../src/git.js");
+      const git = new GitOps("/tmp/repo");
+      await git.init();
+
+      const result = await git.status();
+
+      expect(result.staged).toEqual([]);
+      expect(result.modified).toEqual([]);
+
+      delete process.env.DISABLE_GIT;
+    });
+
+    it("returns empty arrays when status() throws", async () => {
+      const { GitOps } = await import("../src/git.js");
+      const git = new GitOps("/tmp/repo");
+      await git.init();
+
+      status.mockRejectedValueOnce(new Error("not a git repository"));
+
+      const result = await git.status();
+
+      expect(result.staged).toEqual([]);
+      expect(result.modified).toEqual([]);
+    });
   });
 });

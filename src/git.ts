@@ -169,6 +169,23 @@ export class GitOps {
   }
 
   /**
+   * Get git status for checking uncommitted changes.
+   * Returns staged and modified files.
+   */
+  async status(): Promise<{ staged: string[]; modified: string[] }> {
+    if (!this.enabled) return { staged: [], modified: [] };
+    try {
+      const status = await this.git.status();
+      return {
+        staged: status.staged,
+        modified: status.modified,
+      };
+    } catch {
+      return { staged: [], modified: [] };
+    }
+  }
+
+  /**
    * Bidirectional sync: fetch → count unpushed local commits → pull (rebase)
    * → push. Returns details about what changed so callers can trigger
    * re-embedding for notes that arrived from the remote.

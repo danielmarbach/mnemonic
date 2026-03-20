@@ -564,6 +564,139 @@ describe("VaultManager", () => {
       expect(relPath).toBe(".mnemonic-widget/notes/my-note.md");
     });
   });
+
+  describe("getPendingNoteFiles", () => {
+    it("returns pending files for staged notes", async () => {
+      delete process.env.DISABLE_GIT;
+      const projectDir = path.join(tempDir, "project-pending");
+      await fs.mkdir(projectDir, { recursive: true });
+      await initGitRepo(projectDir, "# Pending Test");
+
+      const vaultMgr = new VaultManager(mainVaultPath);
+      await vaultMgr.initMain();
+      const projectVault = await vaultMgr.getOrCreateProjectVault(projectDir);
+      expect(projectVault).toBeTruthy();
+
+      // Write a note
+      const note: Note = {
+        id: "test-note",
+        title: "Test Note",
+        content: "Test content",
+        tags: [],
+        lifecycle: "permanent",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      await projectVault!.storage.writeNote(note);
+
+      // Stage the file manually
+      const git = simpleGit(projectDir);
+      await git.add(".mnemonic/notes/test-note.md");
+
+      // Check for pending files
+      const pendingFiles = await vaultMgr.getPendingNoteFiles(projectVault!, ["test-note"]);
+      expect(pendingFiles).toContain(".mnemonic/notes/test-note.md");
+      
+      process.env.DISABLE_GIT = "true";
+    });
+
+    it("returns pending files for modified notes", async () => {
+      delete process.env.DISABLE_GIT;
+      const projectDir = path.join(tempDir, "project-pending-mod");
+      await fs.mkdir(projectDir, { recursive: true });
+      await initGitRepoWithCommit(projectDir, "# Pending Mod Test");
+
+      const vaultMgr = new VaultManager(mainVaultPath);
+      await vaultMgr.initMain();
+      const projectVault = await vaultMgr.getOrCreateProjectVault(projectDir);
+      expect(projectVault).toBeTruthy();
+
+      // Write and commit a note first
+      const note: Note = {
+        id: "test-note-mod",
+        title: "Test Note",
+        content: "Original content",
+        tags: [],
+        lifecycle: "permanent",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      await projectVault!.storage.writeNote(note);
+      const git = simpleGit(projectDir);
+      await git.add(".mnemonic/notes/test-note-mod.md");
+      await git.commit("initial note");
+
+      // Modify the note (creates modified file)
+      await projectVault!.storage.writeNote({ ...note, content: "Modified content" });
+
+      // Check for pending files - should pick up modified file
+      const pendingFiles = await vaultMgr.getPendingNoteFiles(projectVault!, ["test-note-mod"]);
+      expect(pendingFiles).toContain(".mnemonic/notes/test-note-mod.md");
+      
+      process.env.DISABLE_GIT = "true";
+    });
+
+    it("returns empty array when git is disabled", async () => {
+      // Git is already disabled in beforeEach
+      // The status() method returns empty arrays when DISABLE_GIT=true
+      const pendingFiles = await vaultManager.getPendingNoteFiles(vaultManager.main, ["any-note"]);
+      expect(pendingFiles).toEqual([]);
+    });
+
+    it("returns empty array when no pending changes", async () => {
+      delete process.env.DISABLE_GIT;
+      const projectDir = path.join(tempDir, "project-clean");
+      await fs.mkdir(projectDir, { recursive: true });
+      await initGitRepo(projectDir, "# Clean Test");
+
+      const vaultMgr = new VaultManager(mainVaultPath);
+      await vaultMgr.initMain();
+      const projectVault = await vaultMgr.getOrCreateProjectVault(projectDir);
+      expect(projectVault).toBeTruthy();
+
+      const pendingFiles = await vaultMgr.getPendingNoteFiles(projectVault!, ["nonexistent"]);
+      expect(pendingFiles).toEqual([]);
+      
+      process.env.DISABLE_GIT = "true";
+    });
+
+    it("returns multiple pending files", async () => {
+      delete process.env.DISABLE_GIT;
+      const projectDir = path.join(tempDir, "project-multi-pending");
+      await fs.mkdir(projectDir, { recursive: true });
+      await initGitRepo(projectDir, "# Multi Pending");
+
+      const vaultMgr = new VaultManager(mainVaultPath);
+      await vaultMgr.initMain();
+      const projectVault = await vaultMgr.getOrCreateProjectVault(projectDir);
+      expect(projectVault).toBeTruthy();
+
+      // Write multiple notes and stage them
+      for (let i = 1; i <= 2; i++) {
+        const note: Note = {
+          id: `note-${i}`,
+          title: `Note ${i}`,
+          content: `Content ${i}`,
+          tags: [],
+          lifecycle: "permanent",
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+        await projectVault!.storage.writeNote(note);
+      }
+
+      const git = simpleGit(projectDir);
+      await git.add(".mnemonic/notes/note-1.md");
+      await git.add(".mnemonic/notes/note-2.md");
+
+      const pendingFiles = await vaultMgr.getPendingNoteFiles(projectVault!, ["note-1", "note-2"]);
+      expect(pendingFiles).toHaveLength(2);
+      expect(pendingFiles).toContain(".mnemonic/notes/note-1.md");
+      expect(pendingFiles).toContain(".mnemonic/notes/note-2.md");
+      
+      process.env.DISABLE_GIT = "true";
+    });
+  });
 });
 
 async function initGitRepo(projectDir: string, readmeContent: string): Promise<void> {

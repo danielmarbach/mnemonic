@@ -3454,24 +3454,80 @@ server.registerTool(
     const vaultChanges = new Map<Vault, string[]>();
 
     const fromRels = fromNote.relatedTo ?? [];
-    if (!fromRels.some((r) => r.id === toId)) {
+    const fromRelExists = fromRels.some((r) => r.id === toId);
+    if (!fromRelExists) {
       await fromVault.storage.writeNote({ ...fromNote, relatedTo: [...fromRels, { id: toId, type }], updatedAt: now });
       const files = vaultChanges.get(fromVault) ?? [];
       files.push(vaultManager.noteRelPath(fromVault, fromId));
       vaultChanges.set(fromVault, files);
     }
 
-    if (bidirectional) {
-      const toRels = toNote.relatedTo ?? [];
-      if (!toRels.some((r) => r.id === fromId)) {
-        await toVault.storage.writeNote({ ...toNote, relatedTo: [...toRels, { id: fromId, type }], updatedAt: now });
-        const files = vaultChanges.get(toVault) ?? [];
-        files.push(vaultManager.noteRelPath(toVault, toId));
-        vaultChanges.set(toVault, files);
-      }
+    const toRels = toNote.relatedTo ?? [];
+    const toRelExists = toRels.some((r) => r.id === fromId);
+    if (bidirectional && !toRelExists) {
+      await toVault.storage.writeNote({ ...toNote, relatedTo: [...toRels, { id: fromId, type }], updatedAt: now });
+      const files = vaultChanges.get(toVault) ?? [];
+      files.push(vaultManager.noteRelPath(toVault, toId));
+      vaultChanges.set(toVault, files);
     }
 
+    // Check for uncommitted changes from a previous failed attempt
     if (vaultChanges.size === 0) {
+      // If relationships exist in note content, check git status for pending changes
+      const allVaults = new Set([fromVault, ...(bidirectional && toVault !== fromVault ? [toVault] : [])]);
+      
+      for (const vault of allVaults) {
+        const noteIds = vault === fromVault
+          ? (bidirectional && vault === toVault ? [fromId, toId] : [fromId])
+          : [toId];
+        const pendingFiles = await vaultManager.getPendingNoteFiles(vault, noteIds);
+        
+        if (pendingFiles.length > 0) {
+          // Commit the pending changes from previous failed attempt
+          const commitBody = formatCommitBody({
+            noteId: fromId,
+            noteTitle: fromNote.title,
+            projectName: fromNote.projectName,
+            relationship: { fromId, toId, type },
+          });
+          const commitMessage = `relate: ${fromNote.title} ↔ ${toNote.title}`;
+          const commitStatus = await vault.git.commitWithStatus(commitMessage, pendingFiles, commitBody);
+          
+          if (commitStatus.status === "committed") {
+            await pushAfterMutation(vault);
+          }
+          
+          const retry = buildMutationRetryContract({
+            commit: commitStatus,
+            commitMessage,
+            commitBody,
+            files: pendingFiles,
+            cwd,
+            vault,
+            mutationApplied: true,
+          });
+          
+          const structuredContent: RelateResult = {
+            action: "related",
+            fromId,
+            toId,
+            type,
+            bidirectional,
+            notesModified: pendingFiles.map((f: string) => path.basename(f, '.md')),
+            retry,
+          };
+          
+          const retrySummary = formatRetrySummary(retry);
+          return {
+            content: [{
+              type: "text",
+              text: `Reconciled pending commit for relationship \`${fromId}\` ${bidirectional ? "↔" : "→"} \`${toId}\` (${type})${retrySummary ? `\n${retrySummary}` : ""}`,
+            }],
+            structuredContent,
+          };
+        }
+      }
+      
       return { content: [{ type: "text", text: `Relationship already exists between '${fromId}' and '${toId}'` }], isError: true };
     }
 
@@ -3577,7 +3633,8 @@ server.registerTool(
     if (foundFrom) {
       const { note: fromNote, vault: fromVault } = foundFrom;
       const filtered = (fromNote.relatedTo ?? []).filter((r) => r.id !== toId);
-      if (filtered.length !== (fromNote.relatedTo?.length ?? 0)) {
+      const fromRelExisted = (fromNote.relatedTo?.length ?? 0) > filtered.length;
+      if (fromRelExisted) {
         await fromVault.storage.writeNote({ ...fromNote, relatedTo: filtered, updatedAt: now });
         const files = vaultChanges.get(fromVault) ?? [];
         files.push(vaultManager.noteRelPath(fromVault, fromId));
@@ -3588,7 +3645,8 @@ server.registerTool(
     if (bidirectional && foundTo) {
       const { note: toNote, vault: toVault } = foundTo;
       const filtered = (toNote.relatedTo ?? []).filter((r) => r.id !== fromId);
-      if (filtered.length !== (toNote.relatedTo?.length ?? 0)) {
+      const toRelExisted = (toNote.relatedTo?.length ?? 0) > filtered.length;
+      if (toRelExisted) {
         await toVault.storage.writeNote({ ...toNote, relatedTo: filtered, updatedAt: now });
         const files = vaultChanges.get(toVault) ?? [];
         files.push(vaultManager.noteRelPath(toVault, toId));
@@ -3596,7 +3654,68 @@ server.registerTool(
       }
     }
 
+    // Check for uncommitted changes from a previous failed attempt
     if (vaultChanges.size === 0) {
+      // If no relationships were found in note content, check git status for pending changes
+      const allVaults = new Set<Vault>();
+      if (foundFrom) allVaults.add(foundFrom.vault);
+      if (bidirectional && foundTo) allVaults.add(foundTo.vault);
+      
+      for (const vault of allVaults) {
+        const noteIds: string[] = [];
+        if (foundFrom && foundFrom.vault === vault) noteIds.push(fromId);
+        if (bidirectional && foundTo && foundTo.vault === vault) noteIds.push(toId);
+        
+        const pendingFiles = await vaultManager.getPendingNoteFiles(vault, noteIds);
+        
+        if (pendingFiles.length > 0) {
+          // Commit the pending changes from previous failed attempt
+          const found = foundFrom?.vault === vault ? foundFrom : foundTo;
+          const commitBody = found
+            ? formatCommitBody({
+                noteId: found.note.id,
+                noteTitle: found.note.title,
+                projectName: found.note.projectName,
+              })
+            : undefined;
+          const commitMessage = `unrelate: ${fromId} ↔ ${toId}`;
+          const commitStatus = await vault.git.commitWithStatus(commitMessage, pendingFiles, commitBody);
+          
+          if (commitStatus.status === "committed") {
+            await pushAfterMutation(vault);
+          }
+          
+          const retry = buildMutationRetryContract({
+            commit: commitStatus,
+            commitMessage,
+            commitBody,
+            files: pendingFiles,
+            cwd,
+            vault,
+            mutationApplied: true,
+          });
+          
+          const structuredContent: RelateResult = {
+            action: "unrelated",
+            fromId,
+            toId,
+            type: "related-to",
+            bidirectional,
+            notesModified: pendingFiles.map((f: string) => path.basename(f, '.md')),
+            retry,
+          };
+          
+          const retrySummary = formatRetrySummary(retry);
+          return {
+            content: [{
+              type: "text",
+              text: `Reconciled pending commit for relationship removal between \`${fromId}\` and \`${toId}\`${retrySummary ? `\n${retrySummary}` : ""}`,
+            }],
+            structuredContent,
+          };
+        }
+      }
+      
       return { content: [{ type: "text", text: `No relationship found between '${fromId}' and '${toId}'` }], isError: true };
     }
 
