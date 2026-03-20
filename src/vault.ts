@@ -148,6 +148,22 @@ export class VaultManager {
     return `${vault.notesRelDir}/${noteId}.md`;
   }
 
+  /**
+   * Check for pending git changes (staged or modified) for specific notes in a vault.
+   * Returns file paths that have uncommitted changes from a previous failed attempt.
+   */
+  async getPendingNoteFiles(vault: Vault, noteIds: string[]): Promise<string[]> {
+    const status = await vault.git.status();
+    const pendingFiles: string[] = [];
+    for (const noteId of noteIds) {
+      const filePath = this.noteRelPath(vault, noteId);
+      if (status.staged.includes(filePath) || status.modified.includes(filePath)) {
+        pendingFiles.push(filePath);
+      }
+    }
+    return pendingFiles;
+  }
+
   // ── Private ─────────────────────────────────────────────────────────────────
 
   private isMainRepo(gitRoot: string): boolean {
