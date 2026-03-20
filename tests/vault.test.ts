@@ -702,6 +702,8 @@ describe("VaultManager", () => {
 async function initGitRepo(projectDir: string, readmeContent: string): Promise<void> {
   const git = simpleGit(projectDir);
   await git.init();
+  await git.addConfig("user.email", "test@example.com");
+  await git.addConfig("user.name", "Test");
   await fs.writeFile(path.join(projectDir, "README.md"), readmeContent);
 }
 
