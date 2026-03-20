@@ -4,6 +4,12 @@ All notable changes to `mnemonic` will be documented in this file.
 
 The format is loosely based on Keep a Changelog and uses semver-style version headings.
 
+## [0.13.1] - 2026-03-20
+
+### Fixed
+
+- `relate` and `unrelate` now reconcile pending git changes when relationships already exist in note content. Previously, if git operations failed (e.g., transient `.git/index.lock` errors) after note mutations succeeded, retries returned "relationship already exists" without committing the staged changes, leaving the vault in an inconsistent state.
+
 ## [0.13.0] - 2026-03-19
 
 ### Changed
