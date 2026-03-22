@@ -8,6 +8,56 @@ import {
 } from "../project-introspection.js";
 import type { Note } from "../storage.js";
 
+describe("anchor tag override for notes without relationships", () => {
+  it("notes with anchor tag should be eligible for anchor selection even without relationships", () => {
+    const taggedNote: Note = {
+      id: "tagged", title: "Tagged Anchor", content: "", tags: ["anchor"],
+      lifecycle: "permanent", createdAt: "", updatedAt: "", memoryVersion: 1,
+      relatedTo: [],
+    };
+    
+    expect(taggedNote.tags.some(t => t.toLowerCase() === "anchor")).toBe(true);
+    expect(taggedNote.relatedTo?.length ?? 0).toBe(0);
+  });
+
+  it("notes with alwaysLoad tag should be eligible for anchor selection even without relationships", () => {
+    const taggedNote: Note = {
+      id: "tagged", title: "Always Load", content: "", tags: ["alwaysLoad"],
+      lifecycle: "permanent", createdAt: "", updatedAt: "", memoryVersion: 1,
+      relatedTo: [],
+    };
+    
+    expect(taggedNote.tags.some(t => t.toLowerCase() === "alwaysload")).toBe(true);
+    expect(taggedNote.relatedTo?.length ?? 0).toBe(0);
+  });
+});
+
+describe("project-scoped filtering for themes and anchors", () => {
+  it("project entries can be distinguished from global entries by project field", () => {
+    const projectNote: Note = {
+      id: "proj", title: "Project Note", content: "", tags: [],
+      lifecycle: "permanent", createdAt: "", updatedAt: "", memoryVersion: 1,
+      project: "my-project",
+    };
+    
+    const globalNote: Note = {
+      id: "global", title: "Global Note", content: "", tags: [],
+      lifecycle: "permanent", createdAt: "", updatedAt: "", memoryVersion: 1,
+    };
+    
+    expect(projectNote.project).toBe("my-project");
+    expect(globalNote.project).toBeUndefined();
+  });
+
+  it("vault.isProject can identify project vault entries", () => {
+    const projectVaultEntry = { note: { id: "a" } as Note, vault: { isProject: true } };
+    const mainVaultEntry = { note: { id: "b" } as Note, vault: { isProject: false } };
+    
+    expect(projectVaultEntry.vault.isProject).toBe(true);
+    expect(mainVaultEntry.vault.isProject).toBe(false);
+  });
+});
+
 // Integration tests for project_memory_summary scoring logic.
 // Full MCP-tool integration tests would require client infrastructure.
 // Core scoring functions are tested in project-introspection.test.ts

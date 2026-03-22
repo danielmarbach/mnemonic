@@ -3072,13 +3072,18 @@ server.registerTool(
     }
 
     const policyLine = await formatProjectPolicyLine(project.id);
-    
-    // Build theme cache for connection diversity scoring
-    const themeCache = buildThemeCache(entries.map(e => e.note));
-    
-    // Categorize by theme
+
+    // Separate project-scoped notes (for themes/anchors) from global notes
+    const projectEntries = entries.filter(e =>
+      e.note.project === project.id || e.vault.isProject
+    );
+
+    // Build theme cache for connection diversity scoring (project-scoped only)
+    const themeCache = buildThemeCache(projectEntries.map(e => e.note));
+
+    // Categorize by theme (project-scoped only)
     const themed = new Map<string, NoteEntry[]>();
-    for (const entry of entries) {
+    for (const entry of projectEntries) {
       const theme = classifyTheme(entry.note);
       const bucket = themed.get(theme) ?? [];
       bucket.push(entry);
@@ -3087,8 +3092,8 @@ server.registerTool(
 
     // Theme order for display
     const themeOrder = ["overview", "decisions", "tooling", "bugs", "architecture", "quality", "other"];
-    
-    // Calculate notes distribution
+
+    // Calculate notes distribution (all visible notes)
     const projectVaultCount = entries.filter(e => e.vault.isProject).length;
     const mainVaultCount = entries.length - projectVaultCount;
     const mainVaultProjectEntries = entries.filter(
@@ -3130,9 +3135,6 @@ server.registerTool(
     }
 
     // Recent notes (project-scoped only)
-    const projectEntries = entries.filter(e => 
-      e.note.project === project.id || e.vault.isProject
-    );
     const recent = [...projectEntries]
       .sort((a, b) => b.note.updatedAt.localeCompare(a.note.updatedAt))
       .slice(0, recentLimit);
@@ -3140,8 +3142,14 @@ server.registerTool(
     sections.push(`\nRecent:`);
     sections.push(...recent.map(e => `- ${e.note.updatedAt} — ${e.note.title}`));
 
-    // Anchor notes with diversity constraint
-    const anchorCandidates = entries
+    // Anchor notes with diversity constraint (project-scoped only)
+    // Separate tagged anchors (can have no relationships) from scored anchors (need relationships)
+    const taggedAnchorEntries = projectEntries.filter(e =>
+      e.note.lifecycle === "permanent" &&
+      e.note.tags.some(t => t.toLowerCase() === "anchor" || t.toLowerCase() === "alwaysload")
+    );
+
+    const scoredAnchorCandidates = projectEntries
       .filter(e => e.note.lifecycle === "permanent" && (e.note.relatedTo?.length ?? 0) > 0)
       .map(e => ({
         entry: e,
@@ -3151,34 +3159,33 @@ server.registerTool(
       .filter(x => x.score > -Infinity)
       .sort((a, b) => b.score - a.score);
 
-    // Enforce max 2 per theme
+    // Enforce max 2 per theme for scored anchors
     const anchorThemeCounts = new Map<string, number>();
     const anchors: AnchorNote[] = [];
-    const taggedAnchors: AnchorNote[] = [];
-    
-    for (const candidate of anchorCandidates) {
+    const anchorIds = new Set<string>();
+
+    // Add tagged anchors first (capped at 10 total across all themes)
+    for (const entry of taggedAnchorEntries.slice(0, 10)) {
+      if (anchors.length >= 10) break;
+      anchors.push({
+        id: entry.note.id,
+        title: entry.note.title,
+        centrality: entry.note.relatedTo?.length ?? 0,
+        connectionDiversity: computeConnectionDiversity(entry.note, themeCache),
+        updatedAt: entry.note.updatedAt,
+      });
+      anchorIds.add(entry.note.id);
+    }
+
+    // Add scored anchors with theme diversity constraint
+    for (const candidate of scoredAnchorCandidates) {
+      if (anchors.length >= 10) break;
+      if (anchorIds.has(candidate.entry.note.id)) continue;
+
       const theme = candidate.theme;
       const themeCount = anchorThemeCounts.get(theme) ?? 0;
-      
-      // Check for anchor/alwaysLoad tags
-      const isTagged = candidate.entry.note.tags.some(t => 
-        t.toLowerCase() === "anchor" || t.toLowerCase() === "alwaysload"
-      );
-      
-      if (isTagged && taggedAnchors.length < 10) {
-        taggedAnchors.push({
-          id: candidate.entry.note.id,
-          title: candidate.entry.note.title,
-          centrality: candidate.entry.note.relatedTo?.length ?? 0,
-          connectionDiversity: computeConnectionDiversity(candidate.entry.note, themeCache),
-          updatedAt: candidate.entry.note.updatedAt,
-        });
-        continue;
-      }
-      
       if (themeCount >= 2) continue;
-      if (anchors.length >= anchorLimit) break;
-      
+
       anchors.push({
         id: candidate.entry.note.id,
         title: candidate.entry.note.title,
@@ -3186,17 +3193,8 @@ server.registerTool(
         connectionDiversity: computeConnectionDiversity(candidate.entry.note, themeCache),
         updatedAt: candidate.entry.note.updatedAt,
       });
-      
+      anchorIds.add(candidate.entry.note.id);
       anchorThemeCounts.set(theme, themeCount + 1);
-    }
-    
-    // Combine scored anchors with tagged anchors, dedupe
-    const anchorIds = new Set(anchors.map(a => a.id));
-    for (const tagged of taggedAnchors) {
-      if (!anchorIds.has(tagged.id) && anchors.length < 10) {
-        anchors.push(tagged);
-        anchorIds.add(tagged.id);
-      }
     }
 
     if (anchors.length > 0) {
