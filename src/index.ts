@@ -3067,6 +3067,10 @@ server.registerTool(
         themes: {},
         recent: [],
         anchors: [],
+        orientation: {
+          primaryEntry: { id: "", title: "No notes", rationale: "Empty project vault" },
+          suggestedNext: [],
+        },
       };
       return { content: [{ type: "text", text: `No memories found for project ${project.name}.` }], structuredContent };
     }
@@ -3204,7 +3208,7 @@ server.registerTool(
       ));
     }
 
-    // Related global notes (optional, anchor-based similarity)
+    // Compute orientation after anchors are computed (for text output)
     let relatedGlobal: ProjectSummaryResult["relatedGlobal"];
     
     if (includeRelatedGlobal) {
@@ -3262,6 +3266,58 @@ server.registerTool(
       }
     }
 
+    // Compute orientation layer for actionable guidance
+    const primaryAnchor = anchors[0];
+    const orientation: ProjectSummaryResult["orientation"] = {
+      primaryEntry: primaryAnchor
+        ? {
+            id: primaryAnchor.id,
+            title: primaryAnchor.title,
+            rationale: `Centrality ${primaryAnchor.centrality}, connects ${primaryAnchor.connectionDiversity} themes`,
+          }
+        : {
+            id: recent[0]?.note.id ?? projectEntries[0]?.note.id ?? "",
+            title: recent[0]?.note.title ?? projectEntries[0]?.note.title ?? "No notes",
+            rationale: recent[0]
+              ? "Most recent note — no high-centrality anchors found"
+              : "Only note available",
+          },
+      suggestedNext: anchors.slice(1, 4).map(a => ({
+        id: a.id,
+        title: a.title,
+        rationale: `Centrality ${a.centrality}, connects ${a.connectionDiversity} themes`,
+      })),
+    };
+
+    // Warning for taxonomy dilution
+    const otherBucket = themed.get("other");
+    const otherCount = otherBucket?.length ?? 0;
+    const otherRatio = projectEntries.length > 0 ? otherCount / projectEntries.length : 0;
+    if (otherRatio > 0.3) {
+      orientation.warnings = [
+        `${Math.round(otherRatio * 100)}% of notes in "other" bucket — consider improving thematic classification`,
+      ];
+    }
+
+    // Orientation text output
+    sections.push(`\nOrientation:`);
+    sections.push(`Start with: ${orientation.primaryEntry.title} (\`${orientation.primaryEntry.id}\`)`);
+    sections.push(`  Rationale: ${orientation.primaryEntry.rationale}`);
+    if (orientation.suggestedNext.length > 0) {
+      sections.push(`Then check:`);
+      for (const next of orientation.suggestedNext) {
+        sections.push(`  - ${next.title} (\`${next.id}\`) — ${next.rationale}`);
+      }
+    }
+    if (orientation.warnings && orientation.warnings.length > 0) {
+      sections.push(`Warnings:`);
+      for (const w of orientation.warnings) {
+        sections.push(`  - ${w}`);
+      }
+    }
+
+    // Related global notes (optional, anchor-based similarity)
+
     const structuredContent: ProjectSummaryResult = {
       action: "project_summary_shown",
       project: { id: project.id, name: project.name },
@@ -3279,6 +3335,7 @@ server.registerTool(
         theme: classifyTheme(e.note),
       })),
       anchors,
+      orientation,
       relatedGlobal,
     };
 

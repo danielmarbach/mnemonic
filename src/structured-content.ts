@@ -335,6 +335,18 @@ export interface RelatedGlobalNote {
   preview: string;
 }
 
+export interface OrientationNote {
+  id: string;
+  title: string;
+  rationale: string;
+}
+
+export interface Orientation {
+  primaryEntry: OrientationNote;
+  suggestedNext: OrientationNote[];
+  warnings?: string[];
+}
+
 export interface ProjectSummaryNotes {
   total: number;
   projectVault: number;
@@ -349,6 +361,7 @@ export interface ProjectSummaryResult extends Record<string, unknown> {
   themes: Record<string, ThemeSection>;
   recent: RecentNote[];
   anchors: AnchorNote[];
+  orientation: Orientation;
   relatedGlobal?: {
     notes: RelatedGlobalNote[];
     computedAt: string;
@@ -573,6 +586,18 @@ export const ProjectSummaryNotesSchema = z.object({
   privateProject: z.number(),
 });
 
+export const OrientationNoteSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  rationale: z.string(),
+});
+
+export const OrientationSchema = z.object({
+  primaryEntry: OrientationNoteSchema,
+  suggestedNext: z.array(OrientationNoteSchema),
+  warnings: z.array(z.string()).optional(),
+});
+
 export const ProjectSummaryResultSchema = z.object({
   action: z.literal("project_summary_shown"),
   project: z.object({
@@ -583,6 +608,7 @@ export const ProjectSummaryResultSchema = z.object({
   themes: z.record(z.string(), ThemeSectionSchema),
   recent: z.array(RecentNoteSchema),
   anchors: z.array(AnchorNoteSchema),
+  orientation: OrientationSchema,
   relatedGlobal: z.object({
     notes: z.array(RelatedGlobalNoteSchema),
     computedAt: z.string(),

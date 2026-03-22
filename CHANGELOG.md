@@ -11,10 +11,12 @@ The format is loosely based on Keep a Changelog and uses semver-style version he
 - `project_memory_summary` now returns themed note categories with ranked examples (recent + connected notes first), anchor notes (durable hubs connecting multiple themes), and optional related global notes via anchor similarity — a session-start entrypoint for fast project orientation.
 - Anchors are scored by centrality (log of connection count), connection diversity (distinct themes), and recency — permanent notes with cross-cutting relationships surface first.
 - Notes tagged `anchor` or `alwaysLoad` are prioritized in anchor selection, capped at 10 total.
+- Orientation layer provides actionable guidance: `primaryEntry` (best first note to read with rationale), `suggestedNext` (2-3 follow-ups), and optional `warnings` for taxonomy dilution (>30% in "other" bucket).
 
 ### Changed
 
 - `ProjectSummaryResult.themes` changed from `Record<string, number>` to `Record<string, ThemeSection>` with `count` and `examples` fields — a breaking change for clients parsing structured content.
+- `ProjectSummaryResult` now includes required `orientation` field with `primaryEntry`, `suggestedNext`, and optional `warnings`.
 
 ## [0.13.1] - 2026-03-20
 
