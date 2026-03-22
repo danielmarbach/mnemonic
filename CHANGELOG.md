@@ -4,7 +4,7 @@ All notable changes to `mnemonic` will be documented in this file.
 
 The format is loosely based on Keep a Changelog and uses semver-style version headings.
 
-## [Unreleased]
+## [v0.14.0] - Unreleased
 
 ### Added
 
@@ -12,17 +12,12 @@ The format is loosely based on Keep a Changelog and uses semver-style version he
 - Anchors are scored by centrality (log of connection count), connection diversity (distinct themes), and recency — permanent notes with cross-cutting relationships surface first.
 - Notes tagged `anchor` or `alwaysLoad` are prioritized in anchor selection, capped at 10 total.
 - Orientation layer provides actionable guidance: `primaryEntry` (best first note to read with rationale), `suggestedNext` (2-3 follow-ups), and optional `warnings` for taxonomy dilution (>30% in "other" bucket).
+- Project summaries now stay project-scoped: themes, anchors, counts, and empty-project handling ignore unrelated global notes, while tagged anchors are ranked by score instead of alphabetically.
 
 ### Changed
 
 - `ProjectSummaryResult.themes` changed from `Record<string, number>` to `Record<string, ThemeSection>` with `count` and `examples` fields — a breaking change for clients parsing structured content.
 - `ProjectSummaryResult` now includes required `orientation` field with `primaryEntry`, `suggestedNext`, and optional `warnings`.
-
-### Fixed
-
-- `project_memory_summary` now correctly filters to project-scoped notes only — themes, anchors, and counts exclude global notes.
-- Tagged anchors (`anchor`/`alwaysLoad`) are now ranked by anchorScore instead of alphabetical order.
-- Empty-project case returns "No memories found" even when global notes exist in the vault.
 
 ## [0.13.1] - 2026-03-20
 
