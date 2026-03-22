@@ -26,6 +26,12 @@ export interface LastCommit {
   timestamp: string;
 }
 
+export interface CommitStats {
+  additions: number;
+  deletions: number;
+  filesChanged: number;
+}
+
 export interface SyncResult {
   hasRemote: boolean;
   /** Note ids that arrived or changed during pull (need re-embedding) */
@@ -349,16 +355,79 @@ export class GitOps {
    * Returns empty array when the file has no git history or the repo is unavailable.
    */
   async getRecentCommits(filePath: string, limit: number = 5): Promise<LastCommit[]> {
+    return this.getFileHistory(filePath, limit);
+  }
+
+  /**
+   * Get the most recent commits that touched a specific file.
+   * Returns empty array when the file has no git history or the repo is unavailable.
+   */
+  async getFileHistory(filePath: string, limit: number = 5): Promise<LastCommit[]> {
     if (!this.enabled) return [];
     try {
-      const log = await this.git.log({ maxCount: limit, file: filePath });
-      return log.all.map(entry => ({
-        hash: entry.hash,
-        message: entry.message,
-        timestamp: entry.date,
-      }));
+      const output = await this.git.raw([
+        "log",
+        "--follow",
+        "--format=%H%x09%cI%x09%s",
+        "-n",
+        String(limit),
+        "--",
+        filePath,
+      ]);
+
+      return output
+        .split("\n")
+        .map((line) => line.trim())
+        .filter(Boolean)
+        .map((line) => {
+          const [hash, timestamp, ...messageParts] = line.split("\t");
+          return {
+            hash: hash ?? "",
+            timestamp: timestamp ?? "",
+            message: messageParts.join("\t"),
+          };
+        })
+        .filter((entry) => entry.hash && entry.timestamp && entry.message);
     } catch {
       return [];
+    }
+  }
+
+  /**
+   * Get compact diff stats for a specific commit and file path.
+   * Returns null when stats cannot be derived.
+   */
+  async getCommitStats(filePath: string, commitHash: string): Promise<CommitStats | null> {
+    if (!this.enabled) return null;
+    void filePath;
+
+    try {
+      const output = await this.git.raw([
+        "show",
+        "--format=",
+        "--numstat",
+        commitHash,
+      ]);
+
+      let additions = 0;
+      let deletions = 0;
+      let filesChanged = 0;
+
+      for (const line of output.split("\n")) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+
+        const [addedRaw, deletedRaw] = trimmed.split("\t");
+        if (addedRaw === undefined || deletedRaw === undefined) continue;
+
+        additions += addedRaw === "-" ? 0 : parseInt(addedRaw, 10) || 0;
+        deletions += deletedRaw === "-" ? 0 : parseInt(deletedRaw, 10) || 0;
+        filesChanged += 1;
+      }
+
+      return { additions, deletions, filesChanged };
+    } catch {
+      return null;
     }
   }
 

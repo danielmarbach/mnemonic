@@ -9,7 +9,7 @@ import { promises as fs } from "fs";
 import { NOTE_LIFECYCLES, Storage, type Note, type NoteLifecycle, type Relationship, type RelationshipType } from "./storage.js";
 import { embed, cosineSimilarity, embedModel } from "./embeddings.js";
 import { type CommitResult, type PushResult, type SyncResult } from "./git.js";
-import { getNoteProvenance, computeConfidence } from "./provenance.js";
+import { buildTemporalHistoryEntry, computeConfidence, getNoteProvenance } from "./provenance.js";
 
 import {
   filterRelationships,
@@ -396,6 +396,8 @@ const VAULT_PATH = process.env["VAULT_PATH"]
 
 const DEFAULT_RECALL_LIMIT = 5;
 const DEFAULT_MIN_SIMILARITY = 0.3;
+const TEMPORAL_HISTORY_NOTE_LIMIT = 5;
+const TEMPORAL_HISTORY_COMMIT_LIMIT = 5;
 
 async function readPackageVersion(): Promise<string> {
   const packageJsonPath = path.resolve(import.meta.dirname, "../package.json");
@@ -537,6 +539,26 @@ function formatNote(note: Note, score?: number): string {
     `**tags:** ${note.tags.join(", ") || "none"} | **${describeLifecycle(note.lifecycle)}** | **updated:** ${note.updatedAt}${relStr}\n\n` +
     note.content
   );
+}
+
+function formatTemporalHistory(
+  history: Array<{
+    commitHash: string;
+    timestamp: string;
+    message: string;
+    summary?: string;
+  }>
+): string {
+  if (history.length === 0) {
+    return "**history:** no git history found";
+  }
+
+  const lines = ["**history:**"];
+  for (const entry of history) {
+    const summary = entry.summary ? ` — ${entry.summary}` : "";
+    lines.push(`- \`${entry.commitHash.slice(0, 7)}\` ${entry.timestamp} — ${entry.message}${summary}`);
+  }
+  return lines.join("\n");
 }
 
 // ── Git commit message helpers ────────────────────────────────────────────────
@@ -2027,15 +2049,18 @@ server.registerTool(
     title: "Recall",
     description:
       "Semantic search over stored memories using embeddings.\n\n" +
+      "Supports opt-in temporal mode (`mode: \"temporal\"`) to enrich top semantic matches with compact git-backed history.\n\n" +
       "Use this when:\n" +
       "- You know the topic but not the exact memory id\n" +
       "- You are starting a session and want relevant prior context\n" +
-      "- You want to check whether a memory already exists before creating another one\n\n" +
+      "- You want to check whether a memory already exists before creating another one\n" +
+      "- You explicitly want to inspect how a note evolved over time\n\n" +
       "Do not use this when:\n" +
       "- You already know the exact id; use `get`\n" +
       "- You just want to browse by tags or scope; use `list`\n\n" +
       "Returns:\n" +
-      "- Ranked memory matches with scores, vault label, tags, lifecycle, and updated time\n\n" +
+      "- Ranked memory matches with scores, vault label, tags, lifecycle, and updated time\n" +
+      "- In temporal mode, optional compact history entries for top matches\n\n" +
       "Read-only.\n\n" +
       "Typical next step:\n" +
       "- Use `get`, `update`, `relate`, or `consolidate` based on the results.",
@@ -2049,6 +2074,8 @@ server.registerTool(
       cwd: projectParam,
       limit: z.number().int().min(1).max(20).optional().default(DEFAULT_RECALL_LIMIT),
       minSimilarity: z.number().min(0).max(1).optional().default(DEFAULT_MIN_SIMILARITY),
+      mode: z.enum(["default", "temporal"]).optional().default("default").describe("Temporal history is opt-in. Use `temporal` to enrich top semantic matches with compact git-backed history."),
+      verbose: z.boolean().optional().default(false).describe("Only meaningful with `mode: \"temporal\"`. Adds richer stats-based history context without returning raw diffs."),
       tags: z.array(z.string()).optional().describe("Filter results to notes with all of these tags."),
       scope: z
         .enum(["project", "global", "all"])
@@ -2062,7 +2089,7 @@ server.registerTool(
     }),
     outputSchema: RecallResultSchema,
   },
-  async ({ query, cwd, limit, minSimilarity, tags, scope }) => {
+  async ({ query, cwd, limit, minSimilarity, mode, verbose, tags, scope }) => {
     await ensureBranchSynced(cwd);
 
     const project = await resolveProject(cwd);
@@ -2151,15 +2178,56 @@ server.registerTool(
         recentlyChanged: boolean;
       };
       confidence?: "high" | "medium" | "low";
+      history?: Array<{
+        commitHash: string;
+        timestamp: string;
+        message: string;
+        summary?: string;
+        stats?: {
+          additions: number;
+          deletions: number;
+          filesChanged: number;
+          changeType: "metadata-only change" | "minor edit" | "substantial update";
+        };
+      }>;
     }> = [];
-    for (const { id, score, vault, boosted } of top) {
+    for (const [index, { id, score, vault, boosted }] of top.entries()) {
       const note = await readCachedNote(vault, id);
       if (note) {
-        sections.push(formatNote(note, score));
         const centrality = note.relatedTo?.length ?? 0;
         const filePath = `${vault.notesRelDir}/${id}.md`;
         const provenance = await getNoteProvenance(vault.git, filePath);
         const confidence = computeConfidence(note.lifecycle, note.updatedAt, centrality);
+        let history: Array<{
+          commitHash: string;
+          timestamp: string;
+          message: string;
+          summary?: string;
+          stats?: {
+            additions: number;
+            deletions: number;
+            filesChanged: number;
+            changeType: "metadata-only change" | "minor edit" | "substantial update";
+          };
+        }> | undefined;
+
+        if (mode === "temporal") {
+          if (index < TEMPORAL_HISTORY_NOTE_LIMIT) {
+            const commits = await vault.git.getFileHistory(filePath, TEMPORAL_HISTORY_COMMIT_LIMIT);
+            history = await Promise.all(
+              commits.map(async (commit) => {
+                const stats = await vault.git.getCommitStats(filePath, commit.hash);
+                return buildTemporalHistoryEntry(commit, stats, verbose);
+              })
+            );
+          }
+        }
+
+        const formattedHistory = mode === "temporal" && history !== undefined
+          ? `\n\n${formatTemporalHistory(history)}`
+          : "";
+        sections.push(`${formatNote(note, score)}${formattedHistory}`);
+
         structuredResults.push({
           id,
           title: note.title,
@@ -2173,6 +2241,7 @@ server.registerTool(
           updatedAt: note.updatedAt,
           provenance,
           confidence,
+          history,
         });
       }
     }

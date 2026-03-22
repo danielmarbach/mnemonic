@@ -81,6 +81,18 @@ export interface RecallResult extends Record<string, unknown> {
     updatedAt: string;
     provenance?: Provenance;
     confidence?: Confidence;
+    history?: Array<{
+      commitHash: string;
+      timestamp: string;
+      message: string;
+      summary?: string;
+      stats?: {
+        additions: number;
+        deletions: number;
+        filesChanged: number;
+        changeType: "metadata-only change" | "minor edit" | "substantial update";
+      };
+    }>;
   }>;
 }
 
@@ -464,6 +476,18 @@ export const RecallResultSchema = z.object({
       recentlyChanged: z.boolean(),
     }).optional(),
     confidence: z.enum(["high", "medium", "low"]).optional(),
+    history: z.array(z.object({
+      commitHash: z.string(),
+      timestamp: z.string(),
+      message: z.string(),
+      summary: z.string().optional(),
+      stats: z.object({
+        additions: z.number(),
+        deletions: z.number(),
+        filesChanged: z.number(),
+        changeType: z.enum(["metadata-only change", "minor edit", "substantial update"]),
+      }).optional(),
+    })).optional(),
   })),
 });
 
