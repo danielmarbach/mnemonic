@@ -28,6 +28,14 @@ const tempDirs: string[] = [];
 async function initTestRepo(repoDir: string, branch = "feature/test"): Promise<void> {
   await execFileAsync("git", ["init"], { cwd: repoDir });
   await execFileAsync("git", ["checkout", "-B", branch], { cwd: repoDir });
+  await execFileAsync("git", ["config", "user.name", "Test User"], { cwd: repoDir });
+  await execFileAsync("git", ["config", "user.email", "test@example.com"], { cwd: repoDir });
+}
+
+async function initTestVaultRepo(vaultDir: string): Promise<void> {
+  await execFileAsync("git", ["init"], { cwd: vaultDir });
+  await execFileAsync("git", ["config", "user.name", "Test User"], { cwd: vaultDir });
+  await execFileAsync("git", ["config", "user.email", "test@example.com"], { cwd: vaultDir });
 }
 
 afterEach(async () => {
@@ -250,9 +258,7 @@ describe("local MCP script", () => {
     const embeddingServer = await startFakeEmbeddingServer();
 
     try {
-      await execFileAsync("git", ["init"], { cwd: vaultDir });
-      await execFileAsync("git", ["config", "user.name", "Test User"], { cwd: vaultDir });
-      await execFileAsync("git", ["config", "user.email", "test@example.com"], { cwd: vaultDir });
+      await initTestVaultRepo(vaultDir);
 
       const first = await callLocalMcp(vaultDir, "remember", {
         title: "Relate retry first",
@@ -601,8 +607,6 @@ describe("local MCP script", () => {
 
     await execFileAsync("git", ["init", "--bare"], { cwd: remoteDir });
     await initTestRepo(repoDir);
-    await execFileAsync("git", ["config", "user.name", "Test User"], { cwd: repoDir });
-    await execFileAsync("git", ["config", "user.email", "test@example.com"], { cwd: repoDir });
     await execFileAsync("git", ["remote", "add", "origin", remoteDir], { cwd: repoDir });
 
     const embeddingServer = await startFakeEmbeddingServer();
@@ -2519,6 +2523,8 @@ describe("local MCP script", () => {
       const embeddingServer = await startFakeEmbeddingServer();
 
       try {
+        await initTestVaultRepo(vaultDir);
+
         await callLocalMcp(vaultDir, "remember", {
           title: "Temporal recall schema audit test",
           content: "Testing temporal recall history output.",
@@ -2554,6 +2560,8 @@ describe("local MCP script", () => {
       const embeddingServer = await startFakeEmbeddingServer();
 
       try {
+        await initTestVaultRepo(vaultDir);
+
         for (let i = 1; i <= 6; i++) {
           await callLocalMcp(vaultDir, "remember", {
             title: `Temporal recall cap test ${i}`,
@@ -2587,6 +2595,8 @@ describe("local MCP script", () => {
       const embeddingServer = await startFakeEmbeddingServer();
 
       try {
+        await initTestVaultRepo(vaultDir);
+
         await callLocalMcp(vaultDir, "remember", {
           title: "Plain recall schema audit test",
           content: "Testing that default recall does not include temporal history.",
