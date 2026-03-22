@@ -9,11 +9,13 @@ tags:
   - architecture
 lifecycle: permanent
 createdAt: '2026-03-22T12:42:10.838Z'
-updatedAt: '2026-03-22T12:42:24.212Z'
+updatedAt: '2026-03-22T12:42:49.200Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
   - id: phase-1-provenance-confidence-implementation-design-c2084fd4
+    type: related-to
+  - id: mnemonic-key-design-decisions-3f2a6273
     type: related-to
 memoryVersion: 1
 ---
