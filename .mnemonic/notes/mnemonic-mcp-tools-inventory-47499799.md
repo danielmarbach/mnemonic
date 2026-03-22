@@ -6,7 +6,7 @@ tags:
   - api
 lifecycle: permanent
 createdAt: '2026-03-07T17:59:25.498Z'
-updatedAt: '2026-03-15T15:06:48.181Z'
+updatedAt: '2026-03-22T10:23:48.137Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
@@ -20,23 +20,27 @@ relatedTo:
     type: related-to
 memoryVersion: 1
 ---
-Tools registered in `src/index.ts`:
+# mnemonic — MCP tools inventory
+
+This note lists every MCP tool exposed by mnemonic with a brief description. Keep this updated when tools are added or changed.
+
+## Tools
 
 | Tool | Description |
 | ---- | ----------- |
-| `consolidate` | Analyze and consolidate memories — detect duplicates, suggest merges, execute with `supersedes` or `delete` mode |
-| `detect_project` | Resolve `cwd` to stable project id via git remote URL; includes current write policy |
-| `discover_tags` | List existing tags with usage counts and examples for consistent terminology |
-| `execute_migration` | Execute a named migration (supports dry-run) |
-| `forget` | Delete note + embedding, commit; cleans up dangling `relatedTo` references |
-| `get` | Fetch one or more notes by exact id — returns full content, metadata, and relationships |
-| `get_project_identity` | Show effective project identity and remote override |
-| `get_project_memory_policy` | Show the saved default write scope for a project |
+| `consolidate` | Merge overlapping memories or find duplicates; supports dry-run, suggest-merges, and prune-superseded strategies |
+| `detect_project` | Detect effective project identity (id, name) for a working directory |
+| `discover_tags` | Discover existing tags across vaults with usage counts and examples |
+| `execute_migration` | Execute a named schema migration (dry-run first) |
+| `forget` | Delete a note and its embeddings, clean up relationship references |
+| `get` | Fetch one or more notes by exact id with optional preview, relations, and storage info |
+| `get_project_identity` | Show current project identity including remote override if set |
+| `get_project_memory_policy` | Show saved default write scope and consolidation mode for a project |
 | `list` | List memories with optional previews, relations, storage, timestamps, and `storedIn` filtering |
 | `list_migrations` | List available migrations and pending count |
 | `memory_graph` | Show a compact adjacency list of note relationships |
 | `move_memory` | Move a memory between vaults without changing its id; accepts optional `vaultFolder` to target sub-vaults |
-| `project_memory_summary` | Summarize what mnemonic knows about the current project |
+| `project_memory_summary` | Session-start entrypoint: themed notes, anchors, and explicit orientation (primaryEntry, suggestedNext, warnings) for fast project orientation |
 | `recall` | Semantic search with optional project boost (+0.15) |
 | `recent_memories` | Show the most recently updated memories for a scope and storage location |
 | `remember` | Write note + embedding with project context from `cwd` and storage controlled by `scope`; `checkedForExisting` is a schema-only agent hint |
