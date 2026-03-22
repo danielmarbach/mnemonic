@@ -4,7 +4,7 @@ All notable changes to `mnemonic` will be documented in this file.
 
 The format is loosely based on Keep a Changelog and uses semver-style version headings.
 
-## [0.14.0] - 2026-03-22
+## [Unreleased]
 
 ### Added
 
@@ -17,6 +17,12 @@ The format is loosely based on Keep a Changelog and uses semver-style version he
 
 - `ProjectSummaryResult.themes` changed from `Record<string, number>` to `Record<string, ThemeSection>` with `count` and `examples` fields — a breaking change for clients parsing structured content.
 - `ProjectSummaryResult` now includes required `orientation` field with `primaryEntry`, `suggestedNext`, and optional `warnings`.
+
+### Fixed
+
+- `project_memory_summary` now correctly filters to project-scoped notes only — themes, anchors, and counts exclude global notes.
+- Tagged anchors (`anchor`/`alwaysLoad`) are now ranked by anchorScore instead of alphabetical order.
+- Empty-project case returns "No memories found" even when global notes exist in the vault.
 
 ## [0.13.1] - 2026-03-20
 

@@ -6,8 +6,8 @@ import {
   classifyTheme,
   computeConnectionDiversity,
   withinThemeScore,
-} from "../project-introspection.js";
-import type { Note } from "../storage.js";
+} from "../src/project-introspection.js";
+import type { Note } from "../src/storage.js";
 
 function makeNote(overrides: Partial<Note> = {}): Note {
   const now = new Date().toISOString();
