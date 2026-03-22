@@ -7,7 +7,7 @@ tags:
   - rationale
 lifecycle: permanent
 createdAt: '2026-03-07T17:59:12.124Z'
-updatedAt: '2026-03-22T11:50:37.396Z'
+updatedAt: '2026-03-22T12:42:24.211Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
@@ -32,6 +32,8 @@ relatedTo:
   - id: performance-principles-for-file-first-mcp-and-git-backed-wor-4e7d3bc8
     type: related-to
   - id: phase-1-provenance-confidence-implementation-design-c2084fd4
+    type: related-to
+  - id: temporal-recall-mode-design-for-phase-2-on-demand-history-ex-f8ee504f
     type: related-to
 memoryVersion: 1
 ---

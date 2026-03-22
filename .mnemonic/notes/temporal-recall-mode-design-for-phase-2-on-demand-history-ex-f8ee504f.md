@@ -9,9 +9,12 @@ tags:
   - architecture
 lifecycle: permanent
 createdAt: '2026-03-22T12:42:10.838Z'
-updatedAt: '2026-03-22T12:42:10.838Z'
+updatedAt: '2026-03-22T12:42:24.212Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: phase-1-provenance-confidence-implementation-design-c2084fd4
+    type: related-to
 memoryVersion: 1
 ---
 Phase 2 adds an opt-in temporal recall mode for on-demand history exploration without changing default recall behavior.
