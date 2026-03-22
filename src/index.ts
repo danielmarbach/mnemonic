@@ -3227,7 +3227,7 @@ server.registerTool(
       .sort((a, b) => b.note.updatedAt.localeCompare(a.note.updatedAt))
       .slice(0, recentLimit);
     
-    sections.push(`\nRecent:`);
+    sections.push(`\nRecent activity (start here):`);
     sections.push(...recent.map(e => `- ${e.note.updatedAt} — ${e.note.title}`));
 
     // Anchor notes with diversity constraint (project-scoped only)
