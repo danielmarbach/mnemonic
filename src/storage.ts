@@ -2,6 +2,7 @@ import fs from "fs/promises";
 import path from "path";
 import { randomUUID } from "crypto";
 import matter from "gray-matter";
+import type { NoteProjection } from "./structured-content.js";
 
 export type RelationshipType = "related-to" | "explains" | "example-of" | "supersedes";
 export type NoteLifecycle = "temporary" | "permanent";
@@ -40,6 +41,7 @@ export class Storage {
   readonly vaultPath: string;
   readonly notesDir: string;
   readonly embeddingsDir: string;
+  readonly projectionsDir: string;
   private stagedNotesDir?: string;
   private stagedDeletedNoteIds = new Set<string>();
 
@@ -57,11 +59,14 @@ export class Storage {
     this.embeddingsDir = embeddingsDirOverride
       ? path.resolve(embeddingsDirOverride)
       : path.join(this.vaultPath, "embeddings");
+    // Projections are local-only derived artifacts, colocated with embeddings.
+    this.projectionsDir = path.join(this.vaultPath, "projections");
   }
 
   async init(): Promise<void> {
     await fs.mkdir(this.notesDir, { recursive: true });
     await fs.mkdir(this.embeddingsDir, { recursive: true });
+    await fs.mkdir(this.projectionsDir, { recursive: true });
   }
 
   // ── Notes ──────────────────────────────────────────────────────────────────
@@ -242,6 +247,25 @@ export class Storage {
     return records.filter((record): record is EmbeddingRecord => record !== null);
   }
 
+  // ── Projections ────────────────────────────────────────────────────────────
+
+  async writeProjection(projection: NoteProjection): Promise<void> {
+    await fs.writeFile(
+      this.projectionPath(projection.noteId),
+      JSON.stringify(projection, null, 2),
+      "utf-8"
+    );
+  }
+
+  async readProjection(id: string): Promise<NoteProjection | null> {
+    try {
+      const raw = await fs.readFile(this.projectionPath(id), "utf-8");
+      return JSON.parse(raw) as NoteProjection;
+    } catch {
+      return null;
+    }
+  }
+
   // ── Helpers ────────────────────────────────────────────────────────────────
 
   notePath(id: string): string {
@@ -250,6 +274,10 @@ export class Storage {
 
   embeddingPath(id: string): string {
     return path.join(this.embeddingsDir, `${id}.json`);
+  }
+
+  projectionPath(id: string): string {
+    return path.join(this.projectionsDir, `${id}.json`);
   }
 
   private stagedNotePath(id: string): string | undefined {

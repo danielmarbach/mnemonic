@@ -379,6 +379,18 @@ export interface ProjectSummaryNotes {
   privateProject: number;
 }
 
+export interface NoteProjection {
+  noteId: string;
+  title: string;
+  summary: string;
+  headings: string[];
+  tags: string[];
+  lifecycle?: string;
+  updatedAt?: string;
+  projectionText: string;
+  generatedAt: string;
+}
+
 export interface ProjectSummaryResult extends Record<string, unknown> {
   action: "project_summary_shown";
   project: { id: string; name: string };

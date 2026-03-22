@@ -296,15 +296,17 @@ async function findGitRoot(cwd: string, visited: Set<string> = new Set()): Promi
 }
 
 export async function ensureGitignore(ignorePath: string): Promise<void> {
-  const line = "embeddings/";
+  const requiredLines = ["embeddings/", "projections/"];
+  let existing: string;
   try {
-    const existing = await fs.readFile(ignorePath, "utf-8");
-    if (!existing.includes(line)) {
-      await fs.writeFile(ignorePath, existing.trimEnd() + "\n" + line + "\n");
-    }
+    existing = await fs.readFile(ignorePath, "utf-8");
   } catch {
-    await fs.writeFile(ignorePath, line + "\n");
+    existing = "";
   }
+  const missing = requiredLines.filter(line => !existing.includes(line));
+  if (missing.length === 0) return;
+  const updated = existing.trimEnd() + "\n" + missing.join("\n") + "\n";
+  await fs.writeFile(ignorePath, updated);
 }
 
 async function pathExists(p: string): Promise<boolean> {
