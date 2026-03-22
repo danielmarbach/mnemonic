@@ -4,26 +4,19 @@ All notable changes to `mnemonic` will be documented in this file.
 
 The format is loosely based on Keep a Changelog and uses semver-style version headings.
 
-## [0.14.0] - Unreleased
+## [0.14.0] - 2026-03-22
 
 ### Added
 
 - `recall` now supports opt-in temporal history via `mode: "temporal"`, preserving semantic-first selection while enriching top matches with compact git-backed history entries.
-- Temporal history entries include commit hash, timestamp, message, and bounded RTK-style summaries; `verbose: true` adds richer stats-only context without returning raw diffs.
-- `project_memory_summary` now returns themed note categories with ranked examples (recent + connected notes first), anchor notes (durable hubs connecting multiple themes), and optional related global notes via anchor similarity — a session-start entrypoint for fast project orientation.
-- Anchors are scored by centrality (log of connection count), connection diversity (distinct themes), and recency — permanent notes with cross-cutting relationships surface first.
-- Notes tagged `anchor` or `alwaysLoad` are prioritized in anchor selection, capped at 10 total.
-- Orientation layer provides actionable guidance: `primaryEntry` (best first note to read with rationale), `suggestedNext` (2-3 follow-ups), and optional `warnings` for taxonomy dilution (>30% in "other" bucket).
-- Project summaries now stay project-scoped: themes, anchors, counts, and empty-project handling ignore unrelated global notes, while tagged anchors are ranked by score instead of alphabetically.
-- `recall` results now include optional `provenance` (git-backed last commit hash, message, timestamp, and `recentlyChanged` flag) and `confidence` (high/medium/low) metadata.
-- `orientation.primaryEntry` and `suggestedNext` entries now include `provenance` and `confidence` metadata.
+- `project_memory_summary` returns themed note categories, anchor notes, and an orientation layer for fast session-start navigation.
+- `recall` results now include optional `provenance` (git-backed commit metadata) and `confidence` metadata.
 
 ### Changed
 
-- `ProjectSummaryResult.themes` changed from `Record<string, number>` to `Record<string, ThemeSection>` with `count` and `examples` fields — a breaking change for clients parsing structured content.
+- `ProjectSummaryResult.themes` changed from `Record<string, number>` to `Record<string, ThemeSection>` with `count` and `examples` fields.
 - `ProjectSummaryResult` now includes required `orientation` field with `primaryEntry`, `suggestedNext`, and optional `warnings`.
-- `RecallResult.results` now includes optional `provenance` and `confidence` fields.
-- `RecallResult.results` now also accepts optional `history` entries for temporal recall, with optional `stats` in verbose mode.
+- `RecallResult.results` now accepts optional `history` entries for temporal recall, with optional `stats` in verbose mode.
 - `OrientationNote` now includes optional `provenance` and `confidence` fields.
 
 ## [0.13.1] - 2026-03-20
