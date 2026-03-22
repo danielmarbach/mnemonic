@@ -1,5 +1,5 @@
 import type { GitOps } from "./git.js";
-import type { Note, NoteLifecycle } from "./storage.js";
+import type { NoteLifecycle } from "./storage.js";
 import type { Confidence, Provenance } from "./structured-content.js";
 
 const RECENTLY_CHANGED_DAYS = 5;
@@ -9,8 +9,7 @@ const HIGH_CONFIDENCE_CENTRALITY = 5;
 
 export async function getNoteProvenance(
   git: GitOps,
-  filePath: string,
-  updatedAt: string
+  filePath: string
 ): Promise<Provenance | undefined> {
   const commit = await git.getLastCommit(filePath);
   if (!commit) return undefined;

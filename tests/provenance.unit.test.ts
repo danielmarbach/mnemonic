@@ -43,7 +43,7 @@ describe("getNoteProvenance", () => {
       timestamp: "2026-03-20T10:00:00Z",
     });
 
-    const result = await getNoteProvenance(mockGit, "notes/test.md", "2026-03-20T12:00:00Z");
+    const result = await getNoteProvenance(mockGit, "notes/test.md");
 
     expect(result).toEqual({
       lastUpdatedAt: "2026-03-20T10:00:00Z",
@@ -57,7 +57,7 @@ describe("getNoteProvenance", () => {
   it("returns undefined when git has no commit for the file", async () => {
     mockGit.getLastCommit.mockResolvedValueOnce(null);
 
-    const result = await getNoteProvenance(mockGit, "notes/new.md", "2026-03-20T12:00:00Z");
+    const result = await getNoteProvenance(mockGit, "notes/new.md");
 
     expect(result).toBeUndefined();
   });
@@ -70,9 +70,7 @@ describe("getNoteProvenance", () => {
       timestamp: oldCommit.toISOString(),
     });
 
-    // Pass recent updatedAt to prove recentlyChanged depends on commit date, not updatedAt
-    const recentUpdatedAt = new Date().toISOString();
-    const result = await getNoteProvenance(mockGit, "notes/old.md", recentUpdatedAt);
+    const result = await getNoteProvenance(mockGit, "notes/old.md");
 
     expect(result?.recentlyChanged).toBe(false);
   });
@@ -85,9 +83,7 @@ describe("getNoteProvenance", () => {
       timestamp: recentCommit.toISOString(),
     });
 
-    // Pass old updatedAt to prove recentlyChanged depends on commit date, not updatedAt
-    const oldUpdatedAt = new Date(Date.now() - 100 * 24 * 60 * 60 * 1000).toISOString();
-    const result = await getNoteProvenance(mockGit, "notes/recent.md", oldUpdatedAt);
+    const result = await getNoteProvenance(mockGit, "notes/recent.md");
 
     expect(result?.recentlyChanged).toBe(true);
   });

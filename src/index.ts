@@ -2158,7 +2158,7 @@ server.registerTool(
         sections.push(formatNote(note, score));
         const centrality = note.relatedTo?.length ?? 0;
         const filePath = `${vault.notesRelDir}/${id}.md`;
-        const provenance = await getNoteProvenance(vault.git, filePath, note.updatedAt);
+        const provenance = await getNoteProvenance(vault.git, filePath);
         const confidence = computeConfidence(note.lifecycle, note.updatedAt, centrality);
         structuredResults.push({
           id,
@@ -3304,7 +3304,7 @@ server.registerTool(
       const vault = noteVaultMap.get(anchor.id);
       if (!vault) return {};
       const filePath = `${vault.notesRelDir}/${anchor.id}.md`;
-      const provenance = await getNoteProvenance(vault.git, filePath, anchor.updatedAt);
+      const provenance = await getNoteProvenance(vault.git, filePath);
       const confidence = computeConfidence("permanent", anchor.updatedAt, anchor.centrality);
       return { provenance, confidence };
     };
@@ -3319,7 +3319,7 @@ server.registerTool(
       const vault = noteVaultMap.get(fallbackNote.id);
       if (vault) {
         const filePath = `${vault.notesRelDir}/${fallbackNote.id}.md`;
-        const provenance = await getNoteProvenance(vault.git, filePath, fallbackNote.updatedAt);
+        const provenance = await getNoteProvenance(vault.git, filePath);
         const confidence = computeConfidence(fallbackNote.lifecycle, fallbackNote.updatedAt, 0);
         fallbackEnriched = { provenance, confidence };
       }
