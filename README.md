@@ -420,7 +420,7 @@ Imported notes are written to the main vault with `lifecycle: permanent` and `sc
 | `list_migrations`           | List available migrations and pending count                              |
 | `memory_graph`              | Show compact adjacency list of relationships                             |
 | `move_memory`               | Move note between vaults without changing id                             |
-| `project_memory_summary`    | Summarize what mnemonic knows about a project                            |
+| `project_memory_summary`    | Session-start entrypoint: themed notes, anchors, and orientation for fast project orientation |
 | `recall`                    | Semantic search with optional project boost                              |
 | `recent_memories`           | Show most recently updated notes for scope                               |
 | `remember`                  | Write note + embedding; `cwd` sets context, `scope` picks storage, `lifecycle` picks temporary vs permanent |

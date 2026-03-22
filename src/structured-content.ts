@@ -304,21 +304,68 @@ export interface RecentResult extends Record<string, unknown> {
   }>;
 }
 
-export interface ProjectSummaryResult extends Record<string, unknown> {
-  action: "project_summary_shown";
-  project: { id: string; name: string };
-  notes: {
-    total: number;
-    projectVault: number;
-    mainVault: number;
-    privateProject: number;
-  };
-  themes: Record<string, number>;
-  recent: Array<{
+export interface ThemeSection {
+  count: number;
+  examples: Array<{
     id: string;
     title: string;
     updatedAt: string;
   }>;
+}
+
+export interface AnchorNote {
+  id: string;
+  title: string;
+  centrality: number;
+  connectionDiversity: number;
+  updatedAt: string;
+}
+
+export interface RecentNote {
+  id: string;
+  title: string;
+  updatedAt: string;
+  theme: string;
+}
+
+export interface RelatedGlobalNote {
+  id: string;
+  title: string;
+  similarity: number;
+  preview: string;
+}
+
+export interface OrientationNote {
+  id: string;
+  title: string;
+  rationale: string;
+}
+
+export interface Orientation {
+  primaryEntry: OrientationNote;
+  suggestedNext: OrientationNote[];
+  warnings?: string[];
+}
+
+export interface ProjectSummaryNotes {
+  total: number;
+  projectVault: number;
+  mainVault: number;
+  privateProject: number;
+}
+
+export interface ProjectSummaryResult extends Record<string, unknown> {
+  action: "project_summary_shown";
+  project: { id: string; name: string };
+  notes: ProjectSummaryNotes;
+  themes: Record<string, ThemeSection>;
+  recent: RecentNote[];
+  anchors: AnchorNote[];
+  orientation: Orientation;
+  relatedGlobal?: {
+    notes: RelatedGlobalNote[];
+    computedAt: string;
+  };
 }
 
 // ── Zod output schemas ────────────────────────────────────────────────────────
@@ -501,21 +548,71 @@ export const MemoryGraphResultSchema = z.object({
   truncated: z.boolean(),
 });
 
-export const ProjectSummaryResultSchema = z.object({
-  action: z.literal("project_summary_shown"),
-  project: z.object({ id: z.string(), name: z.string() }),
-  notes: z.object({
-    total: z.number(),
-    projectVault: z.number(),
-    mainVault: z.number(),
-    privateProject: z.number(),
-  }),
-  themes: z.record(z.string(), z.number()),
-  recent: z.array(z.object({
+export const ThemeSectionSchema = z.object({
+  count: z.number(),
+  examples: z.array(z.object({
     id: z.string(),
     title: z.string(),
     updatedAt: z.string(),
   })),
+});
+
+export const AnchorNoteSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  centrality: z.number(),
+  connectionDiversity: z.number(),
+  updatedAt: z.string(),
+});
+
+export const RecentNoteSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  updatedAt: z.string(),
+  theme: z.string(),
+});
+
+export const RelatedGlobalNoteSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  similarity: z.number(),
+  preview: z.string(),
+});
+
+export const ProjectSummaryNotesSchema = z.object({
+  total: z.number(),
+  projectVault: z.number(),
+  mainVault: z.number(),
+  privateProject: z.number(),
+});
+
+export const OrientationNoteSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  rationale: z.string(),
+});
+
+export const OrientationSchema = z.object({
+  primaryEntry: OrientationNoteSchema,
+  suggestedNext: z.array(OrientationNoteSchema),
+  warnings: z.array(z.string()).optional(),
+});
+
+export const ProjectSummaryResultSchema = z.object({
+  action: z.literal("project_summary_shown"),
+  project: z.object({
+    id: z.string(),
+    name: z.string(),
+  }),
+  notes: ProjectSummaryNotesSchema,
+  themes: z.record(z.string(), ThemeSectionSchema),
+  recent: z.array(RecentNoteSchema),
+  anchors: z.array(AnchorNoteSchema),
+  orientation: OrientationSchema,
+  relatedGlobal: z.object({
+    notes: z.array(RelatedGlobalNoteSchema),
+    computedAt: z.string(),
+  }).optional(),
 });
 
 export const SyncResultSchema = z.object({

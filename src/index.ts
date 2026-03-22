@@ -33,7 +33,17 @@ import {
   type ProjectMemoryPolicy,
   type WriteScope,
 } from "./project-memory-policy.js";
-import { classifyTheme, summarizePreview, titleCaseTheme } from "./project-introspection.js";
+import {
+  classifyTheme,
+  summarizePreview,
+  titleCaseTheme,
+  daysSinceUpdate,
+  recencyScore,
+  withinThemeScore,
+  anchorScore,
+  buildThemeCache,
+  computeConnectionDiversity,
+} from "./project-introspection.js";
 import { detectProject, getCurrentGitBranch, resolveProjectIdentity, type ProjectIdentityResolution } from "./project.js";
 import { VaultManager, type Vault } from "./vault.js";
 import { checkBranchChange } from "./branch-tracker.js";
@@ -63,6 +73,8 @@ import type {
   PersistenceStatus,
   MutationRetryContract,
   DiscoverTagsResult,
+  ThemeSection,
+  AnchorNote,
 } from "./structured-content.js";
 import {
   RememberResultSchema,
@@ -3034,86 +3046,307 @@ server.registerTool(
       cwd: z.string().describe("Absolute project working directory. Pass this whenever the task is project-related so routing, search boosting, policy, and vault selection work correctly."),
       maxPerTheme: z.number().int().min(1).max(5).optional().default(3),
       recentLimit: z.number().int().min(1).max(10).optional().default(5),
+      anchorLimit: z.number().int().min(1).max(10).optional().default(5),
+      includeRelatedGlobal: z.boolean().optional().default(false),
+      relatedGlobalLimit: z.number().int().min(1).max(5).optional().default(3),
     }),
     outputSchema: ProjectSummaryResultSchema,
   },
-  async ({ cwd, maxPerTheme, recentLimit }) => {
+  async ({ cwd, maxPerTheme, recentLimit, anchorLimit, includeRelatedGlobal, relatedGlobalLimit }) => {
     await ensureBranchSynced(cwd);
 
     const { project, entries } = await collectVisibleNotes(cwd, "all");
     if (!project) {
       return { content: [{ type: "text", text: `Could not detect a project for: ${cwd}` }], isError: true };
     }
-    if (entries.length === 0) {
-      const structuredContent: ProjectSummaryResult = { action: "project_summary_shown", project: { id: project.id, name: project.name }, notes: { total: 0, projectVault: 0, mainVault: 0, privateProject: 0 }, themes: {}, recent: [] };
+
+    // Separate project-scoped notes (for themes/anchors) from global notes
+    const projectEntries = entries.filter(e =>
+      e.note.project === project.id || e.vault.isProject
+    );
+
+    // Empty-project case: no project-scoped notes exist
+    if (projectEntries.length === 0) {
+      const structuredContent: ProjectSummaryResult = {
+        action: "project_summary_shown",
+        project: { id: project.id, name: project.name },
+        notes: { total: 0, projectVault: 0, mainVault: 0, privateProject: 0 },
+        themes: {},
+        recent: [],
+        anchors: [],
+        orientation: {
+          primaryEntry: { id: "", title: "No notes", rationale: "Empty project vault" },
+          suggestedNext: [],
+        },
+      };
       return { content: [{ type: "text", text: `No memories found for project ${project.name}.` }], structuredContent };
     }
 
     const policyLine = await formatProjectPolicyLine(project.id);
+
+    // Build theme cache for connection diversity scoring (project-scoped only)
+    const themeCache = buildThemeCache(projectEntries.map(e => e.note));
+
+    // Categorize by theme (project-scoped only)
     const themed = new Map<string, NoteEntry[]>();
-    for (const entry of entries) {
+    for (const entry of projectEntries) {
       const theme = classifyTheme(entry.note);
       const bucket = themed.get(theme) ?? [];
       bucket.push(entry);
       themed.set(theme, bucket);
     }
 
+    // Theme order for display
     const themeOrder = ["overview", "decisions", "tooling", "bugs", "architecture", "quality", "other"];
-    const projectVaultCount = entries.filter((entry) => entry.vault.isProject).length;
-    const mainVaultCount = entries.length - projectVaultCount;
+
+    // Calculate notes distribution (project-scoped only)
+    const projectVaultCount = projectEntries.filter(e => e.vault.isProject).length;
+    const mainVaultProjectEntries = projectEntries.filter(e => !e.vault.isProject);
+    const mainVaultCount = mainVaultProjectEntries.length;
+    const totalProjectNotes = projectEntries.length;
+
+    // Build output sections
     const sections: string[] = [];
     sections.push(`Project summary: **${project.name}**`);
     sections.push(`- id: \`${project.id}\``);
     sections.push(`- ${policyLine.replace(/^Policy:\s*/, "policy: ")}`);
-    sections.push(`- memories: ${entries.length} (project-vault: ${projectVaultCount}, main-vault: ${mainVaultCount})`);
-    const mainVaultProjectEntries = entries.filter((entry) => !entry.vault.isProject && entry.note.project === project.id);
+    sections.push(`- memories: ${totalProjectNotes} (project-vault: ${projectVaultCount}, main-vault: ${mainVaultCount})`);
     if (mainVaultProjectEntries.length > 0) {
       sections.push(`- private project memories: ${mainVaultProjectEntries.length}`);
     }
 
-    const themes: Array<{ name: string; count: number; examples: string[] }> = [];
+    const themes: Record<string, ThemeSection> = {};
     for (const theme of themeOrder) {
       const bucket = themed.get(theme);
-      if (!bucket || bucket.length === 0) {
-        continue;
-      }
-      const top = bucket.slice(0, maxPerTheme);
-      sections.push(`\n${titleCaseTheme(theme)}:`);
-      sections.push(...top.map((entry) => `- ${entry.note.title} (\`${entry.note.id}\`)`));
+      if (!bucket || bucket.length === 0) continue;
       
-      themes.push({
-        name: theme,
+      // Sort by within-theme score
+      const sorted = [...bucket].sort((a, b) => 
+        withinThemeScore(b.note) - withinThemeScore(a.note)
+      );
+      const top = sorted.slice(0, maxPerTheme);
+      
+      sections.push(`\n${titleCaseTheme(theme)}:`);
+      sections.push(...top.map(e => `- ${e.note.title} (\`${e.note.id}\`)`));
+      
+      themes[theme] = {
         count: bucket.length,
-        examples: top.map((entry) => entry.note.title),
-      });
+        examples: top.map(e => ({
+          id: e.note.id,
+          title: e.note.title,
+          updatedAt: e.note.updatedAt,
+        })),
+      };
     }
 
-    const recent = [...entries]
+    // Recent notes (project-scoped only)
+    const recent = [...projectEntries]
       .sort((a, b) => b.note.updatedAt.localeCompare(a.note.updatedAt))
       .slice(0, recentLimit);
+    
     sections.push(`\nRecent:`);
-    sections.push(...recent.map((entry) => `- ${entry.note.updatedAt} — ${entry.note.title}`));
+    sections.push(...recent.map(e => `- ${e.note.updatedAt} — ${e.note.title}`));
 
-    const themeCounts: Record<string, number> = {};
-    for (const theme of themes) {
-      themeCounts[theme.name] = theme.count;
+    // Anchor notes with diversity constraint (project-scoped only)
+    // Separate tagged anchors (can have no relationships) from scored anchors (need relationships)
+    const taggedAnchorEntries = projectEntries.filter(e =>
+      e.note.lifecycle === "permanent" &&
+      e.note.tags.some(t => t.toLowerCase() === "anchor" || t.toLowerCase() === "alwaysload")
+    );
+
+    const scoredAnchorCandidates = projectEntries
+      .filter(e => e.note.lifecycle === "permanent" && (e.note.relatedTo?.length ?? 0) > 0)
+      .map(e => ({
+        entry: e,
+        score: anchorScore(e.note, themeCache),
+        theme: classifyTheme(e.note),
+      }))
+      .filter(x => x.score > -Infinity)
+      .sort((a, b) => b.score - a.score);
+
+    // Score tagged anchors too, so they can compete for primaryEntry
+    const scoredTaggedAnchors = taggedAnchorEntries
+      .map(e => ({
+        entry: e,
+        score: anchorScore(e.note, themeCache),
+        theme: classifyTheme(e.note),
+      }))
+      .sort((a, b) => b.score - a.score);
+
+    // Enforce max 2 per theme for scored anchors
+    const anchorThemeCounts = new Map<string, number>();
+    const anchors: AnchorNote[] = [];
+    const anchorIds = new Set<string>();
+
+    // Add tagged anchors first (capped at 10 total across all themes), scored by anchorScore
+    for (const candidate of scoredTaggedAnchors.slice(0, 10)) {
+      if (anchors.length >= 10) break;
+      anchors.push({
+        id: candidate.entry.note.id,
+        title: candidate.entry.note.title,
+        centrality: candidate.entry.note.relatedTo?.length ?? 0,
+        connectionDiversity: computeConnectionDiversity(candidate.entry.note, themeCache),
+        updatedAt: candidate.entry.note.updatedAt,
+      });
+      anchorIds.add(candidate.entry.note.id);
     }
+
+    // Add scored anchors with theme diversity constraint
+    for (const candidate of scoredAnchorCandidates) {
+      if (anchors.length >= 10) break;
+      if (anchorIds.has(candidate.entry.note.id)) continue;
+
+      const theme = candidate.theme;
+      const themeCount = anchorThemeCounts.get(theme) ?? 0;
+      if (themeCount >= 2) continue;
+
+      anchors.push({
+        id: candidate.entry.note.id,
+        title: candidate.entry.note.title,
+        centrality: candidate.entry.note.relatedTo?.length ?? 0,
+        connectionDiversity: computeConnectionDiversity(candidate.entry.note, themeCache),
+        updatedAt: candidate.entry.note.updatedAt,
+      });
+      anchorIds.add(candidate.entry.note.id);
+      anchorThemeCounts.set(theme, themeCount + 1);
+    }
+
+    if (anchors.length > 0) {
+      sections.push(`\nAnchors:`);
+      sections.push(...anchors.slice(0, 5).map(a => 
+        `- ${a.title} (\`${a.id}\`) — centrality: ${a.centrality}, diversity: ${a.connectionDiversity}`
+      ));
+    }
+
+    // Compute orientation after anchors are computed (for text output)
+    let relatedGlobal: ProjectSummaryResult["relatedGlobal"];
+    
+    if (includeRelatedGlobal) {
+      const anchorEmbeddings = await Promise.all(
+        anchors.slice(0, 5).map(async a => {
+          for (const vault of vaultManager.allKnownVaults()) {
+            const emb = await vault.storage.readEmbedding(a.id);
+            if (emb) return { id: a.id, embedding: emb.embedding };
+          }
+          return null;
+        })
+      );
+      
+      const validAnchors = anchorEmbeddings.filter((e): e is NonNullable<typeof e> => e !== null);
+      
+      if (validAnchors.length > 0) {
+        // Get global notes (not project-scoped)
+        const globalEntries = entries.filter(e => !e.note.project);
+        const globalCandidates: Array<{ id: string; title: string; similarity: number; preview: string }> = [];
+        
+        for (const entry of globalEntries) {
+          const emb = await entry.vault.storage.readEmbedding(entry.note.id);
+          if (!emb) continue;
+          
+          // Find max similarity to any anchor
+          let maxSim = 0;
+          for (const anchor of validAnchors) {
+            const sim = cosineSimilarity(anchor.embedding, emb.embedding);
+            if (sim > maxSim) maxSim = sim;
+          }
+          
+          if (maxSim > 0.4) {
+            globalCandidates.push({
+              id: entry.note.id,
+              title: entry.note.title,
+              similarity: maxSim,
+              preview: summarizePreview(entry.note.content, 100),
+            });
+          }
+        }
+        
+        globalCandidates.sort((a, b) => b.similarity - a.similarity);
+        
+        if (globalCandidates.length > 0) {
+          relatedGlobal = {
+            notes: globalCandidates.slice(0, relatedGlobalLimit),
+            computedAt: new Date().toISOString(),
+          };
+          
+          sections.push(`\nRelated Global:`);
+          sections.push(...relatedGlobal.notes.map(n => 
+            `- ${n.title} (\`${n.id}\`) — similarity: ${n.similarity.toFixed(2)}`
+          ));
+        }
+      }
+    }
+
+    // Compute orientation layer for actionable guidance
+    const primaryAnchor = anchors[0];
+    const orientation: ProjectSummaryResult["orientation"] = {
+      primaryEntry: primaryAnchor
+        ? {
+            id: primaryAnchor.id,
+            title: primaryAnchor.title,
+            rationale: `Centrality ${primaryAnchor.centrality}, connects ${primaryAnchor.connectionDiversity} themes`,
+          }
+        : {
+            id: recent[0]?.note.id ?? projectEntries[0]?.note.id ?? "",
+            title: recent[0]?.note.title ?? projectEntries[0]?.note.title ?? "No notes",
+            rationale: recent[0]
+              ? "Most recent note — no high-centrality anchors found"
+              : "Only note available",
+          },
+      suggestedNext: anchors.slice(1, 4).map(a => ({
+        id: a.id,
+        title: a.title,
+        rationale: `Centrality ${a.centrality}, connects ${a.connectionDiversity} themes`,
+      })),
+    };
+
+    // Warning for taxonomy dilution
+    const otherBucket = themed.get("other");
+    const otherCount = otherBucket?.length ?? 0;
+    const otherRatio = projectEntries.length > 0 ? otherCount / projectEntries.length : 0;
+    if (otherRatio > 0.3) {
+      orientation.warnings = [
+        `${Math.round(otherRatio * 100)}% of notes in "other" bucket — consider improving thematic classification`,
+      ];
+    }
+
+    // Orientation text output
+    sections.push(`\nOrientation:`);
+    sections.push(`Start with: ${orientation.primaryEntry.title} (\`${orientation.primaryEntry.id}\`)`);
+    sections.push(`  Rationale: ${orientation.primaryEntry.rationale}`);
+    if (orientation.suggestedNext.length > 0) {
+      sections.push(`Then check:`);
+      for (const next of orientation.suggestedNext) {
+        sections.push(`  - ${next.title} (\`${next.id}\`) — ${next.rationale}`);
+      }
+    }
+    if (orientation.warnings && orientation.warnings.length > 0) {
+      sections.push(`Warnings:`);
+      for (const w of orientation.warnings) {
+        sections.push(`  - ${w}`);
+      }
+    }
+
+    // Related global notes (optional, anchor-based similarity)
 
     const structuredContent: ProjectSummaryResult = {
       action: "project_summary_shown",
       project: { id: project.id, name: project.name },
       notes: {
-        total: entries.length,
+        total: totalProjectNotes,
         projectVault: projectVaultCount,
         mainVault: mainVaultCount,
         privateProject: mainVaultProjectEntries.length,
       },
-      themes: themeCounts,
-      recent: recent.map((entry) => ({
-        id: entry.note.id,
-        title: entry.note.title,
-        updatedAt: entry.note.updatedAt,
+      themes,
+      recent: recent.map(e => ({
+        id: e.note.id,
+        title: e.note.title,
+        updatedAt: e.note.updatedAt,
+        theme: classifyTheme(e.note),
       })),
+      anchors,
+      orientation,
+      relatedGlobal,
     };
 
     return { content: [{ type: "text", text: sections.join("\n") }], structuredContent };
