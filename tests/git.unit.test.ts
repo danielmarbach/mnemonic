@@ -436,4 +436,130 @@ describe("GitOps", () => {
       expect(result.modified).toEqual([]);
     });
   });
+
+  describe("getLastCommit", () => {
+    it("returns last commit for a file", async () => {
+      const { GitOps } = await import("../src/git.js");
+      const git = new GitOps("/tmp/repo");
+      await git.init();
+
+      log.mockResolvedValueOnce({
+        latest: {
+          hash: "abc123",
+          message: "feat: add test note",
+          date: "2026-03-20T10:00:00Z",
+        },
+      });
+
+      const result = await git.getLastCommit("notes/test.md");
+
+      expect(result).toEqual({
+        hash: "abc123",
+        message: "feat: add test note",
+        timestamp: "2026-03-20T10:00:00Z",
+      });
+      expect(log).toHaveBeenCalledWith({ maxCount: 1, file: "notes/test.md" });
+    });
+
+    it("returns null when file has no git history", async () => {
+      const { GitOps } = await import("../src/git.js");
+      const git = new GitOps("/tmp/repo");
+      await git.init();
+
+      log.mockResolvedValueOnce({ latest: null });
+
+      const result = await git.getLastCommit("notes/new-file.md");
+
+      expect(result).toBeNull();
+    });
+
+    it("returns null when git throws", async () => {
+      const { GitOps } = await import("../src/git.js");
+      const git = new GitOps("/tmp/repo");
+      await git.init();
+
+      log.mockRejectedValueOnce(new Error("not a git repository"));
+
+      const result = await git.getLastCommit("notes/test.md");
+
+      expect(result).toBeNull();
+    });
+
+    it("returns null when git is disabled", async () => {
+      process.env.DISABLE_GIT = "true";
+      vi.resetModules();
+
+      const { GitOps } = await import("../src/git.js");
+      const git = new GitOps("/tmp/repo");
+      await git.init();
+
+      const result = await git.getLastCommit("notes/test.md");
+
+      expect(result).toBeNull();
+
+      delete process.env.DISABLE_GIT;
+    });
+  });
+
+  describe("getRecentCommits", () => {
+    it("returns recent commits for a file", async () => {
+      const { GitOps } = await import("../src/git.js");
+      const git = new GitOps("/tmp/repo");
+      await git.init();
+
+      log.mockResolvedValueOnce({
+        all: [
+          { hash: "abc123", message: "feat: latest", date: "2026-03-20T10:00:00Z" },
+          { hash: "def456", message: "fix: previous", date: "2026-03-19T10:00:00Z" },
+        ],
+      });
+
+      const result = await git.getRecentCommits("notes/test.md", 2);
+
+      expect(result).toEqual([
+        { hash: "abc123", message: "feat: latest", timestamp: "2026-03-20T10:00:00Z" },
+        { hash: "def456", message: "fix: previous", timestamp: "2026-03-19T10:00:00Z" },
+      ]);
+      expect(log).toHaveBeenCalledWith({ maxCount: 2, file: "notes/test.md" });
+    });
+
+    it("returns empty array when file has no git history", async () => {
+      const { GitOps } = await import("../src/git.js");
+      const git = new GitOps("/tmp/repo");
+      await git.init();
+
+      log.mockResolvedValueOnce({ all: [] });
+
+      const result = await git.getRecentCommits("notes/new-file.md");
+
+      expect(result).toEqual([]);
+    });
+
+    it("returns empty array when git throws", async () => {
+      const { GitOps } = await import("../src/git.js");
+      const git = new GitOps("/tmp/repo");
+      await git.init();
+
+      log.mockRejectedValueOnce(new Error("not a git repository"));
+
+      const result = await git.getRecentCommits("notes/test.md");
+
+      expect(result).toEqual([]);
+    });
+
+    it("returns empty array when git is disabled", async () => {
+      process.env.DISABLE_GIT = "true";
+      vi.resetModules();
+
+      const { GitOps } = await import("../src/git.js");
+      const git = new GitOps("/tmp/repo");
+      await git.init();
+
+      const result = await git.getRecentCommits("notes/test.md");
+
+      expect(result).toEqual([]);
+
+      delete process.env.DISABLE_GIT;
+    });
+  });
 });

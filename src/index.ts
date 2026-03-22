@@ -9,6 +9,7 @@ import { promises as fs } from "fs";
 import { NOTE_LIFECYCLES, Storage, type Note, type NoteLifecycle, type Relationship, type RelationshipType } from "./storage.js";
 import { embed, cosineSimilarity, embedModel } from "./embeddings.js";
 import { type CommitResult, type PushResult, type SyncResult } from "./git.js";
+import { getNoteProvenance, computeConfidence } from "./provenance.js";
 
 import {
   filterRelationships,
@@ -2143,11 +2144,22 @@ server.registerTool(
       tags: string[];
       lifecycle: NoteLifecycle;
       updatedAt: string;
+      provenance?: {
+        lastUpdatedAt: string;
+        lastCommitHash: string;
+        lastCommitMessage: string;
+        recentlyChanged: boolean;
+      };
+      confidence?: "high" | "medium" | "low";
     }> = [];
     for (const { id, score, vault, boosted } of top) {
       const note = await readCachedNote(vault, id);
       if (note) {
         sections.push(formatNote(note, score));
+        const centrality = note.relatedTo?.length ?? 0;
+        const filePath = `${vault.notesRelDir}/${id}.md`;
+        const provenance = await getNoteProvenance(vault.git, filePath, note.updatedAt);
+        const confidence = computeConfidence(note.lifecycle, note.updatedAt, centrality);
         structuredResults.push({
           id,
           title: note.title,
@@ -2159,6 +2171,8 @@ server.registerTool(
           tags: note.tags,
           lifecycle: note.lifecycle,
           updatedAt: note.updatedAt,
+          provenance,
+          confidence,
         });
       }
     }
@@ -3278,12 +3292,46 @@ server.registerTool(
 
     // Compute orientation layer for actionable guidance
     const primaryAnchor = anchors[0];
+
+    // Build noteId -> vault lookup for provenance enrichment
+    const noteVaultMap = new Map<string, Vault>();
+    for (const entry of projectEntries) {
+      noteVaultMap.set(entry.note.id, entry.vault);
+    }
+
+    // Helper to enrich an anchor with provenance and confidence
+    const enrichOrientationNote = async (anchor: AnchorNote) => {
+      const vault = noteVaultMap.get(anchor.id);
+      if (!vault) return {};
+      const filePath = `${vault.notesRelDir}/${anchor.id}.md`;
+      const provenance = await getNoteProvenance(vault.git, filePath, anchor.updatedAt);
+      const confidence = computeConfidence("permanent", anchor.updatedAt, anchor.centrality);
+      return { provenance, confidence };
+    };
+
+    const primaryEnriched = primaryAnchor ? await enrichOrientationNote(primaryAnchor) : {};
+    const suggestedEnriched = await Promise.all(anchors.slice(1, 4).map(enrichOrientationNote));
+
+    // Enrich fallback primaryEntry when no anchors exist
+    let fallbackEnriched: { provenance?: { lastUpdatedAt: string; lastCommitHash: string; lastCommitMessage: string; recentlyChanged: boolean }; confidence?: "high" | "medium" | "low" } = {};
+    if (!primaryAnchor && recent[0]) {
+      const fallbackNote = recent[0].note;
+      const vault = noteVaultMap.get(fallbackNote.id);
+      if (vault) {
+        const filePath = `${vault.notesRelDir}/${fallbackNote.id}.md`;
+        const provenance = await getNoteProvenance(vault.git, filePath, fallbackNote.updatedAt);
+        const confidence = computeConfidence(fallbackNote.lifecycle, fallbackNote.updatedAt, 0);
+        fallbackEnriched = { provenance, confidence };
+      }
+    }
+
     const orientation: ProjectSummaryResult["orientation"] = {
       primaryEntry: primaryAnchor
         ? {
             id: primaryAnchor.id,
             title: primaryAnchor.title,
             rationale: `Centrality ${primaryAnchor.centrality}, connects ${primaryAnchor.connectionDiversity} themes`,
+            ...primaryEnriched,
           }
         : {
             id: recent[0]?.note.id ?? projectEntries[0]?.note.id ?? "",
@@ -3291,11 +3339,13 @@ server.registerTool(
             rationale: recent[0]
               ? "Most recent note — no high-centrality anchors found"
               : "Only note available",
+            ...fallbackEnriched,
           },
-      suggestedNext: anchors.slice(1, 4).map(a => ({
+      suggestedNext: anchors.slice(1, 4).map((a, i) => ({
         id: a.id,
         title: a.title,
         rationale: `Centrality ${a.centrality}, connects ${a.connectionDiversity} themes`,
+        ...suggestedEnriched[i],
       })),
     };
 
@@ -3313,10 +3363,13 @@ server.registerTool(
     sections.push(`\nOrientation:`);
     sections.push(`Start with: ${orientation.primaryEntry.title} (\`${orientation.primaryEntry.id}\`)`);
     sections.push(`  Rationale: ${orientation.primaryEntry.rationale}`);
+    if (orientation.primaryEntry.confidence) {
+      sections.push(`  Confidence: ${orientation.primaryEntry.confidence}`);
+    }
     if (orientation.suggestedNext.length > 0) {
       sections.push(`Then check:`);
       for (const next of orientation.suggestedNext) {
-        sections.push(`  - ${next.title} (\`${next.id}\`) — ${next.rationale}`);
+        sections.push(`  - ${next.title} (\`${next.id}\`) — ${next.rationale}${next.confidence ? ` [${next.confidence}]` : ""}`);
       }
     }
     if (orientation.warnings && orientation.warnings.length > 0) {
