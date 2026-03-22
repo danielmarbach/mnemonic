@@ -1,15 +1,9 @@
 name: Update PR Description
 
-# Automatically updates the PR title and description from mnemonic design decision notes
-# whenever `.mnemonic/notes/` files are changed in a PR.
-#
-# Can also be triggered manually by collaborators commenting `/update-pr` on any PR.
+# Triggered manually by maintainers commenting `/update-pr` on a PR.
+# Updates the PR title and description from mnemonic design decision notes.
 
 on:
-  pull_request:
-    types: [opened, synchronize]
-    paths:
-      - ".mnemonic/notes/**"
   issue_comment:
     types: [created]
 
@@ -21,17 +15,12 @@ jobs:
   update-pr-description:
     runs-on: ubuntu-latest
 
-    # Run when:
-    #   - a pull_request event fires (already filtered to .mnemonic/notes/** by paths above), OR
-    #   - a PR comment starts with `/update-pr` AND the commenter is a collaborator/member/owner
+    # Run only when a PR comment starts with `/update-pr` AND the commenter is a maintainer
     if: |
-      github.event_name == 'pull_request' ||
-      (
-        github.event_name == 'issue_comment' &&
-        github.event.issue.pull_request != null &&
-        startsWith(github.event.comment.body, '/update-pr') &&
-        contains(fromJson('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.comment.author_association)
-      )
+      github.event_name == 'issue_comment' &&
+      github.event.issue.pull_request != null &&
+      startsWith(github.event.comment.body, '/update-pr') &&
+      contains(fromJson('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.comment.author_association)
 
     steps:
       - name: Resolve PR number and head commit
@@ -39,18 +28,13 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            echo "pr_number=${{ github.event.pull_request.number }}" >> "$GITHUB_OUTPUT"
-            echo "head_sha=${{ github.event.pull_request.head.sha }}" >> "$GITHUB_OUTPUT"
-          else
-            PR_NUMBER="${{ github.event.issue.number }}"
-            HEAD_SHA=$(gh pr view "$PR_NUMBER" \
-              --repo "${{ github.repository }}" \
-              --json headRefOid \
-              --jq '.headRefOid')
-            echo "pr_number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
-            echo "head_sha=$HEAD_SHA" >> "$GITHUB_OUTPUT"
-          fi
+          PR_NUMBER="${{ github.event.issue.number }}"
+          HEAD_SHA=$(gh pr view "$PR_NUMBER" \
+            --repo "${{ github.repository }}" \
+            --json headRefOid \
+            --jq '.headRefOid')
+          echo "pr_number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
+          echo "head_sha=$HEAD_SHA" >> "$GITHUB_OUTPUT"
 
       # Always check out the base branch so we only run trusted script code.
       # Note file contents are fetched via GitHub API using the resolved head SHA.
