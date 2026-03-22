@@ -843,12 +843,210 @@ describe("local MCP script", () => {
         recentLimit: 5,
       }, embeddingServer.url);
 
+      // Project-scoped counts exclude unscoped global notes
       const summaryNotes = summary.structuredContent?.["notes"] as Record<string, unknown>;
-      expect(summaryNotes?.["total"]).toBe(3);
-      expect(summaryNotes?.["projectVault"]).toBe(1);
-      expect(summaryNotes?.["mainVault"]).toBe(2);
+      expect(summaryNotes?.["total"]).toBe(2); // only project-scoped notes
+      expect(summaryNotes?.["projectVault"]).toBe(1); // sharedProject
+      expect(summaryNotes?.["mainVault"]).toBe(1); // privateProject (in main vault with project association)
       expect(summaryNotes?.["privateProject"]).toBe(1);
       expect(summary.text).toContain("private project memories: 1");
+      expect(summary.text).not.toContain("Unscoped global memory"); // unscoped global should not appear
+    } finally {
+      await embeddingServer.close();
+    }
+  }, 20000);
+
+  it("returns empty result when project has no memories but global vault does", async () => {
+    const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-vault-"));
+    const repoDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-project-"));
+    tempDirs.push(vaultDir, repoDir);
+
+    await initTestRepo(repoDir);
+
+    const embeddingServer = await startFakeEmbeddingServer();
+
+    try {
+      // Create unscoped global memory (no project association)
+      await callLocalMcp(vaultDir, "remember", {
+        title: "Unscoped global memory",
+        content: "Stored in main vault without project association.",
+        tags: ["integration", "empty-project"],
+        summary: "Create unscoped global memory",
+        scope: "global",
+      }, embeddingServer.url);
+
+      // Project has no memories, only global unscoped notes exist
+      const summary = await callLocalMcpResponse(vaultDir, "project_memory_summary", {
+        cwd: repoDir,
+      }, embeddingServer.url);
+
+      expect(summary.text).toContain("No memories found");
+      const summaryNotes = summary.structuredContent?.["notes"] as Record<string, unknown>;
+      expect(summaryNotes?.["total"]).toBe(0);
+      expect(summaryNotes?.["projectVault"]).toBe(0);
+      expect(summaryNotes?.["mainVault"]).toBe(0);
+      
+      const orientation = summary.structuredContent?.["orientation"] as Record<string, unknown>;
+      expect(orientation?.["primaryEntry"]).toEqual({
+        id: "",
+        title: "No notes",
+        rationale: "Empty project vault",
+      });
+    } finally {
+      await embeddingServer.close();
+    }
+  }, 20000);
+
+  it("ranks tagged anchors by score not alphabetical order", async () => {
+    const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-vault-"));
+    const repoDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-project-"));
+    tempDirs.push(vaultDir, repoDir);
+
+    await initTestRepo(repoDir);
+
+    const embeddingServer = await startFakeEmbeddingServer();
+
+    try {
+      // Create two tagged anchors with different centrality (permanent for anchor scoring)
+      // Alpha-first but lower centrality
+      const alphaRemember = await callLocalMcp(vaultDir, "remember", {
+        title: "AAA Tagged Anchor",
+        content: "Alphabetically first but lower centrality.",
+        tags: ["anchor", "integration"],
+        summary: "Create alphabetically first tagged anchor",
+        cwd: repoDir,
+        scope: "project",
+        lifecycle: "permanent",
+      }, embeddingServer.url);
+      const alphaId = extractRememberedId(alphaRemember);
+
+      // Create notes to link to (permanent for anchor scoring)
+      const note1 = await callLocalMcp(vaultDir, "remember", {
+        title: "Note to link",
+        content: "A note.",
+        tags: ["integration"],
+        summary: "Create note to link",
+        cwd: repoDir,
+        scope: "project",
+        lifecycle: "permanent",
+      }, embeddingServer.url);
+      const note1Id = extractRememberedId(note1);
+
+      // Beta-later but higher centrality
+      const betaRemember = await callLocalMcp(vaultDir, "remember", {
+        title: "ZZZ Tagged Anchor",
+        content: "Alphabetically last but higher centrality.",
+        tags: ["anchor", "integration"],
+        summary: "Create alphabetically last tagged anchor with more connections",
+        cwd: repoDir,
+        scope: "project",
+        lifecycle: "permanent",
+      }, embeddingServer.url);
+      const betaId = extractRememberedId(betaRemember);
+
+      // Link beta to more notes (higher centrality)
+      await callLocalMcp(vaultDir, "relate", {
+        fromId: betaId,
+        toId: note1Id,
+        type: "related-to",
+        cwd: repoDir,
+      }, embeddingServer.url);
+
+      const summary = await callLocalMcpResponse(vaultDir, "project_memory_summary", {
+        cwd: repoDir,
+      }, embeddingServer.url);
+
+      const anchors = summary.structuredContent?.["anchors"] as Array<Record<string, unknown>>;
+      expect(anchors.length).toBeGreaterThan(0);
+      
+      // Beta should come before alpha despite alphabetical order
+      const betaIndex = anchors.findIndex(a => a["id"] === betaId);
+      const alphaIndex = anchors.findIndex(a => a["id"] === alphaId);
+      
+      // Both should be present
+      expect(betaIndex).toBeGreaterThanOrEqual(0);
+      expect(alphaIndex).toBeGreaterThanOrEqual(0);
+      
+      // Beta (higher centrality) should rank before alpha (lower centrality)
+      expect(betaIndex).toBeLessThan(alphaIndex);
+    } finally {
+      await embeddingServer.close();
+    }
+  }, 20000);
+
+  it("orientation primaryEntry is best anchor by score", async () => {
+    const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-vault-"));
+    const repoDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-project-"));
+    tempDirs.push(vaultDir, repoDir);
+
+    await initTestRepo(repoDir);
+
+    const embeddingServer = await startFakeEmbeddingServer();
+
+    try {
+      // Create a very connected anchor (permanent for anchor scoring)
+      const hubRemember = await callLocalMcp(vaultDir, "remember", {
+        title: "Hub Note",
+        content: "Central hub with many connections.",
+        tags: ["integration"],
+        summary: "Create hub note",
+        cwd: repoDir,
+        scope: "project",
+        lifecycle: "permanent",
+      }, embeddingServer.url);
+      const hubId = extractRememberedId(hubRemember);
+
+      // Create peripheral notes (permanent for anchor scoring)
+      const periph1 = await callLocalMcp(vaultDir, "remember", {
+        title: "Peripheral 1",
+        content: "A peripheral note.",
+        tags: ["integration"],
+        summary: "Create peripheral note 1",
+        cwd: repoDir,
+        scope: "project",
+        lifecycle: "permanent",
+      }, embeddingServer.url);
+      const periph1Id = extractRememberedId(periph1);
+
+      const periph2 = await callLocalMcp(vaultDir, "remember", {
+        title: "Peripheral 2",
+        content: "Another peripheral note.",
+        tags: ["integration"],
+        summary: "Create peripheral note 2",
+        cwd: repoDir,
+        scope: "project",
+        lifecycle: "permanent",
+      }, embeddingServer.url);
+      const periph2Id = extractRememberedId(periph2);
+
+      // Connect hub to peripherals (need cwd for project-scoped notes)
+      await callLocalMcp(vaultDir, "relate", {
+        fromId: hubId,
+        toId: periph1Id,
+        type: "related-to",
+        cwd: repoDir,
+      }, embeddingServer.url);
+      await callLocalMcp(vaultDir, "relate", {
+        fromId: hubId,
+        toId: periph2Id,
+        type: "related-to",
+        cwd: repoDir,
+      }, embeddingServer.url);
+
+      const summary = await callLocalMcpResponse(vaultDir, "project_memory_summary", {
+        cwd: repoDir,
+      }, embeddingServer.url);
+
+      const anchors = summary.structuredContent?.["anchors"] as Array<Record<string, unknown>>;
+      const orientation = summary.structuredContent?.["orientation"] as Record<string, unknown>;
+      const primaryEntry = orientation?.["primaryEntry"] as Record<string, unknown>;
+      
+      // Verify anchor exists (hub should be anchor with 2 connections)
+      expect(anchors!.length).toBeGreaterThan(0);
+      
+      // Hub (with 2 connections) should be primaryEntry
+      expect(primaryEntry?.["id"]).toBe(hubId);
+      expect(primaryEntry?.["rationale"]).toContain("Centrality");
     } finally {
       await embeddingServer.close();
     }

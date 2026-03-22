@@ -3059,7 +3059,14 @@ server.registerTool(
     if (!project) {
       return { content: [{ type: "text", text: `Could not detect a project for: ${cwd}` }], isError: true };
     }
-    if (entries.length === 0) {
+
+    // Separate project-scoped notes (for themes/anchors) from global notes
+    const projectEntries = entries.filter(e =>
+      e.note.project === project.id || e.vault.isProject
+    );
+
+    // Empty-project case: no project-scoped notes exist
+    if (projectEntries.length === 0) {
       const structuredContent: ProjectSummaryResult = {
         action: "project_summary_shown",
         project: { id: project.id, name: project.name },
@@ -3077,11 +3084,6 @@ server.registerTool(
 
     const policyLine = await formatProjectPolicyLine(project.id);
 
-    // Separate project-scoped notes (for themes/anchors) from global notes
-    const projectEntries = entries.filter(e =>
-      e.note.project === project.id || e.vault.isProject
-    );
-
     // Build theme cache for connection diversity scoring (project-scoped only)
     const themeCache = buildThemeCache(projectEntries.map(e => e.note));
 
@@ -3097,19 +3099,18 @@ server.registerTool(
     // Theme order for display
     const themeOrder = ["overview", "decisions", "tooling", "bugs", "architecture", "quality", "other"];
 
-    // Calculate notes distribution (all visible notes)
-    const projectVaultCount = entries.filter(e => e.vault.isProject).length;
-    const mainVaultCount = entries.length - projectVaultCount;
-    const mainVaultProjectEntries = entries.filter(
-      e => !e.vault.isProject && e.note.project === project.id
-    );
-    
+    // Calculate notes distribution (project-scoped only)
+    const projectVaultCount = projectEntries.filter(e => e.vault.isProject).length;
+    const mainVaultProjectEntries = projectEntries.filter(e => !e.vault.isProject);
+    const mainVaultCount = mainVaultProjectEntries.length;
+    const totalProjectNotes = projectEntries.length;
+
     // Build output sections
     const sections: string[] = [];
     sections.push(`Project summary: **${project.name}**`);
     sections.push(`- id: \`${project.id}\``);
     sections.push(`- ${policyLine.replace(/^Policy:\s*/, "policy: ")}`);
-    sections.push(`- memories: ${entries.length} (project-vault: ${projectVaultCount}, main-vault: ${mainVaultCount})`);
+    sections.push(`- memories: ${totalProjectNotes} (project-vault: ${projectVaultCount}, main-vault: ${mainVaultCount})`);
     if (mainVaultProjectEntries.length > 0) {
       sections.push(`- private project memories: ${mainVaultProjectEntries.length}`);
     }
@@ -3163,22 +3164,31 @@ server.registerTool(
       .filter(x => x.score > -Infinity)
       .sort((a, b) => b.score - a.score);
 
+    // Score tagged anchors too, so they can compete for primaryEntry
+    const scoredTaggedAnchors = taggedAnchorEntries
+      .map(e => ({
+        entry: e,
+        score: anchorScore(e.note, themeCache),
+        theme: classifyTheme(e.note),
+      }))
+      .sort((a, b) => b.score - a.score);
+
     // Enforce max 2 per theme for scored anchors
     const anchorThemeCounts = new Map<string, number>();
     const anchors: AnchorNote[] = [];
     const anchorIds = new Set<string>();
 
-    // Add tagged anchors first (capped at 10 total across all themes)
-    for (const entry of taggedAnchorEntries.slice(0, 10)) {
+    // Add tagged anchors first (capped at 10 total across all themes), scored by anchorScore
+    for (const candidate of scoredTaggedAnchors.slice(0, 10)) {
       if (anchors.length >= 10) break;
       anchors.push({
-        id: entry.note.id,
-        title: entry.note.title,
-        centrality: entry.note.relatedTo?.length ?? 0,
-        connectionDiversity: computeConnectionDiversity(entry.note, themeCache),
-        updatedAt: entry.note.updatedAt,
+        id: candidate.entry.note.id,
+        title: candidate.entry.note.title,
+        centrality: candidate.entry.note.relatedTo?.length ?? 0,
+        connectionDiversity: computeConnectionDiversity(candidate.entry.note, themeCache),
+        updatedAt: candidate.entry.note.updatedAt,
       });
-      anchorIds.add(entry.note.id);
+      anchorIds.add(candidate.entry.note.id);
     }
 
     // Add scored anchors with theme diversity constraint
@@ -3322,7 +3332,7 @@ server.registerTool(
       action: "project_summary_shown",
       project: { id: project.id, name: project.name },
       notes: {
-        total: entries.length,
+        total: totalProjectNotes,
         projectVault: projectVaultCount,
         mainVault: mainVaultCount,
         privateProject: mainVaultProjectEntries.length,
