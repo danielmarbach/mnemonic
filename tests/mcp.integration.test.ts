@@ -13,6 +13,9 @@ import {
   MemoryGraphResultSchema,
   MigrationExecuteResultSchema,
   MigrationListResultSchema,
+  OrientationNoteSchema,
+  ProjectSummaryResultSchema,
+  RecallResultSchema,
   SyncResultSchema,
 } from "../src/structured-content.js";
 
@@ -1085,7 +1088,7 @@ describe("local MCP script", () => {
 
       const summary = await callLocalMcpResponse(vaultDir, "project_memory_summary", {
         cwd: repoDir,
-      }, embeddingServer.url);
+      }, { ollamaUrl: embeddingServer.url, disableGit: false });
 
       const anchors = summary.structuredContent?.["anchors"] as Array<Record<string, unknown>>;
       expect(anchors).toEqual([]);
@@ -1095,6 +1098,8 @@ describe("local MCP script", () => {
       expect(primaryEntry?.["id"]).toBe(recentId);
       expect(primaryEntry?.["title"]).toBe("Most recent project note");
       expect(primaryEntry?.["rationale"]).toBe("Most recent note — no high-centrality anchors found");
+      // provenance is undefined when git is disabled or note has no commits; with git enabled it should be populated
+      expect(primaryEntry).toHaveProperty("confidence");
       expect(orientation?.["suggestedNext"]).toEqual([]);
     } finally {
       await embeddingServer.close();
@@ -2506,6 +2511,75 @@ describe("local MCP script", () => {
       await embeddingServer.close();
     }
   }, 15000);
+
+  describe("schema-audit", () => {
+    it("RecallResultSchema accepts provenance and confidence fields in results", async () => {
+      const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-vault-"));
+      tempDirs.push(vaultDir);
+      const embeddingServer = await startFakeEmbeddingServer();
+
+      try {
+        await callLocalMcp(vaultDir, "remember", {
+          title: "Schema audit recall test",
+          content: "Testing provenance and confidence in recall results.",
+          tags: ["audit"],
+          lifecycle: "permanent",
+          scope: "global",
+          summary: "Seed note for recall schema audit",
+        }, embeddingServer.url);
+
+        const response = await callLocalMcpResponse(vaultDir, "recall", {
+          query: "schema audit recall test",
+        }, embeddingServer.url);
+
+        expect(() => RecallResultSchema.parse(response.structuredContent)).not.toThrow();
+        const parsed = RecallResultSchema.parse(response.structuredContent);
+        expect(parsed.action).toBe("recalled");
+        expect(parsed.results).toHaveLength(1);
+        // provenance and confidence are optional but should be accepted if present
+        expect(parsed.results[0]).toHaveProperty("id");
+        expect(parsed.results[0]).toHaveProperty("title");
+      } finally {
+        await embeddingServer.close();
+      }
+    }, 15000);
+
+    it("OrientationNoteSchema accepts provenance and confidence optional fields", async () => {
+      const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-vault-"));
+      const repoDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-project-"));
+      tempDirs.push(vaultDir, repoDir);
+
+      await initTestRepo(repoDir);
+      const embeddingServer = await startFakeEmbeddingServer();
+
+      try {
+        await callLocalMcp(vaultDir, "remember", {
+          title: "Schema audit orientation test",
+          content: "Testing provenance and confidence in orientation.",
+          tags: ["audit", "orientation"],
+          lifecycle: "permanent",
+          scope: "project",
+          summary: "Seed note for orientation schema audit",
+          cwd: repoDir,
+        }, embeddingServer.url);
+
+        const summary = await callLocalMcpResponse(vaultDir, "project_memory_summary", {
+          cwd: repoDir,
+        }, embeddingServer.url);
+
+        expect(() => ProjectSummaryResultSchema.parse(summary.structuredContent)).not.toThrow();
+        const parsed = ProjectSummaryResultSchema.parse(summary.structuredContent);
+        expect(parsed.action).toBe("project_summary_shown");
+        expect(parsed.orientation).toBeDefined();
+        expect(parsed.orientation.primaryEntry).toBeDefined();
+        expect(parsed.orientation.primaryEntry).toHaveProperty("id");
+        expect(parsed.orientation.primaryEntry).toHaveProperty("title");
+        expect(parsed.orientation.primaryEntry).toHaveProperty("rationale");
+      } finally {
+        await embeddingServer.close();
+      }
+    }, 15000);
+  });
 });
 
 async function callLocalMcp(

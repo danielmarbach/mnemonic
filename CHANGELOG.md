@@ -13,11 +13,15 @@ The format is loosely based on Keep a Changelog and uses semver-style version he
 - Notes tagged `anchor` or `alwaysLoad` are prioritized in anchor selection, capped at 10 total.
 - Orientation layer provides actionable guidance: `primaryEntry` (best first note to read with rationale), `suggestedNext` (2-3 follow-ups), and optional `warnings` for taxonomy dilution (>30% in "other" bucket).
 - Project summaries now stay project-scoped: themes, anchors, counts, and empty-project handling ignore unrelated global notes, while tagged anchors are ranked by score instead of alphabetically.
+- `recall` results now include optional `provenance` (git-backed last commit hash, message, timestamp, and `recentlyChanged` flag) and `confidence` (high/medium/low) metadata.
+- `orientation.primaryEntry` and `suggestedNext` entries now include `provenance` and `confidence` metadata.
 
 ### Changed
 
 - `ProjectSummaryResult.themes` changed from `Record<string, number>` to `Record<string, ThemeSection>` with `count` and `examples` fields — a breaking change for clients parsing structured content.
 - `ProjectSummaryResult` now includes required `orientation` field with `primaryEntry`, `suggestedNext`, and optional `warnings`.
+- `RecallResult.results` now includes optional `provenance` and `confidence` fields.
+- `OrientationNote` now includes optional `provenance` and `confidence` fields.
 
 ## [0.13.1] - 2026-03-20
 

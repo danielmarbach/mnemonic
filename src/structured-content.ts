@@ -79,6 +79,8 @@ export interface RecallResult extends Record<string, unknown> {
     tags: string[];
     lifecycle: NoteLifecycle;
     updatedAt: string;
+    provenance?: Provenance;
+    confidence?: Confidence;
   }>;
 }
 
@@ -339,7 +341,18 @@ export interface OrientationNote {
   id: string;
   title: string;
   rationale: string;
+  provenance?: Provenance;
+  confidence?: Confidence;
 }
+
+export interface Provenance {
+  lastUpdatedAt: string;
+  lastCommitHash: string;
+  lastCommitMessage: string;
+  recentlyChanged: boolean;
+}
+
+export type Confidence = "high" | "medium" | "low";
 
 export interface Orientation {
   primaryEntry: OrientationNote;
@@ -444,6 +457,13 @@ export const RecallResultSchema = z.object({
     tags: z.array(z.string()),
     lifecycle: _NoteLifecycle,
     updatedAt: z.string(),
+    provenance: z.object({
+      lastUpdatedAt: z.string(),
+      lastCommitHash: z.string(),
+      lastCommitMessage: z.string(),
+      recentlyChanged: z.boolean(),
+    }).optional(),
+    confidence: z.enum(["high", "medium", "low"]).optional(),
   })),
 });
 
@@ -590,6 +610,13 @@ export const OrientationNoteSchema = z.object({
   id: z.string(),
   title: z.string(),
   rationale: z.string(),
+  provenance: z.object({
+    lastUpdatedAt: z.string(),
+    lastCommitHash: z.string(),
+    lastCommitMessage: z.string(),
+    recentlyChanged: z.boolean(),
+  }).optional(),
+  confidence: z.enum(["high", "medium", "low"]).optional(),
 });
 
 export const OrientationSchema = z.object({

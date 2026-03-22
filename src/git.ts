@@ -20,6 +20,12 @@ export interface SyncGitError {
   conflictFiles?: string[];
 }
 
+export interface LastCommit {
+  hash: string;
+  message: string;
+  timestamp: string;
+}
+
 export interface SyncResult {
   hasRemote: boolean;
   /** Note ids that arrived or changed during pull (need re-embedding) */
@@ -315,6 +321,44 @@ export class GitOps {
       const message = err instanceof Error ? err.message : String(err);
       console.error(`[git] Push failed: ${message}`);
       return { status: "failed", error: message };
+    }
+  }
+
+  /**
+   * Get the last commit that touched a specific file.
+   * Returns null when the file has no git history or the repo is unavailable.
+   */
+  async getLastCommit(filePath: string): Promise<LastCommit | null> {
+    if (!this.enabled) return null;
+    try {
+      const log = await this.git.log({ maxCount: 1, file: filePath });
+      const entry = log.latest;
+      if (!entry) return null;
+      return {
+        hash: entry.hash,
+        message: entry.message,
+        timestamp: entry.date,
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Get the most recent commits that touched a specific file.
+   * Returns empty array when the file has no git history or the repo is unavailable.
+   */
+  async getRecentCommits(filePath: string, limit: number = 5): Promise<LastCommit[]> {
+    if (!this.enabled) return [];
+    try {
+      const log = await this.git.log({ maxCount: limit, file: filePath });
+      return log.all.map(entry => ({
+        hash: entry.hash,
+        message: entry.message,
+        timestamp: entry.date,
+      }));
+    } catch {
+      return [];
     }
   }
 
