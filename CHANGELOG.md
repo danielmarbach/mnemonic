@@ -4,7 +4,7 @@ All notable changes to `mnemonic` will be documented in this file.
 
 The format is loosely based on Keep a Changelog and uses semver-style version headings.
 
-## [v0.14.0] - Unreleased
+## [0.14.0] - Unreleased
 
 ### Added
 
