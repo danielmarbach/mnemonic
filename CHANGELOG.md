@@ -15,7 +15,6 @@ The format is loosely based on Keep a Changelog and uses semver-style version he
 - Project summaries now stay project-scoped: themes, anchors, counts, and empty-project handling ignore unrelated global notes, while tagged anchors are ranked by score instead of alphabetically.
 - `recall` results now include optional `provenance` (git-backed last commit hash, message, timestamp, and `recentlyChanged` flag) and `confidence` (high/medium/low) metadata.
 - `orientation.primaryEntry` and `suggestedNext` entries now include `provenance` and `confidence` metadata.
-- `git.ts` exposes read-only `getLastCommit(filePath)` and `getRecentCommits(filePath, limit)` helpers.
 
 ### Changed
 
