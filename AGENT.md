@@ -162,6 +162,13 @@ Ensures consistency across machines. Default remote is `origin`; for forks, `set
 ### Project-boosted recall
 When `recall` called with `cwd`, project notes get **+0.15 cosine similarity boost** (not hard filter). Keeps global memories accessible while prioritizing project context.
 
+### Temporal recall
+- `recall` supports opt-in temporal enrichment via `mode: "temporal"`
+- Semantic ranking still happens first; git history is fetched only after top matches are selected
+- Default recall behavior and latency expectations stay unchanged when temporal mode is not used
+- Temporal output stays compact: commit hash, timestamp, message, and optional bounded summary
+- `verbose: true` adds richer whole-commit stats-based context only; do not expect raw or partial diffs
+
 ### Multi-vault architecture
 - **Main vault** (`~/mnemonic-vault`): Private global memories, own git repo
 - **Project vault** (`<git-root>/.mnemonic/`): Project-specific memories, committed to project repo
@@ -249,7 +256,7 @@ Keep these high-level anchors in mind:
 | `memory_graph` | Show compact adjacency list of relationships |
 | `move_memory` | Move note between vaults without changing id |
 | `project_memory_summary` | Session-start entrypoint: themed notes, anchors, and orientation for fast project orientation |
-| `recall` | Semantic search with optional project boost |
+| `recall` | Semantic search with optional project boost and opt-in temporal history |
 | `recent_memories` | Show most recently updated notes for scope |
 | `remember` | Write note + embedding; `cwd` sets context, `scope` picks storage, `lifecycle` picks temporary vs permanent |
 | `relate` | Create typed relationship between notes (bidirectional) |

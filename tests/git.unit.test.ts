@@ -507,12 +507,10 @@ describe("GitOps", () => {
       const git = new GitOps("/tmp/repo");
       await git.init();
 
-      log.mockResolvedValueOnce({
-        all: [
-          { hash: "abc123", message: "feat: latest", date: "2026-03-20T10:00:00Z" },
-          { hash: "def456", message: "fix: previous", date: "2026-03-19T10:00:00Z" },
-        ],
-      });
+      raw.mockResolvedValueOnce([
+        "abc123\t2026-03-20T10:00:00Z\tfeat: latest",
+        "def456\t2026-03-19T10:00:00Z\tfix: previous",
+      ].join("\n"));
 
       const result = await git.getRecentCommits("notes/test.md", 2);
 
@@ -520,7 +518,15 @@ describe("GitOps", () => {
         { hash: "abc123", message: "feat: latest", timestamp: "2026-03-20T10:00:00Z" },
         { hash: "def456", message: "fix: previous", timestamp: "2026-03-19T10:00:00Z" },
       ]);
-      expect(log).toHaveBeenCalledWith({ maxCount: 2, file: "notes/test.md" });
+      expect(raw).toHaveBeenCalledWith([
+        "log",
+        "--follow",
+        "--format=%H%x09%cI%x09%s",
+        "-n",
+        "2",
+        "--",
+        "notes/test.md",
+      ]);
     });
 
     it("returns empty array when file has no git history", async () => {
@@ -528,7 +534,7 @@ describe("GitOps", () => {
       const git = new GitOps("/tmp/repo");
       await git.init();
 
-      log.mockResolvedValueOnce({ all: [] });
+      raw.mockResolvedValueOnce("");
 
       const result = await git.getRecentCommits("notes/new-file.md");
 
@@ -540,7 +546,7 @@ describe("GitOps", () => {
       const git = new GitOps("/tmp/repo");
       await git.init();
 
-      log.mockRejectedValueOnce(new Error("not a git repository"));
+      raw.mockRejectedValueOnce(new Error("not a git repository"));
 
       const result = await git.getRecentCommits("notes/test.md");
 
@@ -560,6 +566,79 @@ describe("GitOps", () => {
       expect(result).toEqual([]);
 
       delete process.env.DISABLE_GIT;
+    });
+  });
+
+  describe("getFileHistory", () => {
+    it("returns recent commits for a file using --follow and the requested limit", async () => {
+      const { GitOps } = await import("../src/git.js");
+      const git = new GitOps("/tmp/repo");
+      await git.init();
+
+      raw.mockResolvedValueOnce([
+        "abc123\t2026-03-20T10:00:00Z\tfeat: latest",
+        "def456\t2026-03-19T10:00:00Z\tfix: previous",
+      ].join("\n"));
+
+      const result = await git.getFileHistory("notes/test.md", 2);
+
+      expect(result).toEqual([
+        { hash: "abc123", message: "feat: latest", timestamp: "2026-03-20T10:00:00Z" },
+        { hash: "def456", message: "fix: previous", timestamp: "2026-03-19T10:00:00Z" },
+      ]);
+      expect(raw).toHaveBeenCalledWith([
+        "log",
+        "--follow",
+        "--format=%H%x09%cI%x09%s",
+        "-n",
+        "2",
+        "--",
+        "notes/test.md",
+      ]);
+    });
+
+    it("returns empty array when git history lookup fails", async () => {
+      const { GitOps } = await import("../src/git.js");
+      const git = new GitOps("/tmp/repo");
+      await git.init();
+
+      raw.mockRejectedValueOnce(new Error("not a git repository"));
+
+      const result = await git.getFileHistory("notes/test.md", 3);
+
+      expect(result).toEqual([]);
+    });
+  });
+
+  describe("getCommitStats", () => {
+    it("parses whole-commit numstat output into compact commit stats", async () => {
+      const { GitOps } = await import("../src/git.js");
+      const git = new GitOps("/tmp/repo");
+      await git.init();
+
+      raw.mockResolvedValueOnce("12\t3\tnotes/test.md\n5\t0\tnotes/other.md\n");
+
+      const result = await git.getCommitStats("notes/test.md", "abc123");
+
+      expect(result).toEqual({ additions: 17, deletions: 3, filesChanged: 2 });
+      expect(raw).toHaveBeenCalledWith([
+        "show",
+        "--format=",
+        "--numstat",
+        "abc123",
+      ]);
+    });
+
+    it("returns null when stats lookup fails", async () => {
+      const { GitOps } = await import("../src/git.js");
+      const git = new GitOps("/tmp/repo");
+      await git.init();
+
+      raw.mockRejectedValueOnce(new Error("bad revision"));
+
+      const result = await git.getCommitStats("notes/test.md", "abc123");
+
+      expect(result).toBeNull();
     });
   });
 });

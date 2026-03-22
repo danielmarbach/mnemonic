@@ -303,6 +303,10 @@ Project identity derives from the **git remote URL**, normalized to a stable slu
 
 `recall` with `cwd` searches both vaults. Project notes get a **+0.15 similarity boost** — a soft signal, not a hard filter — so global memories remain accessible while project context floats to the top.
 
+Temporal recall is opt-in via `mode: "temporal"`. It keeps semantic selection first, then enriches only the top matches with compact git-backed history so agents can inspect how a note evolved without turning recall into raw log or diff output.
+
+Use `verbose: true` together with temporal mode when you want richer change stats such as additions, deletions, files changed, and change classification. Those stats describe the whole commit that touched the note, not a raw diff excerpt, so recall stays bounded and does not return full diffs.
+
 The `scope` parameter on `recall` narrows results:
 
 - `"all"` *(default)* — project memories boosted, then global
@@ -421,7 +425,7 @@ Imported notes are written to the main vault with `lifecycle: permanent` and `sc
 | `memory_graph`              | Show compact adjacency list of relationships                             |
 | `move_memory`               | Move note between vaults without changing id                             |
 | `project_memory_summary`    | Session-start entrypoint: themed notes, anchors, and orientation for fast project orientation |
-| `recall`                    | Semantic search with optional project boost                              |
+| `recall`                    | Semantic search with optional project boost and opt-in temporal history  |
 | `recent_memories`           | Show most recently updated notes for scope                               |
 | `remember`                  | Write note + embedding; `cwd` sets context, `scope` picks storage, `lifecycle` picks temporary vs permanent |
 | `relate`                    | Create typed relationship between notes (bidirectional)                  |

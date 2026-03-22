@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { computeConfidence, getNoteProvenance } from "../src/provenance.js";
+import { buildTemporalHistoryEntry, computeConfidence, getNoteProvenance } from "../src/provenance.js";
 
 const mockGit = {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -86,5 +86,113 @@ describe("getNoteProvenance", () => {
     const result = await getNoteProvenance(mockGit, "notes/recent.md");
 
     expect(result?.recentlyChanged).toBe(true);
+  });
+});
+
+describe("buildTemporalHistoryEntry", () => {
+  it("builds a compact summary for a minor edit by default", () => {
+    const result = buildTemporalHistoryEntry(
+      {
+        hash: "abc123",
+        message: "docs: clarify recall behavior",
+        timestamp: "2026-03-20T10:00:00Z",
+      },
+      { additions: 4, deletions: 1, filesChanged: 1 },
+      false
+    );
+
+    expect(result).toEqual({
+      commitHash: "abc123",
+      message: "docs: clarify recall behavior",
+      timestamp: "2026-03-20T10:00:00Z",
+      summary: "minor edit (+4/-1 lines)",
+    });
+  });
+
+  it("returns richer structured stats in verbose mode without raw diffs", () => {
+    const result = buildTemporalHistoryEntry(
+      {
+        hash: "def456",
+        message: "feat: add temporal recall",
+        timestamp: "2026-03-21T10:00:00Z",
+      },
+      { additions: 42, deletions: 10, filesChanged: 3 },
+      true
+    );
+
+    expect(result).toEqual({
+      commitHash: "def456",
+      message: "feat: add temporal recall",
+      timestamp: "2026-03-21T10:00:00Z",
+      summary: "substantial update (+42/-10 lines, 3 files changed)",
+      stats: {
+        additions: 42,
+        deletions: 10,
+        filesChanged: 3,
+        changeType: "substantial update",
+      },
+    });
+  });
+
+  it("falls back to minimal history when stats are unavailable", () => {
+    const result = buildTemporalHistoryEntry(
+      {
+        hash: "ghi789",
+        message: "chore: touch note metadata",
+        timestamp: "2026-03-22T10:00:00Z",
+      },
+      null,
+      true
+    );
+
+    expect(result).toEqual({
+      commitHash: "ghi789",
+      message: "chore: touch note metadata",
+      timestamp: "2026-03-22T10:00:00Z",
+    });
+  });
+
+  it("classifies relationship commits as metadata-only change", () => {
+    const result = buildTemporalHistoryEntry(
+      {
+        hash: "jkl012",
+        message: "relate: A ↔ B",
+        timestamp: "2026-03-22T11:00:00Z",
+      },
+      { additions: 3, deletions: 1, filesChanged: 1 },
+      true
+    );
+
+    expect(result).toEqual({
+      commitHash: "jkl012",
+      message: "relate: A ↔ B",
+      timestamp: "2026-03-22T11:00:00Z",
+      summary: "metadata-only change (1 file changed)",
+      stats: {
+        additions: 3,
+        deletions: 1,
+        filesChanged: 1,
+        changeType: "metadata-only change",
+      },
+    });
+  });
+
+  it("classifies forget commits as metadata-only change for surviving notes", () => {
+    const result = buildTemporalHistoryEntry(
+      {
+        hash: "mno345",
+        message: "forget: remove obsolete note",
+        timestamp: "2026-03-22T11:05:00Z",
+      },
+      { additions: 2, deletions: 3, filesChanged: 1 },
+      false
+    );
+
+    expect(result).toEqual({
+      commitHash: "mno345",
+      message: "forget: remove obsolete note",
+      timestamp: "2026-03-22T11:05:00Z",
+      summary: "metadata-only change",
+    });
   });
 });

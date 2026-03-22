@@ -28,6 +28,14 @@ const tempDirs: string[] = [];
 async function initTestRepo(repoDir: string, branch = "feature/test"): Promise<void> {
   await execFileAsync("git", ["init"], { cwd: repoDir });
   await execFileAsync("git", ["checkout", "-B", branch], { cwd: repoDir });
+  await execFileAsync("git", ["config", "user.name", "Test User"], { cwd: repoDir });
+  await execFileAsync("git", ["config", "user.email", "test@example.com"], { cwd: repoDir });
+}
+
+async function initTestVaultRepo(vaultDir: string): Promise<void> {
+  await execFileAsync("git", ["init"], { cwd: vaultDir });
+  await execFileAsync("git", ["config", "user.name", "Test User"], { cwd: vaultDir });
+  await execFileAsync("git", ["config", "user.email", "test@example.com"], { cwd: vaultDir });
 }
 
 afterEach(async () => {
@@ -250,9 +258,7 @@ describe("local MCP script", () => {
     const embeddingServer = await startFakeEmbeddingServer();
 
     try {
-      await execFileAsync("git", ["init"], { cwd: vaultDir });
-      await execFileAsync("git", ["config", "user.name", "Test User"], { cwd: vaultDir });
-      await execFileAsync("git", ["config", "user.email", "test@example.com"], { cwd: vaultDir });
+      await initTestVaultRepo(vaultDir);
 
       const first = await callLocalMcp(vaultDir, "remember", {
         title: "Relate retry first",
@@ -601,8 +607,6 @@ describe("local MCP script", () => {
 
     await execFileAsync("git", ["init", "--bare"], { cwd: remoteDir });
     await initTestRepo(repoDir);
-    await execFileAsync("git", ["config", "user.name", "Test User"], { cwd: repoDir });
-    await execFileAsync("git", ["config", "user.email", "test@example.com"], { cwd: repoDir });
     await execFileAsync("git", ["remote", "add", "origin", remoteDir], { cwd: repoDir });
 
     const embeddingServer = await startFakeEmbeddingServer();
@@ -2513,6 +2517,108 @@ describe("local MCP script", () => {
   }, 15000);
 
   describe("schema-audit", () => {
+    it("recall temporal mode returns compact history and verbose stats", async () => {
+      const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-vault-"));
+      tempDirs.push(vaultDir);
+      const embeddingServer = await startFakeEmbeddingServer();
+
+      try {
+        await initTestVaultRepo(vaultDir);
+
+        await callLocalMcp(vaultDir, "remember", {
+          title: "Temporal recall schema audit test",
+          content: "Testing temporal recall history output.",
+          tags: ["audit", "temporal"],
+          lifecycle: "permanent",
+          scope: "global",
+          summary: "Seed note for temporal recall schema audit",
+        }, { ollamaUrl: embeddingServer.url, disableGit: false });
+
+        const response = await callLocalMcpResponse(vaultDir, "recall", {
+          query: "temporal recall schema audit test",
+          mode: "temporal",
+          verbose: true,
+        }, { ollamaUrl: embeddingServer.url, disableGit: false });
+
+        expect(() => RecallResultSchema.parse(response.structuredContent)).not.toThrow();
+        const parsed = RecallResultSchema.parse(response.structuredContent);
+        expect(parsed.results).toHaveLength(1);
+        expect(parsed.results[0]?.history).toBeDefined();
+        expect(parsed.results[0]?.history?.length).toBeGreaterThan(0);
+        expect(parsed.results[0]?.history?.[0]).toHaveProperty("commitHash");
+        expect(parsed.results[0]?.history?.[0]).toHaveProperty("message");
+        expect(parsed.results[0]?.history?.[0]).toHaveProperty("timestamp");
+        expect(parsed.results[0]?.history?.[0]).toHaveProperty("stats");
+      } finally {
+        await embeddingServer.close();
+      }
+    }, 15000);
+
+    it("recall temporal mode omits history beyond the enrichment cap instead of claiming no history", async () => {
+      const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-vault-"));
+      tempDirs.push(vaultDir);
+      const embeddingServer = await startFakeEmbeddingServer();
+
+      try {
+        await initTestVaultRepo(vaultDir);
+
+        for (let i = 1; i <= 6; i++) {
+          await callLocalMcp(vaultDir, "remember", {
+            title: `Temporal recall cap test ${i}`,
+            content: `Testing temporal recall enrichment cap item ${i}.`,
+            tags: ["audit", "temporal", "cap-test"],
+            lifecycle: "permanent",
+            scope: "global",
+            summary: `Seed note ${i} for temporal recall cap audit`,
+          }, { ollamaUrl: embeddingServer.url, disableGit: false });
+        }
+
+        const response = await callLocalMcpResponse(vaultDir, "recall", {
+          query: "temporal recall cap test",
+          mode: "temporal",
+          limit: 6,
+        }, { ollamaUrl: embeddingServer.url, disableGit: false });
+
+        const parsed = RecallResultSchema.parse(response.structuredContent);
+        expect(parsed.results).toHaveLength(6);
+        expect(parsed.results[4]?.history).toBeDefined();
+        expect(parsed.results[5]?.history).toBeUndefined();
+        expect(response.text).not.toContain("no git history found");
+      } finally {
+        await embeddingServer.close();
+      }
+    }, 25000);
+
+    it("plain recall leaves temporal history absent", async () => {
+      const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-vault-"));
+      tempDirs.push(vaultDir);
+      const embeddingServer = await startFakeEmbeddingServer();
+
+      try {
+        await initTestVaultRepo(vaultDir);
+
+        await callLocalMcp(vaultDir, "remember", {
+          title: "Plain recall schema audit test",
+          content: "Testing that default recall does not include temporal history.",
+          tags: ["audit", "recall"],
+          lifecycle: "permanent",
+          scope: "global",
+          summary: "Seed note for plain recall schema audit",
+        }, { ollamaUrl: embeddingServer.url, disableGit: false });
+
+        const response = await callLocalMcpResponse(vaultDir, "recall", {
+          query: "plain recall schema audit test",
+        }, { ollamaUrl: embeddingServer.url, disableGit: false });
+
+        const parsed = RecallResultSchema.parse(response.structuredContent);
+        expect(parsed.results).toHaveLength(1);
+        expect(parsed.results[0]?.history).toBeUndefined();
+        expect(response.text).not.toContain("**history:**");
+      } finally {
+        await embeddingServer.close();
+      }
+    }, 15000);
+
     it("RecallResultSchema accepts provenance and confidence fields in results", async () => {
       const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-vault-"));
       tempDirs.push(vaultDir);

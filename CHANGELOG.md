@@ -8,6 +8,8 @@ The format is loosely based on Keep a Changelog and uses semver-style version he
 
 ### Added
 
+- `recall` now supports opt-in temporal history via `mode: "temporal"`, preserving semantic-first selection while enriching top matches with compact git-backed history entries.
+- Temporal history entries include commit hash, timestamp, message, and bounded RTK-style summaries; `verbose: true` adds richer stats-only context without returning raw diffs.
 - `project_memory_summary` now returns themed note categories with ranked examples (recent + connected notes first), anchor notes (durable hubs connecting multiple themes), and optional related global notes via anchor similarity — a session-start entrypoint for fast project orientation.
 - Anchors are scored by centrality (log of connection count), connection diversity (distinct themes), and recency — permanent notes with cross-cutting relationships surface first.
 - Notes tagged `anchor` or `alwaysLoad` are prioritized in anchor selection, capped at 10 total.
@@ -21,6 +23,7 @@ The format is loosely based on Keep a Changelog and uses semver-style version he
 - `ProjectSummaryResult.themes` changed from `Record<string, number>` to `Record<string, ThemeSection>` with `count` and `examples` fields — a breaking change for clients parsing structured content.
 - `ProjectSummaryResult` now includes required `orientation` field with `primaryEntry`, `suggestedNext`, and optional `warnings`.
 - `RecallResult.results` now includes optional `provenance` and `confidence` fields.
+- `RecallResult.results` now also accepts optional `history` entries for temporal recall, with optional `stats` in verbose mode.
 - `OrientationNote` now includes optional `provenance` and `confidence` fields.
 
 ## [0.13.1] - 2026-03-20

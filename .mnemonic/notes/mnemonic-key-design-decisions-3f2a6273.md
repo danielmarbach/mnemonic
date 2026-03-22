@@ -7,7 +7,7 @@ tags:
   - rationale
 lifecycle: permanent
 createdAt: '2026-03-07T17:59:12.124Z'
-updatedAt: '2026-03-22T11:50:37.396Z'
+updatedAt: '2026-03-22T13:00:19.132Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
@@ -33,6 +33,8 @@ relatedTo:
     type: related-to
   - id: phase-1-provenance-confidence-implementation-design-c2084fd4
     type: related-to
+  - id: temporal-recall-mode-design-for-phase-2-on-demand-history-ex-f8ee504f
+    type: related-to
 memoryVersion: 1
 ---
 **One file per note:** Critical for git conflict isolation. Never aggregate notes into a single file.
@@ -44,6 +46,8 @@ memoryVersion: 1
 **Project ID from git remote URL, not local path:** `project.ts` normalizes remote URLs to stable slugs (e.g. `github-com-acme-myapp`). This makes cross-machine consistency work — local paths differ, remote URLs don't.
 
 **Similarity boost, not hard filter:** `recall` gives project notes +0.15 cosine similarity boost rather than excluding global notes. Global memories (user prefs, cross-project patterns) remain accessible in project context.
+
+**Temporal recall is semantic-first and opt-in:** `recall` supports `mode: "temporal"` for on-demand history exploration, but only after normal semantic selection. Default recall behavior and latency expectations stay unchanged. Temporal enrichment is bounded to top matches and compact commit summaries; `verbose: true` adds richer stats-based context, not raw diffs.
 
 **No auto-relationship via LLM:** Decided against using a local Qwen model to auto-build relationships. Small models lack session context, produce spurious edges, and corrupt the graph silently. Instead: agent instructions prompt `relate` immediately after `remember` while session context is warm.
 
