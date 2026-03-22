@@ -7,7 +7,7 @@ tags:
   - rationale
 lifecycle: permanent
 createdAt: '2026-03-07T17:59:12.124Z'
-updatedAt: '2026-03-14T22:14:51.593Z'
+updatedAt: '2026-03-22T11:50:37.396Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
@@ -30,6 +30,8 @@ relatedTo:
   - id: remember-tool-checkedforexisting-is-schema-only-agent-hint-w-a2c94093
     type: related-to
   - id: performance-principles-for-file-first-mcp-and-git-backed-wor-4e7d3bc8
+    type: related-to
+  - id: phase-1-provenance-confidence-implementation-design-c2084fd4
     type: related-to
 memoryVersion: 1
 ---

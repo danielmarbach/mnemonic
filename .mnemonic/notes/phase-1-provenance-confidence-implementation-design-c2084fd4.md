@@ -7,9 +7,12 @@ tags:
   - phase-1
 lifecycle: permanent
 createdAt: '2026-03-22T11:45:34.639Z'
-updatedAt: '2026-03-22T11:45:34.639Z'
+updatedAt: '2026-03-22T11:50:37.396Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: mnemonic-key-design-decisions-3f2a6273
+    type: related-to
 memoryVersion: 1
 ---
 # Phase 1 Provenance + Confidence Design Decision
