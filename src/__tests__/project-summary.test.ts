@@ -1,273 +1,186 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
+
 import {
-  withinThemeScore,
   anchorScore,
-  computeConnectionDiversity,
   buildThemeCache,
   classifyTheme,
+  computeConnectionDiversity,
+  withinThemeScore,
 } from "../project-introspection.js";
 import type { Note } from "../storage.js";
 
-describe("anchor tag override for notes without relationships", () => {
-  it("notes with anchor tag should be eligible for anchor selection even without relationships", () => {
-    const taggedNote: Note = {
-      id: "tagged", title: "Tagged Anchor", content: "", tags: ["anchor"],
-      lifecycle: "permanent", createdAt: "", updatedAt: "", memoryVersion: 1,
-      relatedTo: [],
-    };
-    
-    expect(taggedNote.tags.some(t => t.toLowerCase() === "anchor")).toBe(true);
-    expect(taggedNote.relatedTo?.length ?? 0).toBe(0);
-  });
+function makeNote(overrides: Partial<Note> = {}): Note {
+  const now = new Date().toISOString();
+  return {
+    id: overrides.id ?? "note",
+    title: overrides.title ?? "Note",
+    content: overrides.content ?? "",
+    tags: overrides.tags ?? [],
+    lifecycle: overrides.lifecycle ?? "permanent",
+    createdAt: overrides.createdAt ?? now,
+    updatedAt: overrides.updatedAt ?? now,
+    memoryVersion: overrides.memoryVersion ?? 1,
+    relatedTo: overrides.relatedTo,
+    project: overrides.project,
+    projectName: overrides.projectName,
+  };
+}
 
-  it("notes with alwaysLoad tag should be eligible for anchor selection even without relationships", () => {
-    const taggedNote: Note = {
-      id: "tagged", title: "Always Load", content: "", tags: ["alwaysLoad"],
-      lifecycle: "permanent", createdAt: "", updatedAt: "", memoryVersion: 1,
-      relatedTo: [],
-    };
-    
-    expect(taggedNote.tags.some(t => t.toLowerCase() === "alwaysload")).toBe(true);
-    expect(taggedNote.relatedTo?.length ?? 0).toBe(0);
-  });
-});
-
-describe("project-scoped filtering for themes and anchors", () => {
-  it("project entries can be distinguished from global entries by project field", () => {
-    const projectNote: Note = {
-      id: "proj", title: "Project Note", content: "", tags: [],
-      lifecycle: "permanent", createdAt: "", updatedAt: "", memoryVersion: 1,
-      project: "my-project",
-    };
-    
-    const globalNote: Note = {
-      id: "global", title: "Global Note", content: "", tags: [],
-      lifecycle: "permanent", createdAt: "", updatedAt: "", memoryVersion: 1,
-    };
-    
-    expect(projectNote.project).toBe("my-project");
-    expect(globalNote.project).toBeUndefined();
-  });
-
-  it("vault.isProject can identify project vault entries", () => {
-    const projectVaultEntry = { note: { id: "a" } as Note, vault: { isProject: true } };
-    const mainVaultEntry = { note: { id: "b" } as Note, vault: { isProject: false } };
-    
-    expect(projectVaultEntry.vault.isProject).toBe(true);
-    expect(mainVaultEntry.vault.isProject).toBe(false);
-  });
-});
-
-// Integration tests for project_memory_summary scoring logic.
-// Full MCP-tool integration tests would require client infrastructure.
-// Core scoring functions are tested in project-introspection.test.ts
-
-describe("project_memory_summary scoring integration", () => {
-  describe("within-theme ordering", () => {
-    it("ranks recent notes higher than old notes with same connections", () => {
-      const now = new Date().toISOString();
-      const old = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-      
-      const recentNote: Note = {
-        id: "recent", title: "Recent", content: "", tags: [],
-        lifecycle: "permanent", createdAt: now, updatedAt: now, memoryVersion: 1,
+describe("project summary scoring helpers", () => {
+  describe("withinThemeScore", () => {
+    it("prefers a more recent note when connectivity is the same", () => {
+      const recent = makeNote({
+        id: "recent",
+        updatedAt: new Date().toISOString(),
         relatedTo: [{ id: "other", type: "related-to" }],
-      };
-      
-      const oldNote: Note = {
-        id: "old", title: "Old", content: "", tags: [],
-        lifecycle: "permanent", createdAt: old, updatedAt: old, memoryVersion: 1,
+      });
+      const stale = makeNote({
+        id: "stale",
+        updatedAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
         relatedTo: [{ id: "other", type: "related-to" }],
-      };
-      
-      expect(withinThemeScore(recentNote)).toBeGreaterThan(withinThemeScore(oldNote));
+      });
+
+      expect(withinThemeScore(recent)).toBeGreaterThan(withinThemeScore(stale));
     });
 
-    it("ranks notes with more connections higher (log-scaled)", () => {
+    it("prefers a more connected note when recency is the same", () => {
       const now = new Date().toISOString();
-      const connectedNote: Note = {
-        id: "connected", title: "Connected", content: "", tags: [],
-        lifecycle: "permanent", createdAt: now, updatedAt: now, memoryVersion: 1,
+      const hub = makeNote({
+        id: "hub",
+        updatedAt: now,
         relatedTo: [
           { id: "a", type: "related-to" },
           { id: "b", type: "related-to" },
           { id: "c", type: "related-to" },
         ],
-      };
-      
-      const isolatedNote: Note = {
-        id: "isolated", title: "Isolated", content: "", tags: [],
-        lifecycle: "permanent", createdAt: now, updatedAt: now, memoryVersion: 1,
-        relatedTo: [],
-      };
-      
-      expect(withinThemeScore(connectedNote)).toBeGreaterThan(withinThemeScore(isolatedNote));
+      });
+      const isolated = makeNote({ id: "isolated", updatedAt: now, relatedTo: [] });
+
+      expect(withinThemeScore(hub)).toBeGreaterThan(withinThemeScore(isolated));
     });
   });
 
-  describe("anchor selection", () => {
-    it("rejects temporary notes", () => {
-      const tempNote: Note = {
-        id: "temp", title: "Temp", content: "", tags: [],
-        lifecycle: "temporary", createdAt: "", updatedAt: "", memoryVersion: 1,
-        relatedTo: [{ id: "other", type: "related-to" }],
-      };
-      
-      const cache = new Map([["other", "decisions"]]);
-      expect(anchorScore(tempNote, cache)).toBe(-Infinity);
-    });
-
-    it("scores permanent notes with connections", () => {
-      const now = new Date().toISOString();
-      const anchorNote: Note = {
-        id: "anchor", title: "Anchor", content: "", tags: [],
-        lifecycle: "permanent", createdAt: now, updatedAt: now, memoryVersion: 1,
+  describe("anchorScore", () => {
+    it("rejects temporary notes even when they are highly connected", () => {
+      const temporaryHub = makeNote({
+        id: "temporary-hub",
+        lifecycle: "temporary",
         relatedTo: [
           { id: "a", type: "related-to" },
           { id: "b", type: "related-to" },
+          { id: "c", type: "related-to" },
         ],
-      };
-      
-      const cache = new Map([
-        ["a", "decisions"],
-        ["b", "architecture"],
+      });
+      const themeCache = new Map([
+        ["a", "overview"],
+        ["b", "decisions"],
+        ["c", "architecture"],
       ]);
-      
-      expect(anchorScore(anchorNote, cache)).toBeGreaterThan(0);
+
+      expect(anchorScore(temporaryHub, themeCache)).toBe(-Infinity);
     });
 
-    it("scores diverse connections higher than single-theme connections", () => {
-      const now = new Date().toISOString();
-      const diverseNote: Note = {
-        id: "diverse", title: "Diverse", content: "", tags: [],
-        lifecycle: "permanent", createdAt: now, updatedAt: now, memoryVersion: 1,
+    it("prefers notes that connect multiple themes over same-count single-theme hubs", () => {
+      const diverseHub = makeNote({
+        id: "diverse-hub",
         relatedTo: [
           { id: "a", type: "related-to" },
           { id: "b", type: "related-to" },
           { id: "c", type: "related-to" },
         ],
-      };
-      
-      const narrowNote: Note = {
-        id: "narrow", title: "Narrow", content: "", tags: [],
-        lifecycle: "permanent", createdAt: now, updatedAt: now, memoryVersion: 1,
+      });
+      const narrowHub = makeNote({
+        id: "narrow-hub",
         relatedTo: [
           { id: "x", type: "related-to" },
           { id: "y", type: "related-to" },
           { id: "z", type: "related-to" },
         ],
-      };
-      
+      });
+
       const diverseCache = new Map([
-        ["a", "decisions"],
-        ["b", "architecture"],
-        ["c", "tooling"],
+        ["a", "overview"],
+        ["b", "decisions"],
+        ["c", "architecture"],
       ]);
-      
       const narrowCache = new Map([
         ["x", "decisions"],
         ["y", "decisions"],
         ["z", "decisions"],
       ]);
-      
-      const diverseScore = anchorScore(diverseNote, diverseCache);
-      const narrowScore = anchorScore(narrowNote, narrowCache);
-      
-      expect(diverseScore).toBeGreaterThan(narrowScore);
+
+      expect(anchorScore(diverseHub, diverseCache)).toBeGreaterThan(anchorScore(narrowHub, narrowCache));
+    });
+
+    it("gives some score to permanent tagged notes even without relationships", () => {
+      const taggedAnchor = makeNote({
+        id: "tagged-anchor",
+        tags: ["anchor"],
+        relatedTo: [],
+      });
+
+      expect(anchorScore(taggedAnchor, new Map())).toBeGreaterThan(0);
     });
   });
 
-  describe("connection diversity", () => {
-    it("counts distinct themes of related notes", () => {
-      const note: Note = {
-        id: "test", title: "Test", content: "", tags: [],
-        lifecycle: "permanent", createdAt: "", updatedAt: "", memoryVersion: 1,
+  describe("computeConnectionDiversity", () => {
+    it("counts unique themes, not raw relationship count", () => {
+      const note = makeNote({
+        id: "diversity-check",
         relatedTo: [
           { id: "a", type: "related-to" },
           { id: "b", type: "related-to" },
           { id: "c", type: "related-to" },
+          { id: "d", type: "related-to" },
         ],
-      };
-      
-      const cache = new Map([
-        ["a", "decisions"],
+      });
+
+      const themeCache = new Map([
+        ["a", "overview"],
         ["b", "architecture"],
-        ["c", "decisions"],
+        ["c", "overview"],
+        ["d", "architecture"],
       ]);
-      
-      expect(computeConnectionDiversity(note, cache)).toBe(2);
+
+      expect(computeConnectionDiversity(note, themeCache)).toBe(2);
     });
 
-    it("returns 0 for notes without relationships", () => {
-      const note: Note = {
-        id: "test", title: "Test", content: "", tags: [],
-        lifecycle: "permanent", createdAt: "", updatedAt: "", memoryVersion: 1,
-      };
-      
-      const cache = new Map();
-      expect(computeConnectionDiversity(note, cache)).toBe(0);
-    });
-
-    it("returns 0 when related notes are missing from cache", () => {
-      const note: Note = {
-        id: "test", title: "Test", content: "", tags: [],
-        lifecycle: "permanent", createdAt: "", updatedAt: "", memoryVersion: 1,
+    it("ignores related ids missing from the cache", () => {
+      const note = makeNote({
+        id: "partial-cache",
         relatedTo: [
+          { id: "known", type: "related-to" },
           { id: "unknown", type: "related-to" },
         ],
-      };
-      
-      const cache = new Map();
-      expect(computeConnectionDiversity(note, cache)).toBe(0);
+      });
+
+      expect(computeConnectionDiversity(note, new Map([["known", "tooling"]]))).toBe(1);
     });
   });
 
-  describe("theme classification", () => {
-    it("classifies overview by tag", () => {
-      const note: Note = {
-        id: "test", title: "Overview", content: "", tags: ["overview"],
-        lifecycle: "permanent", createdAt: "", updatedAt: "", memoryVersion: 1,
-      };
-      expect(classifyTheme(note)).toBe("overview");
+  describe("classifyTheme and buildThemeCache", () => {
+    it("classifies important synonyms into the expected buckets", () => {
+      expect(classifyTheme(makeNote({ title: "Project Overview" }))).toBe("overview");
+      expect(classifyTheme(makeNote({ tags: ["policy"] }))).toBe("decisions");
+      expect(classifyTheme(makeNote({ tags: ["docker"] }))).toBe("tooling");
+      expect(classifyTheme(makeNote({ tags: ["setup"] }))).toBe("bugs");
+      expect(classifyTheme(makeNote({ tags: ["relationships"] }))).toBe("architecture");
+      expect(classifyTheme(makeNote({ tags: ["tests"] }))).toBe("quality");
+      expect(classifyTheme(makeNote({ tags: ["misc"] }))).toBe("other");
     });
 
-    it("classifies decisions by tag", () => {
-      const note: Note = {
-        id: "test", title: "Some Decision", content: "", tags: ["decisions"],
-        lifecycle: "permanent", createdAt: "", updatedAt: "", memoryVersion: 1,
-      };
-      expect(classifyTheme(note)).toBe("decisions");
-    });
+    it("builds a theme cache that can drive diversity scoring", () => {
+      const cache = buildThemeCache([
+        makeNote({ id: "overview-note", title: "Overview", tags: ["overview"] }),
+        makeNote({ id: "decision-note", title: "Decision", tags: ["design"] }),
+        makeNote({ id: "tool-note", title: "Tool", tags: ["mcp"] }),
+      ]);
 
-    it("classifies by title containing overview", () => {
-      const note: Note = {
-        id: "test", title: "Project Overview", content: "", tags: [],
-        lifecycle: "permanent", createdAt: "", updatedAt: "", memoryVersion: 1,
-      };
-      expect(classifyTheme(note)).toBe("overview");
-    });
-
-    it("defaults to other for unknown tags", () => {
-      const note: Note = {
-        id: "test", title: "Random Note", content: "", tags: ["random-tag"],
-        lifecycle: "permanent", createdAt: "", updatedAt: "", memoryVersion: 1,
-      };
-      expect(classifyTheme(note)).toBe("other");
-    });
-  });
-
-  describe("buildThemeCache", () => {
-    it("maps note ids to their themes", () => {
-      const notes: Note[] = [
-        { id: "a", title: "Overview", content: "", tags: ["overview"], lifecycle: "permanent", createdAt: "", updatedAt: "", memoryVersion: 1 },
-        { id: "b", title: "Bug Fix", content: "", tags: ["bugs"], lifecycle: "permanent", createdAt: "", updatedAt: "", memoryVersion: 1 },
-        { id: "c", title: "Tool Config", content: "", tags: ["tools"], lifecycle: "permanent", createdAt: "", updatedAt: "", memoryVersion: 1 },
-      ];
-      
-      const cache = buildThemeCache(notes);
-      expect(cache.get("a")).toBe("overview");
-      expect(cache.get("b")).toBe("bugs");
-      expect(cache.get("c")).toBe("tooling");
+      expect(cache).toEqual(new Map([
+        ["overview-note", "overview"],
+        ["decision-note", "decisions"],
+        ["tool-note", "tooling"],
+      ]));
     });
   });
 });
