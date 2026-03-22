@@ -24,3 +24,64 @@ export function classifyTheme(note: Note): string {
 export function titleCaseTheme(theme: string): string {
   return `${theme[0]?.toUpperCase() ?? ""}${theme.slice(1)}`;
 }
+
+export function daysSinceUpdate(updatedAt: string): number {
+  const updated = new Date(updatedAt);
+  const now = new Date();
+  const diffMs = now.getTime() - updated.getTime();
+  return Math.max(0, diffMs / (1000 * 60 * 60 * 24));
+}
+
+export function recencyScore(daysSince: number): number {
+  const capped = Math.min(daysSince, 30);
+  return 1.0 - capped / 30;
+}
+
+export function centralityBonus(relatedCount: number): number {
+  return Math.min(0.2, Math.log(relatedCount + 1) * 0.1);
+}
+
+export function withinThemeScore(note: Note): number {
+  const days = daysSinceUpdate(note.updatedAt);
+  const recency = recencyScore(days);
+  const centrality = centralityBonus(note.relatedTo?.length ?? 0);
+  return recency + centrality;
+}
+
+export function computeConnectionDiversity(
+  note: Note,
+  themeCache: Map<string, string>
+): number {
+  if (!note.relatedTo || note.relatedTo.length === 0) return 0;
+
+  const themes = new Set<string>();
+  for (const rel of note.relatedTo) {
+    const theme = themeCache.get(rel.id);
+    if (theme) themes.add(theme);
+  }
+  return themes.size;
+}
+
+export function anchorScore(
+  note: Note,
+  themeCache: Map<string, string>
+): number {
+  if (note.lifecycle !== "permanent") return -Infinity;
+
+  const days = daysSinceUpdate(note.updatedAt);
+  const recency = 1.0 / (1 + days / 7);
+
+  const centrality = Math.log((note.relatedTo?.length ?? 0) + 1);
+
+  const connectionDiversity = computeConnectionDiversity(note, themeCache);
+
+  return 0.4 * centrality + 0.4 * connectionDiversity + 0.2 * recency;
+}
+
+export function buildThemeCache(notes: Note[]): Map<string, string> {
+  const cache = new Map<string, string>();
+  for (const note of notes) {
+    cache.set(note.id, classifyTheme(note));
+  }
+  return cache;
+}

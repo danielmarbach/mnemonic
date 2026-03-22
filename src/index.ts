@@ -33,7 +33,17 @@ import {
   type ProjectMemoryPolicy,
   type WriteScope,
 } from "./project-memory-policy.js";
-import { classifyTheme, summarizePreview, titleCaseTheme } from "./project-introspection.js";
+import {
+  classifyTheme,
+  summarizePreview,
+  titleCaseTheme,
+  daysSinceUpdate,
+  recencyScore,
+  withinThemeScore,
+  anchorScore,
+  buildThemeCache,
+  computeConnectionDiversity,
+} from "./project-introspection.js";
 import { detectProject, getCurrentGitBranch, resolveProjectIdentity, type ProjectIdentityResolution } from "./project.js";
 import { VaultManager, type Vault } from "./vault.js";
 import { checkBranchChange } from "./branch-tracker.js";
@@ -63,6 +73,8 @@ import type {
   PersistenceStatus,
   MutationRetryContract,
   DiscoverTagsResult,
+  ThemeSection,
+  AnchorNote,
 } from "./structured-content.js";
 import {
   RememberResultSchema,
@@ -3034,10 +3046,13 @@ server.registerTool(
       cwd: z.string().describe("Absolute project working directory. Pass this whenever the task is project-related so routing, search boosting, policy, and vault selection work correctly."),
       maxPerTheme: z.number().int().min(1).max(5).optional().default(3),
       recentLimit: z.number().int().min(1).max(10).optional().default(5),
+      anchorLimit: z.number().int().min(1).max(10).optional().default(5),
+      includeRelatedGlobal: z.boolean().optional().default(false),
+      relatedGlobalLimit: z.number().int().min(1).max(5).optional().default(3),
     }),
     outputSchema: ProjectSummaryResultSchema,
   },
-  async ({ cwd, maxPerTheme, recentLimit }) => {
+  async ({ cwd, maxPerTheme, recentLimit, anchorLimit, includeRelatedGlobal, relatedGlobalLimit }) => {
     await ensureBranchSynced(cwd);
 
     const { project, entries } = await collectVisibleNotes(cwd, "all");
@@ -3045,11 +3060,23 @@ server.registerTool(
       return { content: [{ type: "text", text: `Could not detect a project for: ${cwd}` }], isError: true };
     }
     if (entries.length === 0) {
-      const structuredContent: ProjectSummaryResult = { action: "project_summary_shown", project: { id: project.id, name: project.name }, notes: { total: 0, projectVault: 0, mainVault: 0, privateProject: 0 }, themes: {}, recent: [] };
+      const structuredContent: ProjectSummaryResult = {
+        action: "project_summary_shown",
+        project: { id: project.id, name: project.name },
+        notes: { total: 0, projectVault: 0, mainVault: 0, privateProject: 0 },
+        themes: {},
+        recent: [],
+        anchors: [],
+      };
       return { content: [{ type: "text", text: `No memories found for project ${project.name}.` }], structuredContent };
     }
 
     const policyLine = await formatProjectPolicyLine(project.id);
+    
+    // Build theme cache for connection diversity scoring
+    const themeCache = buildThemeCache(entries.map(e => e.note));
+    
+    // Categorize by theme
     const themed = new Map<string, NoteEntry[]>();
     for (const entry of entries) {
       const theme = classifyTheme(entry.note);
@@ -3058,45 +3085,183 @@ server.registerTool(
       themed.set(theme, bucket);
     }
 
+    // Theme order for display
     const themeOrder = ["overview", "decisions", "tooling", "bugs", "architecture", "quality", "other"];
-    const projectVaultCount = entries.filter((entry) => entry.vault.isProject).length;
+    
+    // Calculate notes distribution
+    const projectVaultCount = entries.filter(e => e.vault.isProject).length;
     const mainVaultCount = entries.length - projectVaultCount;
+    const mainVaultProjectEntries = entries.filter(
+      e => !e.vault.isProject && e.note.project === project.id
+    );
+    
+    // Build output sections
     const sections: string[] = [];
     sections.push(`Project summary: **${project.name}**`);
     sections.push(`- id: \`${project.id}\``);
     sections.push(`- ${policyLine.replace(/^Policy:\s*/, "policy: ")}`);
     sections.push(`- memories: ${entries.length} (project-vault: ${projectVaultCount}, main-vault: ${mainVaultCount})`);
-    const mainVaultProjectEntries = entries.filter((entry) => !entry.vault.isProject && entry.note.project === project.id);
     if (mainVaultProjectEntries.length > 0) {
       sections.push(`- private project memories: ${mainVaultProjectEntries.length}`);
     }
 
-    const themes: Array<{ name: string; count: number; examples: string[] }> = [];
+    const themes: Record<string, ThemeSection> = {};
     for (const theme of themeOrder) {
       const bucket = themed.get(theme);
-      if (!bucket || bucket.length === 0) {
-        continue;
-      }
-      const top = bucket.slice(0, maxPerTheme);
-      sections.push(`\n${titleCaseTheme(theme)}:`);
-      sections.push(...top.map((entry) => `- ${entry.note.title} (\`${entry.note.id}\`)`));
+      if (!bucket || bucket.length === 0) continue;
       
-      themes.push({
-        name: theme,
+      // Sort by within-theme score
+      const sorted = [...bucket].sort((a, b) => 
+        withinThemeScore(b.note) - withinThemeScore(a.note)
+      );
+      const top = sorted.slice(0, maxPerTheme);
+      
+      sections.push(`\n${titleCaseTheme(theme)}:`);
+      sections.push(...top.map(e => `- ${e.note.title} (\`${e.note.id}\`)`));
+      
+      themes[theme] = {
         count: bucket.length,
-        examples: top.map((entry) => entry.note.title),
-      });
+        examples: top.map(e => ({
+          id: e.note.id,
+          title: e.note.title,
+          updatedAt: e.note.updatedAt,
+        })),
+      };
     }
 
-    const recent = [...entries]
+    // Recent notes (project-scoped only)
+    const projectEntries = entries.filter(e => 
+      e.note.project === project.id || e.vault.isProject
+    );
+    const recent = [...projectEntries]
       .sort((a, b) => b.note.updatedAt.localeCompare(a.note.updatedAt))
       .slice(0, recentLimit);
+    
     sections.push(`\nRecent:`);
-    sections.push(...recent.map((entry) => `- ${entry.note.updatedAt} — ${entry.note.title}`));
+    sections.push(...recent.map(e => `- ${e.note.updatedAt} — ${e.note.title}`));
 
-    const themeCounts: Record<string, number> = {};
-    for (const theme of themes) {
-      themeCounts[theme.name] = theme.count;
+    // Anchor notes with diversity constraint
+    const anchorCandidates = entries
+      .filter(e => e.note.lifecycle === "permanent" && (e.note.relatedTo?.length ?? 0) > 0)
+      .map(e => ({
+        entry: e,
+        score: anchorScore(e.note, themeCache),
+        theme: classifyTheme(e.note),
+      }))
+      .filter(x => x.score > -Infinity)
+      .sort((a, b) => b.score - a.score);
+
+    // Enforce max 2 per theme
+    const anchorThemeCounts = new Map<string, number>();
+    const anchors: AnchorNote[] = [];
+    const taggedAnchors: AnchorNote[] = [];
+    
+    for (const candidate of anchorCandidates) {
+      const theme = candidate.theme;
+      const themeCount = anchorThemeCounts.get(theme) ?? 0;
+      
+      // Check for anchor/alwaysLoad tags
+      const isTagged = candidate.entry.note.tags.some(t => 
+        t.toLowerCase() === "anchor" || t.toLowerCase() === "alwaysload"
+      );
+      
+      if (isTagged && taggedAnchors.length < 10) {
+        taggedAnchors.push({
+          id: candidate.entry.note.id,
+          title: candidate.entry.note.title,
+          centrality: candidate.entry.note.relatedTo?.length ?? 0,
+          connectionDiversity: computeConnectionDiversity(candidate.entry.note, themeCache),
+          updatedAt: candidate.entry.note.updatedAt,
+        });
+        continue;
+      }
+      
+      if (themeCount >= 2) continue;
+      if (anchors.length >= anchorLimit) break;
+      
+      anchors.push({
+        id: candidate.entry.note.id,
+        title: candidate.entry.note.title,
+        centrality: candidate.entry.note.relatedTo?.length ?? 0,
+        connectionDiversity: computeConnectionDiversity(candidate.entry.note, themeCache),
+        updatedAt: candidate.entry.note.updatedAt,
+      });
+      
+      anchorThemeCounts.set(theme, themeCount + 1);
+    }
+    
+    // Combine scored anchors with tagged anchors, dedupe
+    const anchorIds = new Set(anchors.map(a => a.id));
+    for (const tagged of taggedAnchors) {
+      if (!anchorIds.has(tagged.id) && anchors.length < 10) {
+        anchors.push(tagged);
+        anchorIds.add(tagged.id);
+      }
+    }
+
+    if (anchors.length > 0) {
+      sections.push(`\nAnchors:`);
+      sections.push(...anchors.slice(0, 5).map(a => 
+        `- ${a.title} (\`${a.id}\`) — centrality: ${a.centrality}, diversity: ${a.connectionDiversity}`
+      ));
+    }
+
+    // Related global notes (optional, anchor-based similarity)
+    let relatedGlobal: ProjectSummaryResult["relatedGlobal"];
+    
+    if (includeRelatedGlobal) {
+      const anchorEmbeddings = await Promise.all(
+        anchors.slice(0, 5).map(async a => {
+          for (const vault of vaultManager.allKnownVaults()) {
+            const emb = await vault.storage.readEmbedding(a.id);
+            if (emb) return { id: a.id, embedding: emb.embedding };
+          }
+          return null;
+        })
+      );
+      
+      const validAnchors = anchorEmbeddings.filter((e): e is NonNullable<typeof e> => e !== null);
+      
+      if (validAnchors.length > 0) {
+        // Get global notes (not project-scoped)
+        const globalEntries = entries.filter(e => !e.note.project);
+        const globalCandidates: Array<{ id: string; title: string; similarity: number; preview: string }> = [];
+        
+        for (const entry of globalEntries) {
+          const emb = await entry.vault.storage.readEmbedding(entry.note.id);
+          if (!emb) continue;
+          
+          // Find max similarity to any anchor
+          let maxSim = 0;
+          for (const anchor of validAnchors) {
+            const sim = cosineSimilarity(anchor.embedding, emb.embedding);
+            if (sim > maxSim) maxSim = sim;
+          }
+          
+          if (maxSim > 0.4) {
+            globalCandidates.push({
+              id: entry.note.id,
+              title: entry.note.title,
+              similarity: maxSim,
+              preview: summarizePreview(entry.note.content, 100),
+            });
+          }
+        }
+        
+        globalCandidates.sort((a, b) => b.similarity - a.similarity);
+        
+        if (globalCandidates.length > 0) {
+          relatedGlobal = {
+            notes: globalCandidates.slice(0, relatedGlobalLimit),
+            computedAt: new Date().toISOString(),
+          };
+          
+          sections.push(`\nRelated Global:`);
+          sections.push(...relatedGlobal.notes.map(n => 
+            `- ${n.title} (\`${n.id}\`) — similarity: ${n.similarity.toFixed(2)}`
+          ));
+        }
+      }
     }
 
     const structuredContent: ProjectSummaryResult = {
@@ -3108,12 +3273,15 @@ server.registerTool(
         mainVault: mainVaultCount,
         privateProject: mainVaultProjectEntries.length,
       },
-      themes: themeCounts,
-      recent: recent.map((entry) => ({
-        id: entry.note.id,
-        title: entry.note.title,
-        updatedAt: entry.note.updatedAt,
+      themes,
+      recent: recent.map(e => ({
+        id: e.note.id,
+        title: e.note.title,
+        updatedAt: e.note.updatedAt,
+        theme: classifyTheme(e.note),
       })),
+      anchors,
+      relatedGlobal,
     };
 
     return { content: [{ type: "text", text: sections.join("\n") }], structuredContent };
