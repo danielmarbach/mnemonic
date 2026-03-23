@@ -166,6 +166,7 @@ export class Storage {
     try {
       await fs.unlink(this.notePath(id));
       try { await fs.unlink(this.embeddingPath(id)); } catch { /* ok */ }
+      try { await fs.unlink(this.projectionPath(id)); } catch { /* ok */ }
       return true;
     } catch {
       return false;
