@@ -143,6 +143,7 @@ flowchart TD
 | `src/migration.ts` | Schema migration registry and execution |
 | `src/consolidate.ts` | Consolidation helper logic for merge plans and relationship cleanup |
 | `src/recall.ts` | Recall result selection heuristic |
+| `src/relationships.ts` | Bounded 1-hop relationship expansion: scoring, preview construction, and fail-soft enrichment |
 | `src/config.ts` | Main-vault runtime config and per-project policy storage |
 | `tests/` | Vitest unit and integration coverage, including MCP smoke tests |
 

@@ -564,6 +564,16 @@ function formatTemporalHistory(
   return lines.join("\n");
 }
 
+function formatRelationshipPreview(preview: RelationshipPreview): string {
+  const shown = preview.shown
+    .map(r => `${r.title} (\`${r.id}\`) [${r.relationType ?? "related-to"}]`)
+    .join(", ");
+  const more = preview.truncated
+    ? ` [+${preview.totalDirectRelations - preview.shown.length} more]`
+    : "";
+  return `**related (${preview.totalDirectRelations}):** ${shown}${more}`;
+}
+
 // ── Git commit message helpers ────────────────────────────────────────────────
 
 /**
@@ -2079,6 +2089,7 @@ server.registerTool(
       "- You just want to browse by tags or scope; use `list`\n\n" +
       "Returns:\n" +
       "- Ranked memory matches with scores, vault label, tags, lifecycle, and updated time\n" +
+      "- Bounded 1-hop relationship previews automatically attached to top results\n" +
       "- In temporal mode, optional compact history entries for top matches\n\n" +
       "Read-only.\n\n" +
       "Typical next step:\n" +
@@ -2261,7 +2272,10 @@ server.registerTool(
         const formattedHistory = mode === "temporal" && history !== undefined
           ? `\n\n${formatTemporalHistory(history)}`
           : "";
-        sections.push(`${formatNote(note, score)}${formattedHistory}`);
+        const formattedRelationships = relationships !== undefined
+          ? `\n\n${formatRelationshipPreview(relationships)}`
+          : "";
+        sections.push(`${formatNote(note, score)}${formattedHistory}${formattedRelationships}`);
 
         structuredResults.push({
           id,
@@ -2602,7 +2616,8 @@ server.registerTool(
       "- You are still searching by topic; use `recall`\n" +
       "- You want to browse many notes; use `list`\n\n" +
       "Returns:\n" +
-      "- Full note content and metadata for the requested ids, including storage label\n\n" +
+      "- Full note content and metadata for the requested ids, including storage label\n" +
+      "- Bounded 1-hop relationship previews when `includeRelationships` is true (max 3 shown)\n\n" +
       "Read-only.\n\n" +
       "Typical next step:\n" +
       "- Use `update`, `forget`, `move_memory`, or `relate` after inspection.",
@@ -2665,6 +2680,10 @@ server.registerTool(
       if (note.tags.length > 0) lines.push(`tags: ${note.tags.join(", ")}`);
       lines.push("");
       lines.push(note.content);
+      if (note.relationships) {
+        lines.push("");
+        lines.push(formatRelationshipPreview(note.relationships));
+      }
       lines.push("");
     }
     if (notFound.length > 0) {
@@ -3166,7 +3185,8 @@ server.registerTool(
       "- You need exact note contents; use `get`\n" +
       "- You need direct semantic matches for a query; use `recall`\n\n" +
       "Returns:\n" +
-      "- A synthesized project-level summary based on stored memories\n\n" +
+      "- A synthesized project-level summary based on stored memories\n" +
+      "- Bounded 1-hop relationship previews on orientation entry points (primaryEntry and suggestedNext)\n\n" +
       "Read-only.\n\n" +
       "Typical next step:\n" +
       "- Use `recall` or `list` to drill down into specific areas.",
@@ -3453,6 +3473,7 @@ server.registerTool(
 
     // Enrich fallback primaryEntry when no anchors exist
     let fallbackEnriched: { provenance?: { lastUpdatedAt: string; lastCommitHash: string; lastCommitMessage: string; recentlyChanged: boolean }; confidence?: "high" | "medium" | "low" } = {};
+    let fallbackRelationships: { relationships?: RelationshipPreview } = {};
     if (!primaryAnchor && recent[0]) {
       const fallbackNote = recent[0].note;
       const vault = noteVaultMap.get(fallbackNote.id);
@@ -3462,6 +3483,12 @@ server.registerTool(
         const confidence = computeConfidence(fallbackNote.lifecycle, fallbackNote.updatedAt, 0);
         fallbackEnriched = { provenance, confidence };
       }
+      const preview = await getRelationshipPreview(
+        fallbackNote,
+        vaultManager.allKnownVaults(),
+        { activeProjectId: project.id, limit: 3 }
+      );
+      if (preview) fallbackRelationships = { relationships: preview };
     }
 
     const orientation: ProjectSummaryResult["orientation"] = {
@@ -3480,6 +3507,7 @@ server.registerTool(
               ? "Most recent note — no high-centrality anchors found"
               : "Only note available",
             ...fallbackEnriched,
+            ...fallbackRelationships,
           },
       suggestedNext: anchors.slice(1, 4).map((a, i) => ({
         id: a.id,
@@ -3507,10 +3535,16 @@ server.registerTool(
     if (orientation.primaryEntry.confidence) {
       sections.push(`  Confidence: ${orientation.primaryEntry.confidence}`);
     }
+    if (orientation.primaryEntry.relationships) {
+      sections.push(`  ${formatRelationshipPreview(orientation.primaryEntry.relationships)}`);
+    }
     if (orientation.suggestedNext.length > 0) {
       sections.push(`Then check:`);
       for (const next of orientation.suggestedNext) {
         sections.push(`  - ${next.title} (\`${next.id}\`) — ${next.rationale}${next.confidence ? ` [${next.confidence}]` : ""}`);
+        if (next.relationships) {
+          sections.push(`    ${formatRelationshipPreview(next.relationships)}`);
+        }
       }
     }
     if (orientation.warnings && orientation.warnings.length > 0) {
