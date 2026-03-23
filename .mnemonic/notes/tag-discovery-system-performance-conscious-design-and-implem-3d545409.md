@@ -9,7 +9,7 @@ tags:
   - implemented
 lifecycle: permanent
 createdAt: '2026-03-15T13:43:54.754Z'
-updatedAt: '2026-03-23T20:43:53.480Z'
+updatedAt: '2026-03-23T21:42:26.536Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 memoryVersion: 1
@@ -160,3 +160,14 @@ If full corpus browsing remains useful for administration or manual exploration,
 ✅ Better bounded outputs for LLM consumers
 ✅ Original anti-hallucination goal preserved
 ✅ Documentation and agent guidance can be tightened around the new contract
+
+## Specificity tuning follow-up
+
+After dogfooding the first note-oriented release, scoring was rebalanced toward specificity because broad tags were still dominating the top results for clearly scoped prompts.
+
+- stronger exact-match boost for tags named directly in the note context
+- lower usage-count weight so popularity acts as a tie-breaker rather than the primary ranking signal
+- average per-note context match is used instead of letting large broad tag clusters dominate via raw totals
+- conditional generic-tag penalty for broad high-frequency single-token tags when a strong specific candidate exists
+- generic prompts fall back toward broader canonical tags instead of returning full inventory output
+- browse mode remains unchanged and inventory-oriented
