@@ -5,6 +5,7 @@ import path from "path";
 import { execFile } from "child_process";
 import { promisify } from "util";
 import { fileURLToPath } from "url";
+import http from "http";
 
 import { GetResultSchema, ProjectSummaryResultSchema, RecallResultSchema } from "../src/structured-content.js";
 
@@ -22,11 +23,40 @@ beforeAll(async () => {
   await execFileAsync("npm", ["run", "build"], { cwd: repoRoot });
 }, 120000);
 
+async function startFakeEmbeddingServer(): Promise<{ url: string; close: () => Promise<void> }> {
+  const server = http.createServer((req, res) => {
+    if (req.method !== "POST" || req.url !== "/api/embed") {
+      res.writeHead(404).end();
+      return;
+    }
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ embeddings: [[0.1, 0.2, 0.3]] }));
+  });
+
+  await new Promise<void>((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", () => resolve());
+  });
+
+  const address = server.address();
+  if (!address || typeof address === "string") {
+    throw new Error("Could not determine fake embedding server address");
+  }
+
+  return {
+    url: `http://127.0.0.1:${address.port}`,
+    close: () => new Promise<void>((resolve, reject) => {
+      server.close((err) => err ? reject(err) : resolve());
+    }),
+  };
+}
+
 async function callLocalMcpMethod(
   vaultDir: string,
   id: number,
   method: string,
   params: Record<string, unknown>,
+  options?: { ollamaUrl?: string },
 ): Promise<{ id?: number; result?: Record<string, unknown> }> {
   const messages = [
     {
@@ -55,6 +85,7 @@ async function callLocalMcpMethod(
         ...process.env,
         DISABLE_GIT: "true",
         VAULT_PATH: vaultDir,
+        ...(options?.ollamaUrl ? { OLLAMA_URL: options.ollamaUrl } : {}),
       },
       stdio: ["pipe", "pipe", "pipe"],
     });
@@ -92,11 +123,12 @@ async function callLocalMcpTool(
   vaultDir: string,
   toolName: string,
   args: Record<string, unknown>,
+  options?: { ollamaUrl?: string },
 ): Promise<{ text: string; structuredContent?: Record<string, unknown> }> {
   const response = await callLocalMcpMethod(vaultDir, 1, "tools/call", {
     name: toolName,
     arguments: args,
-  });
+  }, options);
   const text = response?.result?.content?.[0]?.text;
   if (!text) {
     throw new Error(`Missing tool response for ${toolName}`);
@@ -181,44 +213,49 @@ describe("Phase 4 relationship expansion", () => {
       const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-phase4-recall-"));
       tempDirs.push(vaultDir);
 
-      // Create anchor note
-      const anchor = await callLocalMcpTool(vaultDir, "remember", {
-        title: "Anchor Note",
-        content: "Anchor content",
-        cwd: vaultDir,
-        scope: "project",
-        lifecycle: "permanent",
-        tags: ["anchor"],
-      });
+      const embeddingServer = await startFakeEmbeddingServer();
+      try {
+        // Create anchor note
+        const anchor = await callLocalMcpTool(vaultDir, "remember", {
+          title: "Anchor Note",
+          content: "Anchor content",
+          cwd: vaultDir,
+          scope: "project",
+          lifecycle: "permanent",
+          tags: ["anchor"],
+        }, { ollamaUrl: embeddingServer.url });
 
-      // Create related note
-      const related = await callLocalMcpTool(vaultDir, "remember", {
-        title: "Related to Anchor",
-        content: "Related content",
-        cwd: vaultDir,
-        scope: "project",
-        lifecycle: "permanent",
-      });
+        // Create related note
+        const related = await callLocalMcpTool(vaultDir, "remember", {
+          title: "Related to Anchor",
+          content: "Related content",
+          cwd: vaultDir,
+          scope: "project",
+          lifecycle: "permanent",
+        }, { ollamaUrl: embeddingServer.url });
 
-      // Relate
-      await callLocalMcpTool(vaultDir, "relate", {
-        fromId: related.structuredContent?.id,
-        toId: anchor.structuredContent?.id,
-        type: "related-to",
-        cwd: vaultDir,
-      });
+        // Relate
+        await callLocalMcpTool(vaultDir, "relate", {
+          fromId: related.structuredContent?.id,
+          toId: anchor.structuredContent?.id,
+          type: "related-to",
+          cwd: vaultDir,
+        }, { ollamaUrl: embeddingServer.url });
 
-      // Recall
-      const result = await callLocalMcpTool(vaultDir, "recall", {
-        query: "anchor",
-        cwd: vaultDir,
-        limit: 1,
-      });
+        // Recall
+        const result = await callLocalMcpTool(vaultDir, "recall", {
+          query: "anchor",
+          cwd: vaultDir,
+          limit: 1,
+        }, { ollamaUrl: embeddingServer.url });
 
-      const parsed = RecallResultSchema.parse(result.structuredContent);
-      expect(parsed.results).toHaveLength(1);
-      // Top result should have relationships if it has any
-      expect(parsed.results[0].relationships).toBeDefined();
+        const parsed = RecallResultSchema.parse(result.structuredContent);
+        expect(parsed.results).toHaveLength(1);
+        // Top result should have relationships if it has any
+        expect(parsed.results[0].relationships).toBeDefined();
+      } finally {
+        await embeddingServer.close();
+      }
     }, 30000);
   });
 
