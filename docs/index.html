@@ -1309,6 +1309,8 @@
 <span class="note">    user-prefs-d4e5f6.md</span>
 <span class="dir">  embeddings/</span>
 <span class="gray">    *.json  ← gitignored</span>
+<span class="dir">  projections/</span>
+<span class="gray">    *.json  ← gitignored</span>
         </div>
       </div>
 
@@ -1326,6 +1328,8 @@
 <span class="note">      jwt-migration-a1b2c3.md</span>
 <span class="dir">    embeddings/</span>
 <span class="gray">      *.json  ← gitignored</span>
+<span class="dir">    projections/</span>
+<span class="gray">      *.json  ← gitignored</span>
         </div>
       </div>
     </div>
@@ -1335,7 +1339,8 @@
     </p>
 
     <div class="recall-flow fade-up">
-      <h3>Recall flow &mdash; project-boosted semantic search</h3>
+      <h3>Recall flow &mdash; projection-enhanced semantic search</h3>
+      <p class="section-desc" style="margin-bottom:16px;font-size:0.875rem;">Before embedding, notes are projected into clean structured text: title, lifecycle, tags, summary, and h1–h3 headings. No prose noise, no markdown formatting — just the signal that matters for similarity.</p>
       <div class="flow-steps">
         <div class="flow-step">
           <div class="flow-step-box" style="border-color:rgba(74,222,128,0.25);color:var(--primary-lt)">recall query</div>
@@ -1343,7 +1348,12 @@
         </div>
         <div class="flow-arrow">&#x2192;</div>
         <div class="flow-step">
-          <div class="flow-step-box">embed query</div>
+          <div class="flow-step-box">project notes</div>
+          <div class="flow-step-label">clean signal</div>
+        </div>
+        <div class="flow-arrow">&#x2192;</div>
+        <div class="flow-step">
+          <div class="flow-step-box">embed + rank</div>
           <div class="flow-step-label">Ollama local</div>
         </div>
         <div class="flow-arrow">&#x2192;</div>

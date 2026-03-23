@@ -250,6 +250,7 @@ export class Storage {
   // ── Projections ────────────────────────────────────────────────────────────
 
   async writeProjection(projection: NoteProjection): Promise<void> {
+    await fs.mkdir(this.projectionsDir, { recursive: true });
     await fs.writeFile(
       this.projectionPath(projection.noteId),
       JSON.stringify(projection, null, 2),
