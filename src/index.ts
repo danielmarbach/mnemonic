@@ -530,10 +530,10 @@ function describeLifecycle(lifecycle: NoteLifecycle): string {
   return `lifecycle: ${lifecycle}`;
 }
 
-function formatNote(note: Note, score?: number): string {
+function formatNote(note: Note, score?: number, showRawRelated = true): string {
   const scoreStr = score !== undefined ? ` | similarity: ${score.toFixed(3)}` : "";
   const projectStr = note.project ? ` | project: ${note.projectName ?? note.project}` : " | global";
-  const relStr = note.relatedTo && note.relatedTo.length > 0
+  const relStr = showRawRelated && note.relatedTo && note.relatedTo.length > 0
     ? `\n**related:** ${note.relatedTo.map((r) => `\`${r.id}\` (${r.type})`).join(", ")}`
     : "";
   return (
@@ -2275,7 +2275,8 @@ server.registerTool(
         const formattedRelationships = relationships !== undefined
           ? `\n\n${formatRelationshipPreview(relationships)}`
           : "";
-        sections.push(`${formatNote(note, score)}${formattedHistory}${formattedRelationships}`);
+        // Suppress raw related IDs when enriched preview is shown to avoid duplication
+        sections.push(`${formatNote(note, score, relationships === undefined)}${formattedHistory}${formattedRelationships}`);
 
         structuredResults.push({
           id,
