@@ -4,6 +4,21 @@ All notable changes to `mnemonic` will be documented in this file.
 
 The format is loosely based on Keep a Changelog and uses semver-style version headings.
 
+## [0.16.0] - 2026-03-23
+
+### Added
+
+- Bounded 1-hop relationship expansion layer (`src/relationships.ts`): `recall`, `project_memory_summary`, and `get` now surface direct related notes as compact previews, scored by same-project priority, anchor status, recency, and confidence.
+- `recall` automatically attaches relationship previews to top results (top 1 by default, top 3 when result count is small). Previews appear in both text and structured output.
+- `project_memory_summary` orientation entries (`primaryEntry` and `suggestedNext`) include bounded relationship previews, including the fallback primaryEntry when no anchor notes exist.
+- `get` accepts an optional `includeRelationships` parameter; when true, each returned note includes a bounded 1-hop relationship preview in both text and structured output.
+
+### Changed
+
+- `RecallResult.results` entries now include an optional `relationships` field (`RelationshipPreview`).
+- `GetResult.notes` entries now include an optional `relationships` field (`RelationshipPreview`).
+- `OrientationNote` now includes an optional `relationships` field (`RelationshipPreview`).
+
 ## [0.15.0] - 2026-03-23
 
 ### Added
