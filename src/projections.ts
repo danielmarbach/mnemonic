@@ -48,7 +48,7 @@ export function extractProjectionSummary(note: Note): string {
     const trimmed = para.trim();
     if (!trimmed) continue;
     const paraLines = trimmed.split("\n");
-    const isListBlock = paraLines.some(l => /^\s*[-*+]/.test(l.trim()));
+    const isListBlock = paraLines.some(l => /^\s*[-*+]|\s*\d+\.\s/.test(l.trim()));
     if (isListBlock) {
       const plain = paraLines
         .map(l => l.replace(/^\s*[-*+]\s*/, "").replace(/^\s*\d+\.\s*/, "").trim())
