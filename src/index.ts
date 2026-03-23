@@ -19,6 +19,7 @@ import {
   resolveEffectiveConsolidationMode,
 } from "./consolidate.js";
 import { selectRecallResults } from "./recall.js";
+import { getRelationshipPreview } from "./relationships.js";
 import { cleanMarkdown } from "./markdown.js";
 import { MnemonicConfigStore, readVaultSchemaVersion, type MutationPushMode } from "./config.js";
 import {
@@ -77,6 +78,7 @@ import type {
   DiscoverTagsResult,
   ThemeSection,
   AnchorNote,
+  RelationshipPreview,
 } from "./structured-content.js";
 import {
   RememberResultSchema,
@@ -2207,7 +2209,13 @@ server.registerTool(
           changeType: "metadata-only change" | "minor edit" | "substantial update";
         };
       }>;
+      relationships?: RelationshipPreview;
     }> = [];
+    
+    // Determine how many top results get relationship expansion
+    // Top 1 by default, top 3 if result count is small
+    const recallRelationshipLimit = top.length <= 3 ? 3 : 1;
+    
     for (const [index, { id, score, vault, boosted }] of top.entries()) {
       const note = await readCachedNote(vault, id);
       if (note) {
@@ -2240,6 +2248,16 @@ server.registerTool(
           }
         }
 
+        // Add relationship preview for top N results (fail-soft)
+        let relationships: RelationshipPreview | undefined;
+        if (index < recallRelationshipLimit) {
+          relationships = await getRelationshipPreview(
+            note,
+            vaultManager.allKnownVaults(),
+            { activeProjectId: project?.id, limit: 3 }
+          );
+        }
+
         const formattedHistory = mode === "temporal" && history !== undefined
           ? `\n\n${formatTemporalHistory(history)}`
           : "";
@@ -2259,6 +2277,7 @@ server.registerTool(
           provenance,
           confidence,
           history,
+          relationships,
         });
       }
     }
@@ -2595,12 +2614,14 @@ server.registerTool(
     inputSchema: z.object({
       ids: z.array(z.string()).min(1).describe("One or more memory ids to fetch"),
       cwd: projectParam,
+      includeRelationships: z.boolean().optional().default(false).describe("Include bounded direct relationship previews (1-hop expansion, max 3 shown)"),
     }),
     outputSchema: GetResultSchema,
   },
-  async ({ ids, cwd }) => {
+  async ({ ids, cwd, includeRelationships }) => {
     await ensureBranchSynced(cwd);
 
+    const project = await resolveProject(cwd);
     const found: GetResult["notes"] = [];
     const notFound: string[] = [];
 
@@ -2611,6 +2632,16 @@ server.registerTool(
         continue;
       }
       const { note, vault } = result;
+      
+      let relationships: RelationshipPreview | undefined;
+      if (includeRelationships) {
+        relationships = await getRelationshipPreview(
+          note,
+          vaultManager.allKnownVaults(),
+          { activeProjectId: project?.id, limit: 3 }
+        );
+      }
+      
       found.push({
         id: note.id,
         title: note.title,
@@ -2623,6 +2654,7 @@ server.registerTool(
         createdAt: note.createdAt,
         updatedAt: note.updatedAt,
         vault: storageLabel(vault),
+        relationships,
       });
     }
 
@@ -3400,8 +3432,24 @@ server.registerTool(
       return { provenance, confidence };
     };
 
+    // Helper to enrich an anchor with relationships (1-hop expansion)
+    const enrichOrientationNoteWithRelationships = async (anchor: AnchorNote) => {
+      const vault = noteVaultMap.get(anchor.id);
+      if (!vault) return {};
+      const note = await vault.storage.readNote(anchor.id);
+      if (!note) return {};
+      const relationships = await getRelationshipPreview(
+        note,
+        vaultManager.allKnownVaults(),
+        { activeProjectId: project.id, limit: 3 }
+      );
+      return { relationships };
+    };
+
     const primaryEnriched = primaryAnchor ? await enrichOrientationNote(primaryAnchor) : {};
+    const primaryRelationships = primaryAnchor ? await enrichOrientationNoteWithRelationships(primaryAnchor) : {};
     const suggestedEnriched = await Promise.all(anchors.slice(1, 4).map(enrichOrientationNote));
+    const suggestedRelationships = await Promise.all(anchors.slice(1, 4).map(enrichOrientationNoteWithRelationships));
 
     // Enrich fallback primaryEntry when no anchors exist
     let fallbackEnriched: { provenance?: { lastUpdatedAt: string; lastCommitHash: string; lastCommitMessage: string; recentlyChanged: boolean }; confidence?: "high" | "medium" | "low" } = {};
@@ -3423,6 +3471,7 @@ server.registerTool(
             title: primaryAnchor.title,
             rationale: `Centrality ${primaryAnchor.centrality}, connects ${primaryAnchor.connectionDiversity} themes`,
             ...primaryEnriched,
+            ...primaryRelationships,
           }
         : {
             id: recent[0]?.note.id ?? projectEntries[0]?.note.id ?? "",
@@ -3437,6 +3486,7 @@ server.registerTool(
         title: a.title,
         rationale: `Centrality ${a.centrality}, connects ${a.connectionDiversity} themes`,
         ...suggestedEnriched[i],
+        ...suggestedRelationships[i],
       })),
     };
 
