@@ -861,8 +861,17 @@ export interface RelationshipPreview {
 export interface DiscoverTagsResult extends Record<string, unknown> {
   action: "tags_discovered";
   project?: { id: string; name: string };
+  mode: "suggest" | "browse";
   scope: "project" | "global" | "all";
-  tags: Array<{
+  recommendedTags?: Array<{
+    tag: string;
+    usageCount: number;
+    example?: string;
+    reason?: string;
+    lifecycleTypes: NoteLifecycle[];
+    isTemporaryOnly: boolean;
+  }>;
+  tags?: Array<{
     tag: string;
     usageCount: number;
     examples: string[];
@@ -878,17 +887,25 @@ export interface DiscoverTagsResult extends Record<string, unknown> {
 export const DiscoverTagsResultSchema = z.object({
   action: z.literal("tags_discovered"),
   project: z.object({ id: z.string(), name: z.string() }).optional(),
+  mode: z.enum(["suggest", "browse"]),
   scope: z.enum(["project", "global", "all"]),
+  recommendedTags: z.array(z.object({
+    tag: z.string(),
+    usageCount: z.number(),
+    example: z.string().optional(),
+    reason: z.string().optional(),
+    lifecycleTypes: z.array(_NoteLifecycle),
+    isTemporaryOnly: z.boolean(),
+  })).optional(),
   tags: z.array(z.object({
     tag: z.string(),
     usageCount: z.number(),
     examples: z.array(z.string()),
     lifecycleTypes: z.array(_NoteLifecycle),
     isTemporaryOnly: z.boolean(),
-  })),
+  })).optional(),
   totalTags: z.number(),
   totalNotes: z.number(),
   vaultsSearched: z.number(),
   durationMs: z.number(),
 });
-

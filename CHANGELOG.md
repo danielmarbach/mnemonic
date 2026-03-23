@@ -18,6 +18,7 @@ The format is loosely based on Keep a Changelog and uses semver-style version he
 - `RecallResult.results` entries now include an optional `relationships` field (`RelationshipPreview`).
 - `GetResult.notes` entries now include an optional `relationships` field (`RelationshipPreview`).
 - `OrientationNote` now includes an optional `relationships` field (`RelationshipPreview`).
+- `discover_tags` now defaults to note-oriented tag suggestions using title/content/query context, returning bounded `recommendedTags`; broader inventory output is now explicit via `mode: "browse"`.
 
 ## [0.15.0] - 2026-03-23
 
