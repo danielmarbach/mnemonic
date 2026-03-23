@@ -9,32 +9,67 @@ tags:
   - implemented
 lifecycle: permanent
 createdAt: '2026-03-15T13:43:54.754Z'
-updatedAt: '2026-03-15T15:05:48.647Z'
+updatedAt: '2026-03-23T20:43:53.480Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 memoryVersion: 1
 ---
 ## Current State
 
-The labeling system in mnemonic currently uses vault labels and note tags in an ad-hoc manner. Tagging success depends on consistent terminology across sessions (e.g., "bug" vs "bugs" vs "bugfix").
+The labeling system in mnemonic currently uses vault labels and note tags in an ad-hoc manner. Tagging success depends on consistent terminology across sessions (e.g., `bug` vs `bugs` vs `bugfix`).
 
 ## Implementation Status
 
 **Phase 1: IMPLEMENTED** ✅
 
-The `discover_tags` MCP tool is now available in `src/index.ts` with:
+The current `discover_tags` MCP tool is available in `src/index.ts` with:
 
 - Input parameters: `cwd`, `scope`, `storedIn` (matching `list` tool semantics)
-- Output: Tags sorted by usageCount with examples, lifecycleTypes, and isTemporaryOnly flag
+- Output: tags sorted by usageCount with examples, lifecycleTypes, and isTemporaryOnly flag
 - structuredContent schema in `src/structured-content.ts`
 - Integration test coverage in `tests/mcp.integration.test.ts`
 - Performance telemetry: `durationMs` in response
+
+## Updated Design Direction
+
+The current implementation proved the value of canonical tag discovery, but its broad structured output can become too large and can expose many unrelated tags to the model.
+
+**New direction:** keep the tool name `discover_tags`, but make its default behavior note-oriented rather than corpus-oriented.
+
+### Default behavior should become compact and note-specific
+
+The caller should provide note context such as:
+
+- `title`
+- `content`
+- `query`
+- optional candidate tags
+
+The tool should then return ranked canonical tag suggestions for that note instead of the entire tag inventory.
+
+### Ranking principle
+
+Rank by:
+
+1. relevance to the note context
+2. usage count as a canonicality boost
+3. lifecycle distribution as a quality signal
+
+This preserves the original anti-fragmentation goal without overwhelming the agent with unrelated but common tags.
+
+### Output principle
+
+Default structured output should be compact:
+
+- recommended tags for the note
+- small evidence payload, such as one example title or a short reason
+- no full corpus-wide tag dump unless broad browsing is explicitly requested
 
 ## Performance-Safe Design Decisions
 
 ### Current Recall Performance Model
 
-Recall flow from ARCHITECTURE.md and recall.ts:
+Recall flow from `ARCHITECTURE.md` and `recall.ts`:
 
 1. Embed query via Ollama (50-200ms)
 2. Load embeddings from disk (I/O bound)
@@ -46,7 +81,7 @@ Recall flow from ARCHITECTURE.md and recall.ts:
 
 ### Tag Discovery Impact
 
-**discover_tags workflow**:
+**Current discover_tags workflow**:
 
 - List note IDs from vaults (disk scan)
 - Read each note to extract tags (parallel I/O)
@@ -62,218 +97,66 @@ Performance data:
 
 ### Critical Design Choice: Manual Tool
 
-**Rejected**: Auto-run tag discovery before every remember
+**Rejected**: Auto-run tag discovery before every `remember`
 
 - Would add 100ms-2s latency to each write
 - Violates MCP ergonomics principle
 
-**Accepted**: MCP tool discover_tags that agent calls intentionally
+**Accepted**: MCP tool `discover_tags` that the agent calls intentionally
 
 - Agent decides when tag discovery adds value
-- Typically: before first remember in session or for new topics
-- Keeps performance predictable
+- Tag discovery should be used when tag choice is ambiguous, not as a mandatory pre-step for every write
+- Keeps performance predictable and output bounded
 
 ### No Recall Algorithm Changes
 
 **Rejected**: Boost recall scores based on tag embeddings
 
-- Would require comparing query to note embeddings AND tag embeddings
-- Adds complexity to lightweight heuristic
+- Would require comparing query to note embeddings and tag embeddings
+- Adds complexity to the lightweight heuristic
 
-**Accepted**: Tag discovery for query expansion only
+**Accepted**: note-oriented tag suggestion without redesigning recall
 
-- Agent manually: discover similar tags → add to query → run recall
-- Example: discover shows "bug", "bugs", "bugfix" used → agent queries all three
-- Preserves simple recall algorithm
+- The tool can use note context to rank canonical tags
+- Recall stays focused on note retrieval, not tag-taxonomy management
+- This preserves the simple recall algorithm while improving write-time guidance
 
-## Implementation: Phase 1 (Now) ✅
+## Current Implementation: Phase 1 ✅
 
-### New MCP Tool: discover_tags
+### Current MCP Tool
 
-```typescript
-server.registerTool("discover_tags", {
-  title: "Discover Tags",
-  description:
-    "Discover existing tags across vaults with usage statistics and examples.\n\n" +
-    "Use this when:\n" +
-    "- Before `remember` to find canonical tag names for consistent terminology\n" +
-    "- Starting a new topic and unsure which tags exist (e.g., 'bug' vs 'bugs')\n" +
-    "- Identifying tags only on temporary notes (cleanup candidates)\n\n" +
-    "Do not use this when:\n" +
-    "- You need to browse notes by tag; use `list` with `tags` filter instead\n" +
-    "- You already know the exact tags you want to use\n\n" +
-    "Returns:\n" +
-    "- Tags sorted by usageCount (canonical tags first)\n" +
-    "- Example note titles (up to 3 per tag) showing usage context\n" +
-    "- lifecycleTypes showing temporary vs permanent distribution\n" +
-    "- isTemporaryOnly flag identifying cleanup candidates\n\n" +
-    "Typical next step:\n" +
-    "- Use canonical tags from discover_tags when appropriate, or create new tags when genuinely novel.\n\n" +
-    "Performance: O(n) where n = total notes scanned. Expect 100-200ms for 500 notes.\n\n" +
-    "Read-only.",
-  inputSchema: z.object({
-    cwd: projectParam,
-    scope: z.enum(["project", "global", "all"]).optional().default("all"),
-    storedIn: z.enum(["project-vault", "main-vault", "any"]).optional().default("any"),
-  }),
-  outputSchema: DiscoverTagsResultSchema,
-});
-```
+The current implementation is still corpus-oriented and returns vault-wide tag statistics. That remains useful as the starting point, but it should now be treated as an intermediate step rather than the final design.
 
-Workflow integration:
+Workflow intent:
 
-- Before `remember`, agent calls `discover_tags` with proposed title/content
-- Gets existing tags sorted by usage/relevance
-- Intelligently decides: reuse existing tag, create new, or consolidate synonyms
+- Agent provides proposed note context
+- Tool returns a compact set of relevant canonical tags
+- Agent reuses existing tags or creates a new tag only when genuinely novel
 
-Returns duration metric for performance monitoring.
+## Future Direction
 
-### Implemented Features
+### Phase 2: Note-Oriented Suggestions
 
-**discover_tags workflow** (implemented in `src/index.ts`):
+Evolve `discover_tags` so that the default mode accepts note context and returns a compact ranked set of canonical tag suggestions.
 
-1. Query all notes from relevant vaults (respecting scope and storedIn)
-2. Extract and count tag usage with stats:
-   - usageCount: how many notes use this tag
-   - examples: 2-3 note titles for context
-   - lifecycleTypes: temporary vs permanent distribution
-   - isTemporaryOnly: true if tag only appears on temporary notes
-3. Sort by usageCount descending
-4. Return with performance telemetry (durationMs)
+This phase should also tighten tool descriptions and related documentation so the project consistently describes `discover_tags` as a note-oriented suggestion tool rather than a general tag dump.
 
-Performance characteristics:
+### Broad Browsing Remains Explicit
 
-- Leverages existing Storage parallel read optimizations
-- O(n) where n = total notes scanned
-- Acceptable for typical vault sizes
-
-## Phase 2: Tag Embeddings (Optional Future)
-
-### Architecture
-
-Separate tag embedding index:
-
-```typescript
-interface TagEmbeddingIndex {
-  model: string;
-  updatedAt: string;
-  tags: Array<{
-    tag: string;
-    embedding: number[];
-    appearsIn: string[];  // note ids
-    lifecycleDistribution: { temporary: number; permanent: number };
-  }>;
-}
-```
-
-Stored at: `~/mnemonic-vault/tag-embeddings.json`
-
-**Characteristics**:
-
-- Size: ~200 tags × 1024 dims × 4 bytes ≈ 800KB
-- Load time: ~10-20ms (one-time per session)
-- Updated during sync (like note embeddings)
-- Not loaded automatically for every discover_tags call
-
-### When to Implement Phase 2
-
-**Triggers**:
-
-- discover_tags routinely takes >1s for typical use cases
-- Tag fragmentation persists despite Phase 1
-- User explicitly requests semantic suggestions
-
-**Benefits**:
-
-- Suggests "testing" when writing about "QA" or "quality assurance"
-- Finds related concepts across different terminology
-- Reduces manual tag discovery effort
-
-### Suggestion Algorithm
-
-Extended discover_tags with semantic matching:
-
-```typescript
-interface DiscoverTagsInput {
-  // ... existing fields
-  suggestFor?: string;  // Note content to match against
-}
-
-// When suggestFor is provided:
-1. Embed the suggestion text
-2. Compare against tag embedding index
-3. Return top matches with similarity scores
-4. Include exact matches first
-```
-
-## Phase 3: Structured Taxonomy (Optional Future)
-
-### Project-Specific Tag Categories
-
-Optional taxonomy hints in project memory policy:
-
-```typescript
-interface TagTaxonomyHints {
-  categories: Array<{
-    name: string;
-    description: string;
-    suggestedTags: string[];
-    appliesWhen?: string[];
-  }>;
-}
-```
-
-Example for mnemonic:
-
-```typescript
-{
-  categories: [
-    {
-      name: "Architecture",
-      description: "Design decisions and system structure",
-      suggestedTags: ["architecture", "design", "decision", "performance"],
-      appliesWhen: ["design", "architecture", "system"]
-    },
-    {
-      name: "Quality",
-      description: "Bugs, testing, quality-related work",
-      suggestedTags: ["bug", "testing", "ci", "dogfooding"],
-      appliesWhen: ["bug", "test", "quality"]
-    }
-  ]
-}
-```
-
-### Integration
-
-Extended discover_tags to include category hints when available, helping agents understand project-specific vocabulary.
+If full corpus browsing remains useful for administration or manual exploration, it should be an explicit mode rather than the default experience.
 
 ## Benefits
 
-1. **Consistency**: Reduces tag fragmentation (bug/bugs/bugfix → single "bug")
-2. **Discovery**: Helps agents find related content across semantically similar tags
-3. **Cleanup**: Identifies tags only on temporary notes
-4. **Onboarding**: New team members discover project vocabulary quickly
-5. **Performance**: No impact on recall algorithm or hot paths
-
-## Performance Monitoring
-
-Add telemetry to discover_tags:
-
-- notes_scanned: counter (via totalNotes in response)
-- duration_ms: timer (via durationMs in response)  
-- unique_tags_found: gauge (via totalTags in response)
-
-**Thresholds**:
-
-- <500ms: Excellent
-- 500ms-1s: Acceptable
-- >1s: Consider optimization or Phase 2
+1. **Consistency**: reduces tag fragmentation (`bug`/`bugs`/`bugfix` → canonical choice)
+2. **Relevance**: avoids flooding the agent with unrelated tags
+3. **Compactness**: reduces token-heavy structured output
+4. **Confidence**: still gives enough evidence to trust suggested tags
+5. **Performance**: keeps recall unchanged and preserves explicit invocation
 
 ## Alignment with Architecture Principles
 
-✅ Lightweight heuristic preserved (recall unchanged)
+✅ Lightweight heuristic preserved (`recall` unchanged)
 ✅ MCP ergonomics maintained (explicit tool, not automatic)
-✅ Simple to evolve (phased implementation)
-✅ File-first correctness (no new services)
-✅ Performance tenable (manual invocation, clear boundaries)
+✅ Better bounded outputs for LLM consumers
+✅ Original anti-hallucination goal preserved
+✅ Documentation and agent guidance can be tightened around the new contract
