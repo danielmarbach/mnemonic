@@ -358,4 +358,127 @@ describe("Phase 4 relationship expansion", () => {
       expect(withRelationships.length).toBeGreaterThan(0);
     }, 30000);
   });
+
+  describe("cross-vault relationship expansion", () => {
+    it("includes cross-vault related note in get relationship preview", async () => {
+      const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-phase4-xvault-"));
+      tempDirs.push(vaultDir);
+
+      // Create a note in the global vault (scope: global)
+      const globalNote = await callLocalMcpTool(vaultDir, "remember", {
+        title: "Global Design Note",
+        content: "A global context note",
+        cwd: vaultDir,
+        scope: "global",
+        lifecycle: "permanent",
+      });
+
+      // Create a note in the project vault (scope: project)
+      const projectNote = await callLocalMcpTool(vaultDir, "remember", {
+        title: "Project Note",
+        content: "A project-specific note",
+        cwd: vaultDir,
+        scope: "project",
+        lifecycle: "permanent",
+      });
+
+      // Relate project note → global note
+      await callLocalMcpTool(vaultDir, "relate", {
+        fromId: projectNote.structuredContent?.id,
+        toId: globalNote.structuredContent?.id,
+        type: "related-to",
+        cwd: vaultDir,
+      });
+
+      // Get project note with includeRelationships; should resolve the global note across vaults
+      const result = await callLocalMcpTool(vaultDir, "get", {
+        ids: [projectNote.structuredContent?.id],
+        cwd: vaultDir,
+        includeRelationships: true,
+      });
+
+      const parsed = GetResultSchema.parse(result.structuredContent);
+      expect(parsed.notes[0].relationships).toBeDefined();
+      expect(parsed.notes[0].relationships?.totalDirectRelations).toBe(1);
+      const shownIds = parsed.notes[0].relationships?.shown.map(r => r.id);
+      expect(shownIds).toContain(globalNote.structuredContent?.id);
+    }, 30000);
+
+    it("same-project notes rank before global notes in relationship preview", async () => {
+      const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-phase4-xvault-"));
+      tempDirs.push(vaultDir);
+
+      // Create a global note
+      const globalNote = await callLocalMcpTool(vaultDir, "remember", {
+        title: "Global Note",
+        content: "Global content",
+        cwd: vaultDir,
+        scope: "global",
+        lifecycle: "permanent",
+      });
+
+      // Create two project notes
+      const projectNote1 = await callLocalMcpTool(vaultDir, "remember", {
+        title: "Project Note 1",
+        content: "Project content 1",
+        cwd: vaultDir,
+        scope: "project",
+        lifecycle: "permanent",
+      });
+      const projectNote2 = await callLocalMcpTool(vaultDir, "remember", {
+        title: "Project Note 2",
+        content: "Project content 2",
+        cwd: vaultDir,
+        scope: "project",
+        lifecycle: "permanent",
+      });
+
+      // Create source note in project vault related to both global and project notes
+      const sourceNote = await callLocalMcpTool(vaultDir, "remember", {
+        title: "Source Note",
+        content: "Source content",
+        cwd: vaultDir,
+        scope: "project",
+        lifecycle: "permanent",
+      });
+
+      // Relate source to global first, then to project notes
+      await callLocalMcpTool(vaultDir, "relate", {
+        fromId: sourceNote.structuredContent?.id,
+        toId: globalNote.structuredContent?.id,
+        type: "related-to",
+        cwd: vaultDir,
+      });
+      await callLocalMcpTool(vaultDir, "relate", {
+        fromId: sourceNote.structuredContent?.id,
+        toId: projectNote1.structuredContent?.id,
+        type: "related-to",
+        cwd: vaultDir,
+      });
+      await callLocalMcpTool(vaultDir, "relate", {
+        fromId: sourceNote.structuredContent?.id,
+        toId: projectNote2.structuredContent?.id,
+        type: "related-to",
+        cwd: vaultDir,
+      });
+
+      const result = await callLocalMcpTool(vaultDir, "get", {
+        ids: [sourceNote.structuredContent?.id],
+        cwd: vaultDir,
+        includeRelationships: true,
+      });
+
+      const parsed = GetResultSchema.parse(result.structuredContent);
+      expect(parsed.notes[0].relationships).toBeDefined();
+      expect(parsed.notes[0].relationships?.totalDirectRelations).toBe(3);
+
+      // The shown entries (limit 3) should include both project notes; global note may be shown
+      // but project notes must rank before global when limit < total
+      const shown = parsed.notes[0].relationships!.shown;
+      const shownIds = shown.map(r => r.id);
+      // Both project notes should appear before the global note (same-project boost of 100)
+      expect(shownIds).toContain(projectNote1.structuredContent?.id);
+      expect(shownIds).toContain(projectNote2.structuredContent?.id);
+    }, 30000);
+  });
 });
