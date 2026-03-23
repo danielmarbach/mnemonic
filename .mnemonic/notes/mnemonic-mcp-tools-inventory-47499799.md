@@ -6,7 +6,7 @@ tags:
   - api
 lifecycle: permanent
 createdAt: '2026-03-07T17:59:25.498Z'
-updatedAt: '2026-03-22T10:23:48.137Z'
+updatedAt: '2026-03-23T21:01:42.867Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
@@ -30,7 +30,7 @@ This note lists every MCP tool exposed by mnemonic with a brief description. Kee
 | ---- | ----------- |
 | `consolidate` | Merge overlapping memories or find duplicates; supports dry-run, suggest-merges, and prune-superseded strategies |
 | `detect_project` | Detect effective project identity (id, name) for a working directory |
-| `discover_tags` | Discover existing tags across vaults with usage counts and examples |
+| `discover_tags` | Suggest canonical tags for a note using title/content/query context; `mode: "browse"` opts into broader inventory output |
 | `execute_migration` | Execute a named schema migration (dry-run first) |
 | `forget` | Delete a note and its embeddings, clean up relationship references |
 | `get` | Fetch one or more notes by exact id with optional preview, relations, and storage info |
@@ -83,3 +83,12 @@ The structured-content module still contains result schemas and types for remove
 - `"main-vault"` for the global vault
 - `"project-vault"` for the primary project vault (`.mnemonic/`)
 - `` `sub-vault:${vaultFolderName}` `` for named sub-vaults (`.mnemonic-<name>/`)
+
+## discover_tags behavior
+
+`discover_tags` now has two modes:
+
+- default `mode: "suggest"` returns bounded `recommendedTags` for a specific note
+- explicit `mode: "browse"` returns broader inventory-style `tags`
+
+The intended workflow is to pass note context when tag choice is ambiguous so the tool can suggest canonical tags without flooding the agent with unrelated ones.
