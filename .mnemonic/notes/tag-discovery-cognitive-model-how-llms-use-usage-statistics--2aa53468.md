@@ -9,7 +9,7 @@ tags:
   - llm-behavior
 lifecycle: permanent
 createdAt: '2026-03-15T13:47:29.424Z'
-updatedAt: '2026-03-23T20:43:28.540Z'
+updatedAt: '2026-03-23T21:41:41.269Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 memoryVersion: 1
@@ -80,3 +80,12 @@ A note-oriented `discover_tags` serves that goal better because it:
 - still gives enough evidence for confident pattern matching
 
 The LLM's strength is still pattern recognition, not deep semantic reasoning. The improvement is that pattern matching now happens over a relevant candidate set instead of the entire tag corpus.
+
+## Specificity-first ranking update
+
+`discover_tags` suggestion mode now prefers specificity when direct lexical evidence exists in the note context.
+
+- exact tag-name matches outweigh broad high-frequency tags
+- token overlap and note-context overlap outrank raw popularity
+- usage count remains a secondary canonicality signal rather than the dominant ranking factor
+- when no strong specific candidate exists, ranking falls back toward broader canonical tags instead of returning a full inventory dump
