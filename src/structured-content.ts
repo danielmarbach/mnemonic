@@ -93,6 +93,7 @@ export interface RecallResult extends Record<string, unknown> {
         changeType: "metadata-only change" | "minor edit" | "substantial update";
       };
     }>;
+    relationships?: RelationshipPreview;
   }>;
 }
 
@@ -136,6 +137,7 @@ export interface GetResult extends Record<string, unknown> {
     createdAt: string;
     updatedAt: string;
     vault: string;
+    relationships?: RelationshipPreview;
   }>;
   notFound: string[];
 }
@@ -355,6 +357,7 @@ export interface OrientationNote {
   rationale: string;
   provenance?: Provenance;
   confidence?: Confidence;
+  relationships?: RelationshipPreview;
 }
 
 export interface Provenance {
@@ -416,6 +419,22 @@ const _RelationshipType = z.enum(["related-to", "explains", "example-of", "super
  * - "sub-vault:.mnemonic-<name>" for submodule-specific project vaults.
  */
 const _VaultLabel = z.string();
+
+export const RelatedNotePreviewSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  projectId: z.string().optional(),
+  theme: z.string().optional(),
+  relationType: _RelationshipType.optional(),
+  updatedAt: z.string(),
+  confidence: z.enum(["high", "medium", "low"]).optional(),
+});
+
+export const RelationshipPreviewSchema = z.object({
+  totalDirectRelations: z.number(),
+  shown: z.array(RelatedNotePreviewSchema),
+  truncated: z.boolean(),
+});
 
 export const PersistenceStatusSchema = z.object({
   notePath: z.string(),
@@ -500,6 +519,7 @@ export const RecallResultSchema = z.object({
         changeType: z.enum(["metadata-only change", "minor edit", "substantial update"]),
       }).optional(),
     })).optional(),
+    relationships: RelationshipPreviewSchema.optional(),
   })),
 });
 
@@ -653,6 +673,7 @@ export const OrientationNoteSchema = z.object({
     recentlyChanged: z.boolean(),
   }).optional(),
   confidence: z.enum(["high", "medium", "low"]).optional(),
+  relationships: RelationshipPreviewSchema.optional(),
 });
 
 export const OrientationSchema = z.object({
@@ -721,6 +742,7 @@ export const GetResultSchema = z.object({
     createdAt: z.string(),
     updatedAt: z.string(),
     vault: _VaultLabel,
+    relationships: RelationshipPreviewSchema.optional(),
   })),
   notFound: z.array(z.string()),
 });
@@ -820,6 +842,22 @@ export const PolicyResultSchema = z.object({
   retry: PersistenceStatusSchema.shape.retry,
 });
 
+export interface RelatedNotePreview {
+  id: string;
+  title: string;
+  projectId?: string;
+  theme?: string;
+  relationType?: RelationshipType;
+  updatedAt: string;
+  confidence?: "high" | "medium" | "low";
+}
+
+export interface RelationshipPreview {
+  totalDirectRelations: number;
+  shown: RelatedNotePreview[];
+  truncated: boolean;
+}
+
 export interface DiscoverTagsResult extends Record<string, unknown> {
   action: "tags_discovered";
   project?: { id: string; name: string };
@@ -853,3 +891,4 @@ export const DiscoverTagsResultSchema = z.object({
   vaultsSearched: z.number(),
   durationMs: z.number(),
 });
+

@@ -432,7 +432,7 @@ Imported notes are written to the main vault with `lifecycle: permanent` and `sc
 | `discover_tags`            | List existing tags with usage counts and examples for consistent terminology |
 | `execute_migration`         | Execute a named migration (supports dry-run)                             |
 | `forget`                    | Delete note + embedding, git commit + push, cleanup relationships        |
-| `get`                       | Fetch one or more notes by exact id                                      |
+| `get`                       | Fetch one or more notes by exact id; `includeRelationships: true` adds bounded 1-hop previews |
 | `get_project_identity`      | Show effective project identity and remote override                      |
 | `get_project_memory_policy` | Show saved write scope, consolidation mode, and protected-branch settings |
 | `list`                      | List notes filtered by scope/tags/storage                                |

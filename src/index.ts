@@ -19,6 +19,7 @@ import {
   resolveEffectiveConsolidationMode,
 } from "./consolidate.js";
 import { selectRecallResults } from "./recall.js";
+import { getRelationshipPreview } from "./relationships.js";
 import { cleanMarkdown } from "./markdown.js";
 import { MnemonicConfigStore, readVaultSchemaVersion, type MutationPushMode } from "./config.js";
 import {
@@ -77,6 +78,7 @@ import type {
   DiscoverTagsResult,
   ThemeSection,
   AnchorNote,
+  RelationshipPreview,
 } from "./structured-content.js";
 import {
   RememberResultSchema,
@@ -528,10 +530,10 @@ function describeLifecycle(lifecycle: NoteLifecycle): string {
   return `lifecycle: ${lifecycle}`;
 }
 
-function formatNote(note: Note, score?: number): string {
+function formatNote(note: Note, score?: number, showRawRelated = true): string {
   const scoreStr = score !== undefined ? ` | similarity: ${score.toFixed(3)}` : "";
   const projectStr = note.project ? ` | project: ${note.projectName ?? note.project}` : " | global";
-  const relStr = note.relatedTo && note.relatedTo.length > 0
+  const relStr = showRawRelated && note.relatedTo && note.relatedTo.length > 0
     ? `\n**related:** ${note.relatedTo.map((r) => `\`${r.id}\` (${r.type})`).join(", ")}`
     : "";
   return (
@@ -560,6 +562,16 @@ function formatTemporalHistory(
     lines.push(`- \`${entry.commitHash.slice(0, 7)}\` ${entry.timestamp} — ${entry.message}${summary}`);
   }
   return lines.join("\n");
+}
+
+function formatRelationshipPreview(preview: RelationshipPreview): string {
+  const shown = preview.shown
+    .map(r => `${r.title} (\`${r.id}\`) [${r.relationType ?? "related-to"}]`)
+    .join(", ");
+  const more = preview.truncated
+    ? ` [+${preview.totalDirectRelations - preview.shown.length} more]`
+    : "";
+  return `**related (${preview.totalDirectRelations}):** ${shown}${more}`;
 }
 
 // ── Git commit message helpers ────────────────────────────────────────────────
@@ -2077,6 +2089,7 @@ server.registerTool(
       "- You just want to browse by tags or scope; use `list`\n\n" +
       "Returns:\n" +
       "- Ranked memory matches with scores, vault label, tags, lifecycle, and updated time\n" +
+      "- Bounded 1-hop relationship previews automatically attached to top results\n" +
       "- In temporal mode, optional compact history entries for top matches\n\n" +
       "Read-only.\n\n" +
       "Typical next step:\n" +
@@ -2207,7 +2220,13 @@ server.registerTool(
           changeType: "metadata-only change" | "minor edit" | "substantial update";
         };
       }>;
+      relationships?: RelationshipPreview;
     }> = [];
+    
+    // Determine how many top results get relationship expansion
+    // Top 1 by default, top 3 if result count is small
+    const recallRelationshipLimit = top.length <= 3 ? 3 : 1;
+    
     for (const [index, { id, score, vault, boosted }] of top.entries()) {
       const note = await readCachedNote(vault, id);
       if (note) {
@@ -2240,10 +2259,24 @@ server.registerTool(
           }
         }
 
+        // Add relationship preview for top N results (fail-soft)
+        let relationships: RelationshipPreview | undefined;
+        if (index < recallRelationshipLimit) {
+          relationships = await getRelationshipPreview(
+            note,
+            vaultManager.allKnownVaults(),
+            { activeProjectId: project?.id, limit: 3 }
+          );
+        }
+
         const formattedHistory = mode === "temporal" && history !== undefined
           ? `\n\n${formatTemporalHistory(history)}`
           : "";
-        sections.push(`${formatNote(note, score)}${formattedHistory}`);
+        const formattedRelationships = relationships !== undefined
+          ? `\n\n${formatRelationshipPreview(relationships)}`
+          : "";
+        // Suppress raw related IDs when enriched preview is shown to avoid duplication
+        sections.push(`${formatNote(note, score, relationships === undefined)}${formattedHistory}${formattedRelationships}`);
 
         structuredResults.push({
           id,
@@ -2259,6 +2292,7 @@ server.registerTool(
           provenance,
           confidence,
           history,
+          relationships,
         });
       }
     }
@@ -2583,7 +2617,8 @@ server.registerTool(
       "- You are still searching by topic; use `recall`\n" +
       "- You want to browse many notes; use `list`\n\n" +
       "Returns:\n" +
-      "- Full note content and metadata for the requested ids, including storage label\n\n" +
+      "- Full note content and metadata for the requested ids, including storage label\n" +
+      "- Bounded 1-hop relationship previews when `includeRelationships` is true (max 3 shown)\n\n" +
       "Read-only.\n\n" +
       "Typical next step:\n" +
       "- Use `update`, `forget`, `move_memory`, or `relate` after inspection.",
@@ -2595,12 +2630,14 @@ server.registerTool(
     inputSchema: z.object({
       ids: z.array(z.string()).min(1).describe("One or more memory ids to fetch"),
       cwd: projectParam,
+      includeRelationships: z.boolean().optional().default(false).describe("Include bounded direct relationship previews (1-hop expansion, max 3 shown)"),
     }),
     outputSchema: GetResultSchema,
   },
-  async ({ ids, cwd }) => {
+  async ({ ids, cwd, includeRelationships }) => {
     await ensureBranchSynced(cwd);
 
+    const project = await resolveProject(cwd);
     const found: GetResult["notes"] = [];
     const notFound: string[] = [];
 
@@ -2611,6 +2648,16 @@ server.registerTool(
         continue;
       }
       const { note, vault } = result;
+      
+      let relationships: RelationshipPreview | undefined;
+      if (includeRelationships) {
+        relationships = await getRelationshipPreview(
+          note,
+          vaultManager.allKnownVaults(),
+          { activeProjectId: project?.id, limit: 3 }
+        );
+      }
+      
       found.push({
         id: note.id,
         title: note.title,
@@ -2623,6 +2670,7 @@ server.registerTool(
         createdAt: note.createdAt,
         updatedAt: note.updatedAt,
         vault: storageLabel(vault),
+        relationships,
       });
     }
 
@@ -2633,6 +2681,10 @@ server.registerTool(
       if (note.tags.length > 0) lines.push(`tags: ${note.tags.join(", ")}`);
       lines.push("");
       lines.push(note.content);
+      if (note.relationships) {
+        lines.push("");
+        lines.push(formatRelationshipPreview(note.relationships));
+      }
       lines.push("");
     }
     if (notFound.length > 0) {
@@ -3134,7 +3186,8 @@ server.registerTool(
       "- You need exact note contents; use `get`\n" +
       "- You need direct semantic matches for a query; use `recall`\n\n" +
       "Returns:\n" +
-      "- A synthesized project-level summary based on stored memories\n\n" +
+      "- A synthesized project-level summary based on stored memories\n" +
+      "- Bounded 1-hop relationship previews on orientation entry points (primaryEntry and suggestedNext)\n\n" +
       "Read-only.\n\n" +
       "Typical next step:\n" +
       "- Use `recall` or `list` to drill down into specific areas.",
@@ -3400,11 +3453,28 @@ server.registerTool(
       return { provenance, confidence };
     };
 
+    // Helper to enrich an anchor with relationships (1-hop expansion)
+    const enrichOrientationNoteWithRelationships = async (anchor: AnchorNote) => {
+      const vault = noteVaultMap.get(anchor.id);
+      if (!vault) return {};
+      const note = await vault.storage.readNote(anchor.id);
+      if (!note) return {};
+      const relationships = await getRelationshipPreview(
+        note,
+        vaultManager.allKnownVaults(),
+        { activeProjectId: project.id, limit: 3 }
+      );
+      return { relationships };
+    };
+
     const primaryEnriched = primaryAnchor ? await enrichOrientationNote(primaryAnchor) : {};
+    const primaryRelationships = primaryAnchor ? await enrichOrientationNoteWithRelationships(primaryAnchor) : {};
     const suggestedEnriched = await Promise.all(anchors.slice(1, 4).map(enrichOrientationNote));
+    const suggestedRelationships = await Promise.all(anchors.slice(1, 4).map(enrichOrientationNoteWithRelationships));
 
     // Enrich fallback primaryEntry when no anchors exist
     let fallbackEnriched: { provenance?: { lastUpdatedAt: string; lastCommitHash: string; lastCommitMessage: string; recentlyChanged: boolean }; confidence?: "high" | "medium" | "low" } = {};
+    let fallbackRelationships: { relationships?: RelationshipPreview } = {};
     if (!primaryAnchor && recent[0]) {
       const fallbackNote = recent[0].note;
       const vault = noteVaultMap.get(fallbackNote.id);
@@ -3414,6 +3484,12 @@ server.registerTool(
         const confidence = computeConfidence(fallbackNote.lifecycle, fallbackNote.updatedAt, 0);
         fallbackEnriched = { provenance, confidence };
       }
+      const preview = await getRelationshipPreview(
+        fallbackNote,
+        vaultManager.allKnownVaults(),
+        { activeProjectId: project.id, limit: 3 }
+      );
+      if (preview) fallbackRelationships = { relationships: preview };
     }
 
     const orientation: ProjectSummaryResult["orientation"] = {
@@ -3423,6 +3499,7 @@ server.registerTool(
             title: primaryAnchor.title,
             rationale: `Centrality ${primaryAnchor.centrality}, connects ${primaryAnchor.connectionDiversity} themes`,
             ...primaryEnriched,
+            ...primaryRelationships,
           }
         : {
             id: recent[0]?.note.id ?? projectEntries[0]?.note.id ?? "",
@@ -3431,12 +3508,14 @@ server.registerTool(
               ? "Most recent note — no high-centrality anchors found"
               : "Only note available",
             ...fallbackEnriched,
+            ...fallbackRelationships,
           },
       suggestedNext: anchors.slice(1, 4).map((a, i) => ({
         id: a.id,
         title: a.title,
         rationale: `Centrality ${a.centrality}, connects ${a.connectionDiversity} themes`,
         ...suggestedEnriched[i],
+        ...suggestedRelationships[i],
       })),
     };
 
@@ -3457,10 +3536,16 @@ server.registerTool(
     if (orientation.primaryEntry.confidence) {
       sections.push(`  Confidence: ${orientation.primaryEntry.confidence}`);
     }
+    if (orientation.primaryEntry.relationships) {
+      sections.push(`  ${formatRelationshipPreview(orientation.primaryEntry.relationships)}`);
+    }
     if (orientation.suggestedNext.length > 0) {
       sections.push(`Then check:`);
       for (const next of orientation.suggestedNext) {
         sections.push(`  - ${next.title} (\`${next.id}\`) — ${next.rationale}${next.confidence ? ` [${next.confidence}]` : ""}`);
+        if (next.relationships) {
+          sections.push(`    ${formatRelationshipPreview(next.relationships)}`);
+        }
       }
     }
     if (orientation.warnings && orientation.warnings.length > 0) {
