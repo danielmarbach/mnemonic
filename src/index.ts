@@ -10,6 +10,7 @@ import { NOTE_LIFECYCLES, Storage, type Note, type NoteLifecycle, type Relations
 import { embed, cosineSimilarity, embedModel } from "./embeddings.js";
 import { type CommitResult, type PushResult, type SyncResult } from "./git.js";
 import { buildTemporalHistoryEntry, computeConfidence, getNoteProvenance } from "./provenance.js";
+import { getOrBuildProjection } from "./projections.js";
 
 import {
   filterRelationships,
@@ -760,6 +761,20 @@ async function wouldRelationshipCleanupTouchProjectVault(noteIds: string[]): Pro
   return false;
 }
 
+/**
+ * Get the text to use for embedding a note.
+ * Uses the projection's projectionText when available and fresh;
+ * falls back to the raw title+content if projection fails.
+ */
+async function embedTextForNote(storage: Storage, note: Note): Promise<string> {
+  try {
+    const projection = await getOrBuildProjection(storage, note);
+    return projection.projectionText;
+  } catch {
+    return `${note.title}\n\n${note.content}`;
+  }
+}
+
 async function embedMissingNotes(
   storage: Storage,
   noteIds?: string[],
@@ -789,7 +804,8 @@ async function embedMissingNotes(
       }
 
       try {
-        const vector = await embed(`${note.title}\n\n${note.content}`);
+        const text = await embedTextForNote(storage, note);
+        const vector = await embed(text);
         await storage.writeEmbedding({
           id: note.id,
           model: embedModel,
@@ -1756,7 +1772,8 @@ server.registerTool(
     let embeddingStatus: { status: "written" | "skipped"; reason?: string } = { status: "written" };
 
     try {
-      const vector = await embed(`${title}\n\n${cleanedContent}`);
+      const text = await embedTextForNote(vault.storage, note);
+      const vector = await embed(text);
       await vault.storage.writeEmbedding({ id, model: embedModel, embedding: vector, updatedAt: now });
     } catch (err) {
       embeddingStatus = { status: "skipped", reason: err instanceof Error ? err.message : String(err) };
@@ -2357,7 +2374,8 @@ server.registerTool(
     let embeddingStatus: { status: "written" | "skipped"; reason?: string } = { status: "written" };
 
     try {
-      const vector = await embed(`${updated.title}\n\n${updated.content}`);
+      const text = await embedTextForNote(vault.storage, updated);
+      const vector = await embed(text);
       await vault.storage.writeEmbedding({ id, model: embedModel, embedding: vector, updatedAt: now });
     } catch (err) {
       embeddingStatus = { status: "skipped", reason: err instanceof Error ? err.message : String(err) };
@@ -3334,11 +3352,15 @@ server.registerTool(
           }
           
           if (maxSim > 0.4) {
+            const projection = await entry.vault.storage.readProjection(entry.note.id);
+            const preview = projection?.summary
+              ? projection.summary.slice(0, 100)
+              : summarizePreview(entry.note.content, 100);
             globalCandidates.push({
               id: entry.note.id,
               title: entry.note.title,
               similarity: maxSim,
-              preview: summarizePreview(entry.note.content, 100),
+              preview,
             });
           }
         }
@@ -4705,7 +4727,8 @@ async function executeMerge(
 
   // Generate embedding for consolidated note
   try {
-    const vector = await embed(`${targetTitle}\n\n${consolidatedNote.content}`);
+    const text = await embedTextForNote(targetVault.storage, consolidatedNote);
+    const vector = await embed(text);
     await targetVault.storage.writeEmbedding({
       id: targetId,
       model: embedModel,

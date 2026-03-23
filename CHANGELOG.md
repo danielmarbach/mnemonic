@@ -4,6 +4,19 @@ All notable changes to `mnemonic` will be documented in this file.
 
 The format is loosely based on Keep a Changelog and uses semver-style version headings.
 
+## [0.15.0] - 2026-03-23
+
+### Added
+
+- Projection layer: compact, deterministic derived representations of notes used as embedding input instead of raw title+content. Projections extract title, lifecycle, tags, summary, and headings (h1–h3) into a structured format capped at 1200 characters, improving embedding quality by removing prose noise and markdown formatting.
+- `project_memory_summary` now uses projection summaries for related global note previews when available, falling back to content extraction. Previews are capped at 100 characters for consistent output.
+
+### Changed
+
+- All embedding operations (`remember`, `update`, `embedMissingNotes`, `consolidate`) now use `embedTextForNote()` which builds projections on demand and falls back to raw title+content if projection fails. Embeddings are never blocked by projection errors.
+- Projections are stored in `vaultPath/projections/` as JSON files alongside embeddings, gitignored and never synced. Each projection includes `noteId`, `title`, `summary`, `headings`, `tags`, `lifecycle`, `updatedAt` (staleness anchor), `projectionText` (what's embedded), and `generatedAt`.
+- Staleness detection is timestamp-based: a projection is stale when `projection.updatedAt !== note.updatedAt`. No hashing required.
+
 ## [0.14.0] - 2026-03-22
 
 ### Added
