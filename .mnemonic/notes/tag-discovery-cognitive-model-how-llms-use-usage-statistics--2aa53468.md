@@ -9,7 +9,7 @@ tags:
   - llm-behavior
 lifecycle: permanent
 createdAt: '2026-03-15T13:47:29.424Z'
-updatedAt: '2026-03-23T21:41:41.269Z'
+updatedAt: '2026-03-24T06:10:38.768Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 memoryVersion: 1
@@ -89,3 +89,11 @@ The LLM's strength is still pattern recognition, not deep semantic reasoning. Th
 - token overlap and note-context overlap outrank raw popularity
 - usage count remains a secondary canonicality signal rather than the dominant ranking factor
 - when no strong specific candidate exists, ranking falls back toward broader canonical tags instead of returning a full inventory dump
+
+## Generalized rule for other projects
+
+The specificity heuristic should not overfit to this repository's tag distribution.
+
+- a clearly specific exact match must still win even if the tag appears only once in a sparse project
+- generic prompts should still fall back to broad canonical tags instead of niche one-off tags
+- the branch into specificity-heavy ranking should only happen for exact matches that are genuinely specific, not weak lexical overlap from arbitrary project vocabulary
