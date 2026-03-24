@@ -16,8 +16,6 @@ projectName: mnemonic
 relatedTo:
   - id: documentation-split-for-readme-architecture-and-agent-4e20a50b
     type: related-to
-  - id: mnemonic-consolidate-tool-design-b9cbac6a
-    type: example-of
 memoryVersion: 1
 ---
 Added three missing workflow patterns to the agent instructions in `AGENT.md`, `README.md`, and `docs/index.html`.

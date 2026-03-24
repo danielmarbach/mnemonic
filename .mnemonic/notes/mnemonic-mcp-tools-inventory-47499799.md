@@ -12,10 +12,6 @@ projectName: mnemonic
 relatedTo:
   - id: mnemonic-relationship-graph-implementation-386be386
     type: related-to
-  - id: mnemonic-consolidate-tool-design-b9cbac6a
-    type: explains
-  - id: mcp-prompt-for-cross-tool-workflow-guidance-instead-of-syste-d090a839
-    type: related-to
   - id: remember-tool-checkedforexisting-is-schema-only-agent-hint-w-a2c94093
     type: related-to
 memoryVersion: 1
