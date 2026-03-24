@@ -11,7 +11,7 @@ tags:
   - persistence
 lifecycle: permanent
 createdAt: '2026-03-15T14:51:26.688Z'
-updatedAt: '2026-03-15T14:51:26.688Z'
+updatedAt: '2026-03-24T10:53:27.605Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
@@ -19,6 +19,8 @@ relatedTo:
     type: explains
   - id: parallel-consolidate-operations-can-leave-staged-local-only--e8c33780
     type: example-of
+  - id: git-resilience-retry-contract-concurrency-design-and-languag-351fab47
+    type: supersedes
 memoryVersion: 1
 ---
 Consolidate the retry contract gap fix into the main rollout note
