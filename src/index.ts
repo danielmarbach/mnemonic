@@ -2884,26 +2884,56 @@ server.registerTool(
 );
 
 // ── discover_tags ───────────────────────────────────────────────────────────
+type DiscoverTagStat = {
+  count: number;
+  examples: string[];
+  lifecycles: Set<NoteLifecycle>;
+  contextMatches: number;
+  exactCandidateMatch: boolean;
+};
+
+function tokenizeTagDiscoveryText(value: string): string[] {
+  return value
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter(Boolean);
+}
+
+function countTokenOverlap(tokens: Set<string>, other: Iterable<string>): number {
+  let matches = 0;
+  for (const token of other) {
+    if (tokens.has(token)) {
+      matches++;
+    }
+  }
+  return matches;
+}
+
+function hasExactTagContextMatch(tag: string, values: Array<string | undefined>): boolean {
+  const normalizedTag = tag.toLowerCase();
+  return values.some(value => value?.toLowerCase().includes(normalizedTag) ?? false);
+}
+
 server.registerTool(
   "discover_tags",
   {
     title: "Discover Tags",
     description:
-      "Discover existing tags across vaults with usage statistics and examples.\n\n" +
+      "Suggest canonical tags for a specific note before `remember` when tag choice is ambiguous.\n\n" +
       "Use this when:\n" +
-      "- Before `remember` to find canonical tag names for consistent terminology\n" +
-      "- Starting a new topic and unsure which tags exist (e.g., 'bug' vs 'bugs')\n" +
-      "- Identifying tags only on temporary notes (cleanup candidates)\n\n" +
+      "- You have a note title, content, or query and want compact tag suggestions\n" +
+      "- You want canonical project terminology without exposing lots of unrelated tags\n" +
+      "- You want to demote temporary-only tags unless they fit the note\n\n" +
       "Do not use this when:\n" +
       "- You need to browse notes by tag; use `list` with `tags` filter instead\n" +
-      "- You already know the exact tags you want to use\n\n" +
+      "- You already know the exact tags you want to use\n" +
+      "- You want broad inventory output but are not explicitly requesting `mode: \"browse\"`\n\n" +
       "Returns:\n" +
-      "- Tags sorted by usageCount (canonical tags first)\n" +
-      "- Example note titles (up to 3 per tag) showing usage context\n" +
-      "- lifecycleTypes showing temporary vs permanent distribution\n" +
-      "- isTemporaryOnly flag identifying cleanup candidates\n\n" +
+      "- Default: bounded `recommendedTags` ranked by note relevance first and usage count second\n" +
+      "- Each suggestion includes canonicality and lifecycle signals plus one compact example\n" +
+      "- Optional `mode: \"browse\"` returns broader inventory output\n\n" +
       "Typical next step:\n" +
-      "- Use canonical tags from discover_tags when appropriate, or create new tags when genuinely novel.\n\n" +
+      "- Reuse suggested canonical tags when they fit, or create a new tag only when genuinely novel.\n\n" +
       "Performance: O(n) where n = total notes scanned. Expect 100-200ms for 500 notes.\n\n" +
       "Read-only.",
     annotations: {
@@ -2913,6 +2943,12 @@ server.registerTool(
     },
     inputSchema: z.object({
       cwd: projectParam,
+      mode: z.enum(["suggest", "browse"]).optional().default("suggest"),
+      title: z.string().optional(),
+      content: z.string().optional(),
+      query: z.string().optional(),
+      candidateTags: z.array(z.string()).optional(),
+      lifecycle: z.enum(NOTE_LIFECYCLES).optional(),
       scope: z
         .enum(["project", "global", "all"])
         .optional()
@@ -2927,72 +2963,182 @@ server.registerTool(
         .optional()
         .default("any")
         .describe("Filter by vault storage label like list tool."),
+      limit: z.number().int().min(1).max(50).optional(),
     }),
     outputSchema: DiscoverTagsResultSchema,
   },
-  async ({ cwd, scope, storedIn }) => {
+  async ({ cwd, mode, title, content, query, candidateTags, lifecycle, scope, storedIn, limit }) => {
     await ensureBranchSynced(cwd);
     const startTime = Date.now();
 
     const { project, entries } = await collectVisibleNotes(cwd, scope, undefined, storedIn);
 
-    const tagStats = new Map<string, { count: number; examples: string[]; lifecycles: Set<NoteLifecycle> }>();
+    const tagStats = new Map<string, DiscoverTagStat>();
+    const candidateTagSet = new Set((candidateTags || []).map(tag => tag.toLowerCase()));
+    const contextValues = [title, content, query, ...(candidateTags || [])];
+    const contextTokens = new Set(tokenizeTagDiscoveryText(contextValues.filter(Boolean).join(" ")));
+    const isTemporaryTarget = lifecycle === "temporary";
+    const effectiveLimit = limit ?? (mode === "browse" ? 20 : 10);
 
     for (const { note } of entries) {
+      const noteTokens = new Set(tokenizeTagDiscoveryText(`${note.title} ${note.content} ${note.tags.join(" ")}`));
+      const contextMatches = contextTokens.size > 0 ? countTokenOverlap(contextTokens, noteTokens) : 0;
+
       for (const tag of note.tags) {
-        const stats = tagStats.get(tag) || { count: 0, examples: [], lifecycles: new Set<NoteLifecycle>() };
+        const stats = tagStats.get(tag) || {
+          count: 0,
+          examples: [],
+          lifecycles: new Set<NoteLifecycle>(),
+          contextMatches: 0,
+          exactCandidateMatch: false,
+        };
         stats.count++;
         if (stats.examples.length < 3) {
           stats.examples.push(note.title);
         }
         stats.lifecycles.add(note.lifecycle);
+        stats.contextMatches += contextMatches;
+        if (candidateTagSet.has(tag.toLowerCase())) {
+          stats.exactCandidateMatch = true;
+        }
         tagStats.set(tag, stats);
       }
     }
 
-    const tags = Array.from(tagStats.entries())
-      .map(([tag, stats]) => ({
-        tag,
-        usageCount: stats.count,
-        examples: stats.examples,
-        lifecycleTypes: Array.from(stats.lifecycles) as NoteLifecycle[],
-        isTemporaryOnly: stats.lifecycles.size === 1 && stats.lifecycles.has("temporary"),
-      }))
-      .sort((a, b) => b.usageCount - a.usageCount);
+    const rawTags = Array.from(tagStats.entries())
+      .map(([tag, stats]) => {
+        const lifecycleTypes = Array.from(stats.lifecycles) as NoteLifecycle[];
+        const isTemporaryOnly = stats.lifecycles.size === 1 && stats.lifecycles.has("temporary");
+        const tagTokens = tokenizeTagDiscoveryText(tag);
+        const exactContextMatch = stats.exactCandidateMatch || hasExactTagContextMatch(tag, contextValues);
+        const tagTokenOverlap = contextTokens.size > 0
+          ? countTokenOverlap(contextTokens, tagTokens)
+          : 0;
+        const averageContextMatch = stats.count > 0 ? stats.contextMatches / stats.count : 0;
+        const reason = exactContextMatch
+          ? "matches a candidate tag already present in the note context"
+          : tagTokenOverlap > 0 || stats.contextMatches > 0
+            ? "matches the note context and existing project usage"
+            : "high-usage canonical tag from existing project notes";
+
+        return {
+          tag,
+          usageCount: stats.count,
+          examples: stats.examples,
+          example: stats.examples[0],
+          reason,
+          lifecycleTypes,
+          isTemporaryOnly,
+          exactContextMatch,
+          tagTokenOverlap,
+          averageContextMatch,
+          isBroadSingleToken: tagTokens.length === 1,
+          isHighFrequency: stats.count >= 4,
+          specificityBoost: tagTokens.length > 1 ? 4 : 0,
+        };
+      });
+
+    const hasStrongSpecificCandidate = rawTags.some(tag =>
+      tag.exactContextMatch && (!tag.isBroadSingleToken || tag.usageCount > 1)
+    );
+
+    const tags = rawTags
+      .map((tag) => {
+        const hasWeakDirectMatch = tag.tagTokenOverlap <= 1 && tag.averageContextMatch <= 2;
+        const genericPenalty = hasStrongSpecificCandidate && tag.isBroadSingleToken && tag.isHighFrequency && hasWeakDirectMatch
+          ? 10
+          : 0;
+        const score = hasStrongSpecificCandidate
+          ? (tag.exactContextMatch ? 12 : 0) +
+            (tag.tagTokenOverlap * 5) +
+            tag.specificityBoost +
+            (tag.averageContextMatch * 3) +
+            (tag.usageCount * 0.1) -
+            genericPenalty -
+            (!isTemporaryTarget && tag.isTemporaryOnly ? 2 : 0)
+          : (tag.usageCount * 1.5) +
+            (tag.isTemporaryOnly ? -3 : 1) -
+            (!isTemporaryTarget && tag.isTemporaryOnly ? 2 : 0);
+
+        return {
+          ...tag,
+          score,
+        };
+      })
+      .sort((a, b) => b.score - a.score || b.usageCount - a.usageCount || a.tag.localeCompare(b.tag));
 
     const durationMs = Date.now() - startTime;
+    const vaultsSearched = new Set(entries.map(e => storageLabel(e.vault))).size;
 
     const lines: string[] = [];
-    if (project && scope !== "global") {
-      lines.push(`Tags for ${project.name} (scope: ${scope}):`);
+    if (mode === "browse") {
+      if (project && scope !== "global") {
+        lines.push(`Tags for ${project.name} (scope: ${scope}):`);
+      } else {
+        lines.push(`Tags (scope: ${scope}):`);
+      }
+      lines.push("");
+      lines.push(`Total: ${tags.length} unique tags across ${entries.length} notes (${durationMs}ms)`);
+      lines.push("");
+      lines.push("Tags sorted by usage:");
+      for (const t of tags.slice(0, effectiveLimit)) {
+        const lifecycleMark = t.isTemporaryOnly ? " [temp-only]" : "";
+        lines.push(`  ${t.tag} (${t.usageCount})${lifecycleMark}`);
+        if (t.examples.length > 0) {
+          lines.push(`    Example: "${t.examples[0]}"`);
+        }
+      }
+      if (tags.length > effectiveLimit) {
+        lines.push(`  ... and ${tags.length - effectiveLimit} more`);
+      }
     } else {
-      lines.push(`Tags (scope: ${scope}):`);
-    }
-    lines.push("");
-    lines.push(`Total: ${tags.length} unique tags across ${entries.length} notes (${durationMs}ms)`);
-    lines.push("");
-    lines.push("Tags sorted by usage:");
-    for (const t of tags.slice(0, 20)) {
-      const lifecycleMark = t.isTemporaryOnly ? " [temp-only]" : "";
-      lines.push(`  ${t.tag} (${t.usageCount})${lifecycleMark}`);
-      if (t.examples.length > 0) {
-        lines.push(`    Example: "${t.examples[0]}"`);
+      const suggestedTags = tags.slice(0, effectiveLimit);
+      if (project && scope !== "global") {
+        lines.push(`Suggested tags for ${project.name} (scope: ${scope}):`);
+      } else {
+        lines.push(`Suggested tags (scope: ${scope}):`);
+      }
+      lines.push("");
+      lines.push(`Considered ${tags.length} unique tags across ${entries.length} notes (${durationMs}ms)`);
+      lines.push("");
+      if (contextTokens.size === 0) {
+        lines.push("No note context provided; showing the most canonical existing tags.");
+        lines.push("");
+      }
+      lines.push("Recommended tags:");
+      for (const t of suggestedTags) {
+        const lifecycleMark = t.isTemporaryOnly ? " [temp-only]" : "";
+        lines.push(`  ${t.tag} (${t.usageCount})${lifecycleMark}`);
+        if (t.example) {
+          lines.push(`    Example: "${t.example}"`);
+        }
+        lines.push(`    Why: ${t.reason}`);
       }
     }
-    if (tags.length > 20) {
-      lines.push(`  ... and ${tags.length - 20} more`);
-    }
 
-    const structuredContent: DiscoverTagsResult = {
-      action: "tags_discovered",
-      project: project ? { id: project.id, name: project.name } : undefined,
-      scope: scope || "all",
-      tags,
-      totalTags: tags.length,
-      totalNotes: entries.length,
-      vaultsSearched: new Set(entries.map(e => storageLabel(e.vault))).size,
-      durationMs,
-    };
+    const structuredContent: DiscoverTagsResult = mode === "browse"
+      ? {
+          action: "tags_discovered",
+          project: project ? { id: project.id, name: project.name } : undefined,
+          mode,
+          scope: scope || "all",
+          tags: tags.slice(0, effectiveLimit).map(({ score, example, reason, ...tag }) => tag),
+          totalTags: tags.length,
+          totalNotes: entries.length,
+          vaultsSearched,
+          durationMs,
+        }
+      : {
+          action: "tags_discovered",
+          project: project ? { id: project.id, name: project.name } : undefined,
+          mode,
+          scope: scope || "all",
+          recommendedTags: tags.slice(0, effectiveLimit).map(({ score, examples, ...tag }) => tag),
+          totalTags: tags.length,
+          totalNotes: entries.length,
+          vaultsSearched,
+          durationMs,
+        };
 
     return { content: [{ type: "text", text: lines.join("\n") }], structuredContent };
   }
@@ -5275,7 +5421,7 @@ server.registerPrompt(
             "1. Need to store, refine, or connect knowledge about a topic? Start with `recall`, or use `list` when you need deterministic browsing by scope, storage, or tags.\n" +
             "2. If `recall` or `list` returns matching ids, use `get` to inspect the best match.\n" +
             "3. If one memory should be refined, call `update`.\n" +
-            "4. If no memory covers the topic, call `discover_tags` if tags matter, then call `remember`.\n" +
+            "4. If no memory covers the topic and tag choice is ambiguous, call `discover_tags` with note context, then call `remember`.\n" +
             "5. After storing or updating, use `relate` for strong connections, `consolidate` for overlap, and `move_memory` for wrong storage location.\n\n" +
             "### Anti-patterns\n\n" +
             "- Bad: call `remember` immediately because the user said 'remember'.\n" +
@@ -5293,7 +5439,7 @@ server.registerPrompt(
             "- project memory policy lookup\n\n" +
             "### Tiny examples\n\n" +
             "- Existing bug note found by `recall` -> inspect with `get` -> refine with `update`.\n" +
-            "- No matching note found by `recall` -> optional `discover_tags` -> create with `remember`.\n" +
+            "- No matching note found by `recall` -> optional `discover_tags` with note context -> create with `remember`.\n" +
             "- Two notes overlap heavily -> inspect -> clean up with `consolidate`.",
         },
       },

@@ -23,9 +23,10 @@ Before doing any substantive work:
 ### Before capturing
 
 Before calling `remember`:
-1. **Discover canonical tags** — call `discover_tags` with `cwd` to find existing tag terminology (e.g., is "bug" or "bugs" canonical in this project?).
-   - Use high-usageCount tags for consistency.
+1. **Discover canonical tags when needed** — if tag choice is ambiguous, call `discover_tags` with `cwd` plus note context (`title`, `content`, or `query`) to get compact, note-specific suggestions.
+   - Prefer suggested high-usage tags when they fit the note.
    - Use `isTemporaryOnly: true` tags cautiously — they may be cleanup candidates.
+   - Use `mode: "browse"` only when you intentionally need broader inventory output.
    - Create new tags when genuinely novel, but prefer canonical forms when they exist.
 2. `recall` first — if a related note exists, call `update` instead to avoid fragmentation.
 2. If you've made several closely-related captures in this session, consider `consolidate` before wrapping up.
@@ -245,7 +246,7 @@ Keep these high-level anchors in mind:
 |------|-------------|
 | `consolidate` | Merge multiple notes into one with relationship to sources |
 | `detect_project` | Resolve `cwd` to stable project id via git remote URL |
-| `discover_tags` | List existing tags with usage counts and examples for consistent terminology |
+| `discover_tags` | Suggest canonical tags for a note; `mode: "browse"` opts into broader inventory output |
 | `execute_migration` | Execute a named migration (supports dry-run) |
 | `forget` | Delete note + embedding, git commit + push, cleanup relationships |
 | `get` | Fetch one or more notes by exact id; `includeRelationships: true` adds bounded 1-hop relationship previews |
