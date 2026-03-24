@@ -7,7 +7,7 @@ tags:
   - phase-1
 lifecycle: permanent
 createdAt: '2026-03-22T11:45:34.639Z'
-updatedAt: '2026-03-22T12:42:24.212Z'
+updatedAt: '2026-03-24T10:54:54.335Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
@@ -15,6 +15,8 @@ relatedTo:
     type: related-to
   - id: temporal-recall-mode-design-for-phase-2-on-demand-history-ex-f8ee504f
     type: related-to
+  - id: enrichment-layer-design-provenance-temporal-recall-projectio-7af26f06
+    type: supersedes
 memoryVersion: 1
 ---
 # Phase 1 Provenance + Confidence Design Decision

@@ -9,7 +9,7 @@ tags:
   - architecture
 lifecycle: permanent
 createdAt: '2026-03-22T12:42:10.838Z'
-updatedAt: '2026-03-22T12:42:49.200Z'
+updatedAt: '2026-03-24T10:54:54.335Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
@@ -17,6 +17,8 @@ relatedTo:
     type: related-to
   - id: mnemonic-key-design-decisions-3f2a6273
     type: related-to
+  - id: enrichment-layer-design-provenance-temporal-recall-projectio-7af26f06
+    type: supersedes
 memoryVersion: 1
 ---
 Phase 2 adds an opt-in temporal recall mode for on-demand history exploration without changing default recall behavior.
