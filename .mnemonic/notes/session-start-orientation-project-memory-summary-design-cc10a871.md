@@ -8,9 +8,12 @@ tags:
   - themes
 lifecycle: permanent
 createdAt: '2026-03-22T09:30:00.463Z'
-updatedAt: '2026-03-22T10:22:31.145Z'
+updatedAt: '2026-03-24T10:55:20.655Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: mcp-workflow-ux-hint-prompt-tool-descriptions-and-session-st-e89a18fc
+    type: supersedes
 memoryVersion: 1
 ---
 ## Design Decision: Thematic-First Session Orientation

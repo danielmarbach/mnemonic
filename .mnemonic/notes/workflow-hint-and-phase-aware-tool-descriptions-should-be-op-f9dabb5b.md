@@ -10,9 +10,12 @@ tags:
   - decision
 lifecycle: permanent
 createdAt: '2026-03-19T21:11:58.752Z'
-updatedAt: '2026-03-19T21:11:58.752Z'
+updatedAt: '2026-03-24T10:55:20.655Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: mcp-workflow-ux-hint-prompt-tool-descriptions-and-session-st-e89a18fc
+    type: supersedes
 memoryVersion: 1
 ---
 Optimize mnemonic's workflow guidance for weaker models such as GLM-5 and MiniMax without regressing stronger models.
