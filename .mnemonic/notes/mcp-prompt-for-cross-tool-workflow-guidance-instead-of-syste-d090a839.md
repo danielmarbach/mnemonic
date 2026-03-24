@@ -8,7 +8,7 @@ tags:
   - decision
 lifecycle: permanent
 createdAt: '2026-03-14T14:45:16.894Z'
-updatedAt: '2026-03-19T21:21:49.271Z'
+updatedAt: '2026-03-24T10:55:20.655Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
@@ -16,6 +16,8 @@ relatedTo:
     type: related-to
   - id: mnemonic-mcp-tools-inventory-47499799
     type: related-to
+  - id: mcp-workflow-ux-hint-prompt-tool-descriptions-and-session-st-e89a18fc
+    type: supersedes
 memoryVersion: 1
 ---
 Added `mnemonic-workflow-hint` as an optional MCP prompt (via `server.registerPrompt`) to surface cross-tool workflow guidance without bloating individual tool descriptions.
