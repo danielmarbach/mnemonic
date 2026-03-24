@@ -19,21 +19,13 @@ relatedTo:
     type: related-to
   - id: dynamic-project-context-loading-plan-9f2ed29c
     type: related-to
-  - id: mnemonic-consolidate-tool-design-b9cbac6a
-    type: related-to
   - id: mnemonic-git-commit-protocol-standardization-f2ee3d5e
     type: related-to
   - id: project-identity-remote-override-for-forked-repos-8203a311
     type: related-to
-  - id: mcp-prompt-for-cross-tool-workflow-guidance-instead-of-syste-d090a839
-    type: related-to
   - id: remember-tool-checkedforexisting-is-schema-only-agent-hint-w-a2c94093
     type: related-to
   - id: performance-principles-for-file-first-mcp-and-git-backed-wor-4e7d3bc8
-    type: related-to
-  - id: phase-1-provenance-confidence-implementation-design-c2084fd4
-    type: related-to
-  - id: temporal-recall-mode-design-for-phase-2-on-demand-history-ex-f8ee504f
     type: related-to
 memoryVersion: 1
 ---

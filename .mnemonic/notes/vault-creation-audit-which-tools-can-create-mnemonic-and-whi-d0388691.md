@@ -14,8 +14,6 @@ projectName: mnemonic
 relatedTo:
   - id: project-memory-policy-defaults-storage-location-f563f634
     type: related-to
-  - id: multi-vault-architecture-mnemonic-name-sub-vault-support-f0e0320a
-    type: related-to
 memoryVersion: 1
 ---
 Audit of all cwd-accepting MCP tools against spurious project vault creation. Only three call sites use `getOrCreateProjectVault` — two are intentional, one was a bug (fixed 2026-03-12).

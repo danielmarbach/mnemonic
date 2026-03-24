@@ -11,9 +11,6 @@ createdAt: '2026-03-07T23:17:24.549Z'
 updatedAt: '2026-03-07T23:17:56.240Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
-relatedTo:
-  - id: mnemonic-consolidate-tool-design-b9cbac6a
-    type: example-of
 memoryVersion: 1
 ---
 When dogfooding mnemonic via direct stdio communication, complex JSON payloads with newlines and special characters can fail silently due to shell escaping issues.
