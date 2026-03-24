@@ -8,9 +8,12 @@ tags:
   - mcp-tool
 lifecycle: permanent
 createdAt: '2026-03-09T11:56:33.647Z'
-updatedAt: '2026-03-09T11:56:33.647Z'
+updatedAt: '2026-03-24T10:54:19.723Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: consolidate-tool-design-execute-merge-behavior-idempotency-a-0911e2cd
+    type: supersedes
 memoryVersion: 1
 ---
 Added `content` field to `mergePlan` in the `consolidate` execute-merge strategy.
