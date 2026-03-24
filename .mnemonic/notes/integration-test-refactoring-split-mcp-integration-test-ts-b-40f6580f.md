@@ -1,12 +1,12 @@
 ---
-title: 'integration test refactoring: split mcp.integration.test.ts by theme'
+title: 'Integration test refactoring: split mcp.integration.test.ts by theme'
 tags:
   - testing
   - refactoring
   - architecture
 lifecycle: permanent
 createdAt: '2026-03-23T20:25:40.303Z'
-updatedAt: '2026-03-23T20:25:40.303Z'
+updatedAt: '2026-03-24T09:25:53.584Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 memoryVersion: 1
@@ -15,7 +15,7 @@ After phase 4 merged, split `tests/mcp.integration.test.ts` into themed files an
 
 ## Why
 
-The monolith has grown to ~50 tests with no internal structure. `relationship-expansion.integration.test.ts` already duplicated the `callTool`/temp-vault boilerplate instead of reusing it, confirming the shared-helpers gap.
+The monolith had grown to ~50 tests with no internal structure. `relationship-expansion.integration.test.ts` already duplicated the `callTool`/temp-vault boilerplate instead of reusing it, confirming the shared-helpers gap.
 
 ## Proposed file split
 
@@ -28,8 +28,8 @@ The monolith has grown to ~50 tests with no internal structure. `relationship-ex
 
 ## Extract first
 
-Move shared setup (`callTool`, `createTempVault`, spawn helpers) into `tests/helpers/mcp.ts` before splitting. Once the helper module exists, update `relationship-expansion.integration.test.ts` to use it too.
+Move shared setup (`callLocalMcp`, `createTempVault`, spawn helpers) into `tests/helpers/mcp.ts` before splitting. Once the helper module exists, update `relationship-expansion.integration.test.ts` to use it too.
 
-## Constraint
+## Completed
 
-Do this as a dedicated PR after `phase4` merges to avoid merge conflicts.
+Created `tests/helpers/mcp.ts` with shared infrastructure. Split the monolith into the 6 themed files above. Deleted the original `mcp.integration.test.ts`. All 386 integration tests pass.
