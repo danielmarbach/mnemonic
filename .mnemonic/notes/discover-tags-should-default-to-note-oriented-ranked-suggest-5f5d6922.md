@@ -10,9 +10,12 @@ tags:
   - documentation
 lifecycle: permanent
 createdAt: '2026-03-23T20:41:59.873Z'
-updatedAt: '2026-03-23T20:41:59.873Z'
+updatedAt: '2026-03-24T10:55:45.308Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: tag-discovery-design-note-oriented-pivot-and-cognitive-model-31e928dc
+    type: supersedes
 memoryVersion: 1
 ---
 Shift `discover_tags` from corpus-oriented tag inventory output to note-oriented tag suggestion output.

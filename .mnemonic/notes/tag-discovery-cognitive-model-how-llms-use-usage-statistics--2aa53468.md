@@ -9,9 +9,12 @@ tags:
   - llm-behavior
 lifecycle: permanent
 createdAt: '2026-03-15T13:47:29.424Z'
-updatedAt: '2026-03-24T06:10:38.768Z'
+updatedAt: '2026-03-24T10:55:45.308Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: tag-discovery-design-note-oriented-pivot-and-cognitive-model-31e928dc
+    type: supersedes
 memoryVersion: 1
 ---
 ## Pattern Matching Over Deep Understanding
