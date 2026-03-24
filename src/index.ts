@@ -2909,6 +2909,11 @@ function countTokenOverlap(tokens: Set<string>, other: Iterable<string>): number
   return matches;
 }
 
+function hasExactTagContextMatch(tag: string, values: Array<string | undefined>): boolean {
+  const normalizedTag = tag.toLowerCase();
+  return values.some(value => value?.toLowerCase().includes(normalizedTag) ?? false);
+}
+
 server.registerTool(
   "discover_tags",
   {
@@ -2970,7 +2975,8 @@ server.registerTool(
 
     const tagStats = new Map<string, DiscoverTagStat>();
     const candidateTagSet = new Set((candidateTags || []).map(tag => tag.toLowerCase()));
-    const contextTokens = new Set(tokenizeTagDiscoveryText([title, content, query, ...(candidateTags || [])].filter(Boolean).join(" ")));
+    const contextValues = [title, content, query, ...(candidateTags || [])];
+    const contextTokens = new Set(tokenizeTagDiscoveryText(contextValues.filter(Boolean).join(" ")));
     const isTemporaryTarget = lifecycle === "temporary";
     const effectiveLimit = limit ?? (mode === "browse" ? 20 : 10);
 
@@ -2999,20 +3005,17 @@ server.registerTool(
       }
     }
 
-    const tags = Array.from(tagStats.entries())
+    const rawTags = Array.from(tagStats.entries())
       .map(([tag, stats]) => {
         const lifecycleTypes = Array.from(stats.lifecycles) as NoteLifecycle[];
         const isTemporaryOnly = stats.lifecycles.size === 1 && stats.lifecycles.has("temporary");
+        const tagTokens = tokenizeTagDiscoveryText(tag);
+        const exactContextMatch = stats.exactCandidateMatch || hasExactTagContextMatch(tag, contextValues);
         const tagTokenOverlap = contextTokens.size > 0
-          ? countTokenOverlap(contextTokens, tokenizeTagDiscoveryText(tag))
+          ? countTokenOverlap(contextTokens, tagTokens)
           : 0;
-        const score =
-          (stats.exactCandidateMatch ? 8 : 0) +
-          (tagTokenOverlap * 4) +
-          (stats.contextMatches * 2) +
-          (stats.count * 0.25) -
-          (!isTemporaryTarget && isTemporaryOnly ? 2 : 0);
-        const reason = stats.exactCandidateMatch
+        const averageContextMatch = stats.count > 0 ? stats.contextMatches / stats.count : 0;
+        const reason = exactContextMatch
           ? "matches a candidate tag already present in the note context"
           : tagTokenOverlap > 0 || stats.contextMatches > 0
             ? "matches the note context and existing project usage"
@@ -3026,6 +3029,38 @@ server.registerTool(
           reason,
           lifecycleTypes,
           isTemporaryOnly,
+          exactContextMatch,
+          tagTokenOverlap,
+          averageContextMatch,
+          isBroadSingleToken: tagTokens.length === 1,
+          isHighFrequency: stats.count >= 4,
+          specificityBoost: tagTokens.length > 1 ? 4 : 0,
+        };
+      });
+
+    const hasStrongSpecificCandidate = rawTags.some(tag => tag.exactContextMatch || tag.tagTokenOverlap >= 2);
+
+    const tags = rawTags
+      .map((tag) => {
+        const hasWeakDirectMatch = tag.tagTokenOverlap <= 1 && tag.averageContextMatch <= 2;
+        const genericPenalty = hasStrongSpecificCandidate && tag.isBroadSingleToken && tag.isHighFrequency && hasWeakDirectMatch
+          ? 10
+          : 0;
+        const score = hasStrongSpecificCandidate
+          ? (tag.exactContextMatch ? 12 : 0) +
+            (tag.tagTokenOverlap * 5) +
+            tag.specificityBoost +
+            (tag.averageContextMatch * 3) +
+            (tag.usageCount * 0.1) -
+            genericPenalty -
+            (!isTemporaryTarget && tag.isTemporaryOnly ? 2 : 0)
+          : (tag.usageCount * 0.6) +
+            (tag.tagTokenOverlap * 1.5) +
+            (tag.averageContextMatch * 0.5) -
+            (!isTemporaryTarget && tag.isTemporaryOnly ? 2 : 0);
+
+        return {
+          ...tag,
           score,
         };
       })

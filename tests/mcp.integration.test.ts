@@ -2229,10 +2229,21 @@ describe("local MCP script", () => {
 
     try {
       // Create notes with different tags and lifecycles
+      for (let i = 0; i < 4; i++) {
+        await callLocalMcp(vaultDir, "remember", {
+          title: `Broad design note ${i + 1}`,
+          content: "Design guidance for discover tags workflow and architecture decisions.",
+          tags: ["design", "architecture"],
+          lifecycle: "permanent",
+          scope: "global",
+          summary: "Create broad design note for ranking pressure",
+        }, embeddingServer.url);
+      }
+
       await callLocalMcp(vaultDir, "remember", {
         title: "Tag discovery test note one",
         content: "First note for tag discovery with permanent lifecycle.",
-        tags: ["test-tag", "permanent-only", "discovery"],
+        tags: ["test-tag", "permanent-only", "discovery", "discover_tags"],
         lifecycle: "permanent",
         scope: "global",
         summary: "Create first note for tag discovery test",
@@ -2241,7 +2252,7 @@ describe("local MCP script", () => {
       await callLocalMcp(vaultDir, "remember", {
         title: "Tag discovery test note two",
         content: "Second note for tag discovery also using test-tag.",
-        tags: ["test-tag", "mixed-lifecycle", "discovery"],
+        tags: ["test-tag", "mixed-lifecycle", "discovery", "discover_tags"],
         lifecycle: "permanent",
         scope: "global",
         summary: "Create second note for tag discovery test",
@@ -2257,8 +2268,8 @@ describe("local MCP script", () => {
       }, embeddingServer.url);
 
       const response = await callLocalMcpResponse(vaultDir, "discover_tags", {
-        title: "Improve test-tag discovery workflow",
-        content: "Tighten discovery behavior and canonical test-tag selection for note-oriented suggestions.",
+        title: "Tune discover_tags ranking",
+        content: "Make discover_tags suggestions prefer specific tags over generic design tags.",
         scope: "global",
       }, embeddingServer.url);
 
@@ -2266,13 +2277,14 @@ describe("local MCP script", () => {
       expect(structured?.["action"]).toBe("tags_discovered");
       expect(structured?.["mode"]).toBe("suggest");
       expect(structured?.["totalTags"]).toBeGreaterThan(0);
-      expect(structured?.["totalNotes"]).toBe(3);
+      expect(structured?.["totalNotes"]).toBe(7);
 
       const tags = structured?.["recommendedTags"] as Array<Record<string, unknown>>;
       expect(Array.isArray(tags)).toBe(true);
       expect(tags.length).toBeGreaterThan(0);
       expect(tags.length).toBeLessThanOrEqual(10);
       expect(structured?.["tags"]).toBeUndefined();
+      const rankedNames = tags.map((t) => String(t["tag"]));
 
       // Find the test-tag (should have usageCount 2)
       const testTag = tags.find((t) => t["tag"] === "test-tag");
@@ -2296,6 +2308,14 @@ describe("local MCP script", () => {
       expect(discoveryTag?.["isTemporaryOnly"]).toBe(false);
       expect((discoveryTag?.["lifecycleTypes"] as string[])).toContain("permanent");
       expect((discoveryTag?.["lifecycleTypes"] as string[])).toContain("temporary");
+      expect(rankedNames.indexOf("test-tag")).toBeGreaterThanOrEqual(0);
+      expect(rankedNames.indexOf("discover_tags")).toBeGreaterThanOrEqual(0);
+      if (rankedNames.includes("design")) {
+        expect(rankedNames.indexOf("discover_tags")).toBeLessThan(rankedNames.indexOf("design"));
+      }
+      if (rankedNames.includes("architecture")) {
+        expect(rankedNames.indexOf("discover_tags")).toBeLessThan(rankedNames.indexOf("architecture"));
+      }
 
       // Verify response text contains useful information
       expect(response.text).toContain("Suggested tags");
@@ -2344,6 +2364,49 @@ describe("local MCP script", () => {
       expect(tags.find((t) => t["tag"] === "temp-only")?.["isTemporaryOnly"]).toBe(true);
       expect(structured?.["recommendedTags"]).toBeUndefined();
       expect(response.text).toContain("Tags (scope: global)");
+    } finally {
+      await embeddingServer.close();
+    }
+  }, 15000);
+
+  it("keeps broad canonical tags near the top when the prompt is generic", async () => {
+    const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-vault-"));
+    tempDirs.push(vaultDir);
+    const embeddingServer = await startFakeEmbeddingServer();
+
+    try {
+      await callLocalMcp(vaultDir, "remember", {
+        title: "Architecture decision record",
+        content: "Design note about project structure and architecture guidance.",
+        tags: ["design", "architecture"],
+        lifecycle: "permanent",
+        scope: "global",
+        summary: "Create broad design note",
+      }, embeddingServer.url);
+
+      await callLocalMcp(vaultDir, "remember", {
+        title: "Project workflow note",
+        content: "Workflow guidance for organizing project knowledge.",
+        tags: ["workflow", "design"],
+        lifecycle: "permanent",
+        scope: "global",
+        summary: "Create workflow note",
+      }, embeddingServer.url);
+
+      const response = await callLocalMcpResponse(vaultDir, "discover_tags", {
+        title: "Improve project notes",
+        content: "Make project knowledge easier to use across sessions.",
+        scope: "global",
+      }, embeddingServer.url);
+
+      const structured = response.structuredContent;
+      expect(structured?.["mode"]).toBe("suggest");
+      const rankedTags = structured?.["recommendedTags"] as Array<Record<string, unknown>>;
+      expect(Array.isArray(rankedTags)).toBe(true);
+      const rankedNames = rankedTags.map((tag) => String(tag["tag"]));
+      expect(rankedNames.length).toBeGreaterThan(0);
+      expect(["design", "architecture", "workflow"]).toContain(rankedNames[0]);
+      expect(structured?.["tags"]).toBeUndefined();
     } finally {
       await embeddingServer.close();
     }
