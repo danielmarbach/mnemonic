@@ -3038,7 +3038,9 @@ server.registerTool(
         };
       });
 
-    const hasStrongSpecificCandidate = rawTags.some(tag => tag.exactContextMatch || tag.tagTokenOverlap >= 2);
+    const hasStrongSpecificCandidate = rawTags.some(tag =>
+      tag.exactContextMatch && (!tag.isBroadSingleToken || tag.usageCount > 1)
+    );
 
     const tags = rawTags
       .map((tag) => {
@@ -3054,9 +3056,8 @@ server.registerTool(
             (tag.usageCount * 0.1) -
             genericPenalty -
             (!isTemporaryTarget && tag.isTemporaryOnly ? 2 : 0)
-          : (tag.usageCount * 0.6) +
-            (tag.tagTokenOverlap * 1.5) +
-            (tag.averageContextMatch * 0.5) -
+          : (tag.usageCount * 1.5) +
+            (tag.isTemporaryOnly ? -3 : 1) -
             (!isTemporaryTarget && tag.isTemporaryOnly ? 2 : 0);
 
         return {

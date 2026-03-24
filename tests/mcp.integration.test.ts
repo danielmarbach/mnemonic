@@ -2393,6 +2393,24 @@ describe("local MCP script", () => {
         summary: "Create workflow note",
       }, embeddingServer.url);
 
+      await callLocalMcp(vaultDir, "remember", {
+        title: "Temporary scratchpad",
+        content: "Temporary working note with short-lived cleanup context.",
+        tags: ["temporary-notes", "implemented"],
+        lifecycle: "temporary",
+        scope: "global",
+        summary: "Create temporary noise note",
+      }, embeddingServer.url);
+
+      await callLocalMcp(vaultDir, "remember", {
+        title: "Implementation status",
+        content: "A consolidated implemented note about finished work items.",
+        tags: ["implemented", "consolidated"],
+        lifecycle: "permanent",
+        scope: "global",
+        summary: "Create implementation status noise note",
+      }, embeddingServer.url);
+
       const response = await callLocalMcpResponse(vaultDir, "discover_tags", {
         title: "Improve project notes",
         content: "Make project knowledge easier to use across sessions.",
@@ -2406,7 +2424,65 @@ describe("local MCP script", () => {
       const rankedNames = rankedTags.map((tag) => String(tag["tag"]));
       expect(rankedNames.length).toBeGreaterThan(0);
       expect(["design", "architecture", "workflow"]).toContain(rankedNames[0]);
+      if (rankedNames.includes("temporary-notes")) {
+        expect(rankedNames.indexOf("design")).toBeLessThan(rankedNames.indexOf("temporary-notes"));
+      }
+      if (rankedNames.includes("implemented")) {
+        expect(rankedNames.indexOf("design")).toBeLessThan(rankedNames.indexOf("implemented"));
+      }
+      if (rankedNames.includes("consolidated")) {
+        expect(rankedNames.indexOf("design")).toBeLessThan(rankedNames.indexOf("consolidated"));
+      }
       expect(structured?.["tags"]).toBeUndefined();
+    } finally {
+      await embeddingServer.close();
+    }
+  }, 15000);
+
+  it("prefers an exact specific tag even when it only exists once", async () => {
+    const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-vault-"));
+    tempDirs.push(vaultDir);
+    const embeddingServer = await startFakeEmbeddingServer();
+
+    try {
+      for (let i = 0; i < 4; i++) {
+        await callLocalMcp(vaultDir, "remember", {
+          title: `Broad design note ${i + 1}`,
+          content: "General design and architecture guidance.",
+          tags: ["design", "architecture"],
+          lifecycle: "permanent",
+          scope: "global",
+          summary: "Create broad design baseline note",
+        }, embeddingServer.url);
+      }
+
+      await callLocalMcp(vaultDir, "remember", {
+        title: "Cache invalidation issue",
+        content: "A focused note about cache invalidation behavior.",
+        tags: ["cache-invalidation"],
+        lifecycle: "permanent",
+        scope: "global",
+        summary: "Create one-off specific tag note",
+      }, embeddingServer.url);
+
+      const response = await callLocalMcpResponse(vaultDir, "discover_tags", {
+        title: "Fix cache-invalidation behavior",
+        content: "Investigate cache-invalidation for stale project data.",
+        scope: "global",
+      }, embeddingServer.url);
+
+      const structured = response.structuredContent;
+      expect(structured?.["mode"]).toBe("suggest");
+      const rankedTags = structured?.["recommendedTags"] as Array<Record<string, unknown>>;
+      expect(Array.isArray(rankedTags)).toBe(true);
+      const rankedNames = rankedTags.map((tag) => String(tag["tag"]));
+      expect(rankedNames.indexOf("cache-invalidation")).toBeGreaterThanOrEqual(0);
+      if (rankedNames.includes("design")) {
+        expect(rankedNames.indexOf("cache-invalidation")).toBeLessThan(rankedNames.indexOf("design"));
+      }
+      if (rankedNames.includes("architecture")) {
+        expect(rankedNames.indexOf("cache-invalidation")).toBeLessThan(rankedNames.indexOf("architecture"));
+      }
     } finally {
       await embeddingServer.close();
     }
