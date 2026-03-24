@@ -5,10 +5,14 @@ tags:
   - reindex
   - design-decision
   - embedding
+lifecycle: permanent
 createdAt: '2026-03-09T19:54:03.334Z'
-updatedAt: '2026-03-09T19:54:03.334Z'
+updatedAt: '2026-03-24T10:56:06.201Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: sync-redesign-decouple-embedding-from-git-force-flag-remove--6f2c1517
+    type: supersedes
 memoryVersion: 1
 ---
 Decided to redesign `sync` to always run the embedding step, regardless of whether a git remote exists. The `hasRemote` gate on embedding was an implementation detail leaking into user-visible behavior — the embedding index is local derived state and has no dependency on git.
