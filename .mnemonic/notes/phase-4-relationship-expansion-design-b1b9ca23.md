@@ -7,9 +7,12 @@ tags:
   - mnemonic
 lifecycle: permanent
 createdAt: '2026-03-23T19:43:46.893Z'
-updatedAt: '2026-03-23T19:45:05.295Z'
+updatedAt: '2026-03-24T10:54:54.335Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: enrichment-layer-design-provenance-temporal-recall-projectio-7af26f06
+    type: supersedes
 memoryVersion: 1
 ---
 ## Phase 4: Relationship Expansion - Design Decisions

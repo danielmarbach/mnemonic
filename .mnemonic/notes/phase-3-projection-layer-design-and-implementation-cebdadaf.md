@@ -7,9 +7,12 @@ tags:
   - architecture
 lifecycle: permanent
 createdAt: '2026-03-22T21:31:41.688Z'
-updatedAt: '2026-03-22T21:31:41.688Z'
+updatedAt: '2026-03-24T10:54:54.335Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: enrichment-layer-design-provenance-temporal-recall-projectio-7af26f06
+    type: supersedes
 memoryVersion: 1
 ---
 Projections are compact, deterministic, derived representations of notes used as embedding input instead of raw title+content.
