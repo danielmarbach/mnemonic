@@ -9,12 +9,14 @@ tags:
   - multi-vault
 lifecycle: permanent
 createdAt: '2026-03-14T00:24:21.870Z'
-updatedAt: '2026-03-14T00:24:29.591Z'
+updatedAt: '2026-03-24T10:53:53.576Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
   - id: multi-vault-architecture-mnemonic-name-sub-vault-support-f0e0320a
     type: explains
+  - id: multi-vault-architecture-sub-vault-support-and-label-convent-d5e5840d
+    type: supersedes
 memoryVersion: 1
 ---
 Sub-vault folders (`.mnemonic-<name>`) use the label `sub-vault:<folder>` in all structured MCP output (e.g. `sub-vault:.mnemonic-lib`) rather than exposing the bare folder name or a generic `sub-vault` string.
