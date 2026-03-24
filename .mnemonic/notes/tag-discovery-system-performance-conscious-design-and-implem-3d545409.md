@@ -9,7 +9,7 @@ tags:
   - implemented
 lifecycle: permanent
 createdAt: '2026-03-15T13:43:54.754Z'
-updatedAt: '2026-03-23T21:42:26.536Z'
+updatedAt: '2026-03-24T06:11:13.001Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 memoryVersion: 1
@@ -171,3 +171,12 @@ After dogfooding the first note-oriented release, scoring was rebalanced toward 
 - conditional generic-tag penalty for broad high-frequency single-token tags when a strong specific candidate exists
 - generic prompts fall back toward broader canonical tags instead of returning full inventory output
 - browse mode remains unchanged and inventory-oriented
+
+## Generalized heuristic rule
+
+The final tuning was validated against a synthetic sparse-project scenario as well as this repository's own corpus.
+
+- exact matches on genuinely specific tags should trigger specificity-heavy ranking even if the tag exists only once
+- generic prompts should continue to use the broad canonical fallback path
+- broad one-off exact matches should not be enough to flip the entire ranking into specificity mode
+- this keeps the heuristic useful both for mature repos with many tags and for smaller projects with sparse tag histories
