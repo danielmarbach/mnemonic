@@ -9,9 +9,12 @@ tags:
   - completed
 lifecycle: permanent
 createdAt: '2026-03-10T20:55:24.666Z'
-updatedAt: '2026-03-10T20:55:24.666Z'
+updatedAt: '2026-03-24T10:54:19.723Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: consolidate-tool-design-execute-merge-behavior-idempotency-a-0911e2cd
+    type: supersedes
 memoryVersion: 1
 ---
 Decision: make `consolidate` `execute-merge` idempotent by reusing an existing target note when retries repeat the same merge.
