@@ -8,9 +8,12 @@ tags:
   - decision
 lifecycle: permanent
 createdAt: '2026-03-25T12:36:45.634Z'
-updatedAt: '2026-03-25T12:36:45.634Z'
+updatedAt: '2026-03-25T12:36:53.888Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: enrichment-layer-design-provenance-temporal-recall-projectio-7af26f06
+    type: related-to
 memoryVersion: 1
 ---
 Phase 5 adds a lightweight in-memory session cache (`src/cache.ts`) that eliminates redundant `listNotes()` + `listEmbeddings()` I/O across tool calls within a single MCP session.
