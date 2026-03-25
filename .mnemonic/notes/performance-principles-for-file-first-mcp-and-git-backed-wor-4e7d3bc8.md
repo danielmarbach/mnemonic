@@ -9,11 +9,13 @@ tags:
   - completed
 lifecycle: permanent
 createdAt: '2026-03-14T22:14:46.759Z'
-updatedAt: '2026-03-15T13:45:02.169Z'
+updatedAt: '2026-03-25T12:37:13.150Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
   - id: mnemonic-key-design-decisions-3f2a6273
+    type: related-to
+  - id: active-session-project-cache-single-in-memory-vault-cache-pe-7463f124
     type: related-to
 memoryVersion: 1
 ---
