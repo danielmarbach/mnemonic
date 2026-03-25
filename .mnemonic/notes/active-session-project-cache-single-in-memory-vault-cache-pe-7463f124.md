@@ -8,7 +8,7 @@ tags:
   - decision
 lifecycle: permanent
 createdAt: '2026-03-25T12:36:45.634Z'
-updatedAt: '2026-03-25T12:37:13.150Z'
+updatedAt: '2026-03-25T12:42:56.587Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
@@ -53,7 +53,24 @@ Timing hooks added to `recall`, `get`, and `project_memory_summary` via `perform
 
 29 unit tests in `tests/cache.unit.test.ts` covering: lifecycle, invalidation, note lookup, projection cache, failure handling, and instrumentation (all 6 event types verified without affecting returned data).
 
-## Trade-offs
+## Why full invalidation, not targeted per-note invalidation
+
+The cache stores lists (`noteList: Note[]`, `embeddings: EmbeddingRecord[]`), not just individual entries. Targeted invalidation would require surgically mutating those arrays on every write path:
+
+- `remember` → append to both arrays
+- `forget` → splice from both arrays
+- `update` → find-and-replace in both arrays
+- `relate`/`unrelate` → update two note objects in-place (relationship data lives in note frontmatter content)
+- `move_memory` → remove from one vault's cache, insert into another
+- `sync` → unknown remote changeset; no way to know what changed without re-reading storage
+
+That creates tight coupling between the cache module and storage mutation logic, and introduces a class of silent staleness bugs if any mutation path diverges. Full invalidation keeps correctness trivially obvious: write happens → cache is gone → next read rebuilds from storage.
+
+The session pattern doesn't need targeted invalidation either. The cache's value is in the read phase — several `recall`/`get`/`project_memory_summary` calls before any writes. After a write, the rebuild cost is cheap (one parallel `listNotes()` + `listEmbeddings()`).
+
+Projections are the one case where targeted invalidation would be clean (keyed by note ID, no list dependency), but the gain is marginal since projections are only populated explicitly by tools, not on every cache build.
+
+## Other trade-offs
 
 - No TTL, no LRU — session lifetime is bounded by the MCP process, so no eviction needed.
 - Slight redundancy: `project_memory_summary` calls `resolveProject` twice (once to get cache key, once inside `collectVisibleNotes`). Accepted for clean code.
