@@ -2002,6 +2002,26 @@ VAULT_PATH = <span class="str">"/Users/you/mnemonic-vault"</span></pre>
       <div class="dogfood-card fade-up">
         <div class="dogfood-card-top">
           <div class="dogfood-meta">
+            <span class="dogfood-tag">architecture</span>
+            <span class="dogfood-tag">performance</span>
+            <span class="dogfood-tag">decision</span>
+          </div>
+          <div class="dogfood-id">active-session-project-cache-single-in-memory-vault-cache-pe-7463f124</div>
+        </div>
+        <h3 class="dogfood-title">Active session project cache</h3>
+        <div class="dogfood-body">
+          <p>A module-level singleton in <code>src/cache.ts</code> caches notes, embeddings, and projections per vault for the duration of the MCP session. Notes and embeddings are co-loaded in a single <code>Promise.all()</code> pass on first access, so both are always warm after one I/O round trip.</p>
+          <p>The cache is keyed by project ID and invalidated on every write-path tool. All cache functions are fail-soft: errors return <code>undefined</code> and callers fall back to direct storage. Instrumented with <code>[cache:hit/miss/build/invalidate/fallback]</code> events and per-tool timing.</p>
+        </div>
+        <div class="dogfood-footer">
+          <span class="dogfood-rel">relates to recall-heuristic, enrichment-layer-design</span>
+          <span class="dogfood-date">Mar 25, 2026</span>
+        </div>
+      </div>
+
+      <div class="dogfood-card fade-up">
+        <div class="dogfood-card-top">
+          <div class="dogfood-meta">
             <span class="dogfood-tag">markdown</span>
             <span class="dogfood-tag">linting</span>
             <span class="dogfood-tag">dogfooding</span>

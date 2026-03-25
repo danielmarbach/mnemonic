@@ -26,6 +26,8 @@ mnemonic is at the inception stage. The storage format (frontmatter schema, vaul
 - Very large collections: expect pain points around reindex time, recall latency, and git churn.
 - Many concurrent writers or massive scale: consider a dedicated database and indexing layer instead.
 
+**Session performance:** Within a single MCP session, notes and embeddings are cached in memory after the first access. Repeated calls to `recall`, `get`, and `project_memory_summary` within the same session avoid redundant storage reads. The cache is invalidated automatically on any write (`remember`, `update`, `forget`, `relate`, `unrelate`, `move_memory`, `consolidate`, `sync`).
+
 ## Prerequisites
 
 [Ollama](https://ollama.com) must be running locally with an embedding model pulled:

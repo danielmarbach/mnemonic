@@ -11,6 +11,13 @@ import { embed, cosineSimilarity, embedModel } from "./embeddings.js";
 import { type CommitResult, type PushResult, type SyncResult } from "./git.js";
 import { buildTemporalHistoryEntry, computeConfidence, getNoteProvenance } from "./provenance.js";
 import { getOrBuildProjection } from "./projections.js";
+import {
+  invalidateActiveProjectCache,
+  getOrBuildVaultEmbeddings,
+  getOrBuildVaultNoteList,
+  getSessionCachedNote,
+} from "./cache.js";
+import { performance } from "perf_hooks";
 
 import {
   filterRelationships,
@@ -500,6 +507,9 @@ async function ensureBranchSynced(cwd?: string): Promise<boolean> {
 
   const mainBackfill = await backfillEmbeddingsAfterSync(vaultManager.main.storage, "main vault", [], true);
   console.error(`[branch] Main vault embedded ${mainBackfill.embedded} notes`);
+
+  // Vault contents changed — discard session cache so next access rebuilds from fresh state
+  invalidateActiveProjectCache();
 
   return true;
 }
@@ -1070,6 +1080,7 @@ async function collectVisibleNotes(
   scope: SearchScope = "all",
   tags?: string[],
   storedIn: StorageScope = "any",
+  sessionProjectId?: string,
 ): Promise<{ project: Awaited<ReturnType<typeof resolveProject>>; entries: NoteEntry[] }> {
   const project = await resolveProject(cwd);
   const vaults = await vaultManager.searchOrder(cwd);
@@ -1082,10 +1093,25 @@ async function collectVisibleNotes(
   const entries: NoteEntry[] = [];
 
   for (const vault of vaults) {
-    const vaultNotes = await vault.storage.listNotes(
-      filterProject !== undefined ? { project: filterProject } : undefined
-    );
-    for (const note of vaultNotes) {
+    let rawNotes: Note[];
+    if (sessionProjectId) {
+      const cached = await getOrBuildVaultNoteList(sessionProjectId, vault);
+      if (cached !== undefined) {
+        // Apply project filter on the full cached list
+        rawNotes = filterProject !== undefined
+          ? cached.filter((n) => filterProject === null ? !n.project : n.project === filterProject)
+          : cached;
+      } else {
+        rawNotes = await vault.storage.listNotes(
+          filterProject !== undefined ? { project: filterProject } : undefined
+        );
+      }
+    } else {
+      rawNotes = await vault.storage.listNotes(
+        filterProject !== undefined ? { project: filterProject } : undefined
+      );
+    }
+    for (const note of rawNotes) {
       if (seen.has(note.id)) {
         continue;
       }
@@ -1843,7 +1869,8 @@ server.registerTool(
       timestamp: now,
       persistence,
     };
-    
+
+    invalidateActiveProjectCache();
     return {
       content: [{ type: "text", text: textContent }],
       structuredContent,
@@ -2120,6 +2147,7 @@ server.registerTool(
     outputSchema: RecallResultSchema,
   },
   async ({ query, cwd, limit, minSimilarity, mode, verbose, tags, scope }) => {
+    const t0Recall = performance.now();
     await ensureBranchSynced(cwd);
 
     const project = await resolveProject(cwd);
@@ -2129,6 +2157,11 @@ server.registerTool(
 
     const noteCacheKey = (vault: Vault, id: string): string => `${vault.storage.vaultPath}::${id}`;
     const readCachedNote = async (vault: Vault, id: string): Promise<Note | null> => {
+      // Check session cache first (populated when getOrBuildVaultEmbeddings was called)
+      if (project) {
+        const sessionNote = getSessionCachedNote(project.id, vault.storage.vaultPath, id);
+        if (sessionNote !== undefined) return sessionNote;
+      }
       const key = noteCacheKey(vault, id);
       const cached = noteCache.get(key);
       if (cached) {
@@ -2150,7 +2183,9 @@ server.registerTool(
     const scored: Array<{ id: string; score: number; boosted: number; vault: Vault; isCurrentProject: boolean }> = [];
 
     for (const vault of vaults) {
-      const embeddings = await vault.storage.listEmbeddings();
+      const embeddings = project
+        ? (await getOrBuildVaultEmbeddings(project.id, vault)) ?? await vault.storage.listEmbeddings()
+        : await vault.storage.listEmbeddings();
 
       for (const rec of embeddings) {
         const rawScore = cosineSimilarity(queryVec, rec.embedding);
@@ -2298,7 +2333,7 @@ server.registerTool(
     }
 
     const textContent = `${header}\n\n${sections.join("\n\n---\n\n")}`;
-    
+
     const structuredContent: RecallResult = {
       action: "recalled",
       query,
@@ -2306,6 +2341,7 @@ server.registerTool(
       results: structuredResults,
     };
 
+    console.error(`[recall:timing] ${(performance.now() - t0Recall).toFixed(1)}ms`);
     return {
       content: [{ type: "text", text: textContent }],
       structuredContent,
@@ -2470,6 +2506,7 @@ server.registerTool(
       persistence,
     };
     
+    invalidateActiveProjectCache();
     return { content: [{ type: "text", text: `Updated memory '${id}'\n${formatPersistenceSummary(persistence)}` }], structuredContent };
   }
 );
@@ -2592,6 +2629,7 @@ server.registerTool(
     };
     
     const retrySummary = formatRetrySummary(retry);
+    invalidateActiveProjectCache();
     return {
       content: [{
         type: "text",
@@ -2635,6 +2673,7 @@ server.registerTool(
     outputSchema: GetResultSchema,
   },
   async ({ ids, cwd, includeRelationships }) => {
+    const t0Get = performance.now();
     await ensureBranchSynced(cwd);
 
     const project = await resolveProject(cwd);
@@ -2642,7 +2681,20 @@ server.registerTool(
     const notFound: string[] = [];
 
     for (const id of ids) {
-      const result = await vaultManager.findNote(id, cwd);
+      // Check session cache before hitting storage
+      let result: { note: Note; vault: Vault } | null = null;
+      if (project) {
+        for (const vault of vaultManager.allKnownVaults()) {
+          const cached = getSessionCachedNote(project.id, vault.storage.vaultPath, id);
+          if (cached !== undefined) {
+            result = { note: cached, vault };
+            break;
+          }
+        }
+      }
+      if (!result) {
+        result = await vaultManager.findNote(id, cwd);
+      }
       if (!result) {
         notFound.push(id);
         continue;
@@ -2698,6 +2750,7 @@ server.registerTool(
       notFound,
     };
 
+    console.error(`[get:timing] ${(performance.now() - t0Get).toFixed(1)}ms`);
     return { content: [{ type: "text", text: lines.join("\n").trim() }], structuredContent };
   }
 );
@@ -3353,9 +3406,12 @@ server.registerTool(
     outputSchema: ProjectSummaryResultSchema,
   },
   async ({ cwd, maxPerTheme, recentLimit, anchorLimit, includeRelatedGlobal, relatedGlobalLimit }) => {
+    const t0Summary = performance.now();
     await ensureBranchSynced(cwd);
 
-    const { project, entries } = await collectVisibleNotes(cwd, "all");
+    // Pre-resolve project so we can pass its id to collectVisibleNotes for session caching
+    const preProject = await resolveProject(cwd);
+    const { project, entries } = await collectVisibleNotes(cwd, "all", undefined, "any", preProject?.id);
     if (!project) {
       return { content: [{ type: "text", text: `Could not detect a project for: ${cwd}` }], isError: true };
     }
@@ -3724,6 +3780,7 @@ server.registerTool(
       relatedGlobal,
     };
 
+    console.error(`[summary:timing] ${(performance.now() - t0Summary).toFixed(1)}ms`);
     return { content: [{ type: "text", text: sections.join("\n") }], structuredContent };
   }
 );
@@ -3818,7 +3875,9 @@ server.registerTool(
       action: "synced",
       vaults: vaultResults,
     };
-    
+
+    // Vault contents may have changed via pull — discard session cache
+    invalidateActiveProjectCache();
     return { content: [{ type: "text", text: lines.join("\n") }], structuredContent };
   }
 );
@@ -3990,7 +4049,8 @@ server.registerTool(
     const associationText = metadataRewritten
       ? `Project association is now ${associationValue}.`
       : `Project association remains ${associationValue}.`;
-    
+
+    invalidateActiveProjectCache();
     return {
       content: [{
         type: "text",
@@ -4186,6 +4246,7 @@ server.registerTool(
     };
     
     const retrySummary = formatRetrySummary(retry);
+    invalidateActiveProjectCache();
     return {
       content: [{
         type: "text",
@@ -4371,6 +4432,7 @@ server.registerTool(
     };
     
     const retrySummary = formatRetrySummary(retry);
+    invalidateActiveProjectCache();
     return {
       content: [{
         type: "text",
@@ -4487,14 +4549,20 @@ server.registerTool(
       case "suggest-merges":
         return suggestMerges(projectNotes, threshold, defaultConsolidationMode, project, mode);
 
-      case "execute-merge":
+      case "execute-merge": {
         if (!mergePlan) {
           return { content: [{ type: "text", text: "execute-merge strategy requires a mergePlan with sourceIds and targetTitle." }], isError: true };
         }
-        return executeMerge(entries, mergePlan, defaultConsolidationMode, project, cwd, mode, policy, allowProtectedBranch);
+        const mergeResult = await executeMerge(entries, mergePlan, defaultConsolidationMode, project, cwd, mode, policy, allowProtectedBranch);
+        invalidateActiveProjectCache();
+        return mergeResult;
+      }
 
-      case "prune-superseded":
-        return pruneSuperseded(projectNotes, mode ?? defaultConsolidationMode, project, cwd, policy, allowProtectedBranch);
+      case "prune-superseded": {
+        const pruneResult = await pruneSuperseded(projectNotes, mode ?? defaultConsolidationMode, project, cwd, policy, allowProtectedBranch);
+        invalidateActiveProjectCache();
+        return pruneResult;
+      }
 
       case "dry-run":
         return dryRunAll(projectNotes, threshold, defaultConsolidationMode, project, mode);

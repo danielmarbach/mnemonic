@@ -230,6 +230,7 @@ Keep these high-level anchors in mind:
 - `src/storage.ts` owns markdown notes and embedding JSON persistence
 - `src/git.ts` makes git part of normal mutating behavior
 - `src/migration.ts` owns schema evolution and dry-run-first migration flow
+- `src/cache.ts` owns the active session project cache: one in-memory `SessionProjectCache` per project, keyed by project ID; invalidated on every write-path tool
 - `src/recall.ts` and `src/consolidate.ts` hold behavior that intentionally stays lightweight instead of introducing heavier runtime state
 
 ## Prompts
