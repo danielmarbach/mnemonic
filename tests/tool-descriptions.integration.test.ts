@@ -188,6 +188,8 @@ describe("tool-descriptions", () => {
   }, 15000);
 
   it("keeps broad canonical tags near the top when the prompt is generic", async () => {
+    // Timeout doubled: this test spawns 5 processes (4×remember + discover_tags), more than any
+    // other test in this file. On slow CI the 15 s budget is too tight.
     const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-vault-"));
     tempDirs.push(vaultDir);
     const embeddingServer = await startFakeEmbeddingServer();
@@ -255,7 +257,7 @@ describe("tool-descriptions", () => {
     } finally {
       await embeddingServer.close();
     }
-  }, 15000);
+  }, 30000);
 
   it("prefers an exact specific tag even when it only exists once", async () => {
     const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-vault-"));

@@ -23,6 +23,7 @@ mnemonic is at the inception stage. The storage format (frontmatter schema, vaul
 
 - Hundreds to low thousands of notes: excellent fit.
 - Several thousand: often fine, depending on note size, machine speed, and embedding throughput.
+- Within a session, notes and embeddings are cached after first access — repeated `recall`, `get`, and `project_memory_summary` calls skip storage reads regardless of vault size.
 - Very large collections: expect pain points around reindex time, recall latency, and git churn.
 - Many concurrent writers or massive scale: consider a dedicated database and indexing layer instead.
 

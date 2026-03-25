@@ -37,16 +37,17 @@ describe("computeConfidence", () => {
 
 describe("getNoteProvenance", () => {
   it("returns provenance when git has a commit for the file", async () => {
+    const recentTimestamp = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString();
     mockGit.getLastCommit.mockResolvedValueOnce({
       hash: "abc123",
       message: "feat: add test note",
-      timestamp: "2026-03-20T10:00:00Z",
+      timestamp: recentTimestamp,
     });
 
     const result = await getNoteProvenance(mockGit, "notes/test.md");
 
     expect(result).toEqual({
-      lastUpdatedAt: "2026-03-20T10:00:00Z",
+      lastUpdatedAt: recentTimestamp,
       lastCommitHash: "abc123",
       lastCommitMessage: "feat: add test note",
       recentlyChanged: true,

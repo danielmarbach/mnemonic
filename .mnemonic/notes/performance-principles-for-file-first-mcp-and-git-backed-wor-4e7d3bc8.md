@@ -9,11 +9,13 @@ tags:
   - completed
 lifecycle: permanent
 createdAt: '2026-03-14T22:14:46.759Z'
-updatedAt: '2026-03-15T13:45:02.169Z'
+updatedAt: '2026-03-25T12:37:22.129Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
   - id: mnemonic-key-design-decisions-3f2a6273
+    type: related-to
+  - id: active-session-project-cache-single-in-memory-vault-cache-pe-7463f124
     type: related-to
 memoryVersion: 1
 ---
@@ -60,6 +62,13 @@ Low-hanging performance improvements (March 2024):
 - Avoid duplicate git-root lookup in searchOrder
 - Commit: `perf: avoid duplicate git-root lookup in searchOrder`
 - Validation: `npm test -- tests/vault.test.ts tests/project.test.ts tests/project-introspection.test.ts`
+
+### 6. Active session project cache (Phase 5)
+
+- Module-level singleton in `src/cache.ts` caches `listNotes()` + `listEmbeddings()` together per vault; `recall`, `get`, and `project_memory_summary` all read from the same warm cache within a session
+- Invalidated on every write-path tool; fail-soft returns `undefined` so callers fall back cleanly
+- Instrumented with `[cache:hit/miss/build/invalidate/fallback]` events and per-tool timing via `performance.now()`
+- Validation: `npm test -- tests/cache.unit.test.ts tests/project-memory-summary.integration.test.ts`
 
 ## Design Guardrails
 

@@ -4,6 +4,13 @@ All notable changes to `mnemonic` will be documented in this file.
 
 The format is loosely based on Keep a Changelog and uses semver-style version headings.
 
+## [0.17.0] - 2026-03-25
+
+### Added
+
+- Active session project cache (`src/cache.ts`): notes and embeddings are cached in memory after the first access within an MCP session, so repeated calls to `recall`, `get`, and `project_memory_summary` skip redundant storage reads.
+- The cache is invalidated automatically on every write-path tool (`remember`, `update`, `forget`, `relate`, `unrelate`, `move_memory`, `consolidate`, `sync`) and on branch switch.
+
 ## [0.16.0] - 2026-03-24
 
 ### Added
