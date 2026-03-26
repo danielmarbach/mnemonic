@@ -441,6 +441,18 @@ Imported notes are written to the main vault with `lifecycle: permanent` and `sc
 | `memory_graph`              | Show compact adjacency list of relationships                             |
 | `move_memory`               | Move note between vaults without changing id                             |
 | `project_memory_summary`    | Session-start entrypoint: themed notes, anchors, and orientation for fast project orientation |
+
+### Theme emergence
+
+`project_memory_summary` categorizes notes by theme. Themes **emerge automatically** from your notes:
+
+- **Tag-based classification** — notes with matching tags (e.g., `["decisions"]`, `["bugs"]`) are grouped immediately
+- **Keyword graduation** — keywords that appear across multiple notes become named themes over time
+- **"other" bucket** — notes that don't match any theme are grouped here; this shrinks as themes emerge
+
+No predefined schema required. The system adapts to your project's vocabulary.
+
+**Language handling:** The system degrades gracefully for non-English notes. Stopwords and synonyms are optional English enhancements; keywords that don't match pass through unchanged, allowing non-English keywords to graduate if they meet frequency thresholds.
 | `recall`                    | Semantic search with optional project boost and opt-in temporal history  |
 | `recent_memories`           | Show most recently updated notes for scope                               |
 | `remember`                  | Write note + embedding; `cwd` sets context, `scope` picks storage, `lifecycle` picks temporary vs permanent |
