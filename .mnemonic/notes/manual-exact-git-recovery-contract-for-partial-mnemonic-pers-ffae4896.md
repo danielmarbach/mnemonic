@@ -8,9 +8,12 @@ tags:
   - mcp-tools
 lifecycle: permanent
 createdAt: '2026-03-26T20:59:03.983Z'
-updatedAt: '2026-03-26T20:59:03.983Z'
+updatedAt: '2026-03-26T21:00:32.043Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: git-resilience-retry-contract-concurrency-design-and-languag-351fab47
+    type: explains
 memoryVersion: 1
 ---
 When a mutating mnemonic operation has already written note or embedding state but git add or commit fails, mnemonic should return an explicit manual recovery contract.
