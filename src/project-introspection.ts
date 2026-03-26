@@ -9,6 +9,12 @@ const STOPWORDS = new Set([
   "when", "where", "which", "who", "whom", "whose", "why", "how", "what",
 ]);
 
+const GENERIC_TERMS = new Set([
+  "system", "note", "notes", "data", "file", "files", "config", "configuration",
+  "setup", "update", "change", "fix", "bug", "feature", "task", "work",
+  "project", "app", "application", "code", "implementation", "thing",
+]);
+
 const SYNONYMS: Record<string, string> = {
   auth: "authentication",
   authn: "authentication",
@@ -142,4 +148,96 @@ export function buildThemeCache(notes: Note[]): Map<string, string> {
     cache.set(note.id, classifyTheme(note));
   }
   return cache;
+}
+
+export interface GraduationOptions {
+  minKeywordFrequency?: number;
+}
+
+export interface GraduationResult {
+  themeAssignments: Map<string, string>;
+  promotedThemes: string[];
+  keywordFrequencies: Map<string, number>;
+}
+
+export function computeThemesWithGraduation(
+  notes: Note[],
+  options: GraduationOptions = {}
+): GraduationResult {
+  const minKeywordFrequency = options.minKeywordFrequency ?? 3;
+
+  const noteKeywords = new Map<string, string[]>();
+  for (const note of notes) {
+    noteKeywords.set(note.id, extractKeywords(note));
+  }
+
+  const keywordFrequencies = new Map<string, number>();
+  for (const keywords of noteKeywords.values()) {
+    const unique = new Set(keywords);
+    for (const kw of unique) {
+      keywordFrequencies.set(kw, (keywordFrequencies.get(kw) ?? 0) + 1);
+    }
+  }
+
+  const candidates: string[] = [];
+  for (const [keyword, count] of keywordFrequencies) {
+    if (
+      count >= minKeywordFrequency &&
+      !GENERIC_TERMS.has(keyword) &&
+      !STOPWORDS.has(keyword)
+    ) {
+      candidates.push(keyword);
+    }
+  }
+
+  candidates.sort((a, b) => {
+    const freqDiff = keywordFrequencies.get(b)! - keywordFrequencies.get(a)!;
+    if (freqDiff !== 0) return freqDiff;
+    return a.localeCompare(b);
+  });
+
+  const themeAssignments = new Map<string, string>();
+  const candidateSet = new Set(candidates);
+  for (const note of notes) {
+    const keywords = noteKeywords.get(note.id) ?? [];
+    let assigned: string | null = null;
+
+    const tagBased = classifyTheme(note);
+    if (tagBased !== "other") {
+      assigned = tagBased;
+    } else {
+      for (const kw of keywords) {
+        if (candidateSet.has(kw)) {
+          assigned = kw;
+          break;
+        }
+      }
+    }
+
+    themeAssignments.set(note.id, assigned ?? "other");
+  }
+
+  return {
+    themeAssignments,
+    promotedThemes: candidates,
+    keywordFrequencies,
+  };
+}
+
+export function classifyThemeWithGraduation(
+  note: Note,
+  promotedThemes: Set<string> | string[]
+): string {
+  const promotedSet = promotedThemes instanceof Set ? promotedThemes : new Set(promotedThemes);
+  const tagBased = classifyTheme(note);
+  if (tagBased !== "other") return tagBased;
+
+  const keywords = extractKeywords(note);
+  for (const kw of keywords) {
+    if (promotedSet.has(kw)) {
+      return kw;
+    }
+  }
+
+  return "other";
 }

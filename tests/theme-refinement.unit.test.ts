@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { extractKeywords, normalizeKeyword } from "../src/project-introspection.js";
+import { computeThemesWithGraduation, extractKeywords, normalizeKeyword } from "../src/project-introspection.js";
+import type { Note } from "../src/storage.js";
 
 describe("extractKeywords", () => {
   it("extracts keywords from title and tags", () => {
@@ -62,5 +63,55 @@ describe("normalizeKeyword", () => {
     expect(normalizeKeyword("auth")).toBe("authentication");
     expect(normalizeKeyword("authn")).toBe("authentication");
     expect(normalizeKeyword("jwt")).toBe("jwt"); // stays same
+  });
+});
+
+describe("computeThemesWithGraduation", () => {
+  function makeNote(overrides: Partial<Note>): Note {
+    return {
+      id: overrides.id ?? "test",
+      title: overrides.title ?? "Test note",
+      content: overrides.content ?? "",
+      tags: overrides.tags ?? [],
+      lifecycle: overrides.lifecycle ?? "permanent",
+      createdAt: overrides.createdAt ?? "",
+      updatedAt: overrides.updatedAt ?? "",
+      memoryVersion: overrides.memoryVersion ?? 1,
+    };
+  }
+
+  it("graduates keywords that appear across multiple notes", () => {
+    const notes: Note[] = [
+      makeNote({ id: "a", title: "PostgreSQL connection pool" }),
+      makeNote({ id: "b", title: "PostgreSQL query optimization" }),
+      makeNote({ id: "c", title: "PostgreSQL index strategy" }),
+      makeNote({ id: "d", title: "Random note" }),
+    ];
+
+    const result = computeThemesWithGraduation(notes);
+    expect(result.promotedThemes).toContain("postgresql");
+    expect(result.themeAssignments.get("a")).toBe("postgresql");
+    expect(result.themeAssignments.get("d")).toBe("other");
+  });
+
+  it("does not graduate keywords below threshold", () => {
+    const notes: Note[] = [
+      makeNote({ id: "a", title: "Unique topic alpha" }),
+      makeNote({ id: "b", title: "Random" }),
+    ];
+
+    const result = computeThemesWithGraduation(notes, { minClusterSize: 3 });
+    expect(result.promotedThemes).toHaveLength(0);
+  });
+
+  it("rejects generic terms from graduation", () => {
+    const notes: Note[] = [
+      makeNote({ id: "a", title: "System configuration" }),
+      makeNote({ id: "b", title: "System setup" }),
+      makeNote({ id: "c", title: "System notes" }),
+    ];
+
+    const result = computeThemesWithGraduation(notes);
+    expect(result.promotedThemes).not.toContain("system");
   });
 });
