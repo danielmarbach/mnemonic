@@ -4,6 +4,14 @@ All notable changes to `mnemonic` will be documented in this file.
 
 The format is loosely based on Keep a Changelog and uses semver-style version headings.
 
+## [0.18.0] - Unreleased
+
+### Changed
+
+- Mutating tool retry results now return explicit recovery guidance instead of vague `Retry: safe` text, including recovery kind and no-inference instructions for partial-persistence failures.
+- Recovery precedence is now encoded in retry metadata: deterministic tool reconciliation is preferred where available, and same-vault retries must be replayed serially.
+- Retry metadata now uses `attemptedCommit.subject` instead of `attemptedCommit.message`.
+
 ## [0.17.0] - 2026-03-25
 
 ### Added
