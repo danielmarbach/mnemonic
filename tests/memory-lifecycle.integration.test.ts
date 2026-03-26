@@ -124,14 +124,21 @@ describe("memory-lifecycle", () => {
       expect(git?.["commitOperation"]).toBe("add");
       expect(git?.["push"]).toBe("skipped");
       expect(String(git?.["commitError"] ?? "")).toContain("index.lock");
-      expect(response.text).toContain("Git add error:");
-      expect(response.text).toContain("Retry: safe");
+      expect(response.text).toContain("Recovery: manual exact git recovery allowed");
+      expect(response.text).toContain("Use only the exact values below.");
+      expect(response.text).toContain("Commit subject:");
+      expect(response.text).toContain("remember: Retry contract remember test");
+      expect(response.text).toContain("Git failure:");
+      expect(response.text).not.toContain("Retry: safe");
 
       const retry = persistence?.["retry"] as Record<string, unknown>;
       expect(retry?.["mutationApplied"]).toBe(true);
       expect(retry?.["retrySafe"]).toBe(true);
+      const recovery = retry?.["recovery"] as Record<string, unknown>;
+      expect(recovery?.["kind"]).toBe("manual-exact-git-recovery");
+      expect(recovery?.["allowed"]).toBe(true);
       const attemptedCommit = retry?.["attemptedCommit"] as Record<string, unknown>;
-      expect(attemptedCommit?.["message"]).toBe("remember: Retry contract remember test");
+      expect(attemptedCommit?.["subject"]).toBe("remember: Retry contract remember test");
       expect(attemptedCommit?.["vault"]).toBe("main-vault");
       expect(attemptedCommit?.["operation"]).toBe("add");
       expect((attemptedCommit?.["files"] as string[])).toHaveLength(1);
@@ -156,12 +163,11 @@ describe("memory-lifecycle", () => {
     }, { disableGit: false });
 
     expect(response.text).toContain("defaultScope=global");
-    expect(response.text).toContain("Git add error:");
-    expect(response.text).toContain("Retry: safe");
+    expect(response.text).toContain("Recovery: manual exact git recovery allowed");
     const retry = response.structuredContent?.["retry"] as Record<string, unknown>;
     expect(retry?.["mutationApplied"]).toBe(true);
     const attempted = retry?.["attemptedCommit"] as Record<string, unknown>;
-    expect(attempted?.["message"]).toContain("policy:");
+    expect(attempted?.["subject"]).toContain("policy:");
     expect(attempted?.["vault"]).toBe("main-vault");
     expect(String(attempted?.["error"] ?? "")).toContain("index.lock");
   }, 15000);
@@ -201,14 +207,18 @@ describe("memory-lifecycle", () => {
       }, { ollamaUrl: embeddingServer.url, disableGit: false });
 
       expect(response.text).toContain(`Linked \`${firstId}\` ↔ \`${secondId}\` (related-to)`);
-      expect(response.text).toContain("Git add error:");
-      expect(response.text).toContain("Retry: safe");
+      expect(response.text).toContain("Recovery: rerun same tool call serially");
+      expect(response.text).toContain("Do not replay same-vault mutations in parallel.");
+      expect(response.text).not.toContain("Recovery: manual exact git recovery allowed");
 
       const retry = response.structuredContent?.["retry"] as Record<string, unknown>;
       expect(retry?.["mutationApplied"]).toBe(true);
       expect(retry?.["retrySafe"]).toBe(true);
+      const recovery = retry?.["recovery"] as Record<string, unknown>;
+      expect(recovery?.["kind"]).toBe("rerun-tool-call-serial");
+      expect(recovery?.["allowed"]).toBe(true);
       const attempted = retry?.["attemptedCommit"] as Record<string, unknown>;
-      expect(attempted?.["message"]).toContain("relate:");
+      expect(attempted?.["subject"]).toContain("relate:");
       expect(attempted?.["vault"]).toBe("main-vault");
       expect(String(attempted?.["error"] ?? "")).toContain("index.lock");
     } finally {

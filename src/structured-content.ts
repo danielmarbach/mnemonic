@@ -31,8 +31,13 @@ export interface PersistenceStatus {
 }
 
 export interface MutationRetryContract {
+  recovery: {
+    kind: "manual-exact-git-recovery" | "rerun-tool-call-serial" | "no-manual-recovery";
+    allowed: boolean;
+    reason: string;
+  };
   attemptedCommit: {
-    message: string;
+    subject: string;
     body?: string;
     files: string[];
     cwd?: string;
@@ -44,6 +49,17 @@ export interface MutationRetryContract {
   mutationApplied: boolean;
   retrySafe: boolean;
   rationale: string;
+  instructions: {
+    sourceOfTruth: "attemptedCommit" | "tool-response";
+    useExactSubject: boolean;
+    useExactBody: boolean;
+    useExactFiles: boolean;
+    forbidInferenceFromHistory: boolean;
+    forbidInferenceFromTitleOrSummary: boolean;
+    forbidParallelSameVaultRetries: boolean;
+    preferToolReconciliation: boolean;
+    rerunSameToolCallSerially: boolean;
+  };
 }
 
 export interface StructuredResponse {
@@ -456,8 +472,13 @@ export const PersistenceStatusSchema = z.object({
     pushError: z.string().optional(),
   }),
   retry: z.object({
+    recovery: z.object({
+      kind: z.enum(["manual-exact-git-recovery", "rerun-tool-call-serial", "no-manual-recovery"]),
+      allowed: z.boolean(),
+      reason: z.string(),
+    }),
     attemptedCommit: z.object({
-      message: z.string(),
+      subject: z.string(),
       body: z.string().optional(),
       files: z.array(z.string()),
       cwd: z.string().optional(),
@@ -468,6 +489,17 @@ export const PersistenceStatusSchema = z.object({
     mutationApplied: z.boolean(),
     retrySafe: z.boolean(),
     rationale: z.string(),
+    instructions: z.object({
+      sourceOfTruth: z.enum(["attemptedCommit", "tool-response"]),
+      useExactSubject: z.boolean(),
+      useExactBody: z.boolean(),
+      useExactFiles: z.boolean(),
+      forbidInferenceFromHistory: z.boolean(),
+      forbidInferenceFromTitleOrSummary: z.boolean(),
+      forbidParallelSameVaultRetries: z.boolean(),
+      preferToolReconciliation: z.boolean(),
+      rerunSameToolCallSerially: z.boolean(),
+    }),
   }).optional(),
   durability: z.enum(["local-only", "committed", "pushed"]),
 });

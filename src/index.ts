@@ -958,14 +958,30 @@ function buildMutationRetryContract(args: {
   cwd?: string;
   vault: Vault;
   mutationApplied: boolean;
+  preferredRecovery?: "manual-exact-git-recovery" | "rerun-tool-call-serial" | "no-manual-recovery";
 }): MutationRetryContract | undefined {
   if (args.commit.status !== "failed") {
     return undefined;
   }
 
+  const recoveryKind = args.preferredRecovery ?? (args.mutationApplied
+    ? "manual-exact-git-recovery"
+    : "no-manual-recovery");
+
+  const recoveryReason = recoveryKind === "rerun-tool-call-serial"
+    ? "Tool-level reconciliation exists for this mutation; rerun the same tool call serially for the affected vault."
+    : recoveryKind === "manual-exact-git-recovery"
+      ? "Mutation is already persisted on disk; manual git recovery is allowed only with the exact attemptedCommit values."
+      : "Mutation was not applied deterministically; manual git recovery is not authorized.";
+
   return {
+    recovery: {
+      kind: recoveryKind,
+      allowed: recoveryKind !== "no-manual-recovery",
+      reason: recoveryReason,
+    },
     attemptedCommit: {
-      message: args.commitMessage,
+      subject: args.commitMessage,
       body: args.commitBody,
       files: args.files,
       cwd: args.cwd,
@@ -978,6 +994,17 @@ function buildMutationRetryContract(args: {
     rationale: args.mutationApplied
       ? "Mutation is already persisted on disk; commit can be retried deterministically."
       : "Mutation was not applied; retry may require re-running the operation.",
+    instructions: {
+      sourceOfTruth: recoveryKind === "manual-exact-git-recovery" ? "attemptedCommit" : "tool-response",
+      useExactSubject: recoveryKind === "manual-exact-git-recovery",
+      useExactBody: recoveryKind === "manual-exact-git-recovery",
+      useExactFiles: recoveryKind === "manual-exact-git-recovery",
+      forbidInferenceFromHistory: true,
+      forbidInferenceFromTitleOrSummary: true,
+      forbidParallelSameVaultRetries: true,
+      preferToolReconciliation: recoveryKind === "rerun-tool-call-serial",
+      rerunSameToolCallSerially: recoveryKind === "rerun-tool-call-serial",
+    },
   };
 }
 
@@ -986,13 +1013,54 @@ function formatRetrySummary(retry?: MutationRetryContract): string | undefined {
     return undefined;
   }
 
-  const safety = retry.retrySafe ? "safe" : "requires review";
   const opLabel = retry.attemptedCommit.operation === "add" ? "add" : "commit";
   const error = retry.attemptedCommit.error;
-  return [
-    `Retry: ${safety} | vault=${retry.attemptedCommit.vault} | files=${retry.attemptedCommit.files.length}`,
-    `Git ${opLabel} error: ${error}`,
-  ].join("\n");
+  const lines: string[] = [];
+
+  switch (retry.recovery.kind) {
+    case "rerun-tool-call-serial":
+      lines.push("Recovery: rerun same tool call serially");
+      lines.push(retry.recovery.reason);
+      lines.push("Rerun the same mnemonic tool call one time for the affected vault.");
+      lines.push("Do not replay same-vault mutations in parallel.");
+      lines.push("Manual git recovery is not authorized for this failure.");
+      lines.push("Git failure:");
+      lines.push(`${opLabel}: ${error}`);
+      break;
+    case "manual-exact-git-recovery":
+      lines.push("Recovery: manual exact git recovery allowed");
+      lines.push(retry.recovery.reason);
+      lines.push("Use only the exact values below. Do not infer from git history, note title, summary, or repo state.");
+      lines.push("");
+      lines.push("Commit subject:");
+      lines.push(retry.attemptedCommit.subject);
+      if (retry.attemptedCommit.body) {
+        lines.push("");
+        lines.push("Commit body:");
+        lines.push(retry.attemptedCommit.body);
+      }
+      lines.push("");
+      lines.push("Files:");
+      for (const file of retry.attemptedCommit.files) {
+        lines.push(`- ${file}`);
+      }
+      lines.push("");
+      lines.push("Git failure:");
+      lines.push(`${opLabel}: ${error}`);
+      break;
+    case "no-manual-recovery":
+      lines.push("Recovery: no manual recovery authorized");
+      lines.push(retry.recovery.reason);
+      lines.push("Git failure:");
+      lines.push(`${opLabel}: ${error}`);
+      break;
+    default: {
+      const _exhaustive: never = retry.recovery.kind;
+      throw new Error(`Unknown recovery kind: ${_exhaustive}`);
+    }
+  }
+
+  return lines.join("\n");
 }
 
 function formatPersistenceSummary(persistence: PersistenceStatus): string {
@@ -1007,7 +1075,9 @@ function formatPersistenceSummary(persistence: PersistenceStatus): string {
     lines[0] += ` | embedding reason=${persistence.embedding.reason}`;
   }
 
-  if (persistence.git.commit === "failed" && persistence.git.commitError) {
+  const retrySummary = formatRetrySummary(persistence.retry);
+
+  if (!retrySummary && persistence.git.commit === "failed" && persistence.git.commitError) {
     const opLabel = persistence.git.commitOperation === "add" ? "add" : "commit";
     lines.push(`Git ${opLabel} error: ${persistence.git.commitError}`);
   }
@@ -1016,7 +1086,6 @@ function formatPersistenceSummary(persistence: PersistenceStatus): string {
     lines.push(`Git push error: ${persistence.git.pushError}`);
   }
 
-  const retrySummary = formatRetrySummary(persistence.retry);
   if (retrySummary) {
     lines.push(retrySummary);
   }
@@ -4173,6 +4242,7 @@ server.registerTool(
             cwd,
             vault,
             mutationApplied: true,
+            preferredRecovery: "rerun-tool-call-serial",
           });
           
           const structuredContent: RelateResult = {
@@ -4226,6 +4296,7 @@ server.registerTool(
           cwd,
           vault,
           mutationApplied: true,
+          preferredRecovery: "rerun-tool-call-serial",
         });
       }
       if (commitStatus.status === "committed") {
@@ -4362,6 +4433,7 @@ server.registerTool(
             cwd,
             vault,
             mutationApplied: true,
+            preferredRecovery: "rerun-tool-call-serial",
           });
           
           const structuredContent: RelateResult = {
@@ -4409,6 +4481,7 @@ server.registerTool(
           cwd,
           vault,
           mutationApplied: true,
+          preferredRecovery: "rerun-tool-call-serial",
         });
       }
       if (commitStatus.status === "committed") {
