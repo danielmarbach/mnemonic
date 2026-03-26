@@ -1,5 +1,63 @@
 import type { Note } from "./storage.js";
 
+const STOPWORDS = new Set([
+  "a", "an", "the", "and", "or", "but", "if", "then", "else", "for", "to", "of",
+  "in", "on", "at", "by", "with", "from", "as", "is", "was", "are", "were", "been",
+  "be", "have", "has", "had", "do", "does", "did", "will", "would", "could", "should",
+  "may", "might", "must", "shall", "can", "need", "needs", "note", "notes", "data",
+  "this", "that", "these", "those", "it", "its", "we", "our", "you", "your",
+  "when", "where", "which", "who", "whom", "whose", "why", "how", "what",
+]);
+
+const SYNONYMS: Record<string, string> = {
+  auth: "authentication",
+  authn: "authentication",
+  login: "authentication",
+  signin: "authentication",
+  postgres: "postgresql",
+  pg: "postgresql",
+  db: "database",
+  sql: "database",
+  test: "testing",
+  tests: "testing",
+  spec: "testing",
+  specs: "testing",
+  infra: "infrastructure",
+  deploy: "deployment",
+  deployments: "deployment",
+  endpoint: "api",
+  endpoints: "api",
+  config: "configuration",
+  impl: "implementation",
+  perf: "performance",
+};
+
+export function normalizeKeyword(keyword: string): string {
+  const lower = keyword.toLowerCase();
+  return SYNONYMS[lower] ?? lower;
+}
+
+export function extractKeywords(note: Note): string[] {
+  const words: string[] = [];
+
+  const titleWords = note.title.toLowerCase().split(/\s+/);
+  words.push(...titleWords);
+
+  words.push(...note.tags.map(t => t.toLowerCase()));
+
+  const contentPrefix = note.content.slice(0, 200).toLowerCase();
+  const contentWords = contentPrefix.split(/\s+/);
+  words.push(...contentWords);
+
+  const normalized = words
+    .map(w => w.replace(/[^a-z0-9]/g, ""))
+    .filter(w => w.length >= 2)
+    .map(w => normalizeKeyword(w))
+    .filter(w => !STOPWORDS.has(w));
+
+  return [...new Set(normalized)];
+}
+
 export function summarizePreview(content: string, maxLength = 120): string {
   const singleLine = content.replace(/\s+/g, " ").trim();
   if (singleLine.length <= maxLength) {
