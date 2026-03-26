@@ -8,8 +8,8 @@ The format is loosely based on Keep a Changelog and uses semver-style version he
 
 ### Changed
 
-- Retry/recovery contract for mutating git-backed tools is now explicit and imperative instead of vague `Retry: safe` text. Partial-persistence failures now return structured recovery metadata with a first-class recovery kind, exact `attemptedCommit.subject`/`body`/`files` for manual recovery, and explicit no-inference instructions.
-- Recovery precedence is now encoded in the tool result: generic deterministic partial-persistence failures default to manual exact git recovery, while `relate` and `unrelate` prefer serial tool-call replay through their built-in reconciliation path.
+- Mutating tool retry results now return explicit recovery guidance instead of vague `Retry: safe` text, including recovery kind and no-inference instructions for partial-persistence failures.
+- Recovery precedence is now encoded in retry metadata: deterministic tool reconciliation is preferred where available, and same-vault retries must be replayed serially.
 - Retry metadata now uses `attemptedCommit.subject` instead of `attemptedCommit.message`.
 
 ## [0.17.0] - 2026-03-25
