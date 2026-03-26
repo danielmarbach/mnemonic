@@ -45,6 +45,8 @@ import {
 } from "./project-memory-policy.js";
 import {
   classifyTheme,
+  classifyThemeWithGraduation,
+  computeThemesWithGraduation,
   summarizePreview,
   titleCaseTheme,
   daysSinceUpdate,
@@ -3510,19 +3512,26 @@ server.registerTool(
     const policyLine = await formatProjectPolicyLine(project.id);
 
     // Build theme cache for connection diversity scoring (project-scoped only)
+    // This uses simple classifyTheme for consistent diversity calculations
     const themeCache = buildThemeCache(projectEntries.map(e => e.note));
 
-    // Categorize by theme (project-scoped only)
+    // Compute promoted themes from keywords (graduation system)
+    const graduationResult = computeThemesWithGraduation(projectEntries.map(e => e.note));
+    const promotedThemes = new Set(graduationResult.promotedThemes);
+
+    // Categorize by theme with graduation (project-scoped only)
     const themed = new Map<string, NoteEntry[]>();
     for (const entry of projectEntries) {
-      const theme = classifyTheme(entry.note);
+      const theme = classifyThemeWithGraduation(entry.note, promotedThemes);
       const bucket = themed.get(theme) ?? [];
       bucket.push(entry);
       themed.set(theme, bucket);
     }
 
-    // Theme order for display
-    const themeOrder = ["overview", "decisions", "tooling", "bugs", "architecture", "quality", "other"];
+    // Theme order: fixed themes first, then promoted themes alphabetically, then "other"
+    const fixedThemes = ["overview", "decisions", "tooling", "bugs", "architecture", "quality"];
+    const dynamicThemes = graduationResult.promotedThemes.filter(t => !fixedThemes.includes(t));
+    const themeOrder = [...fixedThemes, ...dynamicThemes.sort(), "other"];
 
     // Calculate notes distribution (project-scoped only)
     const projectVaultCount = projectEntries.filter(e => e.vault.isProject).length;
@@ -3842,7 +3851,7 @@ server.registerTool(
         id: e.note.id,
         title: e.note.title,
         updatedAt: e.note.updatedAt,
-        theme: classifyTheme(e.note),
+        theme: classifyThemeWithGraduation(e.note, promotedThemes),
       })),
       anchors,
       orientation,

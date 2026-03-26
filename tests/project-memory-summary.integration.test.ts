@@ -462,18 +462,18 @@ describe("project-memory-summary", () => {
 
     try {
       const notes = [
-        { title: "Random note 1", tags: ["integration", "warning-check"] },
-        { title: "Random note 2", tags: ["integration", "warning-check"] },
-        { title: "Decision note", tags: ["integration", "warning-check", "decisions"] },
-        { title: "Tool note", tags: ["integration", "warning-check", "tools"] },
+        { title: "Miscellaneous alpha", tags: ["unique-tag-alpha"], content: "Alpha miscellaneous content xyz.", summary: "Record alpha note" },
+        { title: "Miscellaneous beta", tags: ["unique-tag-beta"], content: "Beta miscellaneous content abc.", summary: "Record beta note" },
+        { title: "Decision note", tags: ["decisions"], content: "Decision about architecture.", summary: "Record decision note" },
+        { title: "Tool note", tags: ["tools"], content: "Tool setup information.", summary: "Record tool note" },
       ];
 
       for (const note of notes) {
         await callLocalMcp(vaultDir, "remember", {
           title: note.title,
-          content: `${note.title} content.`,
+          content: note.content,
           tags: note.tags,
-          summary: `Create ${note.title}`,
+          summary: note.summary,
           cwd: repoDir,
           scope: "project",
           lifecycle: "permanent",
@@ -489,10 +489,11 @@ describe("project-memory-summary", () => {
       expect(warnings).toBeDefined();
       expect(warnings?.[0]).toContain('50% of notes in "other" bucket');
 
+      // Add more categorized notes to bring "other" below 30%
       await callLocalMcp(vaultDir, "remember", {
         title: "Architecture note",
-        content: "Architecture content.",
-        tags: ["integration", "warning-check", "architecture"],
+        content: "Architecture content details here.",
+        tags: ["architecture"],
         summary: "Create architecture note",
         cwd: repoDir,
         scope: "project",
@@ -501,8 +502,8 @@ describe("project-memory-summary", () => {
 
       await callLocalMcp(vaultDir, "remember", {
         title: "Quality note",
-        content: "Quality content.",
-        tags: ["integration", "warning-check", "tests"],
+        content: "Quality content specifics here.",
+        tags: ["tests"],
         summary: "Create quality note",
         cwd: repoDir,
         scope: "project",
@@ -511,8 +512,8 @@ describe("project-memory-summary", () => {
 
       await callLocalMcp(vaultDir, "remember", {
         title: "Overview note",
-        content: "Overview content.",
-        tags: ["integration", "warning-check", "overview"],
+        content: "Overview content summary here.",
+        tags: ["overview"],
         summary: "Create overview note",
         cwd: repoDir,
         scope: "project",
