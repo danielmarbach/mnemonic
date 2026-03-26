@@ -441,6 +441,16 @@ Imported notes are written to the main vault with `lifecycle: permanent` and `sc
 | `memory_graph`              | Show compact adjacency list of relationships                             |
 | `move_memory`               | Move note between vaults without changing id                             |
 | `project_memory_summary`    | Session-start entrypoint: themed notes, anchors, and orientation for fast project orientation |
+| `recall`                    | Semantic search with optional project boost and opt-in temporal history  |
+| `recent_memories`           | Show most recently updated notes for scope                               |
+| `remember`                  | Write note + embedding; `cwd` sets context, `scope` picks storage, `lifecycle` picks temporary vs permanent |
+| `relate`                    | Create typed relationship between notes (bidirectional)                  |
+| `set_project_identity`      | Save which git remote defines project identity                           |
+| `set_project_memory_policy` | Save project policy defaults (scope, consolidation mode, protected-branch behavior/patterns) |
+| `sync`                      | Git sync when remote exists plus embedding backfill always; `force=true` rebuilds all embeddings |
+| `unrelate`                  | Remove relationship between notes                                        |
+| `update`                    | Update note content/title/tags/lifecycle, re-embeds always               |
+| `where_is_memory`           | Show note's project association and storage location                     |
 
 ### Theme emergence
 
@@ -453,16 +463,6 @@ Imported notes are written to the main vault with `lifecycle: permanent` and `sc
 No predefined schema required. The system adapts to your project's vocabulary.
 
 **Language handling:** The system degrades gracefully for non-English notes. Stopwords and synonyms are optional English enhancements; keywords that don't match pass through unchanged, allowing non-English keywords to graduate if they meet frequency thresholds.
-| `recall`                    | Semantic search with optional project boost and opt-in temporal history  |
-| `recent_memories`           | Show most recently updated notes for scope                               |
-| `remember`                  | Write note + embedding; `cwd` sets context, `scope` picks storage, `lifecycle` picks temporary vs permanent |
-| `relate`                    | Create typed relationship between notes (bidirectional)                  |
-| `set_project_identity`      | Save which git remote defines project identity                           |
-| `set_project_memory_policy` | Save project policy defaults (scope, consolidation mode, protected-branch behavior/patterns) |
-| `sync`                      | Git sync when remote exists plus embedding backfill always; `force=true` rebuilds all embeddings |
-| `unrelate`                  | Remove relationship between notes                                        |
-| `update`                    | Update note content/title/tags/lifecycle, re-embeds always               |
-| `where_is_memory`           | Show note's project association and storage location                     |
 
 ### Relationships
 

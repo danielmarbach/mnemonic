@@ -6,11 +6,19 @@ The format is loosely based on Keep a Changelog and uses semver-style version he
 
 ## [0.18.0] - Unreleased
 
+### Added
+
+- Theme graduation from "other": keywords appearing across multiple notes become named themes automatically.
+- Keyword extraction with synonym normalization for theme classification.
+- `analyzeThemeQuality()` utility for checking theme distribution metrics.
+
 ### Changed
 
 - Mutating tool retry results now return explicit recovery guidance instead of vague `Retry: safe` text, including recovery kind and no-inference instructions for partial-persistence failures.
 - Recovery precedence is now encoded in retry metadata: deterministic tool reconciliation is preferred where available, and same-vault retries must be replayed serially.
 - Retry metadata now uses `attemptedCommit.subject` instead of `attemptedCommit.message`.
+- `classifyTheme` now uses keyword-based graduation in addition to tag matching.
+- `project_memory_summary` includes both fixed themes and dynamically promoted keywords.
 
 ## [0.17.0] - 2026-03-25
 
