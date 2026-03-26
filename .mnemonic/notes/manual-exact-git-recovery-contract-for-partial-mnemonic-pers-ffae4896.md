@@ -8,7 +8,7 @@ tags:
   - mcp-tools
 lifecycle: permanent
 createdAt: '2026-03-26T20:59:03.983Z'
-updatedAt: '2026-03-26T21:04:09.139Z'
+updatedAt: '2026-03-26T21:46:50.436Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
@@ -22,63 +22,57 @@ memoryVersion: 1
 ---
 When a mutating mnemonic operation has already written note or embedding state but git add or commit fails, mnemonic should return an explicit recovery contract.
 
-Refined decision:
+Status: implemented.
 
-- Recovery must encode both the authorized action and the precedence between recovery paths.
-- If the tool has a deterministic built-in reconciliation path, that path should be preferred over manual git recovery.
-- Same-vault recovery and retry operations must be serialized; agents and callers must not replay same-vault mutations in parallel.
+Implemented outcome:
 
-Recovery precedence:
+- `MutationRetryContract` now includes a first-class `recovery` object with `kind`, `allowed`, and `reason`.
+- The contract now includes explicit `instructions` metadata covering source of truth, exact-value usage, no-inference rules, same-vault serialization, and preference for tool reconciliation.
+- Retry metadata now uses `attemptedCommit.subject` instead of `attemptedCommit.message`.
+- Plain-text retry output is now imperative and recovery-specific instead of generic `Retry: safe` text.
+
+Implemented recovery precedence:
 
 1. `rerun-tool-call-serial`
    - Preferred when the tool can reconcile pending persisted mutations safely and deterministically.
-   - Must be replayed serially for the affected vault.
+   - Implemented for `relate` and `unrelate` reconciliation paths.
 2. `manual-exact-git-recovery`
    - Fallback when `mutationApplied=true` and no higher-level deterministic reconciliation path exists.
-   - Recovery must use only the exact tool-provided commit data.
 3. `no-manual-recovery`
-   - Used when neither tool replay nor manual git is safe.
+   - Reserved for cases where neither tool replay nor manual git is safe.
 
 Manual recovery rules:
 
 - Manual git recovery is allowed only when explicitly authorized by the tool.
 - Recovery must use only the exact tool-provided commit data.
 - Agents must not infer recovery details from git history, note title, summary text, or repo state.
-- Plain-text output must render the exact authorized recovery data, not just a generic safe-retry hint.
+- Plain-text output renders the exact authorized recovery data instead of a generic safe-retry hint.
 
-Recommended contract changes:
+Preview-mode API decision:
 
-- Add a first-class recovery object with a `kind` such as `rerun-tool-call-serial`, `manual-exact-git-recovery`, or `no-manual-recovery`.
-- For the allowed manual path, include exact `attemptedCommit.subject`, `attemptedCommit.body`, `attemptedCommit.files`, `vault`, `cwd`, `operation`, and `error`.
-- Add explicit instruction flags or equivalent semantics stating:
-  - source of truth is `attemptedCommit`
-  - use exact subject/body/files
-  - do not infer from history
-  - do not infer from title or summary
-  - do not replay same-vault mutations in parallel
-  - prefer tool reconciliation over manual git when available
-- Rename `attemptedCommit.message` to `attemptedCommit.subject` to make git semantics unambiguous.
+- The preview contract now exposes only `attemptedCommit.subject`.
+- The temporary compatibility alias back to `attemptedCommit.message` was intentionally removed because the project is still in preview and the cleaner contract is preferable now.
 
-Plain-text UX requirement:
+Plain-text UX now does the following:
 
-- Replace vague text like `Retry: safe | vault=... | files=...` with imperative recovery guidance.
-- The text output should explicitly say whether manual recovery is allowed.
-- If allowed, it should print the exact commit subject, full body, exact files, and the git failure.
-- The text must clearly state that only those exact values are authorized.
-- If a tool replay path is preferred, the text should say to rerun the same tool call serially and explicitly forbid parallel same-vault retries.
+- For `manual-exact-git-recovery`, prints the exact commit subject, full body when present, exact files, and the git failure, together with an explicit no-inference warning.
+- For `rerun-tool-call-serial`, instructs callers to rerun the same tool call serially and explicitly forbids replaying same-vault mutations in parallel.
 
-Why this refinement is needed:
+Files changed for the implementation:
 
-- Structured retry metadata already exists, but weaker or sloppy models still improvise because the text output is under-specified.
-- The tool should be the only source of truth for recovery after partial persistence failures.
-- The latest failure showed that even a correct retry path can be misused if same-vault retries are dispatched in parallel.
-- This prevents agents from reverse-engineering commit style from history or recreating lock contention during recovery.
+- `src/index.ts`
+- `src/structured-content.ts`
+- `tests/memory-lifecycle.integration.test.ts`
+- `CHANGELOG.md`
 
-Acceptance criteria:
+Verification evidence from implementation:
 
-- Tool output alone is sufficient for deterministic recovery.
-- A model can recover correctly without inspecting git history.
-- Recovery precedence is explicit.
-- Same-vault retries are explicitly serialized.
-- The allowed recovery action and forbidden inference sources are explicit.
-- Exact subject/body/files are visible in both structured and plain-text output when manual recovery is allowed.
+- Focused retry-contract tests passed.
+- Typecheck passed.
+- Sequential full-suite runs still showed intermittent unrelated MCP integration flakiness (`Missing tool response` / truncated JSON style failures), but the affected integration files passed when rerun in isolation. The implemented retry-contract change itself verified cleanly in focused coverage.
+
+Why this matters:
+
+- The tool is now much closer to being the sole source of truth for recovery after partial persistence failures.
+- Tool-specific reconciliation paths now outrank manual git when available.
+- The output now explicitly teaches weaker models what to do and what not to do.
