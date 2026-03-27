@@ -1365,6 +1365,7 @@ server.registerTool(
       "- Use `recall` or `project_memory_summary` to orient on existing memory.",
     annotations: {
       readOnlyHint: true,
+      destructiveHint: false,
       idempotentHint: true,
       openWorldHint: false,
     },
@@ -1428,6 +1429,7 @@ server.registerTool(
       "- Use `set_project_identity` only if the wrong remote is defining identity.",
     annotations: {
       readOnlyHint: true,
+      destructiveHint: false,
       idempotentHint: true,
       openWorldHint: false,
     },
@@ -1608,6 +1610,7 @@ server.registerTool(
       "- Run `execute_migration` with `dryRun: true` first.",
     annotations: {
       readOnlyHint: true,
+      destructiveHint: false,
       idempotentHint: true,
       openWorldHint: false,
     },
@@ -2111,6 +2114,7 @@ server.registerTool(
       "- Call `remember` with explicit `scope` for a one-off override, or `set_project_memory_policy` to change defaults.",
     annotations: {
       readOnlyHint: true,
+      destructiveHint: false,
       idempotentHint: true,
       openWorldHint: false,
     },
@@ -2194,6 +2198,7 @@ server.registerTool(
       "- Use `get`, `update`, `relate`, or `consolidate` based on the results.",
     annotations: {
       readOnlyHint: true,
+      destructiveHint: false,
       idempotentHint: true,
       openWorldHint: true,
     },
@@ -2733,6 +2738,7 @@ server.registerTool(
       "- Use `update`, `forget`, `move_memory`, or `relate` after inspection.",
     annotations: {
       readOnlyHint: true,
+      destructiveHint: false,
       idempotentHint: true,
       openWorldHint: false,
     },
@@ -2846,6 +2852,7 @@ server.registerTool(
       "- Use `move_memory` if the storage location is wrong, or `get` for full inspection.",
     annotations: {
       readOnlyHint: true,
+      destructiveHint: false,
       idempotentHint: true,
       openWorldHint: false,
     },
@@ -2912,6 +2919,7 @@ server.registerTool(
       "- Use `get` for exact inspection or `update` / `consolidate` for cleanup.",
     annotations: {
       readOnlyHint: true,
+      destructiveHint: false,
       idempotentHint: true,
       openWorldHint: false,
     },
@@ -3062,6 +3070,7 @@ server.registerTool(
       "Read-only.",
     annotations: {
       readOnlyHint: true,
+      destructiveHint: false,
       idempotentHint: true,
       openWorldHint: false,
     },
@@ -3288,6 +3297,7 @@ server.registerTool(
       "- Use `get` for exact inspection or `update` to continue refining a recent note.",
     annotations: {
       readOnlyHint: true,
+      destructiveHint: false,
       idempotentHint: true,
       openWorldHint: false,
     },
@@ -3370,6 +3380,7 @@ server.registerTool(
       "- Use `get`, `relate`, `unrelate`, or `consolidate` based on what the graph reveals.",
     annotations: {
       readOnlyHint: true,
+      destructiveHint: false,
       idempotentHint: true,
       openWorldHint: false,
     },
@@ -3463,6 +3474,7 @@ server.registerTool(
       "- Use `recall` or `list` to drill down into specific areas.",
     annotations: {
       readOnlyHint: true,
+      destructiveHint: false,
       idempotentHint: true,
       openWorldHint: false,
     },
