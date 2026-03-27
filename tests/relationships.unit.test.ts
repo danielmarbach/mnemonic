@@ -49,17 +49,23 @@ describe("isAnchor", () => {
 
 describe("isRecentlyUpdated", () => {
   it("returns true for notes updated within 5 days", () => {
-    const note = createNote({ updatedAt: "2026-03-22T00:00:00.000Z" }); // 1 day ago
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const note = createNote({ updatedAt: yesterday.toISOString() });
     expect(isRecentlyUpdated(note)).toBe(true);
   });
 
   it("returns false for notes older than 5 days", () => {
-    const note = createNote({ updatedAt: "2026-03-10T00:00:00.000Z" }); // 13 days ago
+    const oldDate = new Date();
+    oldDate.setDate(oldDate.getDate() - 13);
+    const note = createNote({ updatedAt: oldDate.toISOString() });
     expect(isRecentlyUpdated(note)).toBe(false);
   });
 
   it("handles boundary at 5 days", () => {
-    const note = createNote({ updatedAt: "2026-03-18T00:00:00.000Z" }); // exactly 5 days
+    const boundaryDate = new Date();
+    boundaryDate.setDate(boundaryDate.getDate() - 5);
+    const note = createNote({ updatedAt: boundaryDate.toISOString() });
     expect(isRecentlyUpdated(note)).toBe(false);
   });
 });
@@ -82,23 +88,31 @@ describe("scoreRelatedNote", () => {
   });
 
   it("gives recency boost (20 points)", () => {
-    const recentNote = createNote({ updatedAt: "2026-03-22T00:00:00.000Z" });
-    const oldNote = createNote({ updatedAt: "2026-03-10T00:00:00.000Z" });
+    const recentDate = new Date();
+    recentDate.setDate(recentDate.getDate() - 1);
+    const oldDate = new Date();
+    oldDate.setDate(oldDate.getDate() - 13);
+    const recentNote = createNote({ updatedAt: recentDate.toISOString() });
+    const oldNote = createNote({ updatedAt: oldDate.toISOString() });
     expect(scoreRelatedNote(recentNote, undefined)).toBeGreaterThan(
       scoreRelatedNote(oldNote, undefined)
     );
   });
 
   it("gives confidence boost for high confidence notes", () => {
+    const recentDate = new Date();
+    recentDate.setDate(recentDate.getDate() - 1);
+    const oldDate = new Date();
+    oldDate.setDate(oldDate.getDate() - 54);
     const highConfNote = createNote({
       lifecycle: "permanent",
       relatedTo: Array.from({ length: 5 }, (_, i) => ({ id: `rel-${i}`, type: "related-to" as const })),
-      updatedAt: "2026-03-22T00:00:00.000Z",
+      updatedAt: recentDate.toISOString(),
     });
     const lowConfNote = createNote({
       lifecycle: "temporary",
       relatedTo: [],
-      updatedAt: "2026-02-01T00:00:00.000Z",
+      updatedAt: oldDate.toISOString(),
     });
     expect(scoreRelatedNote(highConfNote, undefined)).toBeGreaterThan(
       scoreRelatedNote(lowConfNote, undefined)
@@ -106,12 +120,14 @@ describe("scoreRelatedNote", () => {
   });
 
   it("combines boosts additively", () => {
+    const recentDate = new Date();
+    recentDate.setDate(recentDate.getDate() - 1);
     const perfectNote = createNote({
       project: "test-project",
       lifecycle: "permanent",
       tags: ["anchor"],
       relatedTo: Array.from({ length: 5 }, (_, i) => ({ id: `rel-${i}`, type: "related-to" as const })),
-      updatedAt: "2026-03-22T00:00:00.000Z",
+      updatedAt: recentDate.toISOString(),
     });
     const baseNote = createNote({});
     const perfectScore = scoreRelatedNote(perfectNote, "test-project");
