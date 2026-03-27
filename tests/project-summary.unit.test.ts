@@ -4,7 +4,9 @@ import {
   anchorScore,
   buildThemeCache,
   classifyTheme,
+  classifyThemeWithGraduation,
   computeConnectionDiversity,
+  computeThemesWithGraduation,
   withinThemeScore,
 } from "../src/project-introspection.js";
 import type { Note } from "../src/storage.js";
@@ -181,6 +183,75 @@ describe("project summary scoring helpers", () => {
         ["decision-note", "decisions"],
         ["tool-note", "tooling"],
       ]));
+    });
+  });
+
+  describe("computeThemesWithGraduation", () => {
+    it("returns promoted themes sorted by frequency then alphabetically", () => {
+      const notes = [
+        makeNote({ id: "a", title: "PostgreSQL configuration", tags: [] }),
+        makeNote({ id: "b", title: "PostgreSQL setup", tags: [] }),
+        makeNote({ id: "c", title: "PostgreSQL tuning", tags: [] }),
+        makeNote({ id: "d", title: "Redis cache settings", tags: [] }),
+      ];
+
+      const result = computeThemesWithGraduation(notes, { minKeywordFrequency: 2 });
+
+      expect(result.promotedThemes).toContain("postgresql");
+      expect(result.keywordFrequencies.get("postgresql")).toBe(3);
+      expect(result.keywordFrequencies.get("redis")).toBe(1);
+      expect(result.promotedThemes).not.toContain("redis");
+    });
+
+    it("assigns tag-based themes first, then falls back to keywords", () => {
+      const notes = [
+        makeNote({ id: "tagged", title: "Some note", tags: ["overview"] }),
+        makeNote({ id: "keyword1", title: "PostgreSQL configuration", tags: [] }),
+        makeNote({ id: "keyword2", title: "PostgreSQL tuning", tags: [] }),
+        makeNote({ id: "fallback", title: "Misc entry", tags: [] }),
+      ];
+
+      const result = computeThemesWithGraduation(notes, { minKeywordFrequency: 2 });
+
+      expect(result.themeAssignments.get("tagged")).toBe("overview");
+      expect(result.themeAssignments.get("keyword1")).toBe("postgresql");
+      expect(result.themeAssignments.get("keyword2")).toBe("postgresql");
+      expect(result.themeAssignments.get("fallback")).toBe("other");
+    });
+
+    it("excludes generic terms from promotion", () => {
+      const notes = [
+        makeNote({ id: "a", title: "System note", tags: [] }),
+        makeNote({ id: "b", title: "Another system note", tags: [] }),
+        makeNote({ id: "c", title: "System config", tags: [] }),
+      ];
+
+      const result = computeThemesWithGraduation(notes, { minKeywordFrequency: 2 });
+
+      expect(result.promotedThemes).not.toContain("system");
+    });
+  });
+
+  describe("classifyThemeWithGraduation", () => {
+    it("uses tag-based classification first", () => {
+      const note = makeNote({ title: "Some title", tags: ["overview"] });
+      expect(classifyThemeWithGraduation(note, new Set(["postgresql"]))).toBe("overview");
+    });
+
+    it("uses promoted keywords when no tag-based match", () => {
+      const note = makeNote({ title: "PostgreSQL configuration", tags: [] });
+      expect(classifyThemeWithGraduation(note, new Set(["postgresql"]))).toBe("postgresql");
+    });
+
+    it("returns other when no match", () => {
+      const note = makeNote({ title: "Misc note", tags: [] });
+      expect(classifyThemeWithGraduation(note, new Set(["postgresql"]))).toBe("other");
+    });
+
+    it("accepts promotedThemes as array or Set", () => {
+      const note = makeNote({ title: "PostgreSQL note", tags: [] });
+      expect(classifyThemeWithGraduation(note, ["postgresql"])).toBe("postgresql");
+      expect(classifyThemeWithGraduation(note, new Set(["postgresql"]))).toBe("postgresql");
     });
   });
 });

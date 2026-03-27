@@ -84,6 +84,15 @@ When calling `update`:
 - Preserve the existing lifecycle unless you are intentionally changing it.
 - Do not switch a note between `temporary` and `permanent` implicitly.
 
+### Theme guidance
+
+Themes in `project_memory_summary` are hints, not fixed categories:
+
+- Themes emerge from your project's vocabulary — no predefined schema.
+- "other" means the note didn't match any current theme — this is normal.
+- Use `discover_tags` to find canonical tags before creating new ones.
+- Always start with `project_memory_summary` to orient on existing context.
+
 ### Documentation upkeep
 
 - `ARCHITECTURE.md` is the canonical high-level map of the system; update it whenever control flow, source layout, vault behavior, data model, CI/MCP operational patterns, or major architectural decisions change

@@ -452,6 +452,18 @@ Imported notes are written to the main vault with `lifecycle: permanent` and `sc
 | `update`                    | Update note content/title/tags/lifecycle, re-embeds always               |
 | `where_is_memory`           | Show note's project association and storage location                     |
 
+### Theme emergence
+
+`project_memory_summary` categorizes notes by theme. Themes **emerge automatically** from your notes:
+
+- **Tag-based classification** — notes with matching tags (e.g., `["decisions"]`, `["bugs"]`) are grouped immediately
+- **Keyword graduation** — keywords that appear across multiple notes become named themes over time
+- **"other" bucket** — notes that don't match any theme are grouped here; this shrinks as themes emerge
+
+No predefined schema required. The system adapts to your project's vocabulary.
+
+**Language handling:** The system degrades gracefully for non-English notes. Stopwords and synonyms are optional English enhancements; keywords that don't match pass through unchanged, allowing non-English keywords to graduate if they meet frequency thresholds.
+
 ### Relationships
 
 Notes can be linked with typed edges stored in frontmatter:
