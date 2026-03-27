@@ -14,6 +14,7 @@ The format is loosely based on Keep a Changelog and uses semver-style version he
 
 ### Changed
 
+- All 23 MCP tools now include complete SDK tool hints (`readOnlyHint`, `destructiveHint`, `idempotentHint`, `openWorldHint`). Previously, read-only tools were missing `destructiveHint: false`.
 - Mutating tool retry results now return explicit recovery guidance instead of vague `Retry: safe` text, including recovery kind and no-inference instructions for partial-persistence failures.
 - Recovery precedence is now encoded in retry metadata: deterministic tool reconciliation is preferred where available, and same-vault retries must be replayed serially.
 - Retry metadata now uses `attemptedCommit.subject` instead of `attemptedCommit.message`.
