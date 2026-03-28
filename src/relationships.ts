@@ -80,11 +80,10 @@ function computeRelatedNoteConfidence(note: Note): "high" | "medium" | "low" {
 }
 
 /**
- * Check if note is tagged as anchor.
+ * Check if note should receive explicit alwaysLoad anchor treatment.
  */
 export function isAnchor(note: Note): boolean {
-  return note.lifecycle === "permanent" &&
-    note.tags.some(t => t.toLowerCase() === "anchor" || t.toLowerCase() === "alwaysload");
+  return note.lifecycle === "permanent" && note.alwaysLoad === true;
 }
 
 /**

@@ -253,6 +253,59 @@ describe("project-memory-summary", () => {
     }
   }, 20000);
 
+  it("keeps explicit standalone summary notes eligible for anchors and orientation", async () => {
+    const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-vault-"));
+    const repoDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-project-"));
+    tempDirs.push(vaultDir, repoDir);
+
+    await initTestRepo(repoDir);
+
+    const embeddingServer = await startFakeEmbeddingServer();
+
+    try {
+      const summaryRemember = await callLocalMcp(vaultDir, "remember", {
+        title: "Project Overview",
+        content: "A hand-authored overview note with no graph links yet.",
+        tags: ["integration"],
+        summary: "Create explicit summary note",
+        cwd: repoDir,
+        scope: "project",
+        lifecycle: "permanent",
+      }, embeddingServer.url);
+      const summaryId = extractRememberedId(summaryRemember);
+
+      await updateProjectNoteFrontmatter(repoDir, summaryId, {
+        role: "summary",
+        importance: "high",
+        updatedAt: "2026-03-20T10:00:00.000Z",
+        createdAt: "2026-03-20T10:00:00.000Z",
+      });
+
+      await callLocalMcp(vaultDir, "remember", {
+        title: "Plain Context Note",
+        content: "A regular project note without metadata.",
+        tags: ["integration"],
+        summary: "Create plain project note",
+        cwd: repoDir,
+        scope: "project",
+        lifecycle: "permanent",
+      }, embeddingServer.url);
+
+      const summary = await callLocalMcpResponse(vaultDir, "project_memory_summary", {
+        cwd: repoDir,
+      }, embeddingServer.url);
+
+      const anchors = summary.structuredContent?.["anchors"] as Array<Record<string, unknown>>;
+      expect(anchors.some((anchor) => anchor["id"] === summaryId)).toBe(true);
+
+      const orientation = summary.structuredContent?.["orientation"] as Record<string, unknown>;
+      const primaryEntry = orientation?.["primaryEntry"] as Record<string, unknown>;
+      expect(primaryEntry?.["id"]).toBe(summaryId);
+    } finally {
+      await embeddingServer.close();
+    }
+  }, 20000);
+
   it("lets suggested metadata lightly improve orientation when explicit metadata is absent", async () => {
     const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-vault-"));
     const repoDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-project-"));

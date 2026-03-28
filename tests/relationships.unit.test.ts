@@ -35,18 +35,18 @@ const createVault = (notes: Note[]): Vault => ({
 // ── Unit tests for scoring helpers ────────────────────────────────────────────
 
 describe("isAnchor", () => {
-  it("recognizes anchor tag", () => {
-    const note = createNote({ lifecycle: "permanent", tags: ["anchor"] });
-    expect(isAnchor(note)).toBe(true);
-  });
-
-  it("recognizes alwaysload tag", () => {
-    const note = createNote({ lifecycle: "permanent", tags: ["alwaysload"] });
+  it("recognizes explicit alwaysLoad metadata", () => {
+    const note = createNote({ lifecycle: "permanent", alwaysLoad: true });
     expect(isAnchor(note)).toBe(true);
   });
 
   it("requires permanent lifecycle", () => {
-    const note = createNote({ lifecycle: "temporary", tags: ["anchor"] });
+    const note = createNote({ lifecycle: "temporary", alwaysLoad: true });
+    expect(isAnchor(note)).toBe(false);
+  });
+
+  it("returns false for legacy anchor tags without explicit alwaysLoad", () => {
+    const note = createNote({ tags: ["anchor", "alwaysload"] });
     expect(isAnchor(note)).toBe(false);
   });
 
@@ -88,11 +88,19 @@ describe("scoreRelatedNote", () => {
     );
   });
 
-  it("gives anchor boost (50 points)", () => {
-    const anchorNote = createNote({ lifecycle: "permanent", tags: ["anchor"] });
+  it("gives anchor boost only for explicit alwaysLoad notes", () => {
+    const anchorNote = createNote({ lifecycle: "permanent", alwaysLoad: true });
     const nonAnchorNote = createNote({ lifecycle: "permanent", tags: [] });
     expect(scoreRelatedNote(anchorNote, undefined)).toBeGreaterThan(
       scoreRelatedNote(nonAnchorNote, undefined)
+    );
+  });
+
+  it("does not give anchor boost to legacy anchor tags", () => {
+    const legacyTagged = createNote({ lifecycle: "permanent", tags: ["anchor", "alwaysload"] });
+    const plain = createNote({ lifecycle: "permanent", tags: [] });
+    expect(scoreRelatedNote(legacyTagged, undefined)).toBe(
+      scoreRelatedNote(plain, undefined)
     );
   });
 
@@ -134,7 +142,7 @@ describe("scoreRelatedNote", () => {
     const perfectNote = createNote({
       project: "test-project",
       lifecycle: "permanent",
-      tags: ["anchor"],
+      alwaysLoad: true,
       relatedTo: Array.from({ length: 5 }, (_, i) => ({ id: `rel-${i}`, type: "related-to" as const })),
       updatedAt: recentDate.toISOString(),
     });
@@ -142,7 +150,7 @@ describe("scoreRelatedNote", () => {
     const perfectScore = scoreRelatedNote(perfectNote, "test-project");
     const baseScore = scoreRelatedNote(baseNote, undefined);
     expect(perfectScore).toBeGreaterThan(baseScore);
-    expect(perfectScore).toBeGreaterThanOrEqual(100 + 50 + 20 + 10); // minimum combined boost
+    expect(perfectScore).toBeGreaterThanOrEqual(100 + 8 + 20 + 10); // minimum combined boost
   });
 
   it("prefers summary and decision metadata when other factors are comparable", () => {

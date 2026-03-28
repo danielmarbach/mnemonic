@@ -3636,11 +3636,14 @@ server.registerTool(
           score: anchorScore(e.note, themeCache, metadata),
           theme: themeCache.get(e.note.id) ?? "other",
           alwaysLoad: metadata?.alwaysLoad === true,
+          explicitOrientationRole:
+            metadata?.roleSource === "explicit" &&
+            (metadata.role === "summary" || metadata.role === "decision"),
           hasVisibleGraphParticipation: (baselineContext?.visibleOutbound ?? 0) > 0 || (baselineContext?.inbound ?? 0) > 0,
         };
       })
       .filter(candidate => candidate.score > -Infinity)
-      .filter(candidate => candidate.alwaysLoad || candidate.hasVisibleGraphParticipation)
+      .filter(candidate => candidate.alwaysLoad || candidate.explicitOrientationRole || candidate.hasVisibleGraphParticipation)
       .sort((a, b) => b.score - a.score || a.entry.note.title.localeCompare(b.entry.note.title));
 
     // Enforce max 2 per theme for scored anchors
