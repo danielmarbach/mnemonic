@@ -2375,7 +2375,9 @@ server.registerTool(
               })
             );
             const enriched = enrichTemporalHistory(rawHistory);
-            history = enriched.interpretedHistory;
+            history = verbose
+              ? enriched.interpretedHistory
+              : enriched.interpretedHistory.map(entry => ({ ...entry, stats: undefined }));
             historySummary = enriched.historySummary;
           }
         }
