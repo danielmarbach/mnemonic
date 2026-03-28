@@ -158,7 +158,8 @@ function generateChangeDescription(
 
     case "unknown":
     default:
-      return "Updated the note.";
+      if (isSubstantial) return "Substantially updated the note.";
+      return hasContent ? "Minor update to the note." : "Updated the note.";
   }
 }
 
@@ -248,6 +249,19 @@ export function summarizeHistory(
 
   if (hasConnect) {
     return "The note was connected to related work through incremental updates.";
+  }
+
+  if (dominantCategory === "unknown") {
+    const substantialCount = entries.filter(
+      e => e.stats?.changeType === "substantial update"
+    ).length;
+    if (substantialCount >= 2) {
+      return "The note grew through multiple substantial updates.";
+    }
+    const totalAdditions = entries.reduce((sum, e) => sum + (e.stats?.additions ?? 0), 0);
+    if (totalAdditions > 100) {
+      return "The note expanded significantly through several updates.";
+    }
   }
 
   return "This note has been updated several times.";

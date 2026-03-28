@@ -155,11 +155,22 @@ export function buildProjection(note: Note): NoteProjection {
  * A projection is stale when:
  * - projection is missing → stale (caller handles null case)
  * - projection.updatedAt missing → stale
- * - projection.updatedAt !== note.updatedAt → stale
+ * - updatedAt differs AND projected content actually changed
+ *
+ * Relationship-only changes bump note.updatedAt without affecting projectionText.
+ * Comparing projectionText avoids unnecessary re-embeds in those cases.
  */
 export function isProjectionStale(note: Note, projection: NoteProjection): boolean {
   if (!projection.updatedAt) return true;
-  return projection.updatedAt !== note.updatedAt;
+  if (projection.updatedAt === note.updatedAt) return false;
+  const currentText = buildProjectionText({
+    title: note.title,
+    lifecycle: note.lifecycle,
+    tags: note.tags,
+    summary: extractProjectionSummary(note),
+    headings: extractHeadings(note.content),
+  });
+  return currentText !== projection.projectionText;
 }
 
 // ── Storage helpers ───────────────────────────────────────────────────────────

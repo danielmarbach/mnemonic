@@ -3587,6 +3587,18 @@ server.registerTool(
     const dynamicThemes = graduationResult.promotedThemes.filter(t => !fixedThemes.includes(t));
     const themeOrder = [...fixedThemes, ...dynamicThemes.sort(), "other"];
 
+    // Collapse thin dynamic-theme buckets (< 2 notes) into "other" to reduce noise.
+    // Fixed themes are kept even when small; only keyword-graduated themes are collapsed.
+    const fixedThemeSet = new Set(fixedThemes);
+    for (const [theme, bucket] of Array.from(themed.entries())) {
+      if (!fixedThemeSet.has(theme) && theme !== "other" && bucket.length < 2) {
+        const otherBucket = themed.get("other") ?? [];
+        otherBucket.push(...bucket);
+        themed.set("other", otherBucket);
+        themed.delete(theme);
+      }
+    }
+
     // Calculate notes distribution (project-scoped only)
     const projectVaultCount = projectEntries.filter(e => e.vault.isProject).length;
     const mainVaultProjectEntries = projectEntries.filter(e => !e.vault.isProject);
@@ -3784,8 +3796,29 @@ server.registerTool(
 
     const primaryEnriched = primaryAnchor ? await enrichOrientationNote(primaryAnchor) : {};
     const primaryRelationships = primaryAnchor ? await enrichOrientationNoteWithRelationships(primaryAnchor) : {};
-    const suggestedEnriched = await Promise.all(anchors.slice(1, 4).map(enrichOrientationNote));
-    const suggestedRelationships = await Promise.all(anchors.slice(1, 4).map(enrichOrientationNoteWithRelationships));
+
+    // Select theme-diverse suggestedNext: avoid repeating the primary anchor's theme.
+    // Backfills without constraint if not enough theme-distinct candidates exist.
+    const primaryTheme = primaryAnchor ? (themeCache.get(primaryAnchor.id) ?? "other") : "other";
+    const usedSuggestedThemes = new Set([primaryTheme]);
+    const suggestedCandidates: typeof anchors = [];
+    for (const anchor of anchors.slice(1)) {
+      if (suggestedCandidates.length >= 3) break;
+      const anchorTheme = themeCache.get(anchor.id) ?? "other";
+      if (!usedSuggestedThemes.has(anchorTheme)) {
+        suggestedCandidates.push(anchor);
+        usedSuggestedThemes.add(anchorTheme);
+      }
+    }
+    for (const anchor of anchors.slice(1)) {
+      if (suggestedCandidates.length >= 3) break;
+      if (!suggestedCandidates.includes(anchor)) {
+        suggestedCandidates.push(anchor);
+      }
+    }
+
+    const suggestedEnriched = await Promise.all(suggestedCandidates.map(enrichOrientationNote));
+    const suggestedRelationships = await Promise.all(suggestedCandidates.map(enrichOrientationNoteWithRelationships));
 
     // Enrich fallback primaryEntry when no anchors exist
     let fallbackEnriched: { provenance?: { lastUpdatedAt: string; lastCommitHash: string; lastCommitMessage: string; recentlyChanged: boolean }; confidence?: "high" | "medium" | "low" } = {};
@@ -3825,7 +3858,7 @@ server.registerTool(
             ...fallbackEnriched,
             ...fallbackRelationships,
           },
-      suggestedNext: anchors.slice(1, 4).map((a, i) => ({
+      suggestedNext: suggestedCandidates.map((a, i) => ({
         id: a.id,
         title: a.title,
         rationale: `Centrality ${a.centrality}, connects ${a.connectionDiversity} themes`,

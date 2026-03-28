@@ -282,6 +282,18 @@ describe("isProjectionStale", () => {
     const proj = makeProjection({ updatedAt: "2026-01-15T00:00:00.000Z" });
     expect(isProjectionStale(note, proj)).toBe(true);
   });
+
+  it("returns false when updatedAt differs but projectionText is unchanged", () => {
+    // Relationship-only changes bump updatedAt without affecting projected content.
+    // Build the actual projection text for the default note so they match.
+    const note = makeNote({ updatedAt: "2026-02-01T00:00:00.000Z" });
+    const fresh = buildProjection(note);
+    const proj = makeProjection({
+      updatedAt: "2026-01-01T00:00:00.000Z",
+      projectionText: fresh.projectionText,
+    });
+    expect(isProjectionStale(note, proj)).toBe(false);
+  });
 });
 
 // ── Integration: buildProjection with realistic content ───────────────────────

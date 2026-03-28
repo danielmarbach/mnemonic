@@ -4,6 +4,16 @@ All notable changes to `mnemonic` will be documented in this file.
 
 The format is loosely based on Keep a Changelog and uses semver-style version headings.
 
+## [0.19.1] - 2026-03-28
+
+### Fixed
+
+- Thin dynamic theme buckets (fewer than 2 notes) are now collapsed into "other" in `project_memory_summary`, reducing theme noise without affecting fixed themes.
+- `suggestedNext` in `project_memory_summary` now prefers theme-diverse anchors, avoiding suggestions that repeat the primary entry's theme.
+- `changeDescription` for `unknown`-category history entries now uses stats to produce "Substantially updated the note." or "Minor update to the note." instead of always "Updated the note."
+- `summarizeHistory` now produces more informative summaries for `unknown`-dominant multi-commit notes, using total additions and substantial-update count as signals.
+- `isProjectionStale` now skips re-embedding when `updatedAt` differs but projected content is unchanged, avoiding unnecessary re-embeds for relationship-only note changes.
+
 ## [0.19.0] - 2026-03-28
 
 ### Added
