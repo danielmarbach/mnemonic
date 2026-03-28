@@ -6,6 +6,14 @@ The format is loosely based on Keep a Changelog and uses semver-style version he
 
 ## [0.19.0] - Unreleased
 
+### Added
+
+- **Temporal recall now explains what changed, not just that it changed**
+  - Each history entry includes a `changeDescription` explaining the nature of the change
+  - Notes include a `historySummary` capturing the overall evolution pattern
+  - Interpretation uses structural signals (additions/deletions, file changes) rather than English wording
+  - If interpretation fails, temporal recall still works with basic history
+
 ### Changed
 
 - The workflow hint and user-facing docs now state that roles are optional prioritization hints, inferred roles stay internal-only, lifecycle remains the durability control, and default prioritization is language-independent.

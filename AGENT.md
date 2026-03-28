@@ -178,8 +178,17 @@ When `recall` called with `cwd`, project notes get **+0.15 cosine similarity boo
 - `recall` supports opt-in temporal enrichment via `mode: "temporal"`
 - Semantic ranking still happens first; git history is fetched only after top matches are selected
 - Default recall behavior and latency expectations stay unchanged when temporal mode is not used
-- Temporal output stays compact: commit hash, timestamp, message, and optional bounded summary
+- **Use temporal mode when:**
+  - Asking "what changed?" or "how did this evolve?"
+  - Investigating "did this decision change or get refined over time?"
+  - Understanding note evolution patterns without reading full git history
+- **What you get:**
+  - Per-change descriptions (`changeDescription`): "Expanded the note with additional detail", "Refined the approach based on feedback"
+  - Note-level history summaries (`historySummary`): "Gradually expanded with implementation details"
+  - Semantic categories: create, refine, expand, clarify, connect, restructure, reverse, unknown
+- **Important:** Temporal output is interpretive and bounded—mnemonic explains what kind of change happened using structural/statistical signals, not raw diffs. Do not expect patch content by default.
 - `verbose: true` adds richer whole-commit stats-based context only; do not expect raw or partial diffs
+- **Guidance:** summary first, recall next, temporal only when evolution matters
 
 ### Multi-vault architecture
 - **Main vault** (`~/mnemonic-vault`): Private global memories, own git repo

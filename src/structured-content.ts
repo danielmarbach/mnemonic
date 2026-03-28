@@ -108,7 +108,10 @@ export interface RecallResult extends Record<string, unknown> {
         filesChanged: number;
         changeType: "metadata-only change" | "minor edit" | "substantial update";
       };
+      changeCategory?: "create" | "refine" | "expand" | "clarify" | "connect" | "restructure" | "reverse" | "unknown";
+      changeDescription?: string;
     }>;
+    historySummary?: string;
     relationships?: RelationshipPreview;
   }>;
 }
@@ -550,7 +553,10 @@ export const RecallResultSchema = z.object({
         filesChanged: z.number(),
         changeType: z.enum(["metadata-only change", "minor edit", "substantial update"]),
       }).optional(),
+      changeCategory: z.enum(["create", "refine", "expand", "clarify", "connect", "restructure", "reverse", "unknown"]).optional(),
+      changeDescription: z.string().optional(),
     })).optional(),
+    historySummary: z.string().optional(),
     relationships: RelationshipPreviewSchema.optional(),
   })),
 });

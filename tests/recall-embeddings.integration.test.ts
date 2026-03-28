@@ -216,7 +216,29 @@ This note has no embedding.`,
       const results = structured?.["results"] as Array<Record<string, unknown>>;
       expect(results).toBeDefined();
       expect(results.length).toBeGreaterThan(0);
+
+      // history is defined in temporal mode, even if empty (no git commits yet)
       expect(results[0]?.["history"]).toBeDefined();
+
+      // If history has entries, verify temporal fields are present
+      const history = results[0]?.["history"] as Array<Record<string, unknown>>;
+      if (history && history.length > 0) {
+        for (const entry of history) {
+          expect(entry).toHaveProperty("changeCategory");
+          expect(entry).toHaveProperty("changeDescription");
+          expect(typeof entry["changeCategory"]).toBe("string");
+          expect(typeof entry["changeDescription"]).toBe("string");
+          // Verify descriptions don't contain raw diffs
+          expect(entry["changeDescription"]).not.toContain("@@");
+          expect(entry["changeDescription"]).not.toContain("diff");
+          // "+" and "-" can be part of sentences, so only check at start of line
+          expect(entry["changeDescription"]).not.toMatch(/^[-+]/);
+        }
+
+        // historySummary is present when there are history entries
+        expect(results[0]?.["historySummary"]).toBeDefined();
+        expect(typeof results[0]?.["historySummary"]).toBe("string");
+      }
     } finally {
       await embeddingServer.close();
     }
