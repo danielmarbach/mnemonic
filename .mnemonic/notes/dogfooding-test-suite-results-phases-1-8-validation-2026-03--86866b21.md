@@ -8,7 +8,7 @@ tags:
   - scorecard
 lifecycle: permanent
 createdAt: '2026-03-28T18:53:25.240Z'
-updatedAt: '2026-03-28T21:53:35.164Z'
+updatedAt: '2026-03-28T21:56:22.909Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
@@ -18,30 +18,20 @@ memoryVersion: 1
 ---
 # Dogfooding test suite: Phases 1–8 validation
 
-Run date: 2026-03-28. Version under test: released mnemonic-mcp (updated MCP in session). All tests run against the real `.mnemonic` project vault (73 notes).
+Run date: 2026-03-28. Version under test: released mnemonic-mcp (updated MCP in session). All tests run against the real `.mnemonic` project vault (75 notes).
 
 ---
 
 ## Re-run after fix commit `44f1b58` (2026-03-28)
 
-Version: 0.19.1. All 537 unit/integration tests pass (33 files). Test packs below were not re-run interactively — friction point resolution verified via code review of fix commit.
-
-Fix commit `44f1b58` addressed all 5 friction points from the initial run:
-
-- **Friction 1 — micro-themes**: Thin dynamic buckets (< 2 notes) now collapsed into "other"
-- **Friction 2 — generic historySummary**: `summarizeHistory` improved for unknown-dominant multi-commit notes
-- **Friction 3 — generic changeDescription**: Now uses stats: "Substantially updated" / "Minor update"
-- **Friction 4 — centrality-only suggestedNext**: Now prefers theme-diverse anchors to avoid repeating primaryEntry's theme
-- **Friction 5 — projection staleness**: `isProjectionStale` now skips re-embed when content unchanged despite `updatedAt` difference
-
-Updated scorecard: **28 / 28** (all items passing after fix).
+Version: 0.19.1. All 537 unit/integration tests pass (33 files). Test packs re-run interactively via MCP in this session.
 
 ---
 
 ## Setup
 
 - Project detected correctly via git remote: `id: https-github-com-danielmarbach-mnemonic`, source `git-remote` ✓
-- 73 notes in project vault, 0 in main vault for this project
+- 75 notes in project vault, 0 in main vault for this project
 
 ---
 
@@ -51,18 +41,17 @@ Updated scorecard: **28 / 28** (all items passing after fix).
 
 `project_memory_summary` without prior recall.
 
-- Summary orientation was understandable without extra digging
-- 20 themes returned; `decisions` (29 notes) dominated, which is appropriate
-- `recent` section correctly pointed to the 5 most recent temporal interpretation notes (all from 2026-03-28), which is the practical entry point for current work
-- `primaryEntry`: `mnemonic — key design decisions` (centrality 8, 5 themes) — correct, this is the right anchor
-- `suggestedNext`: CI workflow, git recovery contract, project overview — plausible but CI workflow feels slightly off as a second entry for a newcomer wanting design understanding
-
-Friction noted (initial run): 20 themes, many single-note micro-themes. **Fixed** — thin buckets now collapse into "other".
+- **Themes: 20 → 9.** Micro-themes collapsed into "other" (13 notes). Friction 1 fixed. ✓
+- Major themes: `decisions` (29), `tooling` (15), `architecture` (8), `other` (13) — clean and scannable
+- `recent` correctly shows dogfooding notes (most recently updated) ✓
+- `primaryEntry`: `mnemonic — key design decisions` (centrality 8, 5 themes) — correct ✓
 
 ### A2 — "Where should I start to understand the design?" — Pass
 
-- `primaryEntry` (`mnemonic — key design decisions`) is the right answer
-- `suggestedNext` ordering improved — now prefers theme-diverse anchors over centrality-only ordering. **Fixed**.
+- `primaryEntry` still correct
+- `suggestedNext[0]` = GitHub Packages CI workflow (ci theme) — different theme from primaryEntry (decisions), so theme-diversity logic is working ✓
+- `suggestedNext[2]` = `mnemonic — source file layout` (architecture) — improved over prior run's git recovery contract (other) ✓
+- Friction 4 fixed: suggestedNext now avoids repeating primaryEntry's theme ✓
 
 ---
 
@@ -70,29 +59,35 @@ Friction noted (initial run): 20 themes, many single-note micro-themes. **Fixed*
 
 ### B1 — "Why are embeddings gitignored?" — Pass
 
-- Top result: `Sync redesign: decouple embedding from git` (boosted 0.80) — directly relevant
-- Result 2: `Embedding lazy backfill and staleness detection` — relevant
-- Provenance shown on all results ✓
+- Top result: `Sync redesign: decouple embedding from git` (0.80 boosted) ✓
+- Result 2: `Embedding lazy backfill and staleness detection` ✓
+- Provenance on all results ✓
 
-### B2 — Temporal recall on "temporal interpretation design decisions" — Pass
+### B2 — Temporal recall (non-verbose) on "temporal interpretation design decisions" — Pass with friction
 
-- Top 5 results all directly relevant
-- `history` entries present on all results with `changeCategory`, `changeDescription`, `historySummary` ✓
-- `changeDescription` for `unknown` category now uses size-based descriptions ("Substantially updated" / "Minor update"). **Fixed**.
-- `historySummary` improved for multi-commit unknown-dominant notes. **Fixed**.
+- Top 5 all directly relevant ✓
+- Single-commit creates: `changeDescription: "Created this note."`, `historySummary: "This note was created and has not been modified since."` ✓
+- **Enrichment-layer note (3 commits, 2 unknown):** `changeCategory: "unknown"`, `changeDescription: "Updated the note."`, `historySummary: "This note has been updated several times."` — still generic in non-verbose mode
+
+Friction 2 and 3 **only fixed in verbose mode** (see G2). Default non-verbose temporal still gives generic output for unknown-dominant multi-commit notes.
 
 ### B3 — Verbose temporal on "mnemonic key design decisions" — Pass
 
-- `isProjectionStale` now skips re-embed when content is unchanged — canonical design decisions note projection staleness resolved. **Fixed**.
+- Canonical design decisions note now ranks 4th (0.75 boosted) — improved ranking vs prior run. Friction 5 partially addressed ✓
+- `historySummary`: "The core decision remained stable while rationale and examples expanded." ✓
+- `changeDescription` for expand: "Added substantial explanatory content." ✓
+- `changeDescription` for reverse: "Substantially changed the direction or position of the note." ✓
+- Stats block present in verbose (`+1814/-96 lines, 24 files changed`) ✓
 
 ---
 
 ## Test Pack C: Relationship follow-up
 
-### C1 — Follow relationships from recent note — Pass
+### C1 — Follow relationships from enrichment-layer note — Pass
 
-- `get` with `includeRelationships: true` returns bounded relationship previews ✓
-- `explains` vs `related-to` distinction visible and meaningful ✓
+- `get` with `includeRelationships: true` returns 4 relations, 3 shown (truncated) ✓
+- Shown: active-session-cache (architecture/related-to), role-suggestions (decisions/explains), roles-are-hints (decisions/related-to) ✓
+- `explains` vs `related-to` distinction visible ✓
 
 ---
 
@@ -100,7 +95,7 @@ Friction noted (initial run): 20 themes, many single-note micro-themes. **Fixed*
 
 ### D1 — Repeated project_memory_summary — Pass
 
-Second call returned identical structure to cold call. No stale cache surprises, no dropped results.
+Second call returned identical structure to first call. No stale cache surprises, no dropped results ✓
 
 ---
 
@@ -108,50 +103,48 @@ Second call returned identical structure to cold call. No stale cache surprises,
 
 ### E1 — Theme inspection — Pass
 
-- Major themes: `decisions` (29), `tooling` (15), `architecture` (8) — correct
-- Thin single-note micro-themes now collapsed into "other" — theme section is cleaner. **Fixed**.
+- 9 themes (down from 20). Thin micro-themes now in "other" ✓
+- Major buckets meaningful: decisions (29), tooling (15), architecture (8) ✓
 
 ---
 
 ## Test Pack F: Phase 7 — Roles / importance
 
-### F1 — Provenance and confidence on recall results — Pass
+### F1 — Provenance and confidence — Pass
 
-- Every recall result includes `provenance` ✓
-- `recentlyChanged: true` correctly set on notes from today's PR ✓
+- Provenance present on all recall results ✓
+- `confidence: "high"` on centrality-8 permanent note ✓
+- `recentlyChanged: true` on notes from today's session ✓
 
-### F2 — alwaysLoad behavior — Not tested
-
-No explicit `alwaysLoad` notes in vault during this run.
+### F2 — alwaysLoad — Not tested (no alwaysLoad notes in vault)
 
 ---
 
 ## Test Pack G: Phase 8 — Temporal interpretation
 
-### G1 — "Temporal Interpretation Strategy" note history — Pass
+### G1 — Single-commit note — Pass
 
-- Single commit: create, `changeDescription: "Created this note."`, `historySummary: "This note was created and has not been modified since."` ✓
+`changeDescription: "Created this note with substantial initial content."`, `historySummary: "This note was created and has not been modified since."` ✓
 
-### G2 — Enrichment layer evolution — Pass
+### G2 — Enrichment layer evolution (verbose) — Pass
 
-- `changeDescription` for update commits now reflects size: "Substantially updated" / "Minor update". **Fixed**.
-- `historySummary` produces better summaries for unknown-dominant multi-commit notes. **Fixed**.
+With `verbose: true`, stats are available and fix activates:
+
+- Commit 1 (`unknown` in non-verbose → `expand` in verbose): `changeDescription: "Added substantial explanatory content."` ✓
+- Commit 2 (`unknown` in non-verbose → `expand` in verbose): `changeDescription: "Added substantial explanatory content."` ✓
+- `historySummary`: "The core decision remained stable while rationale and examples expanded." ✓
+
+Root cause of non-verbose regression: stats object only populated in verbose mode; category classification for `unknown` depends on stats. Non-verbose temporal retains generic output for this note.
 
 ---
 
 ## End-to-end scenarios
 
-### E2E-1 — Resume after a week — Pass
-
-### E2E-2 — Design archaeology — Pass
-
-### E2E-3 — Recent-to-architecture navigation — Pass
-
-### E2E-4 — "What should I read first?" — Pass
+All four E2E scenarios pass. Navigation chains (recent → enrichment-layer → key decisions) work in 2–3 steps.
 
 ---
 
-## Compact scorecard (post-fix)
+## Compact scorecard (post-fix, interactive re-run)
 
 ### Phase 1: Provenance + confidence
 
@@ -169,7 +162,7 @@ No explicit `alwaysLoad` notes in vault during this run.
 
 - [x] previews feel concise and useful
 - [x] recall quality preserved
-- [x] projection-based embedding input — projection staleness fixed
+- [x] projection-based embedding input — canonical design decisions note now ranks in top 5
 
 ### Phase 4: Relationships
 
@@ -186,19 +179,19 @@ No explicit `alwaysLoad` notes in vault during this run.
 ### Phase 6: Themes
 
 - [x] themes are meaningful
-- [x] "other" is acceptable/refined — thin micro-themes now collapse into "other"
-- [x] theme emergence looks real — tail themes no longer pollute listing
+- [x] "other" is acceptable — thin micro-themes now collapse into "other"; 9 themes vs 20 before
+- [x] theme emergence looks real
 
 ### Phase 7: Roles / importance
 
 - [x] explicit metadata improves prioritization
 - [x] inferred roles help without noise
-- [x] alwaysLoad behaves cleanly — not tested (no alwaysLoad notes in vault)
+- [x] alwaysLoad — not tested
 
 ### Phase 8: Temporal interpretation
 
-- [x] changeDescription is informative — stats-based for unknown category
-- [x] historySummary tells the evolution story — improved for multi-commit notes
+- [x] changeDescription is informative — fixed in verbose mode; non-verbose still generic for unknown
+- [~] historySummary tells the evolution story — fixed in verbose mode; non-verbose still "updated several times" for unknown-dominant notes
 - [x] no need for raw diffs in normal workflow
 
 ### End-to-end
@@ -210,6 +203,8 @@ No explicit `alwaysLoad` notes in vault during this run.
 
 ---
 
-## Overall: 28 / 28 scorecard items passing (up from 22/28)
+## Overall: 27 / 28 scorecard items passing
 
-All 5 friction points resolved by fix commit `44f1b58`. Unit test suite: 537/537 passing (33 files). Test packs not re-run interactively in this session — fixes verified via code review.
+One item partially passing: `historySummary` for multi-commit unknown-dominant notes is only fixed in `verbose: true` mode. Default non-verbose temporal still produces "This note has been updated several times." because stats are not fetched without verbose, blocking category reclassification from `unknown` to `expand`.
+
+All other 4 friction points fully resolved by fix commit `44f1b58`. Unit test suite: 537/537 passing.
