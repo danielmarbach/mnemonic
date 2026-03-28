@@ -312,8 +312,8 @@ Temporal recall is opt-in via `mode: "temporal"`. It keeps semantic selection fi
 
 **What temporal mode shows:**
 
-- **Per-change descriptions** (`changeDescription`): human-readable summaries like "Expanded the note with additional detail" or "Refined the approach based on feedback"
-- **Note-level history summaries** (`historySummary`): overall patterns like "Gradually expanded with implementation details" or "Established core concept, then refined scope"
+- **Per-change descriptions** (`changeDescription`): human-readable summaries like "Expanded the note with additional detail" or "Minor refinement to existing content."
+- **Note-level history summaries** (`historySummary`): overall patterns like "The core decision remained stable while rationale and examples expanded." or "The note was connected to related work through incremental updates."
 - **Semantic change categories**: create, refine, expand, clarify, connect, restructure, reverse, unknown
 
 **How it works:**
@@ -337,7 +337,11 @@ Each note carries a `lifecycle`:
 
 ### Roles and lifecycle
 
-Roles are optional prioritization hints, not required schema. mnemonic works without them, inferred roles stay internal-only, prioritization is language-independent by default, and lifecycle remains the separate durability axis. A note with `role: plan` can still be either `temporary` or `permanent`.
+Roles are optional prioritization hints, not required schema. mnemonic infers a `role` and `importance` from structural signals (heading count, bullet density, inbound references, relationship types) — inference is language-independent and never overwrites explicit frontmatter. Valid roles: `summary`, `decision`, `plan`, `log`, `reference`. Valid importance values: `high`, `normal`.
+
+Set `alwaysLoad: true` in a note's frontmatter to mark it as an explicit session anchor; it receives the highest recall and relationship-expansion priority regardless of inferred role.
+
+mnemonic works without roles. Inferred roles stay internal-only, prioritization is language-independent by default, and lifecycle remains the separate durability axis. A note with `role: plan` can still be either `temporary` or `permanent`.
 
 ### Note format
 

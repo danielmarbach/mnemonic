@@ -183,8 +183,8 @@ When `recall` called with `cwd`, project notes get **+0.15 cosine similarity boo
   - Investigating "did this decision change or get refined over time?"
   - Understanding note evolution patterns without reading full git history
 - **What you get:**
-  - Per-change descriptions (`changeDescription`): "Expanded the note with additional detail", "Refined the approach based on feedback"
-  - Note-level history summaries (`historySummary`): "Gradually expanded with implementation details"
+  - Per-change descriptions (`changeDescription`): "Expanded the note with additional detail", "Minor refinement to existing content."
+  - Note-level history summaries (`historySummary`): "The core decision remained stable while rationale and examples expanded.", "The note was connected to related work through incremental updates."
   - Semantic categories: create, refine, expand, clarify, connect, restructure, reverse, unknown
 - **Important:** Temporal output is interpretive and bounded—mnemonic explains what kind of change happened using structural/statistical signals, not raw diffs. Do not expect patch content by default.
 - `verbose: true` adds richer whole-commit stats-based context only; do not expect raw or partial diffs
@@ -251,6 +251,8 @@ Keep these high-level anchors in mind:
 - `src/git.ts` makes git part of normal mutating behavior
 - `src/migration.ts` owns schema evolution and dry-run-first migration flow
 - `src/cache.ts` owns the active session project cache: one in-memory `SessionProjectCache` per project, keyed by project ID; invalidated on every write-path tool
+- `src/role-suggestions.ts` infers role and importance from structural signals; never writes to frontmatter
+- `src/temporal-interpretation.ts` classifies and summarizes git history entries; called as post-processing after temporal history retrieval
 - `src/recall.ts` and `src/consolidate.ts` hold behavior that intentionally stays lightweight instead of introducing heavier runtime state
 
 ## Prompts
@@ -359,7 +361,7 @@ Any change to note format, frontmatter schema, config structure, or relationship
 - When adding a new latest-schema migration, bump `defaultConfig.schemaVersion` in `src/config.ts` at the same time so fresh installs start at the current schema.
 
 **Test files mirrored to source structure**:
-- `src/storage.ts` → `tests/storage.test.ts` (doesn't exist yet, add when needed)
+- `src/storage.ts` → `tests/storage.unit.test.ts`
 - `src/vault.ts` → `tests/vault.test.ts`
 - `src/migration.ts` → `tests/migration.test.ts`
 
