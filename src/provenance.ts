@@ -1,6 +1,7 @@
 import type { CommitStats, GitOps, LastCommit } from "./git.js";
 import type { NoteLifecycle } from "./storage.js";
 import type { Confidence, Provenance } from "./structured-content.js";
+export type { InterpretedHistoryEntry } from "./temporal-interpretation.js";
 
 const RECENTLY_CHANGED_DAYS = 5;
 const HIGH_CONFIDENCE_DAYS = 30;

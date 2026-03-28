@@ -1252,9 +1252,14 @@
         <p>Pending migrations are visible per vault, dry-runs are built in, and failed runs roll staged note writes back instead of leaving half-migrated memories behind.</p>
       </div>
       <div class="feature-card fade-up">
-        <span class="feature-icon">&#x23F3;</span>
-        <h3>Temporary note lifecycle</h3>
-        <p>Your LLM can plan and track complex feature work across sessions — implementation plans, WIP checkpoints, open questions — committed to git so they evolve alongside the code. Mark notes <code style="font-family:JetBrains Mono,monospace;font-size:0.8em;color:var(--cyan-lt)">temporary</code> and they naturally fade once the work is done; <code style="font-family:JetBrains Mono,monospace;font-size:0.8em;color:var(--cyan-lt)">permanent</code> for decisions and lessons worth keeping forever. Roles, when present, are optional prioritization hints only: <code style="font-family:JetBrains Mono,monospace;font-size:0.8em;color:var(--cyan-lt)">role: plan</code> does not decide durability.</p>
+        <span class="feature-icon">&#x1F4CC;</span>
+        <h3>Notes surface smarter over time</h3>
+        <p>Mark notes <code style="font-family:JetBrains Mono,monospace;font-size:0.8em;color:var(--cyan-lt)">temporary</code> for plans and WIP, <code style="font-family:JetBrains Mono,monospace;font-size:0.8em;color:var(--cyan-lt)">permanent</code> for decisions worth keeping. Decision and summary notes rank higher automatically as they accumulate references and relationships — no manual tagging required. Pin any note as a session anchor to always bring it to the top.</p>
+      </div>
+      <div class="feature-card fade-up">
+        <span class="feature-icon">&#x1F4DC;</span>
+        <h3>Understand how decisions evolved</h3>
+        <p>Opt-in temporal mode adds compact git-backed history to <code style="font-family:JetBrains Mono,monospace;font-size:0.8em;color:var(--primary-lt)">recall</code> results. Each change is described in plain language — "Expanded the note with additional detail", "Connected this note to related work" — and the overall arc is summarised: "The core decision remained stable while rationale expanded." See how a decision formed without wading through raw diffs.</p>
       </div>
     </div>
   </div>
@@ -1339,8 +1344,8 @@
     </p>
 
     <div class="recall-flow fade-up">
-      <h3>Recall flow &mdash; projection-enhanced semantic search</h3>
-      <p class="section-desc" style="margin-bottom:16px;font-size:0.875rem;">Before embedding, notes are projected into clean structured text: title, lifecycle, tags, summary, and h1–h3 headings. No prose noise, no markdown formatting — just the signal that matters for similarity.</p>
+      <h3>Recall flow &mdash; projection-enhanced, role-boosted semantic search</h3>
+      <p class="section-desc" style="margin-bottom:16px;font-size:0.875rem;">Before embedding, notes are projected into clean structured text: title, lifecycle, tags, summary, and h1–h3 headings — no prose noise. At ranking time, inferred role and importance further boost scores so summary and decision notes surface naturally. Top results include bounded 1-hop relationship previews and optional git-backed provenance.</p>
       <div class="flow-steps">
         <div class="flow-step">
           <div class="flow-step-box" style="border-color:rgba(74,222,128,0.25);color:var(--primary-lt)">recall query</div>
@@ -1493,7 +1498,7 @@
             <div class="tool-card-name">detect_project</div>
             <div class="tool-card-purpose">Check which project this folder belongs to</div>
           </div>
-          <div class="tool-card" data-tip="Get a quick orientation: themed categories, recent changes, anchor notes (cross-cutting hubs), and explicit guidance on which notes to read first — perfect for starting a session.">
+          <div class="tool-card" data-tip="Get a quick orientation: themes that emerge automatically from your project's vocabulary, anchor notes (cross-cutting hubs), and explicit guidance on which notes to read first — perfect for starting a session.">
             <div class="tool-card-name">project_memory_summary</div>
             <div class="tool-card-purpose">What does mnemonic know about this project?</div>
           </div>
@@ -2022,21 +2027,20 @@ VAULT_PATH = <span class="str">"/Users/you/mnemonic-vault"</span></pre>
       <div class="dogfood-card fade-up">
         <div class="dogfood-card-top">
           <div class="dogfood-meta">
-            <span class="dogfood-tag">markdown</span>
-            <span class="dogfood-tag">linting</span>
-            <span class="dogfood-tag">dogfooding</span>
+            <span class="dogfood-tag">architecture</span>
+            <span class="dogfood-tag">design</span>
+            <span class="dogfood-tag">decision</span>
           </div>
-          <div class="dogfood-id">markdown-linting-for-memory-content-259a1c85</div>
+          <div class="dogfood-id">enrichment-layer-design-provenance-temporal-recall-projectio-7af26f06</div>
         </div>
-        <h3 class="dogfood-title">Markdown linting for memory content</h3>
+        <h3 class="dogfood-title">Enrichment layer design: provenance, temporal recall, projections, and relationship expansion</h3>
         <div class="dogfood-body">
-          <p>Lint markdown note bodies during <code>remember</code> and <code>update</code> so recalled content stays clean. Auto-apply fixable issues like malformed headings, list spacing, and extra blank lines. Reject non-fixable issues after auto-fix so low-quality markdown is never stored.</p>
-          <p>Disable <code>MD013</code> (line length) and <code>MD041</code> (first line must be H1) because note bodies are content fragments, not standalone documents.</p>
-          <p class="dogfood-note">Dogfooding note: this decision was captured through the local MCP server itself, not by writing vault files directly.</p>
+          <p>Four post-processing layers added on top of semantic recall, each additive and fail-soft: provenance and confidence metadata from git; opt-in temporal history enriched after semantic selection; projection-based embedding from structured note representations; bounded 1-hop relationship previews scored by project affinity, anchor status, and recency.</p>
+          <p>Core recall ranking is unaffected by any layer. Failures degrade gracefully to basic results.</p>
         </div>
         <div class="dogfood-footer">
-          <span class="dogfood-rel">relates to key-design-decisions</span>
-          <span class="dogfood-date">Mar 7, 2026</span>
+          <span class="dogfood-rel">relates to session-cache, role-heuristics</span>
+          <span class="dogfood-date">Mar 28, 2026</span>
         </div>
       </div>
 
@@ -2044,27 +2048,26 @@ VAULT_PATH = <span class="str">"/Users/you/mnemonic-vault"</span></pre>
         <div class="dogfood-card-top">
           <div class="dogfood-meta">
             <span class="dogfood-tag">design</span>
-            <span class="dogfood-tag">consolidation</span>
-            <span class="dogfood-tag">mcp-tool</span>
+            <span class="dogfood-tag">temporal</span>
+            <span class="dogfood-tag">phase-8</span>
           </div>
-          <div class="dogfood-id">mnemonic-consolidate-tool-design-b9cbac6a</div>
+          <div class="dogfood-id">temporal-interpretation-strategy-f8573d1d</div>
         </div>
-        <h3 class="dogfood-title">mnemonic consolidate tool design</h3>
+        <h3 class="dogfood-title">Temporal Interpretation Strategy</h3>
         <div class="dogfood-body">
-          <p><strong>Two modes.</strong> <code>supersedes</code> keeps sources and adds a relationship to the new consolidated note — preserves history, allows pruning later. <code>delete</code> hard-deletes sources via <code>forget</code> for clean, immediate results.</p>
-          <p><strong>Cross-vault.</strong> Gathers all notes with matching project ID from both vaults, consolidates into the project vault. The consolidated note inherits all relationships from sources.</p>
-          <p><strong>Safety.</strong> Dry-run by default for analysis strategies. Git commit per operation for easy revert.</p>
+          <p>Temporal mode now explains <em>what kind</em> of change happened, not just that one occurred. Each history entry is classified into one of eight semantic categories — create, refine, expand, clarify, connect, restructure, reverse, unknown — using structural signals: additions/deletions ratio, churn, relationship changes, and commit message prefixes.</p>
+          <p>Classification is language-independent. Conservative thresholds prefer <code>unknown</code> over misclassification. Raw diffs are intentionally excluded from default output.</p>
         </div>
         <div class="dogfood-footer">
-          <span class="dogfood-rel">relates to 3 other notes</span>
-          <span class="dogfood-date">Mar 7, 2026</span>
+          <span class="dogfood-rel">relates to enrichment-layer-design</span>
+          <span class="dogfood-date">Mar 28, 2026</span>
         </div>
       </div>
 
     </div>
 
     <div class="dogfood-cta fade-up">
-      <p>These 25 notes — and everything mnemonic knows about itself — are committed to the repo inside <code>.mnemonic/notes/</code>. Plain markdown. Human-readable. Open the folder and read them directly.</p>
+      <p>Every architectural call, trade-off, and lesson — committed to the repo inside <code>.mnemonic/notes/</code> as plain markdown. Human-readable. Open the folder and read them directly.</p>
       <a href="https://github.com/danielmarbach/mnemonic/tree/main/.mnemonic/notes" class="btn btn-ghost" target="_blank" rel="noopener" style="margin-top:16px;display:inline-flex">
         Browse the decision log on GitHub
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-left:4px"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>

@@ -310,6 +310,16 @@ Project identity derives from the **git remote URL**, normalized to a stable slu
 
 Temporal recall is opt-in via `mode: "temporal"`. It keeps semantic selection first, then enriches only the top matches with compact git-backed history so agents can inspect how a note evolved without turning recall into raw log or diff output.
 
+**What temporal mode shows:**
+
+- **Per-change descriptions** (`changeDescription`): human-readable summaries like "Expanded the note with additional detail" or "Minor refinement to existing content."
+- **Note-level history summaries** (`historySummary`): overall patterns like "The core decision remained stable while rationale and examples expanded." or "The note was connected to related work through incremental updates."
+- **Semantic change categories**: create, refine, expand, clarify, connect, restructure, reverse, unknown
+
+**How it works:**
+
+mnemonic interprets change semantically using structural and statistical signals (size ratios, heading changes, section movements) rather than language-dependent analysis. Raw diffs are intentionally NOT part of default temporal output—you get interpretive summaries that explain what kind of change happened, not patch noise.
+
 Use `verbose: true` together with temporal mode when you want richer change stats such as additions, deletions, files changed, and change classification. Those stats describe the whole commit that touched the note, not a raw diff excerpt, so recall stays bounded and does not return full diffs.
 
 The `scope` parameter on `recall` narrows results:
@@ -327,7 +337,11 @@ Each note carries a `lifecycle`:
 
 ### Roles and lifecycle
 
-Roles are optional prioritization hints, not required schema. mnemonic works without them, inferred roles stay internal-only, prioritization is language-independent by default, and lifecycle remains the separate durability axis. A note with `role: plan` can still be either `temporary` or `permanent`.
+Roles are optional prioritization hints, not required schema. mnemonic infers a `role` and `importance` from structural signals (heading count, bullet density, inbound references, relationship types) — inference is language-independent and never overwrites explicit frontmatter. Valid roles: `summary`, `decision`, `plan`, `log`, `reference`. Valid importance values: `high`, `normal`.
+
+Set `alwaysLoad: true` in a note's frontmatter to mark it as an explicit session anchor; it receives the highest recall and relationship-expansion priority regardless of inferred role.
+
+mnemonic works without roles. Inferred roles stay internal-only, prioritization is language-independent by default, and lifecycle remains the separate durability axis. A note with `role: plan` can still be either `temporary` or `permanent`.
 
 ### Note format
 

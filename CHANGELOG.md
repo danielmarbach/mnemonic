@@ -4,7 +4,14 @@ All notable changes to `mnemonic` will be documented in this file.
 
 The format is loosely based on Keep a Changelog and uses semver-style version headings.
 
-## [0.19.0] - Unreleased
+## [0.19.0] - 2026-03-28
+
+### Added
+
+- Role and importance inference (`src/role-suggestions.ts`): notes are automatically assigned a suggested `role` and `importance` from structural signals; inference is language-independent and never overwrites explicit frontmatter.
+- `alwaysLoad: true` in note frontmatter marks a note as an explicit session anchor with highest recall and relationship-expansion priority.
+- `recall` and relationship expansion now factor in effective role and importance, so summary and decision notes surface higher without manual tagging.
+- Temporal recall history entries now include a `changeDescription` and notes include a `historySummary` capturing the overall evolution pattern; classification uses structural signals only and degrades gracefully when stats are unavailable.
 
 ### Changed
 

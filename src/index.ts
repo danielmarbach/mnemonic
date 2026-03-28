@@ -10,6 +10,7 @@ import { NOTE_LIFECYCLES, Storage, type Note, type NoteLifecycle, type Relations
 import { embed, cosineSimilarity, embedModel } from "./embeddings.js";
 import { type CommitResult, type PushResult, type SyncResult } from "./git.js";
 import { buildTemporalHistoryEntry, computeConfidence, getNoteProvenance } from "./provenance.js";
+import { enrichTemporalHistory, type InterpretedHistoryEntry } from "./temporal-interpretation.js";
 import { getOrBuildProjection } from "./projections.js";
 import {
   invalidateActiveProjectCache,
@@ -562,6 +563,7 @@ function formatTemporalHistory(
     timestamp: string;
     message: string;
     summary?: string;
+    changeDescription?: string;
   }>
 ): string {
   if (history.length === 0) {
@@ -571,7 +573,8 @@ function formatTemporalHistory(
   const lines = ["**history:**"];
   for (const entry of history) {
     const summary = entry.summary ? ` — ${entry.summary}` : "";
-    lines.push(`- \`${entry.commitHash.slice(0, 7)}\` ${entry.timestamp} — ${entry.message}${summary}`);
+    const changeDesc = entry.changeDescription ? ` (${entry.changeDescription})` : "";
+    lines.push(`- \`${entry.commitHash.slice(0, 7)}\` ${entry.timestamp} — ${entry.message}${summary}${changeDesc}`);
   }
   return lines.join("\n");
 }
@@ -2332,6 +2335,7 @@ server.registerTool(
           changeType: "metadata-only change" | "minor edit" | "substantial update";
         };
       }>;
+      historySummary?: string;
       relationships?: RelationshipPreview;
     }> = [];
     
@@ -2359,15 +2363,20 @@ server.registerTool(
           };
         }> | undefined;
 
+        let historySummary: string | undefined;
+
         if (mode === "temporal") {
           if (index < TEMPORAL_HISTORY_NOTE_LIMIT) {
             const commits = await vault.git.getFileHistory(filePath, TEMPORAL_HISTORY_COMMIT_LIMIT);
-            history = await Promise.all(
+            const rawHistory = await Promise.all(
               commits.map(async (commit) => {
                 const stats = await vault.git.getCommitStats(filePath, commit.hash);
                 return buildTemporalHistoryEntry(commit, stats, verbose);
               })
             );
+            const enriched = enrichTemporalHistory(rawHistory);
+            history = enriched.interpretedHistory;
+            historySummary = enriched.historySummary;
           }
         }
 
@@ -2404,6 +2413,7 @@ server.registerTool(
           provenance,
           confidence,
           history,
+          historySummary,
           relationships,
         });
       }
