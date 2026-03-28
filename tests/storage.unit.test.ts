@@ -95,6 +95,139 @@ Body`;
       expect(read?.lifecycle).toBe("permanent");
     });
 
+    it("should read explicit role, importance, and alwaysLoad metadata from frontmatter", async () => {
+      const notesDir = path.join(tempDir, "notes");
+      const content = `---
+title: Metadata note
+tags: []
+lifecycle: permanent
+role: decision
+importance: high
+alwaysLoad: true
+createdAt: 2023-01-01T00:00:00.000Z
+updatedAt: 2023-01-01T00:00:00.000Z
+---
+
+Body`;
+
+      await fs.writeFile(path.join(notesDir, "metadata-note.md"), content, "utf-8");
+
+      const read = await storage.readNote("metadata-note");
+
+      expect(read?.role).toBe("decision");
+      expect(read?.importance).toBe("high");
+      expect(read?.alwaysLoad).toBe(true);
+    });
+
+    it("should treat unsupported role, importance, and alwaysLoad values as absent", async () => {
+      const notesDir = path.join(tempDir, "notes");
+      const content = `---
+title: Invalid metadata note
+tags: []
+lifecycle: permanent
+role: invalid-role
+importance: urgent
+alwaysLoad: yes
+createdAt: 2023-01-01T00:00:00.000Z
+updatedAt: 2023-01-01T00:00:00.000Z
+---
+
+Body`;
+
+      await fs.writeFile(path.join(notesDir, "invalid-metadata-note.md"), content, "utf-8");
+
+      const read = await storage.readNote("invalid-metadata-note");
+
+      expect(read).toBeTruthy();
+      expect(read?.role).toBeUndefined();
+      expect(read?.importance).toBeUndefined();
+      expect(read?.alwaysLoad).toBeUndefined();
+    });
+
+    it("should round-trip explicit metadata and only serialize explicitly present values", async () => {
+      const now = new Date().toISOString();
+      const note: Note = {
+        id: "metadata-round-trip",
+        title: "Metadata Round Trip",
+        content: "Round trip body",
+        tags: ["metadata"],
+        lifecycle: "permanent",
+        role: "summary",
+        importance: "low",
+        alwaysLoad: true,
+        createdAt: now,
+        updatedAt: now,
+      };
+
+      await storage.writeNote(note);
+
+      const raw = await fs.readFile(path.join(tempDir, "notes", `${note.id}.md`), "utf-8");
+      expect(raw).toContain("role: summary");
+      expect(raw).toContain("importance: low");
+      expect(raw).toContain("alwaysLoad: true");
+
+      const read = await storage.readNote(note.id);
+
+      expect(read).toEqual({
+        ...note,
+        memoryVersion: 0,
+        project: undefined,
+        projectName: undefined,
+        relatedTo: undefined,
+      });
+
+      const noteWithoutMetadata: Note = {
+        id: "metadata-absent",
+        title: "Metadata Absent",
+        content: "No metadata body",
+        tags: [],
+        lifecycle: "permanent",
+        createdAt: now,
+        updatedAt: now,
+      };
+
+      await storage.writeNote(noteWithoutMetadata);
+
+      const rawWithoutMetadata = await fs.readFile(
+        path.join(tempDir, "notes", `${noteWithoutMetadata.id}.md`),
+        "utf-8"
+      );
+      expect(rawWithoutMetadata).not.toContain("role:");
+      expect(rawWithoutMetadata).not.toContain("importance:");
+      expect(rawWithoutMetadata).not.toContain("alwaysLoad:");
+    });
+
+    it("should round-trip explicit alwaysLoad false metadata", async () => {
+      const now = new Date().toISOString();
+      const note: Note = {
+        id: "metadata-alwaysload-false",
+        title: "AlwaysLoad False",
+        content: "Explicit false body",
+        tags: [],
+        lifecycle: "permanent",
+        alwaysLoad: false,
+        createdAt: now,
+        updatedAt: now,
+      };
+
+      await storage.writeNote(note);
+
+      const raw = await fs.readFile(path.join(tempDir, "notes", `${note.id}.md`), "utf-8");
+      expect(raw).toContain("alwaysLoad: false");
+
+      const read = await storage.readNote(note.id);
+
+      expect(read).toEqual({
+        ...note,
+        memoryVersion: 0,
+        project: undefined,
+        projectName: undefined,
+        relatedTo: undefined,
+        role: undefined,
+        importance: undefined,
+      });
+    });
+
     it("should return null for non-existent note", async () => {
       const read = await storage.readNote("non-existent");
       expect(read).toBeNull();

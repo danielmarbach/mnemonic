@@ -1,4 +1,10 @@
 import type { Vault } from "./vault.js";
+import type { EffectiveNoteMetadata } from "./role-suggestions.js";
+
+const RECALL_ALWAYS_LOAD_BOOST = 0.01;
+const RECALL_SUMMARY_BOOST = 0.012;
+const RECALL_DECISION_BOOST = 0.009;
+const RECALL_HIGH_IMPORTANCE_BOOST = 0.006;
 
 export interface ScoredRecallCandidate {
   id: string;
@@ -6,6 +12,30 @@ export interface ScoredRecallCandidate {
   boosted: number;
   vault: Vault;
   isCurrentProject: boolean;
+}
+
+export function computeRecallMetadataBoost(metadata?: EffectiveNoteMetadata): number {
+  if (!metadata) {
+    return 0;
+  }
+
+  let boost = 0;
+
+  if (metadata.alwaysLoad === true && metadata.alwaysLoadSource === "explicit") {
+    boost += RECALL_ALWAYS_LOAD_BOOST;
+  }
+
+  if (metadata.role === "summary") {
+    boost += RECALL_SUMMARY_BOOST;
+  } else if (metadata.role === "decision") {
+    boost += RECALL_DECISION_BOOST;
+  }
+
+  if (metadata.importance === "high") {
+    boost += RECALL_HIGH_IMPORTANCE_BOOST;
+  }
+
+  return boost;
 }
 
 export function selectRecallResults(

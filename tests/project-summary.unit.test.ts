@@ -11,6 +11,12 @@ import {
 } from "../src/project-introspection.js";
 import type { Note } from "../src/storage.js";
 
+const noMetadata = {
+  roleSource: "none",
+  importanceSource: "none",
+  alwaysLoadSource: "none",
+} as const;
+
 function makeNote(overrides: Partial<Note> = {}): Note {
   const now = new Date().toISOString();
   return {
@@ -60,6 +66,93 @@ describe("project summary scoring helpers", () => {
 
       expect(withinThemeScore(hub)).toBeGreaterThan(withinThemeScore(isolated));
     });
+
+    it("prefers summary notes over comparable context notes", () => {
+      const note = makeNote({
+        id: "scored-note",
+        updatedAt: "2026-03-20T10:00:00.000Z",
+        relatedTo: [{ id: "other", type: "related-to" }],
+      });
+
+      const summaryScore = withinThemeScore(note, {
+        role: "summary",
+        roleSource: "explicit",
+        importanceSource: "none",
+        alwaysLoadSource: "none",
+      });
+      const contextScore = withinThemeScore(note, {
+        role: "context",
+        roleSource: "explicit",
+        importanceSource: "none",
+        alwaysLoadSource: "none",
+      });
+
+      expect(summaryScore).toBeGreaterThan(contextScore);
+    });
+
+    it("gives suggested summary metadata a smaller within-theme boost", () => {
+      const note = makeNote({
+        id: "suggested-summary-note",
+        updatedAt: "2026-03-20T10:00:00.000Z",
+        relatedTo: [{ id: "other", type: "related-to" }],
+      });
+
+      expect(withinThemeScore(note, {
+        role: "summary",
+        roleSource: "suggested",
+        importanceSource: "none",
+        alwaysLoadSource: "none",
+      })).toBeGreaterThan(withinThemeScore(note, noMetadata));
+    });
+
+    it("keeps explicit metadata stronger than suggested metadata within a theme", () => {
+      const note = makeNote({
+        id: "metadata-precedence-note",
+        updatedAt: "2026-03-20T10:00:00.000Z",
+        relatedTo: [{ id: "other", type: "related-to" }],
+      });
+
+      const explicitScore = withinThemeScore(note, {
+        role: "summary",
+        roleSource: "explicit",
+        importance: "high",
+        importanceSource: "explicit",
+        alwaysLoadSource: "none",
+      });
+
+      const suggestedScore = withinThemeScore(note, {
+        role: "summary",
+        roleSource: "suggested",
+        importance: "high",
+        importanceSource: "suggested",
+        alwaysLoadSource: "none",
+      });
+
+      expect(explicitScore).toBeGreaterThan(suggestedScore);
+    });
+
+    it("keeps metadata-free notes driven by graph and recency rather than wording", () => {
+      const hub = makeNote({
+        id: "metadata-free-hub",
+        title: "Plain implementation note",
+        content: "Ordinary content without special structure.",
+        updatedAt: new Date().toISOString(),
+        relatedTo: [
+          { id: "a", type: "related-to" },
+          { id: "b", type: "related-to" },
+          { id: "c", type: "related-to" },
+        ],
+      });
+      const wordyIsolated = makeNote({
+        id: "wordy-isolated",
+        title: "Summary decision overview architecture plan",
+        content: "These are just words, not metadata.",
+        updatedAt: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000).toISOString(),
+        relatedTo: [],
+      });
+
+      expect(withinThemeScore(hub, noMetadata)).toBeGreaterThan(withinThemeScore(wordyIsolated, noMetadata));
+    });
   });
 
   describe("anchorScore", () => {
@@ -80,6 +173,30 @@ describe("project summary scoring helpers", () => {
       ]);
 
       expect(anchorScore(temporaryHub, themeCache)).toBe(-Infinity);
+    });
+
+    it("keeps temporary plan notes rejected even with metadata boosts", () => {
+      const temporaryPlan = makeNote({
+        id: "temporary-plan",
+        lifecycle: "temporary",
+        relatedTo: [
+          { id: "a", type: "related-to" },
+          { id: "b", type: "related-to" },
+        ],
+      });
+      const themeCache = new Map([
+        ["a", "overview"],
+        ["b", "decisions"],
+      ]);
+
+      expect(anchorScore(temporaryPlan, themeCache, {
+        role: "plan",
+        roleSource: "explicit",
+        importance: "high",
+        importanceSource: "explicit",
+        alwaysLoad: true,
+        alwaysLoadSource: "explicit",
+      })).toBe(-Infinity);
     });
 
     it("prefers notes that connect multiple themes over same-count single-theme hubs", () => {
@@ -114,14 +231,59 @@ describe("project summary scoring helpers", () => {
       expect(anchorScore(diverseHub, diverseCache)).toBeGreaterThan(anchorScore(narrowHub, narrowCache));
     });
 
-    it("gives some score to permanent tagged notes even without relationships", () => {
-      const taggedAnchor = makeNote({
-        id: "tagged-anchor",
-        tags: ["anchor"],
-        relatedTo: [],
+    it("boosts explicit alwaysLoad and importance metadata when scoring anchors", () => {
+      const note = makeNote({
+        id: "metadata-anchor",
+        relatedTo: [{ id: "other", type: "related-to" }],
       });
 
-      expect(anchorScore(taggedAnchor, new Map())).toBeGreaterThan(0);
+      expect(anchorScore(note, new Map(), {
+        ...noMetadata,
+        importance: "high",
+        alwaysLoad: true,
+        importanceSource: "explicit",
+        alwaysLoadSource: "explicit",
+      })).toBeGreaterThan(anchorScore(note, new Map(), noMetadata));
+    });
+
+    it("gives suggested role and importance metadata a smaller anchor boost", () => {
+      const note = makeNote({
+        id: "suggested-anchor",
+        relatedTo: [{ id: "other", type: "related-to" }],
+      });
+
+      expect(anchorScore(note, new Map(), {
+        role: "summary",
+        roleSource: "suggested",
+        importance: "high",
+        importanceSource: "suggested",
+        alwaysLoadSource: "none",
+      })).toBeGreaterThan(anchorScore(note, new Map(), noMetadata));
+    });
+
+    it("keeps explicit anchor metadata stronger than suggested metadata", () => {
+      const note = makeNote({
+        id: "explicit-beats-suggested-anchor",
+        relatedTo: [{ id: "other", type: "related-to" }],
+      });
+
+      const explicitScore = anchorScore(note, new Map(), {
+        role: "decision",
+        roleSource: "explicit",
+        importance: "high",
+        importanceSource: "explicit",
+        alwaysLoadSource: "none",
+      });
+
+      const suggestedScore = anchorScore(note, new Map(), {
+        role: "decision",
+        roleSource: "suggested",
+        importance: "high",
+        importanceSource: "suggested",
+        alwaysLoadSource: "none",
+      });
+
+      expect(explicitScore).toBeGreaterThan(suggestedScore);
     });
   });
 

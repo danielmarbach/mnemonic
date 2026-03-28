@@ -1,4 +1,35 @@
 import type { Note } from "./storage.js";
+import type { EffectiveNoteMetadata } from "./role-suggestions.js";
+
+type ScoringMetadata = Pick<EffectiveNoteMetadata, "role" | "roleSource" | "importance" | "importanceSource" | "alwaysLoad" | "alwaysLoadSource">;
+
+function explicitAlwaysLoad(metadata?: ScoringMetadata) {
+  return metadata?.alwaysLoadSource === "explicit" ? metadata.alwaysLoad === true : false;
+}
+
+function roleBonus(
+  role: EffectiveNoteMetadata["role"],
+  source: EffectiveNoteMetadata["roleSource"],
+  explicitBonuses: Partial<Record<NonNullable<EffectiveNoteMetadata["role"]>, number>>,
+  suggestedBonuses: Partial<Record<NonNullable<EffectiveNoteMetadata["role"]>, number>>,
+): number {
+  if (!role) return 0;
+  if (source === "explicit") return explicitBonuses[role] ?? 0;
+  if (source === "suggested") return suggestedBonuses[role] ?? 0;
+  return 0;
+}
+
+function importanceBonus(
+  importance: EffectiveNoteMetadata["importance"],
+  source: EffectiveNoteMetadata["importanceSource"],
+  explicitBonuses: Partial<Record<NonNullable<EffectiveNoteMetadata["importance"]>, number>>,
+  suggestedBonuses: Partial<Record<NonNullable<EffectiveNoteMetadata["importance"]>, number>>,
+): number {
+  if (!importance) return 0;
+  if (source === "explicit") return explicitBonuses[importance] ?? 0;
+  if (source === "suggested") return suggestedBonuses[importance] ?? 0;
+  return 0;
+}
 
 const STOPWORDS = new Set([
   "a", "an", "the", "and", "or", "but", "if", "then", "else", "for", "to", "of",
@@ -105,11 +136,27 @@ export function centralityBonus(relatedCount: number): number {
   return Math.min(0.2, Math.log(relatedCount + 1) * 0.1);
 }
 
-export function withinThemeScore(note: Note): number {
+function summaryMetadataBonus(metadata?: ScoringMetadata): number {
+  if (!metadata) return 0;
+
+  return roleBonus(
+    metadata.role,
+    metadata.roleSource,
+    { summary: 0.18, decision: 0.12, reference: 0.06, context: 0.03 },
+    { summary: 0.06, decision: 0.04, reference: 0.02, context: 0.01 },
+  ) + importanceBonus(
+    metadata.importance,
+    metadata.importanceSource,
+    { high: 0.12, normal: 0.06 },
+    { high: 0.04, normal: 0.02 },
+  );
+}
+
+export function withinThemeScore(note: Note, metadata?: ScoringMetadata): number {
   const days = daysSinceUpdate(note.updatedAt);
   const recency = recencyScore(days);
   const centrality = centralityBonus(note.relatedTo?.length ?? 0);
-  return recency + centrality;
+  return recency + centrality + summaryMetadataBonus(metadata);
 }
 
 export function computeConnectionDiversity(
@@ -128,7 +175,8 @@ export function computeConnectionDiversity(
 
 export function anchorScore(
   note: Note,
-  themeCache: Map<string, string>
+  themeCache: Map<string, string>,
+  metadata?: ScoringMetadata,
 ): number {
   if (note.lifecycle !== "permanent") return -Infinity;
 
@@ -139,7 +187,21 @@ export function anchorScore(
 
   const connectionDiversity = computeConnectionDiversity(note, themeCache);
 
-  return 0.4 * centrality + 0.4 * connectionDiversity + 0.2 * recency;
+  const metadataRoleBonus = roleBonus(
+    metadata?.role,
+    metadata?.roleSource ?? "none",
+    { summary: 0.22, decision: 0.16, reference: 0.08, context: 0.04 },
+    { summary: 0.08, decision: 0.06, reference: 0.03, context: 0.015 },
+  );
+  const metadataImportanceBonus = importanceBonus(
+    metadata?.importance,
+    metadata?.importanceSource ?? "none",
+    { high: 0.2, normal: 0.1 },
+    { high: 0.06, normal: 0.03 },
+  );
+  const alwaysLoadBonus = explicitAlwaysLoad(metadata) ? 0.45 : 0;
+
+  return 0.4 * centrality + 0.4 * connectionDiversity + 0.2 * recency + metadataRoleBonus + metadataImportanceBonus + alwaysLoadBonus;
 }
 
 export function buildThemeCache(notes: Note[]): Map<string, string> {

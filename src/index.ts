@@ -25,7 +25,7 @@ import {
   normalizeMergePlanSourceIds,
   resolveEffectiveConsolidationMode,
 } from "./consolidate.js";
-import { selectRecallResults } from "./recall.js";
+import { computeRecallMetadataBoost, selectRecallResults } from "./recall.js";
 import { getRelationshipPreview } from "./relationships.js";
 import { cleanMarkdown } from "./markdown.js";
 import { MnemonicConfigStore, readVaultSchemaVersion, type MutationPushMode } from "./config.js";
@@ -53,9 +53,9 @@ import {
   recencyScore,
   withinThemeScore,
   anchorScore,
-  buildThemeCache,
   computeConnectionDiversity,
 } from "./project-introspection.js";
+import { getEffectiveMetadata } from "./role-suggestions.js";
 import { detectProject, getCurrentGitBranch, resolveProjectIdentity, type ProjectIdentityResolution } from "./project.js";
 import { VaultManager, type Vault } from "./vault.js";
 import { checkBranchChange } from "./branch-tracker.js";
@@ -2284,7 +2284,8 @@ server.registerTool(
           if (isProjectNote) continue;
         }
 
-        const boost = isCurrentProject ? 0.15 : 0;
+        const metadataBoost = computeRecallMetadataBoost(getEffectiveMetadata(note));
+        const boost = (isCurrentProject ? 0.15 : 0) + metadataBoost;
         scored.push({ id: rec.id, score: rawScore, boosted: rawScore + boost, vault, isCurrentProject: Boolean(isCurrentProject) });
       }
     }
@@ -3523,13 +3524,44 @@ server.registerTool(
 
     const policyLine = await formatProjectPolicyLine(project.id);
 
-    // Build theme cache for connection diversity scoring (project-scoped only)
-    // This uses simple classifyTheme for consistent diversity calculations
-    const themeCache = buildThemeCache(projectEntries.map(e => e.note));
+    const projectNoteIds = new Set(projectEntries.map(e => e.note.id));
 
     // Compute promoted themes from keywords (graduation system)
     const graduationResult = computeThemesWithGraduation(projectEntries.map(e => e.note));
     const promotedThemes = new Set(graduationResult.promotedThemes);
+    const themeCache = graduationResult.themeAssignments;
+
+    const inboundReferences = new Map<string, number>();
+    const linkedByPermanentNotes = new Map<string, number>();
+    for (const entry of projectEntries) {
+      for (const rel of entry.note.relatedTo ?? []) {
+        if (!projectNoteIds.has(rel.id)) {
+          continue;
+        }
+
+        inboundReferences.set(rel.id, (inboundReferences.get(rel.id) ?? 0) + 1);
+        if (entry.note.lifecycle === "permanent") {
+          linkedByPermanentNotes.set(rel.id, (linkedByPermanentNotes.get(rel.id) ?? 0) + 1);
+        }
+      }
+    }
+
+    const effectiveMetadataById = new Map(
+      projectEntries.map((entry) => {
+        const inbound = inboundReferences.get(entry.note.id) ?? 0;
+        const visibleOutbound = (entry.note.relatedTo ?? []).filter((rel) => projectNoteIds.has(rel.id)).length;
+        const metadata = getEffectiveMetadata(entry.note, {
+          inboundReferences: inbound,
+          linkedByPermanentNotes: linkedByPermanentNotes.get(entry.note.id) ?? 0,
+          anchorCandidate: entry.note.lifecycle === "permanent" && (visibleOutbound > 0 || inbound > 0),
+        });
+        return [entry.note.id, {
+          metadata,
+          inbound,
+          visibleOutbound,
+        }] as const;
+      })
+    );
 
     // Categorize by theme with graduation (project-scoped only)
     const themed = new Map<string, NoteEntry[]>();
@@ -3568,7 +3600,7 @@ server.registerTool(
       
       // Sort by within-theme score
       const sorted = [...bucket].sort((a, b) => 
-        withinThemeScore(b.note) - withinThemeScore(a.note)
+        withinThemeScore(b.note, effectiveMetadataById.get(b.note.id)?.metadata) - withinThemeScore(a.note, effectiveMetadataById.get(a.note.id)?.metadata)
       );
       const top = sorted.slice(0, maxPerTheme);
       
@@ -3594,53 +3626,34 @@ server.registerTool(
     sections.push(...recent.map(e => `- ${e.note.updatedAt} — ${e.note.title}`));
 
     // Anchor notes with diversity constraint (project-scoped only)
-    // Separate tagged anchors (can have no relationships) from scored anchors (need relationships)
-    const taggedAnchorEntries = projectEntries.filter(e =>
-      e.note.lifecycle === "permanent" &&
-      e.note.tags.some(t => t.toLowerCase() === "anchor" || t.toLowerCase() === "alwaysload")
-    );
-
     const scoredAnchorCandidates = projectEntries
-      .filter(e => e.note.lifecycle === "permanent" && (e.note.relatedTo?.length ?? 0) > 0)
-      .map(e => ({
-        entry: e,
-        score: anchorScore(e.note, themeCache),
-        theme: classifyTheme(e.note),
-      }))
-      .filter(x => x.score > -Infinity)
-      .sort((a, b) => b.score - a.score);
-
-    // Score tagged anchors too, so they can compete for primaryEntry
-    const scoredTaggedAnchors = taggedAnchorEntries
-      .map(e => ({
-        entry: e,
-        score: anchorScore(e.note, themeCache),
-        theme: classifyTheme(e.note),
-      }))
-      .sort((a, b) => b.score - a.score);
+      .map(e => {
+        const baselineContext = effectiveMetadataById.get(e.note.id);
+        const metadata = baselineContext?.metadata;
+        return {
+          entry: e,
+          metadata,
+          score: anchorScore(e.note, themeCache, metadata),
+          theme: themeCache.get(e.note.id) ?? "other",
+          alwaysLoad: metadata?.alwaysLoad === true,
+          explicitOrientationRole:
+            metadata?.roleSource === "explicit" &&
+            (metadata.role === "summary" || metadata.role === "decision"),
+          hasVisibleGraphParticipation: (baselineContext?.visibleOutbound ?? 0) > 0 || (baselineContext?.inbound ?? 0) > 0,
+        };
+      })
+      .filter(candidate => candidate.score > -Infinity)
+      .filter(candidate => candidate.alwaysLoad || candidate.explicitOrientationRole || candidate.hasVisibleGraphParticipation)
+      .sort((a, b) => b.score - a.score || a.entry.note.title.localeCompare(b.entry.note.title));
 
     // Enforce max 2 per theme for scored anchors
     const anchorThemeCounts = new Map<string, number>();
     const anchors: AnchorNote[] = [];
     const anchorIds = new Set<string>();
 
-    // Add tagged anchors first (capped at 10 total across all themes), scored by anchorScore
-    for (const candidate of scoredTaggedAnchors.slice(0, 10)) {
-      if (anchors.length >= 10) break;
-      anchors.push({
-        id: candidate.entry.note.id,
-        title: candidate.entry.note.title,
-        centrality: candidate.entry.note.relatedTo?.length ?? 0,
-        connectionDiversity: computeConnectionDiversity(candidate.entry.note, themeCache),
-        updatedAt: candidate.entry.note.updatedAt,
-      });
-      anchorIds.add(candidate.entry.note.id);
-    }
-
     // Add scored anchors with theme diversity constraint
     for (const candidate of scoredAnchorCandidates) {
       if (anchors.length >= 10) break;
-      if (anchorIds.has(candidate.entry.note.id)) continue;
 
       const theme = candidate.theme;
       const themeCount = anchorThemeCounts.get(theme) ?? 0;
@@ -5573,18 +5586,13 @@ server.registerPrompt(
           text:
             "## Mnemonic MCP workflow hints\n\n" +
             "Avoid duplicate memories. Prefer inspecting and updating existing memories before creating new ones.\n\n" +
-            "### Hard rules\n\n" +
             "- REQUIRES: Before `remember`, call `recall` or `list` first.\n" +
             "- If `recall` or `list` returns a plausible match, call `get` before deciding whether to `update` or `remember`.\n" +
             "- If an existing memory already covers the topic, use `update`, not `remember`.\n" +
             "- When unsure, prefer `recall` over `remember`.\n" +
             "- For repo-related tasks, pass `cwd` so mnemonic can route project memories correctly.\n\n" +
-            "### Decision protocol\n\n" +
-            "1. Need to store, refine, or connect knowledge about a topic? Start with `recall`, or use `list` when you need deterministic browsing by scope, storage, or tags.\n" +
-            "2. If `recall` or `list` returns matching ids, use `get` to inspect the best match.\n" +
-            "3. If one memory should be refined, call `update`.\n" +
-            "4. If no memory covers the topic and tag choice is ambiguous, call `discover_tags` with note context, then call `remember`.\n" +
-            "5. After storing or updating, use `relate` for strong connections, `consolidate` for overlap, and `move_memory` for wrong storage location.\n\n" +
+            "Workflow: `recall`/`list` -> `get` -> `update` or `remember` -> `relate`/`consolidate`/`move_memory`. Use `discover_tags` only when tag choice is ambiguous.\n\n" +
+            "Roles are optional prioritization hints, not schema. Lifecycle still governs durability. `role: plan` does not imply `temporary`. Inferred roles are internal hints only. Prioritization is language-independent by default.\n\n" +
             "### Anti-patterns\n\n" +
             "- Bad: call `remember` immediately because the user said 'remember'.\n" +
             "- Good: `recall` or `list` first, then `get`, then `update` or `remember`.\n" +

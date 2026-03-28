@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { mkdtemp, stat } from "fs/promises";
+import { mkdtemp, readFile, stat, writeFile } from "fs/promises";
 import os from "os";
 import path from "path";
+import matter from "gray-matter";
 
 import {
   callLocalMcp,
@@ -13,6 +14,18 @@ import {
 } from "./helpers/mcp.js";
 
 import { MemoryGraphResultSchema, ProjectSummaryResultSchema } from "../src/structured-content.js";
+
+async function updateProjectNoteFrontmatter(
+  repoDir: string,
+  noteId: string,
+  updates: Record<string, unknown>,
+): Promise<void> {
+  const notePath = path.join(repoDir, ".mnemonic", "notes", `${noteId}.md`);
+  await stat(notePath);
+  const raw = await readFile(notePath, "utf8");
+  const parsed = matter(raw);
+  await writeFile(notePath, matter.stringify(parsed.content, { ...parsed.data, ...updates }));
+}
 
 describe("project-memory-summary", () => {
   it("shows consistent cross-vault results for list recent_memories and project_memory_summary", async () => {
@@ -139,7 +152,7 @@ describe("project-memory-summary", () => {
     }
   }, 20000);
 
-  it("ranks tagged anchors by score not alphabetical order", async () => {
+  it("uses explicit metadata to break otherwise comparable anchor ties", async () => {
     const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-vault-"));
     const repoDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-project-"));
     tempDirs.push(vaultDir, repoDir);
@@ -150,10 +163,10 @@ describe("project-memory-summary", () => {
 
     try {
       const alphaRemember = await callLocalMcp(vaultDir, "remember", {
-        title: "AAA Tagged Anchor",
+        title: "AAA Plain Anchor",
         content: "Alphabetically first but lower centrality.",
-        tags: ["anchor", "integration"],
-        summary: "Create alphabetically first tagged anchor",
+        tags: ["integration"],
+        summary: "Create alphabetically first plain anchor",
         cwd: repoDir,
         scope: "project",
         lifecycle: "permanent",
@@ -167,20 +180,48 @@ describe("project-memory-summary", () => {
         summary: "Create note to link",
         cwd: repoDir,
         scope: "project",
-        lifecycle: "permanent",
+        lifecycle: "temporary",
       }, embeddingServer.url);
       const note1Id = extractRememberedId(note1);
 
       const betaRemember = await callLocalMcp(vaultDir, "remember", {
-        title: "ZZZ Tagged Anchor",
-        content: "Alphabetically last but higher centrality.",
-        tags: ["anchor", "integration"],
-        summary: "Create alphabetically last tagged anchor with more connections",
+        title: "ZZZ Metadata Anchor",
+        content: "Alphabetically last but boosted by explicit metadata.",
+        tags: ["integration"],
+        summary: "Create alphabetically last metadata anchor",
         cwd: repoDir,
         scope: "project",
         lifecycle: "permanent",
       }, embeddingServer.url);
       const betaId = extractRememberedId(betaRemember);
+
+      const note2 = await callLocalMcp(vaultDir, "remember", {
+        title: "Second note to link",
+        content: "Another note.",
+        tags: ["integration"],
+        summary: "Create second note to link",
+        cwd: repoDir,
+        scope: "project",
+        lifecycle: "temporary",
+      }, embeddingServer.url);
+      const note2Id = extractRememberedId(note2);
+
+      const sharedTimestamp = "2026-03-20T10:00:00.000Z";
+      await updateProjectNoteFrontmatter(repoDir, alphaId, { updatedAt: sharedTimestamp, createdAt: sharedTimestamp });
+      await updateProjectNoteFrontmatter(repoDir, betaId, {
+        updatedAt: sharedTimestamp,
+        createdAt: sharedTimestamp,
+        role: "summary",
+        importance: "high",
+        alwaysLoad: true,
+      });
+
+      await callLocalMcp(vaultDir, "relate", {
+        fromId: alphaId,
+        toId: note2Id,
+        type: "related-to",
+        cwd: repoDir,
+      }, embeddingServer.url);
 
       await callLocalMcp(vaultDir, "relate", {
         fromId: betaId,
@@ -203,6 +244,189 @@ describe("project-memory-summary", () => {
       expect(alphaIndex).toBeGreaterThanOrEqual(0);
 
       expect(betaIndex).toBeLessThan(alphaIndex);
+
+      const orientation = summary.structuredContent?.["orientation"] as Record<string, unknown>;
+      const primaryEntry = orientation?.["primaryEntry"] as Record<string, unknown>;
+      expect(primaryEntry?.["id"]).toBe(betaId);
+    } finally {
+      await embeddingServer.close();
+    }
+  }, 20000);
+
+  it("keeps explicit standalone summary notes eligible for anchors and orientation", async () => {
+    const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-vault-"));
+    const repoDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-project-"));
+    tempDirs.push(vaultDir, repoDir);
+
+    await initTestRepo(repoDir);
+
+    const embeddingServer = await startFakeEmbeddingServer();
+
+    try {
+      const summaryRemember = await callLocalMcp(vaultDir, "remember", {
+        title: "Project Overview",
+        content: "A hand-authored overview note with no graph links yet.",
+        tags: ["integration"],
+        summary: "Create explicit summary note",
+        cwd: repoDir,
+        scope: "project",
+        lifecycle: "permanent",
+      }, embeddingServer.url);
+      const summaryId = extractRememberedId(summaryRemember);
+
+      await updateProjectNoteFrontmatter(repoDir, summaryId, {
+        role: "summary",
+        importance: "high",
+        updatedAt: "2026-03-20T10:00:00.000Z",
+        createdAt: "2026-03-20T10:00:00.000Z",
+      });
+
+      await callLocalMcp(vaultDir, "remember", {
+        title: "Plain Context Note",
+        content: "A regular project note without metadata.",
+        tags: ["integration"],
+        summary: "Create plain project note",
+        cwd: repoDir,
+        scope: "project",
+        lifecycle: "permanent",
+      }, embeddingServer.url);
+
+      const summary = await callLocalMcpResponse(vaultDir, "project_memory_summary", {
+        cwd: repoDir,
+      }, embeddingServer.url);
+
+      const anchors = summary.structuredContent?.["anchors"] as Array<Record<string, unknown>>;
+      expect(anchors.some((anchor) => anchor["id"] === summaryId)).toBe(true);
+
+      const orientation = summary.structuredContent?.["orientation"] as Record<string, unknown>;
+      const primaryEntry = orientation?.["primaryEntry"] as Record<string, unknown>;
+      expect(primaryEntry?.["id"]).toBe(summaryId);
+    } finally {
+      await embeddingServer.close();
+    }
+  }, 20000);
+
+  it("lets suggested metadata lightly improve orientation when explicit metadata is absent", async () => {
+    const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-vault-"));
+    const repoDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-project-"));
+    tempDirs.push(vaultDir, repoDir);
+
+    await initTestRepo(repoDir);
+
+    const embeddingServer = await startFakeEmbeddingServer();
+
+    try {
+      const plainId = extractRememberedId(await callLocalMcp(vaultDir, "remember", {
+        title: "AAA Plain Anchor",
+        content: "Plain hub note without explicit or strongly suggestive structure.",
+        tags: ["integration", "suggested-orientation", "overview"],
+        summary: "Create plain anchor for suggested metadata test",
+        cwd: repoDir,
+        scope: "project",
+        lifecycle: "permanent",
+      }, embeddingServer.url));
+
+      const suggestedId = extractRememberedId(await callLocalMcp(vaultDir, "remember", {
+        title: "ZZZ Suggested Decision Anchor",
+        content: [
+          "## Decision",
+          "We use a lightweight metadata hint in orientation scoring.",
+          "## Why",
+          "This note explains two implementation leaves and stays permanent.",
+          "- Tradeoff: keep graph and recency primary.",
+          "- Rollout: add only a light metadata bonus.",
+        ].join("\n\n"),
+        tags: ["integration", "suggested-orientation", "overview"],
+        summary: "Create suggested-metadata anchor for orientation test",
+        cwd: repoDir,
+        scope: "project",
+        lifecycle: "permanent",
+      }, embeddingServer.url));
+
+      const decisionLeafA = extractRememberedId(await callLocalMcp(vaultDir, "remember", {
+        title: "Decision leaf A",
+        content: "Implementation detail A.",
+        tags: ["integration", "suggested-orientation", "decisions"],
+        summary: "Create decision leaf A",
+        cwd: repoDir,
+        scope: "project",
+        lifecycle: "temporary",
+      }, embeddingServer.url));
+
+      const decisionLeafB = extractRememberedId(await callLocalMcp(vaultDir, "remember", {
+        title: "Decision leaf B",
+        content: "Implementation detail B.",
+        tags: ["integration", "suggested-orientation", "architecture"],
+        summary: "Create decision leaf B",
+        cwd: repoDir,
+        scope: "project",
+        lifecycle: "temporary",
+      }, embeddingServer.url));
+
+      const plainLeafA = extractRememberedId(await callLocalMcp(vaultDir, "remember", {
+        title: "Plain leaf A",
+        content: "Plain detail A.",
+        tags: ["integration", "suggested-orientation", "decisions"],
+        summary: "Create plain leaf A",
+        cwd: repoDir,
+        scope: "project",
+        lifecycle: "temporary",
+      }, embeddingServer.url));
+
+      const plainLeafB = extractRememberedId(await callLocalMcp(vaultDir, "remember", {
+        title: "Plain leaf B",
+        content: "Plain detail B.",
+        tags: ["integration", "suggested-orientation", "architecture"],
+        summary: "Create plain leaf B",
+        cwd: repoDir,
+        scope: "project",
+        lifecycle: "temporary",
+      }, embeddingServer.url));
+
+      const sharedTimestamp = "2026-03-20T10:00:00.000Z";
+      await updateProjectNoteFrontmatter(repoDir, plainId, { updatedAt: sharedTimestamp, createdAt: sharedTimestamp });
+      await updateProjectNoteFrontmatter(repoDir, suggestedId, { updatedAt: sharedTimestamp, createdAt: sharedTimestamp });
+
+      await callLocalMcp(vaultDir, "relate", {
+        fromId: suggestedId,
+        toId: decisionLeafA,
+        type: "explains",
+        cwd: repoDir,
+      }, embeddingServer.url);
+      await callLocalMcp(vaultDir, "relate", {
+        fromId: suggestedId,
+        toId: decisionLeafB,
+        type: "explains",
+        cwd: repoDir,
+      }, embeddingServer.url);
+      await callLocalMcp(vaultDir, "relate", {
+        fromId: plainId,
+        toId: plainLeafA,
+        type: "related-to",
+        cwd: repoDir,
+      }, embeddingServer.url);
+      await callLocalMcp(vaultDir, "relate", {
+        fromId: plainId,
+        toId: plainLeafB,
+        type: "related-to",
+        cwd: repoDir,
+      }, embeddingServer.url);
+
+      const summary = await callLocalMcpResponse(vaultDir, "project_memory_summary", {
+        cwd: repoDir,
+      }, embeddingServer.url);
+
+      const anchors = summary.structuredContent?.["anchors"] as Array<Record<string, unknown>>;
+      const suggestedIndex = anchors.findIndex((anchor) => anchor["id"] === suggestedId);
+      const plainIndex = anchors.findIndex((anchor) => anchor["id"] === plainId);
+
+      expect(suggestedIndex).toBeGreaterThanOrEqual(0);
+      expect(plainIndex).toBeGreaterThanOrEqual(0);
+      expect(suggestedIndex).toBeLessThan(plainIndex);
+
+      const orientation = summary.structuredContent?.["orientation"] as Record<string, unknown>;
+      const primaryEntry = orientation?.["primaryEntry"] as Record<string, unknown>;
+      expect(primaryEntry?.["id"]).toBe(suggestedId);
     } finally {
       await embeddingServer.close();
     }
@@ -275,6 +499,73 @@ describe("project-memory-summary", () => {
       expect(anchors!.length).toBeGreaterThan(0);
       expect(primaryEntry?.["id"]).toBe(hubId);
       expect(primaryEntry?.["rationale"]).toContain("Centrality");
+    } finally {
+      await embeddingServer.close();
+    }
+  }, 20000);
+
+  it("keeps inbound-only permanent notes eligible as anchors", async () => {
+    const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-vault-"));
+    const repoDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-project-"));
+    tempDirs.push(vaultDir, repoDir);
+
+    await initTestRepo(repoDir);
+
+    const embeddingServer = await startFakeEmbeddingServer();
+
+    try {
+      const hubId = extractRememberedId(await callLocalMcp(vaultDir, "remember", {
+        title: "Inbound Hub",
+        content: "Permanent note linked only by other project notes.",
+        tags: ["integration", "inbound-anchor", "overview"],
+        summary: "Create inbound-only hub",
+        cwd: repoDir,
+        scope: "project",
+        lifecycle: "permanent",
+      }, embeddingServer.url));
+
+      const leaf1Id = extractRememberedId(await callLocalMcp(vaultDir, "remember", {
+        title: "Inbound leaf 1",
+        content: "Leaf note one.",
+        tags: ["integration", "inbound-anchor", "decisions"],
+        summary: "Create inbound leaf 1",
+        cwd: repoDir,
+        scope: "project",
+        lifecycle: "permanent",
+      }, embeddingServer.url));
+
+      const leaf2Id = extractRememberedId(await callLocalMcp(vaultDir, "remember", {
+        title: "Inbound leaf 2",
+        content: "Leaf note two.",
+        tags: ["integration", "inbound-anchor", "architecture"],
+        summary: "Create inbound leaf 2",
+        cwd: repoDir,
+        scope: "project",
+        lifecycle: "permanent",
+      }, embeddingServer.url));
+
+      await callLocalMcp(vaultDir, "relate", {
+        fromId: leaf1Id,
+        toId: hubId,
+        type: "related-to",
+        bidirectional: false,
+        cwd: repoDir,
+      }, embeddingServer.url);
+      await callLocalMcp(vaultDir, "relate", {
+        fromId: leaf2Id,
+        toId: hubId,
+        type: "related-to",
+        bidirectional: false,
+        cwd: repoDir,
+      }, embeddingServer.url);
+
+      const summary = await callLocalMcpResponse(vaultDir, "project_memory_summary", {
+        cwd: repoDir,
+      }, embeddingServer.url);
+
+      const anchors = summary.structuredContent?.["anchors"] as Array<Record<string, unknown>>;
+      expect(anchors.map((anchor) => anchor["id"])) .toContain(hubId);
+
     } finally {
       await embeddingServer.close();
     }
@@ -445,6 +736,98 @@ describe("project-memory-summary", () => {
       for (const entry of suggestedNext) {
         expect(String(entry["rationale"] ?? "")).toContain("Centrality");
         expect(String(entry["rationale"] ?? "")).toContain("connects");
+      }
+    } finally {
+      await embeddingServer.close();
+    }
+  }, 20000);
+
+  it("uses the same graduated theme system for anchor diversity and theme caps", async () => {
+    const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-vault-"));
+    const repoDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-project-"));
+    tempDirs.push(vaultDir, repoDir);
+
+    await initTestRepo(repoDir);
+
+    const embeddingServer = await startFakeEmbeddingServer();
+
+    try {
+      const postgresA = extractRememberedId(await callLocalMcp(vaultDir, "remember", {
+        title: "PostgreSQL operations hub",
+        content: "Central PostgreSQL operations note.",
+        tags: ["integration", "graduated-theme"],
+        summary: "Create PostgreSQL operations hub",
+        cwd: repoDir,
+        scope: "project",
+        lifecycle: "permanent",
+      }, embeddingServer.url));
+
+      const postgresB = extractRememberedId(await callLocalMcp(vaultDir, "remember", {
+        title: "PostgreSQL tuning hub",
+        content: "Central PostgreSQL tuning note.",
+        tags: ["integration", "graduated-theme"],
+        summary: "Create PostgreSQL tuning hub",
+        cwd: repoDir,
+        scope: "project",
+        lifecycle: "permanent",
+      }, embeddingServer.url));
+
+      const postgresC = extractRememberedId(await callLocalMcp(vaultDir, "remember", {
+        title: "PostgreSQL failover hub",
+        content: "Central PostgreSQL failover note.",
+        tags: ["integration", "graduated-theme"],
+        summary: "Create PostgreSQL failover hub",
+        cwd: repoDir,
+        scope: "project",
+        lifecycle: "permanent",
+      }, embeddingServer.url));
+
+      const leaf1 = extractRememberedId(await callLocalMcp(vaultDir, "remember", {
+        title: "PostgreSQL leaf 1",
+        content: "Leaf one.",
+        tags: ["integration", "graduated-theme"],
+        summary: "Create PostgreSQL leaf 1",
+        cwd: repoDir,
+        scope: "project",
+        lifecycle: "temporary",
+      }, embeddingServer.url));
+
+      const leaf2 = extractRememberedId(await callLocalMcp(vaultDir, "remember", {
+        title: "PostgreSQL leaf 2",
+        content: "Leaf two.",
+        tags: ["integration", "graduated-theme"],
+        summary: "Create PostgreSQL leaf 2",
+        cwd: repoDir,
+        scope: "project",
+        lifecycle: "temporary",
+      }, embeddingServer.url));
+
+      const leaf3 = extractRememberedId(await callLocalMcp(vaultDir, "remember", {
+        title: "PostgreSQL leaf 3",
+        content: "Leaf three.",
+        tags: ["integration", "graduated-theme"],
+        summary: "Create PostgreSQL leaf 3",
+        cwd: repoDir,
+        scope: "project",
+        lifecycle: "temporary",
+      }, embeddingServer.url));
+
+      await callLocalMcp(vaultDir, "relate", { fromId: postgresA, toId: leaf1, type: "related-to", cwd: repoDir }, embeddingServer.url);
+      await callLocalMcp(vaultDir, "relate", { fromId: postgresA, toId: leaf2, type: "related-to", cwd: repoDir }, embeddingServer.url);
+      await callLocalMcp(vaultDir, "relate", { fromId: postgresB, toId: leaf1, type: "related-to", cwd: repoDir }, embeddingServer.url);
+      await callLocalMcp(vaultDir, "relate", { fromId: postgresB, toId: leaf3, type: "related-to", cwd: repoDir }, embeddingServer.url);
+      await callLocalMcp(vaultDir, "relate", { fromId: postgresC, toId: leaf2, type: "related-to", cwd: repoDir }, embeddingServer.url);
+      await callLocalMcp(vaultDir, "relate", { fromId: postgresC, toId: leaf3, type: "related-to", cwd: repoDir }, embeddingServer.url);
+
+      const summary = await callLocalMcpResponse(vaultDir, "project_memory_summary", {
+        cwd: repoDir,
+      }, embeddingServer.url);
+
+      const anchors = summary.structuredContent?.["anchors"] as Array<Record<string, unknown>>;
+      const postgresAnchors = anchors.filter((anchor) => String(anchor["title"]).includes("PostgreSQL"));
+      expect(postgresAnchors).toHaveLength(2);
+      for (const anchor of postgresAnchors) {
+        expect(anchor["connectionDiversity"]).toBe(1);
       }
     } finally {
       await embeddingServer.close();

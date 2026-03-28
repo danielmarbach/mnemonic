@@ -12,13 +12,17 @@ tags:
   - relationship-expansion
 lifecycle: permanent
 createdAt: '2026-03-24T10:54:54.335Z'
-updatedAt: '2026-03-25T12:36:53.888Z'
+updatedAt: '2026-03-28T01:01:19.611Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
   - id: mnemonic-key-design-decisions-3f2a6273
     type: related-to
   - id: active-session-project-cache-single-in-memory-vault-cache-pe-7463f124
+    type: related-to
+  - id: mnemonic-role-suggestions-are-read-only-runtime-hints-d9e468cf
+    type: explains
+  - id: mnemonic-roles-are-hints-not-schema-b45478c7
     type: related-to
 memoryVersion: 1
 ---

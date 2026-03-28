@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { selectRecallResults, type ScoredRecallCandidate } from "../src/recall.js";
+import { computeRecallMetadataBoost, selectRecallResults, type ScoredRecallCandidate } from "../src/recall.js";
+import type { EffectiveNoteMetadata } from "../src/role-suggestions.js";
 
 const vault = {} as ScoredRecallCandidate["vault"];
 
@@ -51,5 +52,50 @@ describe("selectRecallResults", () => {
         "all"
       ).map((result) => result.id)
     ).toEqual(["global-best"]);
+  });
+
+  it("keeps stronger project preference behavior intact after additive metadata boosts", () => {
+    const results = selectRecallResults(
+      [
+        { id: "global-metadata", score: 0.91, boosted: 0.94, vault, isCurrentProject: false },
+        { id: "project-a", score: 0.78, boosted: 0.93, vault, isCurrentProject: true },
+        { id: "project-b", score: 0.76, boosted: 0.91, vault, isCurrentProject: true },
+      ],
+      2,
+      "all"
+    );
+
+    expect(results.map((result) => result.id)).toEqual(["project-a", "project-b"]);
+  });
+});
+
+describe("computeRecallMetadataBoost", () => {
+  it("adds a small metadata boost", () => {
+    const metadata: EffectiveNoteMetadata = {
+      role: "summary",
+      roleSource: "suggested",
+      importance: "high",
+      importanceSource: "suggested",
+      alwaysLoadSource: "none",
+    };
+
+    const boost = computeRecallMetadataBoost(metadata);
+
+    expect(boost).toBeGreaterThan(0);
+    expect(boost).toBeLessThan(0.05);
+  });
+
+  it("keeps semantic-best results ahead when metadata boost is smaller", () => {
+    const summaryMetadata: EffectiveNoteMetadata = {
+      role: "summary",
+      roleSource: "suggested",
+      importanceSource: "none",
+      alwaysLoadSource: "none",
+    };
+
+    const semanticBest = 0.92 + computeRecallMetadataBoost();
+    const metadataBoosted = 0.9 + computeRecallMetadataBoost(summaryMetadata);
+
+    expect(semanticBest).toBeGreaterThan(metadataBoosted);
   });
 });

@@ -7,13 +7,17 @@ tags:
   - decision
 lifecycle: permanent
 createdAt: '2026-03-24T10:55:20.655Z'
-updatedAt: '2026-03-24T10:55:20.655Z'
+updatedAt: '2026-03-28T11:40:53.428Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
   - id: mnemonic-key-design-decisions-3f2a6273
     type: related-to
   - id: mnemonic-mcp-tools-inventory-47499799
+    type: related-to
+  - id: mnemonic-explicit-metadata-outranks-inferred-prioritization-6d3a6da0
+    type: explains
+  - id: mnemonic-language-independent-role-heuristics-f66619c1
     type: related-to
 memoryVersion: 1
 ---

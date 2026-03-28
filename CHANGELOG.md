@@ -4,6 +4,12 @@ All notable changes to `mnemonic` will be documented in this file.
 
 The format is loosely based on Keep a Changelog and uses semver-style version headings.
 
+## [0.19.0] - Unreleased
+
+### Changed
+
+- The workflow hint and user-facing docs now state that roles are optional prioritization hints, inferred roles stay internal-only, lifecycle remains the durability control, and default prioritization is language-independent.
+
 ## [0.18.0] - 2026-03-27
 
 ### Added
