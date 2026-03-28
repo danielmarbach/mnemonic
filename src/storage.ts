@@ -6,7 +6,11 @@ import type { NoteProjection } from "./structured-content.js";
 
 export type RelationshipType = "related-to" | "explains" | "example-of" | "supersedes";
 export type NoteLifecycle = "temporary" | "permanent";
+export type NoteRole = "summary" | "decision" | "plan" | "context" | "reference";
+export type NoteImportance = "high" | "normal" | "low";
 export const NOTE_LIFECYCLES = ["temporary", "permanent"] as const satisfies readonly NoteLifecycle[];
+export const NOTE_ROLES = ["summary", "decision", "plan", "context", "reference"] as const satisfies readonly NoteRole[];
+export const NOTE_IMPORTANCE_LEVELS = ["high", "normal", "low"] as const satisfies readonly NoteImportance[];
 
 export interface Relationship {
   id: string;
@@ -19,6 +23,9 @@ export interface Note {
   content: string;
   tags: string[];
   lifecycle: NoteLifecycle;
+  role?: NoteRole;
+  importance?: NoteImportance;
+  alwaysLoad?: boolean;
   /** Stable project identifier, or undefined for global memories */
   project?: string;
   /** Human-readable project name for display */
@@ -202,6 +209,15 @@ export class Storage {
       createdAt: note.createdAt,
       updatedAt: note.updatedAt,
     };
+    if (isNoteRole(note.role)) {
+      frontmatter["role"] = note.role;
+    }
+    if (isNoteImportance(note.importance)) {
+      frontmatter["importance"] = note.importance;
+    }
+    if (typeof note.alwaysLoad === "boolean") {
+      frontmatter["alwaysLoad"] = note.alwaysLoad;
+    }
     if (note.project) {
       frontmatter["project"] = note.project;
       if (note.projectName) frontmatter["projectName"] = note.projectName;
@@ -344,6 +360,9 @@ export class Storage {
       content: parsed.content.trim(),
       tags: parsed.data["tags"] ?? [],
       lifecycle: normalizeLifecycle(parsed.data["lifecycle"]),
+      role: normalizeRole(parsed.data["role"]),
+      importance: normalizeImportance(parsed.data["importance"]),
+      alwaysLoad: normalizeAlwaysLoad(parsed.data["alwaysLoad"]),
       project: parsed.data["project"] as string | undefined,
       projectName: parsed.data["projectName"] as string | undefined,
       relatedTo: parsed.data["relatedTo"] as Relationship[] | undefined,
@@ -364,6 +383,26 @@ function normalizeMemoryVersion(value: unknown): number {
 
 function normalizeLifecycle(value: unknown): NoteLifecycle {
   return value === "temporary" ? "temporary" : "permanent";
+}
+
+function normalizeRole(value: unknown): NoteRole | undefined {
+  return isNoteRole(value) ? value : undefined;
+}
+
+function normalizeImportance(value: unknown): NoteImportance | undefined {
+  return isNoteImportance(value) ? value : undefined;
+}
+
+function normalizeAlwaysLoad(value: unknown): boolean | undefined {
+  return typeof value === "boolean" ? value : undefined;
+}
+
+function isNoteRole(value: unknown): value is NoteRole {
+  return typeof value === "string" && NOTE_ROLES.includes(value as NoteRole);
+}
+
+function isNoteImportance(value: unknown): value is NoteImportance {
+  return typeof value === "string" && NOTE_IMPORTANCE_LEVELS.includes(value as NoteImportance);
 }
 
 function toIsoString(value: unknown): string {

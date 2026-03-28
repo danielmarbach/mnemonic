@@ -2,6 +2,7 @@ import type { Note, Relationship } from "./storage.js";
 import type { Vault } from "./vault.js";
 import type { RelatedNotePreview, RelationshipPreview } from "./structured-content.js";
 import { classifyTheme } from "./project-introspection.js";
+import { getEffectiveMetadata, type EffectiveNoteMetadata, type RoleSuggestionContext } from "./role-suggestions.js";
 
 const RECENTLY_CHANGED_DAYS = 5;
 const HIGH_CONFIDENCE_CENTRALITY = 5;
@@ -10,6 +11,10 @@ const MEDIUM_CONFIDENCE_DAYS = 90;
 
 const DEFAULT_RELATIONSHIP_LIMIT = 3;
 const HARD_MAX_RELATIONSHIP_LIMIT = 5;
+const RELATIONSHIP_ALWAYS_LOAD_BOOST = 8;
+const RELATIONSHIP_SUMMARY_BOOST = 4;
+const RELATIONSHIP_DECISION_BOOST = 3;
+const RELATIONSHIP_HIGH_IMPORTANCE_BOOST = 2;
 
 // ── Options ──────────────────────────────────────────────────────────────────
 
@@ -29,6 +34,29 @@ interface ScoredRelatedNote {
   vault: Vault;
   relationType: Relationship["type"];
   score: number;
+}
+
+function buildRoleSuggestionContext(note: Note, allNotes: Note[]): RoleSuggestionContext {
+  let inboundReferences = 0;
+  let linkedByPermanentNotes = 0;
+
+  for (const candidate of allNotes) {
+    const hasRelationship = (candidate.relatedTo ?? []).some((relationship) => relationship.id === note.id);
+    if (!hasRelationship) {
+      continue;
+    }
+
+    inboundReferences += 1;
+    if (candidate.lifecycle === "permanent") {
+      linkedByPermanentNotes += 1;
+    }
+  }
+
+  return {
+    inboundReferences,
+    linkedByPermanentNotes,
+    anchorCandidate: note.lifecycle === "permanent" && ((note.relatedTo?.length ?? 0) > 0 || inboundReferences > 0),
+  };
 }
 
 /**
@@ -75,7 +103,8 @@ export function isRecentlyUpdated(note: Note): boolean {
  */
 export function scoreRelatedNote(
   note: Note,
-  activeProjectId?: string
+  activeProjectId?: string,
+  metadata: EffectiveNoteMetadata = getEffectiveMetadata(note)
 ): number {
   let score = 0;
 
@@ -102,6 +131,20 @@ export function scoreRelatedNote(
     score += 5;
   }
 
+  if (metadata.alwaysLoad === true && metadata.alwaysLoadSource === "explicit") {
+    score += RELATIONSHIP_ALWAYS_LOAD_BOOST;
+  }
+
+  if (metadata.role === "summary") {
+    score += RELATIONSHIP_SUMMARY_BOOST;
+  } else if (metadata.role === "decision") {
+    score += RELATIONSHIP_DECISION_BOOST;
+  }
+
+  if (metadata.importance === "high") {
+    score += RELATIONSHIP_HIGH_IMPORTANCE_BOOST;
+  }
+
   return score;
 }
 
@@ -122,6 +165,13 @@ export async function getDirectRelatedNotes(
   }
 
   const scored: ScoredRelatedNote[] = [];
+  const notesByVault = new Map<Vault, Note[]>();
+
+  for (const vault of allVaults) {
+    notesByVault.set(vault, await vault.storage.listNotes());
+  }
+
+  const visibleNotes = [...notesByVault.values()].flat();
 
   for (const vault of allVaults) {
     for (const relatedId of relatedIds) {
@@ -131,7 +181,8 @@ export async function getDirectRelatedNotes(
       const relationship = note.relatedTo!.find(r => r.id === relatedId);
       if (!relationship) continue;
 
-      const score = scoreRelatedNote(relatedNote, activeProjectId);
+      const metadata = getEffectiveMetadata(relatedNote, buildRoleSuggestionContext(relatedNote, visibleNotes));
+      const score = scoreRelatedNote(relatedNote, activeProjectId, metadata);
       scored.push({
         note: relatedNote,
         vault,

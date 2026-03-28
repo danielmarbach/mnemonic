@@ -42,6 +42,8 @@ When storing a memory, choose the lifecycle intentionally:
 - Use `lifecycle: "temporary"` for working-state notes that mainly help during active execution and will likely lose value once the work is complete. Examples: accepted implementation plans, WIP checkpoints, temporary investigation state, draft next steps, unvalidated future ideas and design options not yet chosen.
 - Use `lifecycle: "permanent"` for durable knowledge that future sessions should keep even after the current task is done. Examples: decisions and rationale, discovered constraints, bug causes, workarounds, architecture notes, reusable lessons.
 - If unsure, prefer `permanent`.
+- Roles and tags are separate from lifecycle. Roles are optional prioritization hints, not schema; mnemonic still works without them; inferred roles are internal-only; prioritization is language-independent by default.
+- `role: plan` does not imply `temporary`.
 - Tags like `plan`, `wip`, and `completed` are descriptive only. They do not control cleanup behavior.
 
 ### Capture triggers
@@ -246,7 +248,7 @@ Keep these high-level anchors in mind:
 
 | Prompt | Description |
 |--------|-------------|
-| `mnemonic-workflow-hint` | Optional. Returns an imperative decision protocol for weaker and stronger models: use `recall` or `list` first, inspect with `get`, update existing memories, remember only when nothing matches, then organize with `relate`, `consolidate`, or `move_memory`. Not auto-injected — clients request it on demand. |
+| `mnemonic-workflow-hint` | Optional. Returns a compact decision protocol: use `recall` or `list` first, inspect with `get`, update existing memories, remember only when nothing matches, then organize with `relate`, `consolidate`, or `move_memory`. Also reminds models that roles are optional hints, inferred roles stay internal-only, prioritization is language-independent by default, and lifecycle remains separate. |
 
 ## Tools
 

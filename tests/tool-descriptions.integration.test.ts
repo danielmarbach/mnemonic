@@ -27,6 +27,11 @@ describe("tool-descriptions", () => {
     expect(promptText).toContain("If `recall` or `list` returns a plausible match, call `get` before deciding whether to `update` or `remember`.");
     expect(promptText).toContain("When unsure, prefer `recall` over `remember`.");
     expect(promptText).toContain("Bad: call `remember` immediately because the user said 'remember'.");
+    expect(promptText).toContain("Roles are optional prioritization hints, not schema.");
+    expect(promptText).toContain("Lifecycle still governs durability.");
+    expect(promptText).toContain("`role: plan` does not imply `temporary`.");
+    expect(promptText).toContain("Inferred roles are internal hints only.");
+    expect(promptText).toContain("Prioritization is language-independent by default.");
   }, 15000);
 
   it("surfaces prerequisite-first workflow wording in phase-aware tool descriptions", async () => {

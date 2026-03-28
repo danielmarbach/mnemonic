@@ -325,6 +325,10 @@ Each note carries a `lifecycle`:
 - `"permanent"` *(default)* — durable knowledge for future sessions
 - `"temporary"` — working-state scaffolding (plans, WIP checkpoints) that can be cleaned up once consolidated
 
+### Roles and lifecycle
+
+Roles are optional prioritization hints, not required schema. mnemonic works without them, inferred roles stay internal-only, prioritization is language-independent by default, and lifecycle remains the separate durability axis. A note with `role: plan` can still be either `temporary` or `permanent`.
+
 ### Note format
 
 Notes are standard markdown with YAML frontmatter:
@@ -422,7 +426,7 @@ Imported notes are written to the main vault with `lifecycle: permanent` and `sc
 
 | Prompt | Description |
 |--------|-------------|
-| `mnemonic-workflow-hint` | Optional. Returns an imperative decision protocol for weaker and stronger models: use `recall` or `list` first, inspect with `get`, update existing memories, remember only when nothing matches, then organize with `relate`, `consolidate`, or `move_memory`. Not auto-injected — request it on demand. |
+| `mnemonic-workflow-hint` | Optional. Returns a compact decision protocol: use `recall` or `list` first, inspect with `get`, update existing memories, remember only when nothing matches, then organize with `relate`, `consolidate`, or `move_memory`. Also reminds models that roles are optional prioritization hints, inferred roles are internal-only, prioritization is language-independent by default, and lifecycle stays separate. |
 
 ## Tools
 
@@ -555,6 +559,8 @@ mnemonic and Beads address complementary concerns. mnemonic is a **knowledge gra
 **What are temporary notes?**
 
 mnemonic distinguishes between two lifecycle states. `temporary` notes capture evolving working-state: hypotheses, in-progress plans, experiment results, draft reasoning. `permanent` notes capture durable knowledge: decisions, root cause explanations, architectural guidance, lessons learned. As an investigation progresses, a cluster of temporary notes is typically `consolidate`d into one or more permanent notes, and the scaffolding is discarded. This two-phase lifecycle keeps exploratory thinking from polluting long-term memory while still giving agents a place to reason incrementally before committing to a conclusion.
+
+Roles, when present, are separate from lifecycle: they help prioritization and retrieval, not retention policy. mnemonic still works without roles, and any inferred role metadata remains an internal hint rather than part of the user-facing note contract.
 
 ## Contributing
 

@@ -7,7 +7,9 @@ import {
   isAnchor,
   isRecentlyUpdated,
 } from "../src/relationships.js";
+import type { EffectiveNoteMetadata } from "../src/role-suggestions.js";
 import type { Note } from "../src/storage.js";
+import type { Vault } from "../src/vault.js";
 
 // ── Test fixtures ─────────────────────────────────────────────────────────────
 
@@ -22,6 +24,13 @@ const createNote = (overrides: Partial<Note>): Note => ({
   relatedTo: [],
   ...overrides,
 });
+
+const createVault = (notes: Note[]): Vault => ({
+  storage: {
+    readNote: async (id: string) => notes.find(note => note.id === id),
+    listNotes: async () => notes,
+  },
+} as unknown as Vault);
 
 // ── Unit tests for scoring helpers ────────────────────────────────────────────
 
@@ -135,6 +144,60 @@ describe("scoreRelatedNote", () => {
     expect(perfectScore).toBeGreaterThan(baseScore);
     expect(perfectScore).toBeGreaterThanOrEqual(100 + 50 + 20 + 10); // minimum combined boost
   });
+
+  it("prefers summary and decision metadata when other factors are comparable", () => {
+    const baseNote = createNote({ updatedAt: "2026-01-01T00:00:00.000Z" });
+    const summaryMetadata: EffectiveNoteMetadata = {
+      role: "summary",
+      roleSource: "suggested",
+      importanceSource: "none",
+      alwaysLoadSource: "none",
+    };
+    const decisionMetadata: EffectiveNoteMetadata = {
+      role: "decision",
+      roleSource: "suggested",
+      importanceSource: "none",
+      alwaysLoadSource: "none",
+    };
+
+    expect(scoreRelatedNote(baseNote, undefined, summaryMetadata)).toBeGreaterThan(
+      scoreRelatedNote(baseNote, undefined)
+    );
+    expect(scoreRelatedNote(baseNote, undefined, decisionMetadata)).toBeGreaterThan(
+      scoreRelatedNote(baseNote, undefined)
+    );
+  });
+
+  it("gives an explicit alwaysLoad boost", () => {
+    const note = createNote({ updatedAt: "2026-01-01T00:00:00.000Z" });
+    const alwaysLoadMetadata: EffectiveNoteMetadata = {
+      roleSource: "none",
+      importanceSource: "none",
+      alwaysLoad: true,
+      alwaysLoadSource: "explicit",
+    };
+
+    expect(scoreRelatedNote(note, undefined, alwaysLoadMetadata)).toBeGreaterThan(
+      scoreRelatedNote(note, undefined)
+    );
+  });
+
+  it("keeps same-project priority above metadata-only global notes", () => {
+    const projectNote = createNote({ id: "project", project: "test-project", updatedAt: "2026-01-01T00:00:00.000Z" });
+    const globalNote = createNote({ id: "global", updatedAt: "2026-01-01T00:00:00.000Z" });
+    const richMetadata: EffectiveNoteMetadata = {
+      role: "summary",
+      roleSource: "suggested",
+      importance: "high",
+      importanceSource: "suggested",
+      alwaysLoad: true,
+      alwaysLoadSource: "explicit",
+    };
+
+    expect(scoreRelatedNote(projectNote, "test-project")).toBeGreaterThan(
+      scoreRelatedNote(globalNote, "test-project", richMetadata)
+    );
+  });
 });
 
 // ── Integration tests for relationship expansion ──────────────────────────────
@@ -188,6 +251,47 @@ describe("buildRelationshipPreview", () => {
 
     const result = buildRelationshipPreview(scored, { activeProjectId: "test-project" });
     expect(result?.shown[0].theme).toBeUndefined();
+  });
+});
+
+describe("getDirectRelatedNotes", () => {
+  it("uses visible relationship graph context to infer metadata during scoring", async () => {
+    const source = createNote({
+      id: "source",
+      relatedTo: [
+        { id: "summary", type: "related-to" },
+        { id: "plain", type: "related-to" },
+      ],
+    });
+    const summary = createNote({
+      id: "summary",
+      title: "Summary note",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+      content: [
+        "# Overview",
+        "## Details",
+        "- first",
+        "- second",
+        "- third",
+        "- fourth",
+      ].join("\n"),
+    });
+    const plain = createNote({
+      id: "plain",
+      title: "Plain note",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+      content: "Just a regular note.",
+    });
+    const inboundA = createNote({ id: "inbound-a", lifecycle: "permanent", relatedTo: [{ id: "summary", type: "related-to" }] });
+    const inboundB = createNote({ id: "inbound-b", lifecycle: "permanent", relatedTo: [{ id: "summary", type: "related-to" }] });
+    const inboundC = createNote({ id: "inbound-c", lifecycle: "temporary", relatedTo: [{ id: "summary", type: "related-to" }] });
+    const inboundD = createNote({ id: "inbound-d", lifecycle: "temporary", relatedTo: [{ id: "summary", type: "related-to" }] });
+
+    const vault = createVault([source, summary, plain, inboundA, inboundB, inboundC, inboundD]);
+
+    const result = await getDirectRelatedNotes(source, [vault]);
+
+    expect(result.map(entry => entry.note.id).slice(0, 2)).toEqual(["summary", "plain"]);
   });
 });
 
