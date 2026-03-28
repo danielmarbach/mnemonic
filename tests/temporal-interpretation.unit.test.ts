@@ -588,6 +588,46 @@ describe("temporal interpretation edge cases", () => {
     expect(result).toBe("restructure");
   });
 
+  it("classifies large deletion-dominant changes as 'reverse'", () => {
+    const entry = makeHistoryEntry({
+      stats: {
+        additions: 10,
+        deletions: 80,
+        filesChanged: 1,
+        changeType: "substantial update",
+      },
+    });
+    const result = classifyChange(entry);
+    expect(result).toBe("reverse");
+  });
+
+  it("classifies pure deletion as 'reverse'", () => {
+    const entry = makeHistoryEntry({
+      stats: {
+        additions: 0,
+        deletions: 100,
+        filesChanged: 1,
+        changeType: "substantial update",
+      },
+    });
+    const result = classifyChange(entry);
+    expect(result).toBe("reverse");
+  });
+
+  it("does not classify as 'reverse' when deletions are below threshold", () => {
+    // totalChanged = 25 < 50, never reaches the substantial branch
+    const entry = makeHistoryEntry({
+      stats: {
+        additions: 5,
+        deletions: 20,
+        filesChanged: 1,
+        changeType: "minor edit",
+      },
+    });
+    const result = classifyChange(entry);
+    expect(result).not.toBe("reverse");
+  });
+
   it("handles create with minimal content", () => {
     const entry = makeHistoryEntry({
       message: "Create note",
@@ -616,5 +656,149 @@ describe("temporal interpretation edge cases", () => {
     const result = interpretHistoryEntry(entry, { isFirstCommit: true });
     expect(result.changeCategory).toBe("create");
     expect(result.changeDescription).toBe("Created this note with substantial initial content.");
+  });
+});
+
+// ── Language independence ──────────────────────────────────────────────────────
+
+describe("language-independent classification", () => {
+  it("classifies Italian 'expand' commit by stats, not message", () => {
+    // "Added new example" in Italian — classification must ignore message wording
+    const entry = makeHistoryEntry({
+      message: "Aggiunto nuovo esempio",
+      stats: {
+        additions: 80,
+        deletions: 10,
+        filesChanged: 1,
+        changeType: "substantial update",
+      },
+    });
+    expect(classifyChange(entry)).toBe("expand");
+  });
+
+  it("classifies Chinese 'refine' commit by stats, not message", () => {
+    // "Fixed error" in Chinese
+    const entry = makeHistoryEntry({
+      message: "修复了错误",
+      stats: {
+        additions: 3,
+        deletions: 2,
+        filesChanged: 1,
+        changeType: "minor edit",
+      },
+    });
+    expect(classifyChange(entry)).toBe("refine");
+  });
+
+  it("classifies Japanese generic commit by stats, not message", () => {
+    // "Updated" in Japanese — deletions exceed additions, neither expand nor reverse threshold
+    const entry = makeHistoryEntry({
+      message: "更新",
+      stats: {
+        additions: 30,
+        deletions: 50,
+        filesChanged: 2,
+        changeType: "substantial update",
+      },
+    });
+    // totalChanged=80, churnRatio=20/80=0.25, additions not > deletions → not expand
+    // deletions(50) not > additions*2(60) → not reverse → restructure
+    expect(classifyChange(entry)).toBe("restructure");
+  });
+
+  it("classifies Arabic commit as 'clarify' by stats alone", () => {
+    const entry = makeHistoryEntry({
+      message: "تحديث الملاحظة",
+      stats: {
+        additions: 5,
+        deletions: 25,
+        filesChanged: 1,
+        changeType: "minor edit",
+      },
+    });
+    // totalChanged=30, churnRatio=20/30≈0.67 > 0.5 → clarify
+    expect(classifyChange(entry)).toBe("clarify");
+  });
+
+  it("enrichTemporalHistory produces same categories for equivalent non-English commits", () => {
+    const entries: TemporalHistoryEntry[] = [
+      makeHistoryEntry({
+        commitHash: "b",
+        timestamp: "2026-01-02T00:00:00.000Z",
+        message: "Aggiunto nuovo esempio",
+        stats: { additions: 80, deletions: 10, filesChanged: 1, changeType: "substantial update" },
+      }),
+      makeHistoryEntry({
+        commitHash: "a",
+        timestamp: "2026-01-01T00:00:00.000Z",
+        message: "Initial commit",
+        stats: { additions: 50, deletions: 0, filesChanged: 1, changeType: "substantial update" },
+      }),
+    ];
+    const result = enrichTemporalHistory(entries);
+    expect(result.interpretedHistory[1].changeCategory).toBe("create");
+    expect(result.interpretedHistory[0].changeCategory).toBe("expand");
+  });
+});
+
+// ── enrichTemporalHistory relationshipChanged detection ───────────────────────
+
+describe("enrichTemporalHistory relationship detection", () => {
+  it("detects relate: prefix and sets connect category for zero-change commit", () => {
+    const entries: TemporalHistoryEntry[] = [
+      makeHistoryEntry({
+        commitHash: "b",
+        timestamp: "2026-01-02T00:00:00.000Z",
+        message: "relate: linked to related note",
+        stats: { additions: 0, deletions: 0, filesChanged: 1, changeType: "metadata-only change" },
+      }),
+      makeHistoryEntry({
+        commitHash: "a",
+        timestamp: "2026-01-01T00:00:00.000Z",
+        message: "remember: initial note",
+        stats: { additions: 30, deletions: 0, filesChanged: 1, changeType: "minor edit" },
+      }),
+    ];
+    const result = enrichTemporalHistory(entries);
+    expect(result.interpretedHistory[0].changeCategory).toBe("connect");
+  });
+
+  it("detects unrelate: prefix and sets connect category", () => {
+    const entries: TemporalHistoryEntry[] = [
+      makeHistoryEntry({
+        commitHash: "b",
+        timestamp: "2026-01-02T00:00:00.000Z",
+        message: "unrelate: removed link",
+        stats: { additions: 0, deletions: 0, filesChanged: 1, changeType: "metadata-only change" },
+      }),
+      makeHistoryEntry({
+        commitHash: "a",
+        timestamp: "2026-01-01T00:00:00.000Z",
+        message: "remember: initial note",
+        stats: { additions: 30, deletions: 0, filesChanged: 1, changeType: "minor edit" },
+      }),
+    ];
+    const result = enrichTemporalHistory(entries);
+    expect(result.interpretedHistory[0].changeCategory).toBe("connect");
+  });
+
+  it("does not set relationshipChanged for non-relationship prefixes", () => {
+    const entries: TemporalHistoryEntry[] = [
+      makeHistoryEntry({
+        commitHash: "b",
+        timestamp: "2026-01-02T00:00:00.000Z",
+        message: "update: clarified wording",
+        stats: { additions: 0, deletions: 0, filesChanged: 1, changeType: "metadata-only change" },
+      }),
+      makeHistoryEntry({
+        commitHash: "a",
+        timestamp: "2026-01-01T00:00:00.000Z",
+        message: "remember: initial note",
+        stats: { additions: 30, deletions: 0, filesChanged: 1, changeType: "minor edit" },
+      }),
+    ];
+    const result = enrichTemporalHistory(entries);
+    // No relationshipChanged, zero-change → unknown
+    expect(result.interpretedHistory[0].changeCategory).toBe("unknown");
   });
 });

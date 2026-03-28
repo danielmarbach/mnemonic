@@ -14,7 +14,6 @@ export interface InterpretHistoryContext {
   isFirstCommit?: boolean;
   previousEntry?: TemporalHistoryEntry;
   relationshipChanged?: boolean;
-  headingDelta?: number;
 }
 
 export interface TemporalHistoryEntry {
@@ -101,6 +100,9 @@ export function classifyChange(
   if (totalChanged >= 50 || stats.changeType === "substantial update") {
     if (churnRatio < 0.3 && stats.additions > stats.deletions) {
       return "expand";
+    }
+    if (stats.deletions > stats.additions * 2 && stats.deletions >= 30) {
+      return "reverse";
     }
     return "restructure";
   }
@@ -261,10 +263,15 @@ export function enrichTemporalHistory(
     return { interpretedHistory: [] };
   }
 
+  const relationshipPrefixes = ["relate:", "unrelate:"];
   const interpretedHistory = entries.map((entry, index) => {
+    const relationshipChanged = relationshipPrefixes.some(
+      (prefix) => entry.message.toLowerCase().startsWith(prefix)
+    );
     const context: InterpretHistoryContext = {
       isFirstCommit: index === entries.length - 1,
       previousEntry: index < entries.length - 1 ? entries[index + 1] : undefined,
+      relationshipChanged,
     };
     return interpretHistoryEntry(entry, context);
   });
