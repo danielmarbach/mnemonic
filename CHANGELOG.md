@@ -4,6 +4,12 @@ All notable changes to `mnemonic` will be documented in this file.
 
 The format is loosely based on Keep a Changelog and uses semver-style version headings.
 
+## [0.19.2] - 2026-03-28
+
+### Fixed
+
+- `changeDescription` and `changeCategory` in non-verbose temporal recall now classify correctly using commit stats. Previously, stats were only threaded into the classification pipeline in verbose mode, causing all non-verbose multi-commit notes to fall back to `"unknown"` / `"Updated the note."`. Stats are now always used internally; the `verbose` flag only controls what is exposed in the output.
+
 ## [0.19.1] - 2026-03-28
 
 ### Fixed

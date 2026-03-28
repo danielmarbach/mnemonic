@@ -73,16 +73,12 @@ export function buildTemporalHistoryEntry(
   return {
     ...base,
     summary: formatTemporalSummary(stats, changeType, verbose),
-    ...(verbose
-      ? {
-          stats: {
-            additions: stats.additions,
-            deletions: stats.deletions,
-            filesChanged: stats.filesChanged,
-            changeType,
-          },
-        }
-      : {}),
+    stats: {
+      additions: stats.additions,
+      deletions: stats.deletions,
+      filesChanged: stats.filesChanged,
+      changeType,
+    },
   };
 }
 

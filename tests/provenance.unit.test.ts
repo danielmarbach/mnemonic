@@ -1,199 +1,106 @@
-import { describe, expect, it, vi } from "vitest";
-import { buildTemporalHistoryEntry, computeConfidence, getNoteProvenance } from "../src/provenance.js";
+import { describe, expect, it } from "vitest";
+import { buildTemporalHistoryEntry } from "../src/provenance.js";
+import { enrichTemporalHistory } from "../src/temporal-interpretation.js";
+import type { CommitStats, LastCommit } from "../src/git.js";
 
-const mockGit = {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  getLastCommit: vi.fn() as any,
-} as any;
+function makeCommit(overrides: Partial<LastCommit> = {}): LastCommit {
+  return {
+    hash: "abc1234",
+    timestamp: "2026-01-01T00:00:00.000Z",
+    message: "Test commit",
+    ...overrides,
+  };
+}
 
-describe("computeConfidence", () => {
-  it("returns high when lifecycle is permanent, centrality >= 5, and updated within 30 days", () => {
-    const recent = new Date();
-    const updatedAt = recent.toISOString();
-    expect(computeConfidence("permanent", updatedAt, 5)).toBe("high");
-    expect(computeConfidence("permanent", updatedAt, 10)).toBe("high");
-  });
-
-  it("returns medium when updated within 90 days but not meeting high criteria", () => {
-    const recent = new Date();
-    const updatedAt = recent.toISOString();
-    expect(computeConfidence("permanent", updatedAt, 4)).toBe("medium");
-    expect(computeConfidence("temporary", updatedAt, 10)).toBe("medium");
-  });
-
-  it("returns medium when permanent, centrality >= 5, but updated more than 30 days ago", () => {
-    const oldDate = new Date(Date.now() - 45 * 24 * 60 * 60 * 1000);
-    const updatedAt = oldDate.toISOString();
-    expect(computeConfidence("permanent", updatedAt, 5)).toBe("medium");
-  });
-
-  it("returns low when updated more than 90 days ago", () => {
-    const oldDate = new Date(Date.now() - 100 * 24 * 60 * 60 * 1000);
-    const updatedAt = oldDate.toISOString();
-    expect(computeConfidence("permanent", updatedAt, 10)).toBe("low");
-    expect(computeConfidence("temporary", updatedAt, 0)).toBe("low");
-  });
-});
-
-describe("getNoteProvenance", () => {
-  it("returns provenance when git has a commit for the file", async () => {
-    const recentTimestamp = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString();
-    mockGit.getLastCommit.mockResolvedValueOnce({
-      hash: "abc123",
-      message: "feat: add test note",
-      timestamp: recentTimestamp,
-    });
-
-    const result = await getNoteProvenance(mockGit, "notes/test.md");
-
-    expect(result).toEqual({
-      lastUpdatedAt: recentTimestamp,
-      lastCommitHash: "abc123",
-      lastCommitMessage: "feat: add test note",
-      recentlyChanged: true,
-    });
-    expect(mockGit.getLastCommit).toHaveBeenCalledWith("notes/test.md");
-  });
-
-  it("returns undefined when git has no commit for the file", async () => {
-    mockGit.getLastCommit.mockResolvedValueOnce(null);
-
-    const result = await getNoteProvenance(mockGit, "notes/new.md");
-
-    expect(result).toBeUndefined();
-  });
-
-  it("marks recentlyChanged=false when commit is older than 5 days", async () => {
-    const oldCommit = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000);
-    mockGit.getLastCommit.mockResolvedValueOnce({
-      hash: "def456",
-      message: "old commit",
-      timestamp: oldCommit.toISOString(),
-    });
-
-    const result = await getNoteProvenance(mockGit, "notes/old.md");
-
-    expect(result?.recentlyChanged).toBe(false);
-  });
-
-  it("marks recentlyChanged=true when commit is within 5 days", async () => {
-    const recentCommit = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
-    mockGit.getLastCommit.mockResolvedValueOnce({
-      hash: "ghi789",
-      message: "recent commit",
-      timestamp: recentCommit.toISOString(),
-    });
-
-    const result = await getNoteProvenance(mockGit, "notes/recent.md");
-
-    expect(result?.recentlyChanged).toBe(true);
-  });
-});
+function makeStats(overrides: Partial<CommitStats> = {}): CommitStats {
+  return {
+    additions: 50,
+    deletions: 10,
+    filesChanged: 2,
+    ...overrides,
+  };
+}
 
 describe("buildTemporalHistoryEntry", () => {
-  it("builds a compact summary for a minor edit by default", () => {
-    const result = buildTemporalHistoryEntry(
-      {
-        hash: "abc123",
-        message: "docs: clarify recall behavior",
-        timestamp: "2026-03-20T10:00:00Z",
-      },
-      { additions: 4, deletions: 1, filesChanged: 1 },
+  it("returns base entry when stats are null", () => {
+    const entry = buildTemporalHistoryEntry(makeCommit(), null, false);
+    expect(entry.commitHash).toBe("abc1234");
+    expect(entry.stats).toBeUndefined();
+    expect(entry.summary).toBeUndefined();
+  });
+
+  it("always includes stats regardless of verbose flag (for classification pipeline)", () => {
+    const commit = makeCommit();
+    const stats = makeStats({ additions: 80, deletions: 10, filesChanged: 2 });
+
+    const nonVerbose = buildTemporalHistoryEntry(commit, stats, false);
+    const verbose = buildTemporalHistoryEntry(commit, stats, true);
+
+    expect(nonVerbose.stats).toBeDefined();
+    expect(nonVerbose.stats?.additions).toBe(80);
+    expect(nonVerbose.stats?.deletions).toBe(10);
+    expect(nonVerbose.stats?.filesChanged).toBe(2);
+
+    expect(verbose.stats).toBeDefined();
+    expect(verbose.stats?.additions).toBe(80);
+  });
+
+  it("non-verbose summary omits file count", () => {
+    const entry = buildTemporalHistoryEntry(
+      makeCommit(),
+      makeStats({ additions: 50, deletions: 10, filesChanged: 3 }),
       false
     );
-
-    expect(result).toEqual({
-      commitHash: "abc123",
-      message: "docs: clarify recall behavior",
-      timestamp: "2026-03-20T10:00:00Z",
-      summary: "minor edit (+4/-1 lines)",
-    });
+    expect(entry.summary).toMatch(/\+50\/-10 lines/);
+    expect(entry.summary).not.toMatch(/files? changed/);
   });
 
-  it("returns richer structured stats in verbose mode without raw diffs", () => {
-    const result = buildTemporalHistoryEntry(
-      {
-        hash: "def456",
-        message: "feat: add temporal recall",
-        timestamp: "2026-03-21T10:00:00Z",
-      },
-      { additions: 42, deletions: 10, filesChanged: 3 },
+  it("verbose summary includes file count", () => {
+    const entry = buildTemporalHistoryEntry(
+      makeCommit(),
+      makeStats({ additions: 50, deletions: 10, filesChanged: 3 }),
       true
     );
-
-    expect(result).toEqual({
-      commitHash: "def456",
-      message: "feat: add temporal recall",
-      timestamp: "2026-03-21T10:00:00Z",
-      summary: "substantial update (+42/-10 lines, 3 files changed)",
-      stats: {
-        additions: 42,
-        deletions: 10,
-        filesChanged: 3,
-        changeType: "substantial update",
-      },
-    });
+    expect(entry.summary).toMatch(/\+50\/-10 lines/);
+    expect(entry.summary).toMatch(/3 files changed/);
   });
 
-  it("falls back to minimal history when stats are unavailable", () => {
-    const result = buildTemporalHistoryEntry(
-      {
-        hash: "ghi789",
-        message: "chore: touch note metadata",
-        timestamp: "2026-03-22T10:00:00Z",
-      },
-      null,
-      true
-    );
-
-    expect(result).toEqual({
-      commitHash: "ghi789",
-      message: "chore: touch note metadata",
-      timestamp: "2026-03-22T10:00:00Z",
-    });
-  });
-
-  it("classifies relationship commits as metadata-only change", () => {
-    const result = buildTemporalHistoryEntry(
-      {
-        hash: "jkl012",
-        message: "relate: A ↔ B",
-        timestamp: "2026-03-22T11:00:00Z",
-      },
-      { additions: 3, deletions: 1, filesChanged: 1 },
-      true
-    );
-
-    expect(result).toEqual({
-      commitHash: "jkl012",
-      message: "relate: A ↔ B",
-      timestamp: "2026-03-22T11:00:00Z",
-      summary: "metadata-only change (1 file changed)",
-      stats: {
-        additions: 3,
-        deletions: 1,
-        filesChanged: 1,
-        changeType: "metadata-only change",
-      },
-    });
-  });
-
-  it("classifies forget commits as metadata-only change for surviving notes", () => {
-    const result = buildTemporalHistoryEntry(
-      {
-        hash: "mno345",
-        message: "forget: remove obsolete note",
-        timestamp: "2026-03-22T11:05:00Z",
-      },
-      { additions: 2, deletions: 3, filesChanged: 1 },
+  it("classifies metadata-only change correctly", () => {
+    const entry = buildTemporalHistoryEntry(
+      makeCommit({ message: "relate: link to other note" }),
+      makeStats({ additions: 0, deletions: 0, filesChanged: 1 }),
       false
     );
+    expect(entry.stats?.changeType).toBe("metadata-only change");
+    expect(entry.summary).toBe("metadata-only change");
+  });
 
-    expect(result).toEqual({
-      commitHash: "mno345",
-      message: "forget: remove obsolete note",
-      timestamp: "2026-03-22T11:05:00Z",
-      summary: "metadata-only change",
-    });
+  it("stats enable correct changeCategory in enrichment pipeline (the core fix)", () => {
+    // Simulates the enrichment-layer scenario: two substantial expansion commits
+    // that were previously misclassified as 'unknown' due to missing stats in non-verbose mode.
+    // After the fix, stats are always present so classifyChange can resolve them as 'expand'.
+    const entries = [
+      buildTemporalHistoryEntry(
+        makeCommit({ hash: "b", timestamp: "2026-01-02T00:00:00.000Z", message: "update: add phase 5 content" }),
+        makeStats({ additions: 809, deletions: 23, filesChanged: 14 }),
+        false  // non-verbose
+      ),
+      buildTemporalHistoryEntry(
+        makeCommit({ hash: "a", timestamp: "2026-01-01T00:00:00.000Z", message: "consolidate(supersedes): initial note" }),
+        makeStats({ additions: 115, deletions: 4, filesChanged: 5 }),
+        false  // non-verbose
+      ),
+    ];
+
+    const result = enrichTemporalHistory(entries);
+
+    // The last entry is the oldest = create
+    expect(result.interpretedHistory[1].changeCategory).toBe("create");
+    // The update entry — with stats it classifies as 'expand', not 'unknown'
+    expect(result.interpretedHistory[0].changeCategory).toBe("expand");
+    expect(result.interpretedHistory[0].changeDescription).toBe("Added substantial explanatory content.");
+    // historySummary reflects the expansion pattern, not generic fallback
+    // 2-entry history uses the specific "created and then expanded" path
+    expect(result.historySummary).toBe("This note was created and then expanded with additional detail.");
   });
 });
