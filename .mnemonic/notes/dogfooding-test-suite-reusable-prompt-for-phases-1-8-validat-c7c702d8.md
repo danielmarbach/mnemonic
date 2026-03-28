@@ -8,9 +8,12 @@ tags:
   - reusable
 lifecycle: permanent
 createdAt: '2026-03-28T18:54:38.792Z'
-updatedAt: '2026-03-28T18:54:38.792Z'
+updatedAt: '2026-03-28T18:54:48.362Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: dogfooding-test-suite-results-phases-1-8-validation-2026-03--86866b21
+    type: related-to
 memoryVersion: 1
 ---
 # Dogfooding test suite: reusable prompt for Phases 1–8 validation

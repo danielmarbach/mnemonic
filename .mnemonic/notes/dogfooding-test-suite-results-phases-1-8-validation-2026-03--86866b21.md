@@ -8,9 +8,12 @@ tags:
   - scorecard
 lifecycle: permanent
 createdAt: '2026-03-28T18:53:25.240Z'
-updatedAt: '2026-03-28T18:53:25.240Z'
+updatedAt: '2026-03-28T18:54:48.362Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: dogfooding-test-suite-reusable-prompt-for-phases-1-8-validat-c7c702d8
+    type: related-to
 memoryVersion: 1
 ---
 # Dogfooding test suite: Phases 1–8 validation
