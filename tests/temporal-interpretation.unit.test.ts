@@ -259,6 +259,26 @@ describe("interpretHistoryEntry", () => {
     expect(result.changeDescription).toBe("Updated the note.");
   });
 
+  it("uses 'Substantially updated' description for unknown category with substantial stats", () => {
+    // zero-change entry without relationshipChanged → unknown, but changeType=substantial triggers size-based description
+    const entry = makeHistoryEntry({
+      stats: { additions: 0, deletions: 0, filesChanged: 1, changeType: "substantial update" },
+    });
+    const result = interpretHistoryEntry(entry);
+    expect(result.changeCategory).toBe("unknown");
+    expect(result.changeDescription).toBe("Substantially updated the note.");
+  });
+
+  it("uses 'Minor update' description for unknown category with non-substantial stats", () => {
+    // zero-change entry without relationshipChanged → unknown, minor change type
+    const entry = makeHistoryEntry({
+      stats: { additions: 0, deletions: 0, filesChanged: 1, changeType: "minor edit" },
+    });
+    const result = interpretHistoryEntry(entry);
+    expect(result.changeCategory).toBe("unknown");
+    expect(result.changeDescription).toBe("Minor update to the note.");
+  });
+
   it("generates appropriate descriptions for each category", () => {
     const categories: ChangeCategory[] = [
       "create",
@@ -420,6 +440,37 @@ describe("summarizeHistory", () => {
     const result = summarizeHistory(entries);
     // refine is dominant (2 non-create), no expansion or restructure
     expect(result).toBe("This note was created and then refined incrementally.");
+  });
+
+  it("summarizes unknown-dominant pattern with multiple substantial updates", () => {
+    const substantialStats = { additions: 200, deletions: 50, filesChanged: 5, changeType: "substantial update" as const };
+    const entries = [
+      makeInterpretedEntry({ changeCategory: "unknown", stats: substantialStats }),
+      makeInterpretedEntry({ changeCategory: "unknown", stats: substantialStats }),
+      makeInterpretedEntry({ changeCategory: "create" }),
+    ];
+    const result = summarizeHistory(entries);
+    expect(result).toBe("The note grew through multiple substantial updates.");
+  });
+
+  it("summarizes unknown-dominant pattern with high total additions", () => {
+    const entries = [
+      makeInterpretedEntry({ changeCategory: "unknown", stats: { additions: 80, deletions: 10, filesChanged: 2, changeType: "minor edit" as const } }),
+      makeInterpretedEntry({ changeCategory: "unknown", stats: { additions: 60, deletions: 5, filesChanged: 2, changeType: "minor edit" as const } }),
+      makeInterpretedEntry({ changeCategory: "create" }),
+    ];
+    const result = summarizeHistory(entries);
+    expect(result).toBe("The note expanded significantly through several updates.");
+  });
+
+  it("falls back to generic message for unknown-dominant pattern with low stats", () => {
+    const entries = [
+      makeInterpretedEntry({ changeCategory: "unknown" }),
+      makeInterpretedEntry({ changeCategory: "unknown" }),
+      makeInterpretedEntry({ changeCategory: "create" }),
+    ];
+    const result = summarizeHistory(entries);
+    expect(result).toBe("This note has been updated several times.");
   });
 });
 
