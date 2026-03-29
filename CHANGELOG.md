@@ -4,6 +4,12 @@ All notable changes to `mnemonic` will be documented in this file.
 
 The format is loosely based on Keep a Changelog and uses semver-style version headings.
 
+## [0.19.3] - 2026-03-29
+
+### Fixed
+
+- `alwaysLoad` parameter is now properly handled in `remember` and `update` tools. Previously, the parameter was accepted by the tool schemas but not persisted to note frontmatter, causing session anchors to silently fail.
+
 ## [0.19.2] - 2026-03-28
 
 ### Fixed

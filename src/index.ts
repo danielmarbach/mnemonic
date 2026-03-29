@@ -1810,6 +1810,13 @@ server.registerTool(
       summary: z.string().optional().describe(
         "Git commit summary only. Imperative mood, concise, and focused on why the change matters."
       ),
+      alwaysLoad: z
+        .boolean()
+        .optional()
+        .describe(
+          "When true, this note loads automatically at session start and receives priority in recall and relationship expansion. " +
+          "Use for session anchors and critical context that should always be available."
+        ),
       cwd: z
         .string()
         .optional()
@@ -1840,7 +1847,7 @@ server.registerTool(
     }),
     outputSchema: RememberResultSchema,
   },
-  async ({ title, content, tags, lifecycle, summary, cwd, scope, allowProtectedBranch = false }) => {
+  async ({ title, content, tags, lifecycle, summary, alwaysLoad, cwd, scope, allowProtectedBranch = false }) => {
     await ensureBranchSynced(cwd);
 
     const project = await resolveProject(cwd);
@@ -1875,6 +1882,7 @@ server.registerTool(
     const note: Note = {
       id, title, content: cleanedContent, tags,
       lifecycle: lifecycle ?? "permanent",
+      alwaysLoad: alwaysLoad ?? false,
       project: project?.id,
       projectName: project?.name,
       createdAt: now,
@@ -2473,6 +2481,13 @@ server.registerTool(
         .optional()
         .describe("Change lifecycle. Preserve the existing value unless you're intentionally switching it."),
       summary: z.string().optional().describe("Git commit summary only. Imperative mood, concise, and focused on why the change matters."),
+      alwaysLoad: z
+        .boolean()
+        .optional()
+        .describe(
+          "When true, this note loads automatically at session start and receives priority in recall and relationship expansion. " +
+          "Use for session anchors and critical context that should always be available."
+        ),
       cwd: projectParam,
       allowProtectedBranch: z
         .boolean()
@@ -2484,7 +2499,7 @@ server.registerTool(
     }),
     outputSchema: UpdateResultSchema,
   },
-  async ({ id, content, title, tags, lifecycle, summary, cwd, allowProtectedBranch = false }) => {
+  async ({ id, content, title, tags, lifecycle, summary, alwaysLoad, cwd, allowProtectedBranch = false }) => {
     await ensureBranchSynced(cwd);
 
     const found = await vaultManager.findNote(id, cwd);
@@ -2525,6 +2540,7 @@ server.registerTool(
       content: cleanedContent ?? note.content,
       tags: tags ?? note.tags,
       lifecycle: lifecycle ?? note.lifecycle,
+      alwaysLoad: alwaysLoad !== undefined ? alwaysLoad : note.alwaysLoad,
       updatedAt: now,
     };
 
@@ -2547,6 +2563,7 @@ server.registerTool(
     if (content !== undefined) changes.push("content");
     if (tags !== undefined) changes.push("tags");
     if (lifecycle !== undefined && lifecycle !== note.lifecycle) changes.push("lifecycle");
+    if (alwaysLoad !== undefined && alwaysLoad !== note.alwaysLoad) changes.push("alwaysLoad");
     const changeDesc = changes.length > 0 ? `Updated ${changes.join(", ")}` : "No changes";
     const commitSummary = summary ?? changeDesc;
 

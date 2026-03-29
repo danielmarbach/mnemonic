@@ -308,6 +308,53 @@ describe("memory-lifecycle", () => {
     }
   }, 15000);
 
+  it("persists alwaysLoad to note frontmatter via remember and update", async () => {
+    const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-vault-"));
+    tempDirs.push(vaultDir);
+    const embeddingServer = await startFakeEmbeddingServer();
+
+    try {
+      // Test remember with alwaysLoad: true
+      const rememberText = await callLocalMcp(vaultDir, "remember", {
+        title: "AlwaysLoad remember test",
+        content: "Note created with alwaysLoad true.",
+        tags: ["integration", "alwaysLoad"],
+        alwaysLoad: true,
+        summary: "Create note with alwaysLoad via remember",
+        scope: "global",
+      }, embeddingServer.url);
+
+      const noteId = extractRememberedId(rememberText);
+      const notePath = path.join(vaultDir, "notes", `${noteId}.md`);
+
+      let noteContents = await readFile(notePath, "utf-8");
+      expect(noteContents).toContain("alwaysLoad: true");
+
+      // Test update with alwaysLoad: false
+      await callLocalMcp(vaultDir, "update", {
+        id: noteId,
+        content: "Note updated with alwaysLoad false.",
+        alwaysLoad: false,
+        summary: "Update note to set alwaysLoad false",
+      }, embeddingServer.url);
+
+      noteContents = await readFile(notePath, "utf-8");
+      expect(noteContents).toContain("alwaysLoad: false");
+
+      // Test update without alwaysLoad preserves existing value
+      await callLocalMcp(vaultDir, "update", {
+        id: noteId,
+        content: "Note updated without changing alwaysLoad.",
+        summary: "Update note without alwaysLoad param",
+      }, embeddingServer.url);
+
+      noteContents = await readFile(notePath, "utf-8");
+      expect(noteContents).toContain("alwaysLoad: false");
+    } finally {
+      await embeddingServer.close();
+    }
+  }, 15000);
+
   it("cleans related notes when forgetting a linked memory", async () => {
     const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-vault-"));
     tempDirs.push(vaultDir);
