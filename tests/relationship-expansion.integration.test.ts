@@ -92,12 +92,14 @@ async function callLocalMcpMethod(
 
     let stdoutData = "";
     let stderrData = "";
+    let stderrDataOut = "";
 
     child.stdout.on("data", (chunk) => {
       stdoutData += chunk.toString();
     });
     child.stderr.on("data", (chunk) => {
       stderrData += chunk.toString();
+      stderrDataOut += chunk.toString();
     });
     child.on("error", reject);
     child.on("close", (code) => {
@@ -111,9 +113,16 @@ async function callLocalMcpMethod(
     child.stdin.end(messages.map((msg) => JSON.stringify(msg)).join("\n") + "\n");
   });
 
-  const lines = stdout.trim().split("\n");
+  const lines = stdout.trim().split("\n").filter(Boolean);
+  if (lines.length === 0) {
+    throw new Error(`Empty stdout from MCP process. stderr: ${stderrDataOut}`);
+  }
   const lastLine = lines[lines.length - 1];
-  return JSON.parse(lastLine);
+  try {
+    return JSON.parse(lastLine);
+  } catch (e) {
+    throw new Error(`Failed to parse JSON from: ${lastLine}. stderr: ${stderrDataOut}`);
+  }
 }
 
 async function callLocalMcpTool(
