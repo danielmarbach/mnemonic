@@ -8,7 +8,7 @@ tags:
   - reusable
 lifecycle: permanent
 createdAt: '2026-03-28T18:54:38.792Z'
-updatedAt: '2026-03-28T18:54:48.362Z'
+updatedAt: '2026-03-29T13:11:48.917Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
@@ -50,6 +50,8 @@ Run a structured dogfooding test of the mnemonic MCP against the released versio
 
 **F1 — Provenance and confidence (Phase 7):** From recall results (B1 or B2), inspect provenance: lastUpdatedAt, lastCommitHash, recentlyChanged. Is confidence "high" on anchor notes? "medium" on others? Rate: Pass / Pass with friction / Fail.
 
+**F2 — AlwaysLoad via MCP (Phase 7):** Create a test note with `remember` including `alwaysLoad: true`, then update it with `alwaysLoad: false`. Verify via `get` that `alwaysLoad` is persisted in the frontmatter. Rate: Pass / Pass with friction / Fail.
+
 **G1 — Single-commit note history (Phase 8):** From B2 temporal results, find a note with 1 commit. Is `historySummary` "This note was created and has not been modified since."? Rate: Pass / Pass with friction / Fail.
 
 **G2 — Multi-commit note evolution (Phase 8):** Find a note with 3+ commits from B2 temporal results. Is `historySummary` informative or generic? Is `changeDescription` for unknown category helpful or just "Updated the note."? Rate: Pass / Pass with friction / Fail.
@@ -61,6 +63,8 @@ Run a structured dogfooding test of the mnemonic MCP against the released versio
 **E2E-3 — Recent-to-architecture navigation:** Start from the most recent note (from summary). Via `get` + includeRelationships, navigate to an architecture or decisions note. Does the path work in 3 steps or fewer? Rate: Pass / Pass with friction / Fail.
 
 **E2E-4 — "What should I read first?"** Call `recall` with query="what should I read first to understand temporal interpretation" and cwd. Does the right note rank at top? Do its relationships form a coherent cluster? Rate: Pass / Pass with friction / Fail.
+
+**CLEANUP:** Call `forget` on any test notes created during F2.
 
 **CAPTURE:** Call `remember` with title "Dogfooding test suite results: Phases 1–8 validation (YYYY-MM-DD)", lifecycle permanent, scope project, tags [dogfooding, testing, phases, validation, scorecard], containing all test results and completed scorecard.
 
@@ -109,7 +113,7 @@ Run a structured dogfooding test of the mnemonic MCP against the released versio
 
 - [ ] explicit metadata improves prioritization
 - [ ] inferred roles help without noise
-- [ ] alwaysLoad behaves cleanly
+- [ ] alwaysLoad behaves cleanly (F2 test: remember/update via MCP)
 
 ### Phase 8: Temporal interpretation
 
@@ -129,3 +133,4 @@ Run a structured dogfooding test of the mnemonic MCP against the released versio
 ## Known runs
 
 - 2026-03-28: note `dogfooding-test-suite-results-phases-1-8-validation-2026-03--86866b21`, run by Claude Sonnet 4.6, result 22/28 passing.
+- 2026-03-29: note `dogfooding-test-suite-results-phases-1-8-validation-2026-03--86866b21`, run by Claude Sonnet 4.6, result 28/28 passing (v0.19.2).
