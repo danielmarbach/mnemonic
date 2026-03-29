@@ -113,6 +113,7 @@ export async function callLocalMcpMethod(
 
     let stdoutData = "";
     let stderrData = "";
+    let stdinReady = false;
 
     child.stdout.on("data", (chunk) => {
       stdoutData += chunk.toString();
@@ -123,14 +124,21 @@ export async function callLocalMcpMethod(
     child.on("error", reject);
     child.on("close", (code) => {
       if (code !== 0) {
-        reject(new Error(`MCP script exited with ${code}: ${stderrData}`));
+        reject(new Error(`MCP script exited with code ${code}: ${stderrData}`));
         return;
       }
       resolve(stdoutData);
     });
 
-    child.stdin.end(messages.map((message) => JSON.stringify(message)).join("\n") + "\n");
+    child.stdin.write(messages.map((message) => JSON.stringify(message)).join("\n") + "\n", () => {
+      stdinReady = true;
+      setTimeout(() => child.stdin.end(), 200);
+    });
   });
+
+  if (!stdout.trim()) {
+    throw new Error(`Empty stdout from MCP process`);
+  }
 
   const lines = stdout.trim().split("\n").filter(Boolean).map((line) => JSON.parse(line) as {
     id?: number;
