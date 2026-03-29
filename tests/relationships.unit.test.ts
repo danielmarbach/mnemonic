@@ -72,8 +72,10 @@ describe("isRecentlyUpdated", () => {
   });
 
   it("handles boundary at 5 days", () => {
-    const boundaryDate = new Date();
-    boundaryDate.setDate(boundaryDate.getDate() - 5);
+    // Subtract 5 days + 1 minute to ensure we're unambiguously past the 5-day threshold.
+    // Using setDate alone creates a timestamp at the same millisecond, so Math.floor
+    // may yield 4 (not 5) when isRecentlyUpdated computes `now - updatedDate` moments later.
+    const boundaryDate = new Date(Date.now() - 5 * 24 * 60 * 60 * 1000 - 60_000);
     const note = createNote({ updatedAt: boundaryDate.toISOString() });
     expect(isRecentlyUpdated(note)).toBe(false);
   });
