@@ -108,10 +108,7 @@ async function callLocalMcpMethod(
       }
     });
 
-    messages.forEach((msg) => {
-      child.stdin.write(JSON.stringify(msg) + "\n");
-    });
-    child.stdin.end();
+    child.stdin.end(messages.map((msg) => JSON.stringify(msg)).join("\n") + "\n");
   });
 
   const lines = stdout.trim().split("\n");
