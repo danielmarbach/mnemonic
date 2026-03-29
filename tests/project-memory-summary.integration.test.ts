@@ -15,6 +15,17 @@ import {
 
 import { MemoryGraphResultSchema, ProjectSummaryResultSchema } from "../src/structured-content.js";
 
+/**
+ * Directly updates note frontmatter - USE SPARINGLY.
+ * 
+ * This helper bypasses the MCP tools and writes directly to the file system.
+ * It should ONLY be used for:
+ * - Setting timestamps (updatedAt/createdAt) that MCP tools automatically set to current time
+ * - Setting metadata fields (role, importance) that are not exposed via MCP tools
+ * 
+ * For standard fields (title, content, tags, lifecycle, alwaysLoad), use the MCP `update` tool.
+ * For testing MCP tool behavior, use `callLocalMcp` instead of this helper.
+ */
 async function updateProjectNoteFrontmatter(
   repoDir: string,
   noteId: string,
