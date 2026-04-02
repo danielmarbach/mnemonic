@@ -4,6 +4,12 @@ All notable changes to `mnemonic` will be documented in this file.
 
 The format is loosely based on Keep a Changelog and uses semver-style version headings.
 
+## [0.19.4] - 2026-04-02
+
+### Changed
+
+- `move_memory` tool description now suggests using `relate` after moving a note into a vault where related memories may exist, matching the proactive workflow hint already present in `remember`.
+
 ## [0.19.3] - 2026-03-29
 
 ### Fixed

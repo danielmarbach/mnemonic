@@ -46,7 +46,7 @@ describe("tool-descriptions", () => {
     expect(byName.get("update")).toContain("Use after `recall` + `get` when an existing memory should be refined instead of creating a duplicate.");
     expect(byName.get("relate")).toContain("Use after you have identified the exact memories to connect.");
     expect(byName.get("consolidate")).toContain("Use after `recall`, `list`, or `memory_graph` shows overlap that should be merged or cleaned up.");
-    expect(byName.get("move_memory")).toContain("Use after `where_is_memory` or `get` confirms a memory is stored in the wrong place.");
+    expect(byName.get("move_memory")).toContain("Use `relate` if the moved memory connects to existing notes in the new vault.");
     expect(byName.get("discover_tags")).toContain("Suggest canonical tags for a specific note before `remember` when tag choice is ambiguous.");
   }, 15000);
 

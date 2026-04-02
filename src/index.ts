@@ -4066,7 +4066,8 @@ server.registerTool(
       "- The moved memory id, resulting storage label, project association, and persistence status\n\n" +
       "Side effects: rewrites storage location, may adjust project association, git commits, and may push.\n\n" +
       "Typical next step:\n" +
-      "- Use `where_is_memory` or `get` to verify the final state.",
+      "- Use `where_is_memory` or `get` to verify the final state.\n" +
+      "- Use `relate` if the moved memory connects to existing notes in the new vault.",
     annotations: {
       readOnlyHint: false,
       destructiveHint: false,
