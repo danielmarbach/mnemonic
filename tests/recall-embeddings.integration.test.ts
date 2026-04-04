@@ -16,6 +16,45 @@ import {
 import { RecallResultSchema } from "../src/structured-content.js";
 
 describe("recall-embeddings", () => {
+  async function writeSeedNote(vaultDir: string, note: {
+    id: string;
+    title: string;
+    content: string;
+    tags?: string[];
+    lifecycle?: "temporary" | "permanent";
+    updatedAt?: string;
+  }): Promise<void> {
+    await mkdir(path.join(vaultDir, "notes"), { recursive: true });
+    await writeFile(
+      path.join(vaultDir, "notes", `${note.id}.md`),
+      `---
+title: ${note.title}
+tags: [${(note.tags ?? []).join(", ")}]
+lifecycle: ${note.lifecycle ?? "permanent"}
+createdAt: 2026-01-01T00:00:00.000Z
+updatedAt: ${note.updatedAt ?? "2026-01-01T00:00:00.000Z"}
+memoryVersion: 1
+---
+
+${note.content}`,
+      "utf-8",
+    );
+  }
+
+  async function writeSeedEmbedding(vaultDir: string, id: string, embedding: number[]): Promise<void> {
+    await mkdir(path.join(vaultDir, "embeddings"), { recursive: true });
+    await writeFile(
+      path.join(vaultDir, "embeddings", `${id}.json`),
+      JSON.stringify({
+        id,
+        model: "nomic-embed-text",
+        embedding,
+        updatedAt: "2026-01-01T00:00:00.000Z",
+      }, null, 2),
+      "utf-8",
+    );
+  }
+
   it("recall backfills a missing embedding and returns the note", async () => {
     const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-vault-"));
     tempDirs.push(vaultDir);
@@ -333,6 +372,94 @@ This note has no embedding.`,
       expect(parsed.results.length).toBeGreaterThan(0);
       expect(parsed.results[0]).toHaveProperty("id");
       expect(parsed.results[0]).toHaveProperty("title");
+    } finally {
+      await embeddingServer.close();
+    }
+  }, 15000);
+
+  it("reranks semantic ties using projections even when no projection cache is warm", async () => {
+    const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-hybrid-rerank-"));
+    tempDirs.push(vaultDir);
+    const embeddingServer = await startFakeEmbeddingServer();
+
+    try {
+      await writeSeedNote(vaultDir, {
+        id: "a-unrelated",
+        title: "Weekly Notes",
+        content: "General team status and logistics.",
+        tags: ["journal"],
+      });
+      await writeSeedNote(vaultDir, {
+        id: "b-target",
+        title: "Hybrid Recall Design",
+        content: "Exact design notes for hybrid recall ranking and rescue.",
+        tags: ["recall", "design"],
+      });
+
+      await writeSeedEmbedding(vaultDir, "a-unrelated", [0.1, 0.2, 0.3]);
+      await writeSeedEmbedding(vaultDir, "b-target", [0.1, 0.2, 0.3]);
+
+      const response = await callLocalMcpResponse(vaultDir, "recall", {
+        query: "hybrid recall design",
+        limit: 2,
+        scope: "global",
+      }, embeddingServer.url);
+
+      const parsed = RecallResultSchema.parse(response.structuredContent);
+      expect(parsed.results).toHaveLength(2);
+      expect(parsed.results[0]?.id).toBe("b-target");
+      expect(parsed.results[0]?.title).toBe("Hybrid Recall Design");
+    } finally {
+      await embeddingServer.close();
+    }
+  }, 15000);
+
+  it("lexical rescue keeps the strongest projection matches instead of first-seen notes", async () => {
+    const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-hybrid-rescue-"));
+    tempDirs.push(vaultDir);
+    const embeddingServer = await startFakeEmbeddingServer();
+
+    try {
+      await writeSeedNote(vaultDir, {
+        id: "a-weak",
+        title: "Recall notes",
+        content: "Brief mention of recall.",
+        tags: ["recall"],
+      });
+      await writeSeedNote(vaultDir, {
+        id: "b-mid",
+        title: "Recall design",
+        content: "Design considerations for recall behavior.",
+        tags: ["recall", "design"],
+      });
+      await writeSeedNote(vaultDir, {
+        id: "c-mid",
+        title: "Hybrid design",
+        content: "Hybrid matching notes for retrieval.",
+        tags: ["hybrid", "design"],
+      });
+      await writeSeedNote(vaultDir, {
+        id: "d-strong",
+        title: "Hybrid Recall Design",
+        content: "Hybrid recall design with lexical reranking and lexical rescue.",
+        tags: ["hybrid", "recall", "design"],
+      });
+
+      for (const id of ["a-weak", "b-mid", "c-mid", "d-strong"]) {
+        await writeSeedEmbedding(vaultDir, id, [-0.1, -0.2, -0.3]);
+      }
+
+      const response = await callLocalMcpResponse(vaultDir, "recall", {
+        query: "hybrid recall design",
+        limit: 3,
+        scope: "global",
+      }, embeddingServer.url);
+
+      const parsed = RecallResultSchema.parse(response.structuredContent);
+      expect(parsed.results).toHaveLength(3);
+      expect(parsed.results.map((result) => result.id)).toContain("d-strong");
+      expect(parsed.results[0]?.id).toBe("d-strong");
+      expect(parsed.results.map((result) => result.id)).not.toContain("a-weak");
     } finally {
       await embeddingServer.close();
     }

@@ -4,6 +4,16 @@ All notable changes to `mnemonic` will be documented in this file.
 
 The format is loosely based on Keep a Changelog and uses semver-style version headings.
 
+## [0.20.0] - 2026-04-04
+
+### Added
+
+- Hybrid recall: semantic search is now enhanced with lightweight lexical reranking over note projections. When semantic results are weak, a bounded lexical rescue path scans projections for additional candidates, improving exact-match and partial-query recall without changing the storage model or adding new infrastructure.
+
+### Changed
+
+- `recall` results now include a `lexicalScore` field in structured output when computed, showing the lexical overlap contribution alongside the semantic score.
+
 ## [0.19.5] - 2026-04-04
 
 ### Fixed

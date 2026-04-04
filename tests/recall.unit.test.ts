@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { computeRecallMetadataBoost, selectRecallResults, type ScoredRecallCandidate } from "../src/recall.js";
+import {
+  computeRecallMetadataBoost,
+  selectRecallResults,
+  applyLexicalReranking,
+  computeHybridScore,
+  type ScoredRecallCandidate,
+} from "../src/recall.js";
 import type { EffectiveNoteMetadata } from "../src/role-suggestions.js";
 
 const vault = {} as ScoredRecallCandidate["vault"];
@@ -67,6 +73,16 @@ describe("selectRecallResults", () => {
 
     expect(results.map((result) => result.id)).toEqual(["project-a", "project-b"]);
   });
+
+  it("uses hybrid score for ordering when lexical scores are present", () => {
+    const candidates: ScoredRecallCandidate[] = [
+      { id: "a", score: 0.5, boosted: 0.5, vault, isCurrentProject: true, lexicalScore: 0.9 },
+      { id: "b", score: 0.52, boosted: 0.52, vault, isCurrentProject: true, lexicalScore: 0.1 },
+    ];
+
+    const results = selectRecallResults(candidates, 2, "all");
+    expect(results.map((r) => r.id)).toEqual(["a", "b"]);
+  });
 });
 
 describe("computeRecallMetadataBoost", () => {
@@ -97,5 +113,64 @@ describe("computeRecallMetadataBoost", () => {
     const metadataBoosted = 0.9 + computeRecallMetadataBoost(summaryMetadata);
 
     expect(semanticBest).toBeGreaterThan(metadataBoosted);
+  });
+});
+
+describe("computeHybridScore", () => {
+  it("returns boosted score when no lexical score", () => {
+    const candidate: ScoredRecallCandidate = { id: "a", score: 0.7, boosted: 0.8, vault, isCurrentProject: true };
+    expect(computeHybridScore(candidate)).toBeCloseTo(0.8, 5);
+  });
+
+  it("adds lexical contribution when present", () => {
+    const candidate: ScoredRecallCandidate = { id: "a", score: 0.7, boosted: 0.8, vault, isCurrentProject: true, lexicalScore: 1.0 };
+    const hybrid = computeHybridScore(candidate);
+    expect(hybrid).toBeGreaterThan(0.8);
+  });
+
+  it("lexical score cannot overcome large semantic gap", () => {
+    const lowSemantic: ScoredRecallCandidate = { id: "a", score: 0.3, boosted: 0.3, vault, isCurrentProject: false, lexicalScore: 1.0 };
+    const highSemantic: ScoredRecallCandidate = { id: "b", score: 0.8, boosted: 0.8, vault, isCurrentProject: false, lexicalScore: 0 };
+    expect(computeHybridScore(highSemantic)).toBeGreaterThan(computeHybridScore(lowSemantic));
+  });
+});
+
+describe("applyLexicalReranking", () => {
+  it("computes lexical scores and reorders candidates", () => {
+    const candidates: ScoredRecallCandidate[] = [
+      { id: "a", score: 0.6, boosted: 0.6, vault, isCurrentProject: true },
+      { id: "b", score: 0.62, boosted: 0.62, vault, isCurrentProject: true },
+    ];
+
+    const projectionTexts = new Map([
+      ["a", "Title: Design Decisions\nSummary: key design decisions for the system"],
+      ["b", "Title: Random Note\nSummary: something unrelated"],
+    ]);
+
+    const reranked = applyLexicalReranking(candidates, "design decisions", (id) => projectionTexts.get(id));
+
+    expect(reranked[0].lexicalScore).toBeGreaterThan(reranked[1].lexicalScore!);
+    expect(reranked[0].id).toBe("a");
+  });
+
+  it("handles missing projection text gracefully", () => {
+    const candidates: ScoredRecallCandidate[] = [
+      { id: "a", score: 0.6, boosted: 0.6, vault, isCurrentProject: true },
+    ];
+
+    const reranked = applyLexicalReranking(candidates, "test", () => undefined);
+
+    expect(reranked[0].lexicalScore).toBeUndefined();
+  });
+
+  it("preserves all candidates after reranking", () => {
+    const candidates: ScoredRecallCandidate[] = [
+      { id: "a", score: 0.5, boosted: 0.5, vault, isCurrentProject: true },
+      { id: "b", score: 0.7, boosted: 0.7, vault, isCurrentProject: true },
+    ];
+
+    const reranked = applyLexicalReranking(candidates, "test", (id) => `text for ${id}`);
+
+    expect(reranked).toHaveLength(2);
   });
 });

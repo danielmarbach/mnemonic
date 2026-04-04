@@ -1344,8 +1344,8 @@
     </p>
 
     <div class="recall-flow fade-up">
-      <h3>Recall flow &mdash; projection-enhanced, role-boosted semantic search</h3>
-      <p class="section-desc" style="margin-bottom:16px;font-size:0.875rem;">Before embedding, notes are projected into clean structured text: title, lifecycle, tags, summary, and h1–h3 headings — no prose noise. At ranking time, inferred role and importance further boost scores so summary and decision notes surface naturally. Top results include bounded 1-hop relationship previews and optional git-backed provenance.</p>
+      <h3>Recall flow &mdash; hybrid semantic + lexical search</h3>
+      <p class="section-desc" style="margin-bottom:16px;font-size:0.875rem;">Before embedding, notes are projected into clean structured text: title, lifecycle, tags, summary, and h1–h3 headings — no prose noise. Semantic search finds the right note even when you don't remember exact words. When results are weak, lexical matching rescues by scanning projections for keyword overlap. Inferred role and importance further boost scores so summary and decision notes surface naturally.</p>
       <div class="flow-steps">
         <div class="flow-step">
           <div class="flow-step-box" style="border-color:rgba(74,222,128,0.25);color:var(--primary-lt)">recall query</div>
@@ -1353,23 +1353,18 @@
         </div>
         <div class="flow-arrow">&#x2192;</div>
         <div class="flow-step">
-          <div class="flow-step-box">project notes</div>
-          <div class="flow-step-label">clean signal</div>
-        </div>
-        <div class="flow-arrow">&#x2192;</div>
-        <div class="flow-step">
-          <div class="flow-step-box">embed + rank</div>
+          <div class="flow-step-box">semantic search</div>
           <div class="flow-step-label">Ollama local</div>
         </div>
         <div class="flow-arrow">&#x2192;</div>
         <div class="flow-step">
-          <div class="flow-step-box">project vault</div>
-          <div class="flow-step-label"><span class="boost-badge">+0.15 boost</span></div>
+          <div class="flow-step-box">lexical rerank</div>
+          <div class="flow-step-label"><span class="boost-badge">tiebreaker</span></div>
         </div>
         <div class="flow-arrow">+</div>
         <div class="flow-step">
-          <div class="flow-step-box">main vault</div>
-          <div class="flow-step-label">global fallback</div>
+          <div class="flow-step-box">lexical rescue</div>
+          <div class="flow-step-label">weak results</div>
         </div>
         <div class="flow-arrow">&#x2192;</div>
         <div class="flow-step">
