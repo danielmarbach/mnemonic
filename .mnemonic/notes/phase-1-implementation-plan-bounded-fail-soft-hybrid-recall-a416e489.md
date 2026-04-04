@@ -7,10 +7,13 @@ tags:
   - token-efficiency
 lifecycle: temporary
 createdAt: '2026-04-04T11:51:15.300Z'
-updatedAt: '2026-04-04T11:51:15.300Z'
+updatedAt: '2026-04-04T11:51:25.510Z'
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: phase-1-design-hybrid-recall-over-existing-projections-4dc7dbb9
+    type: explains
 memoryVersion: 1
 ---
 Implement hybrid recall over existing projections in a way that preserves semantic-first behavior, token efficiency, and mnemonic's low-infrastructure design.
