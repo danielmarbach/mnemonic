@@ -4,6 +4,12 @@ All notable changes to `mnemonic` will be documented in this file.
 
 The format is loosely based on Keep a Changelog and uses semver-style version headings.
 
+## [0.19.5] - 2026-04-04
+
+### Fixed
+
+- `discover_tags` now returns schema-compliant structured output in both suggest and browse modes. Previously, internal ranking fields leaked into tag items, causing MCP callers to fail with `-32602` schema validation errors.
+
 ## [0.19.4] - 2026-04-02
 
 ### Changed

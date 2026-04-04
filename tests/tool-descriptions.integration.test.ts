@@ -13,7 +13,7 @@ import {
   tempDirs,
 } from "./helpers/mcp.js";
 
-import { ProjectSummaryResultSchema } from "../src/structured-content.js";
+import { DiscoverTagsResultSchema, ProjectSummaryResultSchema } from "../src/structured-content.js";
 
 describe("tool-descriptions", () => {
   it("exposes workflow-hint prompt as an imperative decision protocol", async () => {
@@ -101,6 +101,7 @@ describe("tool-descriptions", () => {
       }, embeddingServer.url);
 
       const structured = response.structuredContent;
+      expect(() => DiscoverTagsResultSchema.parse(structured)).not.toThrow();
       expect(structured?.["action"]).toBe("tags_discovered");
       expect(structured?.["mode"]).toBe("suggest");
       expect(structured?.["totalTags"]).toBeGreaterThan(0);
@@ -115,6 +116,14 @@ describe("tool-descriptions", () => {
 
       const testTag = tags.find((t) => t["tag"] === "test-tag");
       expect(testTag).toBeDefined();
+      expect(Object.keys(testTag!).sort()).toEqual([
+        "example",
+        "isTemporaryOnly",
+        "lifecycleTypes",
+        "reason",
+        "tag",
+        "usageCount",
+      ]);
       expect(testTag?.["usageCount"]).toBe(2);
       expect(typeof testTag?.["example"]).toBe("string");
       expect(testTag?.["isTemporaryOnly"]).toBe(false);
@@ -179,6 +188,7 @@ describe("tool-descriptions", () => {
       }, embeddingServer.url);
 
       const structured = response.structuredContent;
+      expect(() => DiscoverTagsResultSchema.parse(structured)).not.toThrow();
       expect(structured?.["action"]).toBe("tags_discovered");
       expect(structured?.["mode"]).toBe("browse");
       const tags = structured?.["tags"] as Array<Record<string, unknown>>;
