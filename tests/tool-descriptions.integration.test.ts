@@ -323,6 +323,52 @@ describe("tool-descriptions", () => {
     }
   }, 15000);
 
+  it("does not treat short tags as exact matches inside larger words", async () => {
+    const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-vault-"));
+    tempDirs.push(vaultDir);
+    const embeddingServer = await startFakeEmbeddingServer();
+
+    try {
+      await callLocalMcp(vaultDir, "remember", {
+        title: "Short tag note",
+        content: "A note tagged with io.",
+        tags: ["io"],
+        lifecycle: "permanent",
+        scope: "global",
+        summary: "Create short tag note",
+      }, embeddingServer.url);
+
+      await callLocalMcp(vaultDir, "remember", {
+        title: "Mnemonic design note",
+        content: "A design note about mnemonic retrieval behavior.",
+        tags: ["design", "mnemonic"],
+        lifecycle: "permanent",
+        scope: "global",
+        summary: "Create mnemonic design note",
+      }, embeddingServer.url);
+
+      const response = await callLocalMcpResponse(vaultDir, "discover_tags", {
+        title: "Mnemonic retrieval plan",
+        content: "Improve mnemonic recall behavior without changing the design.",
+        scope: "global",
+      }, embeddingServer.url);
+
+      const structured = response.structuredContent;
+      expect(structured?.["mode"]).toBe("suggest");
+      const rankedTags = structured?.["recommendedTags"] as Array<Record<string, unknown>>;
+      expect(Array.isArray(rankedTags)).toBe(true);
+      const rankedNames = rankedTags.map((tag) => String(tag["tag"]));
+      expect(rankedNames.indexOf("design")).toBeGreaterThanOrEqual(0);
+      expect(rankedNames.indexOf("mnemonic")).toBeGreaterThanOrEqual(0);
+      if (rankedNames.includes("io")) {
+        expect(rankedNames.indexOf("io")).toBeGreaterThan(rankedNames.indexOf("mnemonic"));
+        expect(rankedNames.indexOf("io")).toBeGreaterThan(rankedNames.indexOf("design"));
+      }
+    } finally {
+      await embeddingServer.close();
+    }
+  }, 15000);
+
   it("OrientationNoteSchema accepts provenance and confidence optional fields", async () => {
     const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-vault-"));
     const repoDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-project-"));

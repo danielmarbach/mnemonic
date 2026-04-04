@@ -9,6 +9,7 @@ The format is loosely based on Keep a Changelog and uses semver-style version he
 ### Fixed
 
 - `discover_tags` now returns schema-compliant structured output in both suggest and browse modes. Previously, internal ranking fields leaked into tag items, causing MCP callers to fail with `-32602` schema validation errors.
+- `discover_tags` exact context matching now respects tag boundaries, so short tags like `io` no longer get boosted from substring hits inside larger words such as `mnemonic`.
 
 ## [0.19.4] - 2026-04-02
 

@@ -3071,9 +3071,14 @@ function countTokenOverlap(tokens: Set<string>, other: Iterable<string>): number
   return matches;
 }
 
+function escapeRegex(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 function hasExactTagContextMatch(tag: string, values: Array<string | undefined>): boolean {
   const normalizedTag = tag.toLowerCase();
-  return values.some(value => value?.toLowerCase().includes(normalizedTag) ?? false);
+  const pattern = new RegExp(`(^|[^a-z0-9_-])${escapeRegex(normalizedTag)}([^a-z0-9_-]|$)`);
+  return values.some(value => value ? pattern.test(value.toLowerCase()) : false);
 }
 
 server.registerTool(
@@ -3219,7 +3224,10 @@ server.registerTool(
             (tag.usageCount * 0.1) -
             genericPenalty -
             (!isTemporaryTarget && tag.isTemporaryOnly ? 2 : 0)
-          : (tag.usageCount * 1.5) +
+          : (tag.exactContextMatch ? 6 : 0) +
+            (tag.tagTokenOverlap * 3) +
+            (tag.averageContextMatch * 2) +
+            (tag.usageCount * 1.5) +
             (tag.isTemporaryOnly ? -3 : 1) -
             (!isTemporaryTarget && tag.isTemporaryOnly ? 2 : 0);
 
