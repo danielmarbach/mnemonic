@@ -7,13 +7,15 @@ tags:
   - token-efficiency
 lifecycle: permanent
 createdAt: '2026-04-04T11:51:15.298Z'
-updatedAt: '2026-04-04T11:51:25.510Z'
+updatedAt: '2026-04-04T11:51:46.379Z'
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
   - id: phase-1-implementation-plan-bounded-fail-soft-hybrid-recall-a416e489
     type: explains
+  - id: mnemonic-key-design-decisions-3f2a6273
+    type: example-of
 memoryVersion: 1
 ---
 Hybrid recall should improve mnemonic recall quality by combining semantic retrieval with lexical reranking and lexical rescue over existing projection data, while preserving mnemonic's core simplicity constraints.

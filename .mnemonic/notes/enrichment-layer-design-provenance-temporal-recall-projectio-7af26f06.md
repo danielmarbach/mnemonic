@@ -12,7 +12,7 @@ tags:
   - relationship-expansion
 lifecycle: permanent
 createdAt: '2026-03-24T10:54:54.335Z'
-updatedAt: '2026-03-28T01:01:19.611Z'
+updatedAt: '2026-04-04T11:51:46.378Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
@@ -23,6 +23,8 @@ relatedTo:
   - id: mnemonic-role-suggestions-are-read-only-runtime-hints-d9e468cf
     type: explains
   - id: mnemonic-roles-are-hints-not-schema-b45478c7
+    type: related-to
+  - id: phase-1-design-hybrid-recall-over-existing-projections-4dc7dbb9
     type: related-to
 memoryVersion: 1
 ---
