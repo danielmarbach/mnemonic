@@ -308,6 +308,8 @@ Project identity derives from the **git remote URL**, normalized to a stable slu
 
 `recall` with `cwd` searches both vaults. Project notes get a **+0.15 similarity boost** — a soft signal, not a hard filter — so global memories remain accessible while project context floats to the top.
 
+**Hybrid recall** enhances semantic search with lightweight lexical reranking over note projections. When semantic results are weak, a bounded lexical rescue path scans projections for additional candidates, improving exact-match and partial-query recall without changing the storage model or adding new infrastructure. Lexical scores act as tiebreakers — they cannot overcome a large semantic gap but can reorder close candidates.
+
 Temporal recall is opt-in via `mode: "temporal"`. It keeps semantic selection first, then enriches only the top matches with compact git-backed history so agents can inspect how a note evolved without turning recall into raw log or diff output.
 
 **What temporal mode shows:**

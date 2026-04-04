@@ -8,7 +8,8 @@ tags:
   - reusable
 lifecycle: permanent
 createdAt: '2026-03-28T18:54:38.792Z'
-updatedAt: '2026-03-29T13:11:48.917Z'
+updatedAt: '2026-04-04T20:37:07.773Z'
+alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
@@ -42,6 +43,8 @@ Run a structured dogfooding test of the mnemonic MCP against the released versio
 
 **B3 — Verbose temporal:** Call `recall` with query="mnemonic key design decisions", cwd, mode="temporal", verbose=true, limit=3. Does the canonical key design decisions note rank at top? Are stats context useful? Rate: Pass / Pass with friction / Fail.
 
+**B4 — Cold hybrid recall phrasing:** In a fresh session before any prior `recall` warms projection lookups, call `recall` with query="hybrid reranking rescue projections", cwd, limit=3. Does the hybrid recall design note rank first even though the phrasing is projection-heavy rather than an exact title match? Rate: Pass / Pass with friction / Fail.
+
 **C1 — Relationship follow-up from recent note:** Identify the most recent note from the summary's recent section. Call `get` with that id, cwd, includeRelationships=true. Follow one relationship: does it lead to a useful connected note? Rate: Pass / Pass with friction / Fail.
 
 **D1 — Warm session (Phase 5 cache):** Call `project_memory_summary` a second time (same session, same cwd). Same structure? Any dropped results? Felt faster? Rate: Pass / Pass with friction / Fail.
@@ -50,7 +53,7 @@ Run a structured dogfooding test of the mnemonic MCP against the released versio
 
 **F1 — Provenance and confidence (Phase 7):** From recall results (B1 or B2), inspect provenance: lastUpdatedAt, lastCommitHash, recentlyChanged. Is confidence "high" on anchor notes? "medium" on others? Rate: Pass / Pass with friction / Fail.
 
-**F2 — AlwaysLoad via MCP (Phase 7):** Create a test note with `remember` including `alwaysLoad: true`, then update it with `alwaysLoad: false`. Verify via `get` that `alwaysLoad` is persisted in the frontmatter. Rate: Pass / Pass with friction / Fail.
+**F2 — AlwaysLoad via MCP (Phase 7):** Create a test note with `remember` including `alwaysLoad: true`, then update it with `alwaysLoad: false`. Use the returned note id to inspect `/path/to/mnemonic/.mnemonic/notes/<id>.md` directly and verify the frontmatter changes from `alwaysLoad: true` to `alwaysLoad: false`. Rate: Pass / Pass with friction / Fail.
 
 **G1 — Single-commit note history (Phase 8):** From B2 temporal results, find a note with 1 commit. Is `historySummary` "This note was created and has not been modified since."? Rate: Pass / Pass with friction / Fail.
 
@@ -89,6 +92,7 @@ Run a structured dogfooding test of the mnemonic MCP against the released versio
 - [ ] previews feel concise and useful
 - [ ] recall quality preserved
 - [ ] no obvious loss from projection-based embedding input
+- [ ] cold hybrid recall reranking works for projection-heavy phrasing
 
 ### Phase 4: Relationships
 
@@ -113,7 +117,7 @@ Run a structured dogfooding test of the mnemonic MCP against the released versio
 
 - [ ] explicit metadata improves prioritization
 - [ ] inferred roles help without noise
-- [ ] alwaysLoad behaves cleanly (F2 test: remember/update via MCP)
+- [ ] alwaysLoad behaves cleanly (F2 test: remember/update via MCP, verify frontmatter in note file)
 
 ### Phase 8: Temporal interpretation
 

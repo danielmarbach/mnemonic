@@ -17,6 +17,8 @@ import {
   getOrBuildVaultEmbeddings,
   getOrBuildVaultNoteList,
   getSessionCachedNote,
+  getSessionCachedProjection,
+  setSessionCachedProjection,
 } from "./cache.js";
 import { performance } from "perf_hooks";
 
@@ -26,7 +28,14 @@ import {
   normalizeMergePlanSourceIds,
   resolveEffectiveConsolidationMode,
 } from "./consolidate.js";
-import { computeRecallMetadataBoost, selectRecallResults } from "./recall.js";
+import { computeRecallMetadataBoost, computeHybridScore, selectRecallResults, applyLexicalReranking, type ScoredRecallCandidate } from "./recall.js";
+import {
+  shouldTriggerLexicalRescue,
+  computeLexicalScore,
+  LEXICAL_RESCUE_CANDIDATE_LIMIT,
+  LEXICAL_RESCUE_THRESHOLD,
+  LEXICAL_RESCUE_RESULT_LIMIT,
+} from "./lexical.js";
 import { getRelationshipPreview } from "./relationships.js";
 import { cleanMarkdown } from "./markdown.js";
 import { MnemonicConfigStore, readVaultSchemaVersion, type MutationPushMode } from "./config.js";
@@ -2184,6 +2193,63 @@ server.registerTool(
   }
 );
 
+// ── Lexical rescue helper ─────────────────────────────────────────────────────
+
+async function collectLexicalRescueCandidates(
+  vaults: Vault[],
+  query: string,
+  project: { id: string; name: string } | undefined,
+  scope: "project" | "global" | "all",
+  tags: string[] | undefined,
+  existingIds: ScoredRecallCandidate[]
+): Promise<ScoredRecallCandidate[]> {
+  const existingIdSet = new Set(existingIds.map((c) => c.id));
+  const candidates: ScoredRecallCandidate[] = [];
+
+  for (const vault of vaults) {
+    const notes = await vault.storage.listNotes().catch(() => []);
+    for (const note of notes) {
+      if (existingIdSet.has(note.id)) continue;
+
+      if (tags && tags.length > 0) {
+        const noteTags = new Set(note.tags);
+        if (!tags.every((t) => noteTags.has(t))) continue;
+      }
+
+      const isProjectNote = note.project !== undefined;
+      const isCurrentProject = project && note.project === project.id;
+
+      if (scope === "project" && !isCurrentProject) continue;
+      if (scope === "global" && isProjectNote) continue;
+
+      const projection = await getOrBuildProjection(vault.storage, note).catch(() => undefined);
+      if (!projection) continue;
+
+      const lexicalScore = computeLexicalScore(query, projection.projectionText);
+      if (lexicalScore < LEXICAL_RESCUE_THRESHOLD) continue;
+
+      const metadataBoost = computeRecallMetadataBoost(getEffectiveMetadata(note));
+      const boost = (isCurrentProject ? 0.15 : 0) + metadataBoost;
+
+      candidates.push({
+        id: note.id,
+        score: 0,
+        boosted: boost,
+        vault,
+        isCurrentProject: Boolean(isCurrentProject),
+        lexicalScore,
+      });
+
+      if (candidates.length >= LEXICAL_RESCUE_CANDIDATE_LIMIT) break;
+    }
+    if (candidates.length >= LEXICAL_RESCUE_CANDIDATE_LIMIT) break;
+  }
+
+  return candidates
+    .sort((a, b) => computeHybridScore(b) - computeHybridScore(a))
+    .slice(0, LEXICAL_RESCUE_RESULT_LIMIT);
+}
+
 // ── recall ────────────────────────────────────────────────────────────────────
 server.registerTool(
   "recall",
@@ -2267,7 +2333,7 @@ server.registerTool(
       await embedMissingNotes(vault.storage).catch(() => { /* best-effort: don't block recall if Ollama is down */ });
     }
 
-    const scored: Array<{ id: string; score: number; boosted: number; vault: Vault; isCurrentProject: boolean }> = [];
+    const scored: ScoredRecallCandidate[] = [];
 
     for (const vault of vaults) {
       const embeddings = project
@@ -2301,7 +2367,53 @@ server.registerTool(
       }
     }
 
-    const top = selectRecallResults(scored, limit, scope);
+    const projectionTexts = new Map<string, string>();
+    for (const candidate of scored) {
+      const note = await readCachedNote(candidate.vault, candidate.id).catch(() => null);
+      if (!note) {
+        continue;
+      }
+
+      const projection = await getOrBuildProjection(candidate.vault.storage, note).catch(() => undefined);
+      if (!projection) {
+        continue;
+      }
+
+      projectionTexts.set(candidate.id, projection.projectionText);
+      if (project) {
+        setSessionCachedProjection(project.id, candidate.id, projection);
+      }
+    }
+
+    // Apply lexical reranking over semantic candidates (fail-soft)
+    const getProjectionText = (id: string): string | undefined => {
+      const inlineProjection = projectionTexts.get(id);
+      if (inlineProjection) {
+        return inlineProjection;
+      }
+      if (project) {
+        const cached = getSessionCachedProjection(project.id, id);
+        if (cached) return cached.projectionText;
+      }
+      return undefined;
+    };
+    const reranked = applyLexicalReranking(scored, query, getProjectionText);
+
+    // Lexical rescue: when semantic results are weak, scan projections for additional candidates
+    const topScore = reranked.length > 0 ? reranked[0].score : undefined;
+    if (shouldTriggerLexicalRescue(topScore, reranked.length)) {
+      const rescueCandidates = await collectLexicalRescueCandidates(
+        vaults,
+        query,
+        project ?? undefined,
+        scope,
+        tags,
+        reranked
+      );
+      reranked.push(...rescueCandidates);
+    }
+
+    const top = selectRecallResults(reranked, limit, scope);
 
     if (top.length === 0) {
       const structuredContent: RecallResult = { action: "recalled", query, scope: scope || "all", results: [] };
