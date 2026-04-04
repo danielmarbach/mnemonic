@@ -24,8 +24,6 @@ relatedTo:
     type: explains
   - id: mnemonic-roles-are-hints-not-schema-b45478c7
     type: related-to
-  - id: phase-1-design-hybrid-recall-over-existing-projections-4dc7dbb9
-    type: related-to
 memoryVersion: 1
 ---
 Four post-processing enrichment layers added on top of semantic recall. Each is additive: core recall ranking is unaffected, failures fail-soft.

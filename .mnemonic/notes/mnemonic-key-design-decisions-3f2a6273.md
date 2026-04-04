@@ -27,8 +27,6 @@ relatedTo:
     type: related-to
   - id: performance-principles-for-file-first-mcp-and-git-backed-wor-4e7d3bc8
     type: related-to
-  - id: phase-1-design-hybrid-recall-over-existing-projections-4dc7dbb9
-    type: example-of
 memoryVersion: 1
 ---
 **One file per note:** Critical for git conflict isolation. Never aggregate notes into a single file.
