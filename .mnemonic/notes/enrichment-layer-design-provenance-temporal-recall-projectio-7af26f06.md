@@ -12,7 +12,7 @@ tags:
   - relationship-expansion
 lifecycle: permanent
 createdAt: '2026-03-24T10:54:54.335Z'
-updatedAt: '2026-04-04T11:51:46.378Z'
+updatedAt: '2026-04-04T22:09:27.419Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
@@ -20,6 +20,8 @@ relatedTo:
     type: related-to
   - id: active-session-project-cache-single-in-memory-vault-cache-pe-7463f124
     type: related-to
+  - id: mnemonic-role-suggestions-are-read-only-runtime-hints-consol-532d5d9b
+    type: explains
 memoryVersion: 1
 ---
 Four post-processing enrichment layers added on top of semantic recall. Each is additive: core recall ranking is unaffected, failures fail-soft.
