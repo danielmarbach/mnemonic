@@ -1,5 +1,5 @@
 import { afterAll, afterEach, beforeAll } from "vitest";
-import { mkdtemp, rm } from "fs/promises";
+import { access, mkdir, mkdtemp, rm } from "fs/promises";
 import os from "os";
 import path from "path";
 import { spawn } from "child_process";
@@ -11,8 +11,78 @@ import { execFile } from "child_process";
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 export const execFileAsync = promisify(execFile);
 export const builtEntryPoint = path.join(repoRoot, "build", "index.js");
+const buildLockDir = path.join(repoRoot, ".mcp-test-build-lock");
+let buildReadyPromise: Promise<void> | undefined;
 
 export const tempDirs: string[] = [];
+
+export async function ensureBuiltEntryPointReady(options?: {
+  entryPoint?: string;
+  lockDir?: string;
+  runBuild?: () => Promise<void>;
+  timeoutMs?: number;
+  pollIntervalMs?: number;
+  resetMemoizedState?: boolean;
+}): Promise<void> {
+  if (options?.resetMemoizedState) {
+    buildReadyPromise = undefined;
+  }
+
+  if (!buildReadyPromise) {
+    buildReadyPromise = ensureBuiltEntryPointReadyInternal(options).catch((error) => {
+      buildReadyPromise = undefined;
+      throw error;
+    });
+  }
+
+  await buildReadyPromise;
+}
+
+async function ensureBuiltEntryPointReadyInternal(options?: {
+  entryPoint?: string;
+  lockDir?: string;
+  runBuild?: () => Promise<void>;
+  timeoutMs?: number;
+  pollIntervalMs?: number;
+}): Promise<void> {
+  const entryPoint = options?.entryPoint ?? builtEntryPoint;
+  const lockDir = options?.lockDir ?? buildLockDir;
+  const runBuild = options?.runBuild ?? (() => execFileAsync("npm", ["run", "build"], { cwd: repoRoot }).then(() => undefined));
+  const timeoutMs = options?.timeoutMs ?? 120_000;
+  const pollIntervalMs = options?.pollIntervalMs ?? 100;
+  const deadline = Date.now() + timeoutMs;
+
+  while (true) {
+    try {
+      await access(entryPoint);
+      return;
+    } catch {
+      // entry point not ready yet
+    }
+
+    try {
+      await mkdir(lockDir);
+      try {
+        await runBuild();
+      } finally {
+        await rm(lockDir, { recursive: true, force: true });
+      }
+      await access(entryPoint);
+      return;
+    } catch (error) {
+      const isLockHeld = error instanceof Error && "code" in error && error.code === "EEXIST";
+      if (!isLockHeld) {
+        throw error;
+      }
+    }
+
+    if (Date.now() >= deadline) {
+      throw new Error(`Timed out waiting for MCP build lock at ${lockDir}`);
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
+  }
+}
 
 export async function initTestRepo(repoDir: string, branch = "feature/test"): Promise<void> {
   await execFileAsync("git", ["init"], { cwd: repoDir });
@@ -32,7 +102,7 @@ afterEach(async () => {
 });
 
 beforeAll(async () => {
-  await execFileAsync("npm", ["run", "build"], { cwd: repoRoot });
+  await ensureBuiltEntryPointReady();
 }, 120000);
 
 export async function startFakeEmbeddingServer(): Promise<{ url: string; close: () => Promise<void> }> {
