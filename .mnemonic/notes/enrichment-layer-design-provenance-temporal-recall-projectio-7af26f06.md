@@ -20,10 +20,6 @@ relatedTo:
     type: related-to
   - id: active-session-project-cache-single-in-memory-vault-cache-pe-7463f124
     type: related-to
-  - id: mnemonic-role-suggestions-are-read-only-runtime-hints-d9e468cf
-    type: explains
-  - id: mnemonic-roles-are-hints-not-schema-b45478c7
-    type: related-to
 memoryVersion: 1
 ---
 Four post-processing enrichment layers added on top of semantic recall. Each is additive: core recall ranking is unaffected, failures fail-soft.
