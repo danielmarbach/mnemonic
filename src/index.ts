@@ -3071,9 +3071,14 @@ function countTokenOverlap(tokens: Set<string>, other: Iterable<string>): number
   return matches;
 }
 
+function escapeRegex(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 function hasExactTagContextMatch(tag: string, values: Array<string | undefined>): boolean {
   const normalizedTag = tag.toLowerCase();
-  return values.some(value => value?.toLowerCase().includes(normalizedTag) ?? false);
+  const pattern = new RegExp(`(^|[^a-z0-9_-])${escapeRegex(normalizedTag)}([^a-z0-9_-]|$)`);
+  return values.some(value => value ? pattern.test(value.toLowerCase()) : false);
 }
 
 server.registerTool(
@@ -3219,7 +3224,10 @@ server.registerTool(
             (tag.usageCount * 0.1) -
             genericPenalty -
             (!isTemporaryTarget && tag.isTemporaryOnly ? 2 : 0)
-          : (tag.usageCount * 1.5) +
+          : (tag.exactContextMatch ? 6 : 0) +
+            (tag.tagTokenOverlap * 3) +
+            (tag.averageContextMatch * 2) +
+            (tag.usageCount * 1.5) +
             (tag.isTemporaryOnly ? -3 : 1) -
             (!isTemporaryTarget && tag.isTemporaryOnly ? 2 : 0);
 
@@ -3285,7 +3293,13 @@ server.registerTool(
           project: project ? { id: project.id, name: project.name } : undefined,
           mode,
           scope: scope || "all",
-          tags: tags.slice(0, effectiveLimit).map(({ score, example, reason, ...tag }) => tag),
+          tags: tags.slice(0, effectiveLimit).map(tag => ({
+            tag: tag.tag,
+            usageCount: tag.usageCount,
+            examples: tag.examples,
+            lifecycleTypes: tag.lifecycleTypes,
+            isTemporaryOnly: tag.isTemporaryOnly,
+          })),
           totalTags: tags.length,
           totalNotes: entries.length,
           vaultsSearched,
@@ -3296,7 +3310,14 @@ server.registerTool(
           project: project ? { id: project.id, name: project.name } : undefined,
           mode,
           scope: scope || "all",
-          recommendedTags: tags.slice(0, effectiveLimit).map(({ score, examples, ...tag }) => tag),
+          recommendedTags: tags.slice(0, effectiveLimit).map(tag => ({
+            tag: tag.tag,
+            usageCount: tag.usageCount,
+            example: tag.example,
+            reason: tag.reason,
+            lifecycleTypes: tag.lifecycleTypes,
+            isTemporaryOnly: tag.isTemporaryOnly,
+          })),
           totalTags: tags.length,
           totalNotes: entries.length,
           vaultsSearched,

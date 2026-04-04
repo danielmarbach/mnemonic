@@ -13,7 +13,7 @@ import {
   tempDirs,
 } from "./helpers/mcp.js";
 
-import { ProjectSummaryResultSchema } from "../src/structured-content.js";
+import { DiscoverTagsResultSchema, ProjectSummaryResultSchema } from "../src/structured-content.js";
 
 describe("tool-descriptions", () => {
   it("exposes workflow-hint prompt as an imperative decision protocol", async () => {
@@ -101,6 +101,7 @@ describe("tool-descriptions", () => {
       }, embeddingServer.url);
 
       const structured = response.structuredContent;
+      expect(() => DiscoverTagsResultSchema.parse(structured)).not.toThrow();
       expect(structured?.["action"]).toBe("tags_discovered");
       expect(structured?.["mode"]).toBe("suggest");
       expect(structured?.["totalTags"]).toBeGreaterThan(0);
@@ -115,6 +116,14 @@ describe("tool-descriptions", () => {
 
       const testTag = tags.find((t) => t["tag"] === "test-tag");
       expect(testTag).toBeDefined();
+      expect(Object.keys(testTag!).sort()).toEqual([
+        "example",
+        "isTemporaryOnly",
+        "lifecycleTypes",
+        "reason",
+        "tag",
+        "usageCount",
+      ]);
       expect(testTag?.["usageCount"]).toBe(2);
       expect(typeof testTag?.["example"]).toBe("string");
       expect(testTag?.["isTemporaryOnly"]).toBe(false);
@@ -179,6 +188,7 @@ describe("tool-descriptions", () => {
       }, embeddingServer.url);
 
       const structured = response.structuredContent;
+      expect(() => DiscoverTagsResultSchema.parse(structured)).not.toThrow();
       expect(structured?.["action"]).toBe("tags_discovered");
       expect(structured?.["mode"]).toBe("browse");
       const tags = structured?.["tags"] as Array<Record<string, unknown>>;
@@ -307,6 +317,52 @@ describe("tool-descriptions", () => {
       }
       if (rankedNames.includes("architecture")) {
         expect(rankedNames.indexOf("cache-invalidation")).toBeLessThan(rankedNames.indexOf("architecture"));
+      }
+    } finally {
+      await embeddingServer.close();
+    }
+  }, 15000);
+
+  it("does not treat short tags as exact matches inside larger words", async () => {
+    const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-vault-"));
+    tempDirs.push(vaultDir);
+    const embeddingServer = await startFakeEmbeddingServer();
+
+    try {
+      await callLocalMcp(vaultDir, "remember", {
+        title: "Short tag note",
+        content: "A note tagged with io.",
+        tags: ["io"],
+        lifecycle: "permanent",
+        scope: "global",
+        summary: "Create short tag note",
+      }, embeddingServer.url);
+
+      await callLocalMcp(vaultDir, "remember", {
+        title: "Mnemonic design note",
+        content: "A design note about mnemonic retrieval behavior.",
+        tags: ["design", "mnemonic"],
+        lifecycle: "permanent",
+        scope: "global",
+        summary: "Create mnemonic design note",
+      }, embeddingServer.url);
+
+      const response = await callLocalMcpResponse(vaultDir, "discover_tags", {
+        title: "Mnemonic retrieval plan",
+        content: "Improve mnemonic recall behavior without changing the design.",
+        scope: "global",
+      }, embeddingServer.url);
+
+      const structured = response.structuredContent;
+      expect(structured?.["mode"]).toBe("suggest");
+      const rankedTags = structured?.["recommendedTags"] as Array<Record<string, unknown>>;
+      expect(Array.isArray(rankedTags)).toBe(true);
+      const rankedNames = rankedTags.map((tag) => String(tag["tag"]));
+      expect(rankedNames.indexOf("design")).toBeGreaterThanOrEqual(0);
+      expect(rankedNames.indexOf("mnemonic")).toBeGreaterThanOrEqual(0);
+      if (rankedNames.includes("io")) {
+        expect(rankedNames.indexOf("io")).toBeGreaterThan(rankedNames.indexOf("mnemonic"));
+        expect(rankedNames.indexOf("io")).toBeGreaterThan(rankedNames.indexOf("design"));
       }
     } finally {
       await embeddingServer.close();
