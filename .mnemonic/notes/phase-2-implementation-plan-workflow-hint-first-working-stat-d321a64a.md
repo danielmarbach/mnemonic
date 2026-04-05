@@ -7,7 +7,7 @@ tags:
   - phases
 lifecycle: temporary
 createdAt: '2026-04-05T09:26:57.835Z'
-updatedAt: '2026-04-05T09:27:10.252Z'
+updatedAt: '2026-04-05T09:38:54.824Z'
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
@@ -27,7 +27,7 @@ Implement working-state continuity aligned with the existing mnemonic workflow.
 
 Milestones:
 
-1. Align workflow hints and tool descriptions.
+1. ✅ Align workflow hints and tool descriptions.
 2. Define a structured temporary working-state note pattern.
 3. Implement working-state preservation.
 4. Add recovery after project orientation.
@@ -44,11 +44,28 @@ Definition of done:
 - Recovery is compact and useful.
 - No new persistence layer is introduced.
 
-Validation against the Phase 2 design and existing project memory:
-
-- The plan is materially aligned with the design goals and with the existing workflow UX and temporary-note lifecycle decisions already stored in mnemonic.
-- No major gaps were found.
-- Two implementation constraints should stay explicit during execution: preservation should stay selective based on continuation value, and recovery must remain a follow-on step after orientation rather than becoming a competing entrypoint.
-
 Guiding principle:
 Orient with project memory, continue with temporary working state, and consolidate stable value back into durable notes.
+
+## Design Context
+
+This implementation follows the Phase 2 design decision that working-state continuity should be achieved within the existing workflow:
+
+- `project_memory_summary` remains the canonical session-start entrypoint (not replaced by working-state recovery)
+- Temporary notes serve as the working-state substrate (no parallel persistence layer)
+- Recovery is a follow-on step after orientation (not a competing entrypoint)
+- Preservation is selective based on continuation value
+
+See related design notes:
+
+- `phase-2-design-workflow-hint-first-working-state-continuity` for core principles
+- `mcp-workflow-ux-hint-prompt-tool-descriptions-and-session-st` for UX patterns
+- `temporary-note-lifecycle-and-consolidation-defaults` for temporary vs permanent decisions
+
+## Implementation Constraints
+
+1. **Selective Preservation**: Only preserve working-state when continuation value is high. Working-state should be ephemeral by default; capture happens deliberately.
+
+2. **Orientation-Then-Recovery**: Recovery must not replace orientation. Agents call `project_memory_summary` first, then recover working-state as a separate step.
+
+3. **Consolidation Integration**: Working-state should naturally consolidate into durable notes. Temporary notes get superseded or deleted once their knowledge stabilizes.
