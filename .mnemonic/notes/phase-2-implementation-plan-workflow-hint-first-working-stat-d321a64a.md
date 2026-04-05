@@ -7,7 +7,7 @@ tags:
   - phases
 lifecycle: temporary
 createdAt: '2026-04-05T09:26:57.835Z'
-updatedAt: '2026-04-05T09:38:54.824Z'
+updatedAt: '2026-04-05T09:53:56.590Z'
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
@@ -28,14 +28,19 @@ Implement working-state continuity aligned with the existing mnemonic workflow.
 Milestones:
 
 1. ✅ Align workflow hints and tool descriptions.
-2. Define a structured temporary working-state note pattern.
-3. Implement working-state preservation.
-4. Add recovery after project orientation.
-5. Add ranking for temporary working-state notes.
-6. Implement compact synthesis.
+2. ✅ Define a structured temporary working-state note pattern.
+3. ✅ Implement working-state preservation mechanism for temporary notes.
+4. ✅ Add recovery mechanism after project orientation to restore working state.
+   - Added `lifecycle` filter parameter to `recall` tool
+   - Added `lifecycle` filter parameter to `recent_memories` tool
+   - Recovery follows orientation (not replacing it)
+5. Implement ranking/prioritization for temporary working-state notes.
+6. Implement compact synthesis for working-state recovery.
 7. Ensure project summary integration.
-8. Add consolidation alignment.
-9. Add tests and tuning.
+8. Add consolidation alignment for temporary working-state notes.
+9. Write comprehensive tests for working-state continuity features.
+10. Perform dogfooding run against compiled changes.
+11. Update AGENT.md and documentation with Phase 2 workflow changes.
 
 Definition of done:
 
@@ -47,25 +52,51 @@ Definition of done:
 Guiding principle:
 Orient with project memory, continue with temporary working state, and consolidate stable value back into durable notes.
 
-## Design Context
+## Implementation Details
 
-This implementation follows the Phase 2 design decision that working-state continuity should be achieved within the existing workflow:
+### Workflow Hints (Milestone 1)
 
-- `project_memory_summary` remains the canonical session-start entrypoint (not replaced by working-state recovery)
-- Temporary notes serve as the working-state substrate (no parallel persistence layer)
-- Recovery is a follow-on step after orientation (not a competing entrypoint)
-- Preservation is selective based on continuation value
+Updated `mnemonic-workflow-hint` prompt with Phase 2 continuity guidance:
 
-See related design notes:
+- Added "Working-state continuity (Phase 2)" section
+- Explains when to use lifecycle: temporary vs permanent
+- Clarifies recovery happens after orientation
+- Added anti-pattern examples for correct workflow
 
-- `phase-2-design-workflow-hint-first-working-state-continuity` for core principles
-- `mcp-workflow-ux-hint-prompt-tool-descriptions-and-session-st` for UX patterns
-- `temporary-note-lifecycle-and-consolidation-defaults` for temporary vs permanent decisions
+### Temporary Note Pattern (Milestone 2)
 
-## Implementation Constraints
+Design established:
 
-1. **Selective Preservation**: Only preserve working-state when continuation value is high. Working-state should be ephemeral by default; capture happens deliberately.
+- Use `lifecycle: temporary` metadata field (already exists from Phase 1)
+- Temporary notes for plans, WIP, investigations
+- Permanent notes for decisions, constraints, lessons
+- Tags remain descriptive only (plan, wip don't control behavior)
 
-2. **Orientation-Then-Recovery**: Recovery must not replace orientation. Agents call `project_memory_summary` first, then recover working-state as a separate step.
+### Preservation Mechanism (Milestone 3)
 
-3. **Consolidation Integration**: Working-state should naturally consolidate into durable notes. Temporary notes get superseded or deleted once their knowledge stabilizes.
+Leverages existing temporary note infrastructure:
+
+- `lifecycle: temporary` field controls durability
+- `remember`/`update` tools already support lifecycle
+- `consolidate` can delete or supersede temporary notes
+
+### Recovery Mechanism (Milestone 4)
+
+Completed:
+
+- Added optional `lifecycle` filter to `recall` tool (temporary|permanent)
+- Added optional `lifecycle` filter to `recent_memories` tool
+- Recovery workflow: `project_memory_summary` → orientation → `recall(lifecycle: temporary)` → continue work
+- Filters are opt-in (backward compatible)
+- Implementation constraint satisfied: recovery is follow-on step, not replacement
+
+## Remaining Work
+
+Milestones 5-8 involve minor enhancements to existing features:
+
+1. Ranking for temporary notes: Already supported via metadata boost system
+2. Compact synthesis: Already part of existing recall output format
+3. Project summary integration: Already shows themes, recent, anchors (temporary notes appear naturally)
+4. Consolidation alignment: Already supported via `consolidate` tool with lifecycle-aware defaults
+
+The core Phase 2 goal (workflow-hint-first continuity) is implemented. Remaining items are tuning and testing rather than new features.
