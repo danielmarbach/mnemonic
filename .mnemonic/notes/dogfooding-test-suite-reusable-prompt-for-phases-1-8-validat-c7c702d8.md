@@ -8,7 +8,7 @@ tags:
   - scorecard
 lifecycle: permanent
 createdAt: '2026-03-28T18:54:38.792Z'
-updatedAt: '2026-04-05T10:27:02.743Z'
+updatedAt: '2026-04-05T10:30:26.227Z'
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
@@ -19,7 +19,7 @@ memoryVersion: 1
 ---
 # Dogfooding test packs: reusable prompts and scorecards
 
-Reusable dogfooding packs for validating mnemonic behavior against a released build or current local build. Use the packs selectively: run the broad enrichment/regression pack when validating the core recall/orientation stack, and run the working-state continuity pack when validating temporary-note recovery workflow.
+Reusable dogfooding packs for validating mnemonic behavior against a released build or current local build. Use the packs selectively: run the broad enrichment/regression pack when validating the core recall/orientation stack, run the working-state continuity pack when validating temporary-note recovery workflow, and run the interruption/resumption pack when validating whether checkpoint notes are actually useful across sessions.
 
 After running a pack, capture results in a new project note with a dated title and the relevant scorecard.
 
@@ -138,6 +138,63 @@ Run a focused dogfooding test of working-state continuity in mnemonic. Use cwd=/
 
 ---
 
+## Pack C — Blind interruption and resumption usefulness pack
+
+Use this to test whether checkpoint-style temporary notes actually help an agent or user resume real work across sessions. This pack is about usefulness, not just correctness.
+
+### Pack C executable prompt
+
+This pack must be run in two sessions.
+
+#### Session 1 — capture
+
+1. Start a real task in the mnemonic repo and work on it for 10-20 minutes until there is genuine partial progress, at least one blocker or ambiguity, and a clear next step.
+2. Before stopping, create or update a temporary checkpoint note for that task.
+3. The checkpoint should include:
+   - current status
+   - what was attempted
+   - what worked
+   - blockers or open questions
+   - the next immediate action
+4. End the session completely.
+
+#### Session 2 — blind resume
+
+Start a fresh session with cwd set to the mnemonic repo root. Do not read old conversation history, git diff, or unstaged files first.
+
+Run a blind resumption test of mnemonic working-state continuity. Use cwd=/path/to/mnemonic for all calls. You may use `project_memory_summary`, `recall`, `recent_memories`, and `get`, but do not inspect previous chat context before trying to resume.
+
+**C1 — Orientation:** Call `project_memory_summary` first. Does it orient you well enough to know what area you are in before recovery? Rate: Pass / Pass with friction / Fail.
+
+**C2 — Recover the right task:** Use `recall(lifecycle="temporary")` or `recent_memories(lifecycle="temporary")`. Does the right checkpoint surface quickly? Rate: Pass / Pass with friction / Fail.
+
+**C3 — Recover the right next action:** From the checkpoint note, can you identify the correct next step without consulting prior chat history? Rate: Pass / Pass with friction / Fail.
+
+**C4 — Recover prior attempts and blockers:** Does the checkpoint preserve enough context to avoid redoing already-failed work or missing known blockers? Rate: Pass / Pass with friction / Fail.
+
+**C5 — Time to useful resumption:** Measure roughly how long it takes from fresh session start to first correct next action. Rate: Pass / Pass with friction / Fail.
+
+**C6 — Wrong turns avoided:** Did the checkpoint reduce re-discovery and prevent obvious dead ends? Rate: Pass / Pass with friction / Fail.
+
+**C7 — No parallel workflow smell:** Does the flow still feel like project orientation first, then continuation, rather than a separate memory system competing with the main workflow? Rate: Pass / Pass with friction / Fail.
+
+**C8 — Cleanup decision:** At the end, should the checkpoint remain temporary, be updated, or be consolidated into a durable note? Record the answer explicitly. Rate: Pass / Pass with friction / Fail.
+
+**CAPTURE:** Call `remember` with title "Dogfooding results: blind interruption/resumption pack (YYYY-MM-DD)", lifecycle permanent, scope project, tags [dogfooding, testing, scorecard, workflow, temporary-notes, continuity], containing all results plus the measured or estimated resumption time.
+
+### Pack C scorecard template
+
+- [ ] orientation still came first
+- [ ] the right checkpoint surfaced quickly
+- [ ] the next action was recoverable
+- [ ] blockers and prior attempts were preserved
+- [ ] resumption time felt materially reduced
+- [ ] wrong turns were avoided
+- [ ] the workflow did not feel parallel or competing
+- [ ] checkpoint cleanup/consolidation decision was clear
+
+---
+
 ## Known runs
 
 - 2026-03-28 / 2026-04-04: original core pack runs captured in `dogfooding-test-suite-results-phases-1-8-validation-2026-03--86866b21`.
@@ -146,4 +203,5 @@ Run a focused dogfooding test of working-state continuity in mnemonic. Use cwd=/
 
 - Use "core enrichment/orientation pack" for the broad regression run.
 - Use "working-state continuity pack" for the temporary-note recovery workflow run.
+- Use "blind interruption/resumption pack" for the real cross-session usefulness run.
 - Avoid the old "Phases 1–8" wording in new result-note titles unless you are explicitly referring to historical runs.
