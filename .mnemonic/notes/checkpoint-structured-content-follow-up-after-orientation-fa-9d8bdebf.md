@@ -7,10 +7,13 @@ tags:
   - schema
 lifecycle: temporary
 createdAt: '2026-04-05T10:56:31.566Z'
-updatedAt: '2026-04-05T10:56:31.566Z'
+updatedAt: '2026-04-05T10:57:18.662Z'
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: structuredcontent-rollout-for-tool-results-consolidated-886a1f12
+    type: explains
 memoryVersion: 1
 ---
 Structured-content follow-up can be implemented later in a separate change; it is not required to complete the Phase 2 orientation fallback work on `checkpoint`.
@@ -35,3 +38,4 @@ The branch fix restored `project_memory_summary` behavior: orientation stays per
 ## Resume hint
 
 Implement this as a separate branch or later commit after the current bugfix work is considered complete. Treat it as structured-content/API cleanup with compatibility considerations, not as part of the orientation fallback bugfix.
+ugfix.
