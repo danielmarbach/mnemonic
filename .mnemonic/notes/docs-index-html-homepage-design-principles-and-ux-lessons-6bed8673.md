@@ -9,7 +9,7 @@ tags:
   - navigation
 lifecycle: permanent
 createdAt: '2026-03-12T05:20:45.016Z'
-updatedAt: '2026-03-14T13:17:06.223Z'
+updatedAt: '2026-04-05T10:22:33.748Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 memoryVersion: 1
@@ -23,6 +23,8 @@ Accumulated design principles and UX lessons for `docs/index.html`, distilled fr
 **Avoid internal vocabulary in user-facing copy** — Words like "embedding", "cosine similarity", "frontmatter", "cwd", "scope routing", and "write scope" mean nothing to a first-time visitor. Reserve them for technical docs.
 
 **Keep technical names out of banners and callouts** — A top-of-page banner referencing `list_migrations` assumes familiarity with MCP tool names. Describe outcomes instead: "pending migrations are surfaced automatically" rather than "run `list_migrations`".
+
+**Selective tool-name usage is acceptable when outcome-first copy stays intact** — Tool or prompt names can appear in homepage copy when they help trust, recognition, or discoverability, but they must stay secondary to the user outcome. If a sentence starts reading like internal workflow documentation, it has gone too far.
 
 **Two-pass copywriting** — First pass produces technically accurate but nerdy text. Second pass rewrites from the user's seat: "what am I trying to do right now?" That second pass is where personality and approachability come from.
 
