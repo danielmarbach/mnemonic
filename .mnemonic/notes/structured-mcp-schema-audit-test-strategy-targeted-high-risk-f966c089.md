@@ -13,9 +13,6 @@ createdAt: '2026-03-11T15:11:28.262Z'
 updatedAt: '2026-04-05T10:57:18.662Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
-relatedTo:
-  - id: checkpoint-structured-content-follow-up-after-orientation-fa-9d8bdebf
-    type: related-to
 memoryVersion: 1
 ---
 Decision: use targeted schema-audit integration tests for high-risk MCP tools instead of requiring a bespoke schema-parsing test for every single tool immediately.
