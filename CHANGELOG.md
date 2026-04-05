@@ -4,6 +4,20 @@ All notable changes to `mnemonic` will be documented in this file.
 
 The format is loosely based on Keep a Changelog and uses semver-style version headings.
 
+## [0.21.0] - 2026-04-05
+
+### Added
+
+- `recall` and `recent_memories` now accept an optional `lifecycle` filter, making it easier to resume active work from temporary notes after project orientation.
+
+### Changed
+
+- `mnemonic-workflow-hint`, `AGENT.md`, `README.md`, and the mirrored website guidance now describe working-state continuity as a summary-first workflow: start with `project_memory_summary`, then recover temporary notes if needed.
+
+### Fixed
+
+- Working-state continuity guidance no longer tells agents to preserve temporary checkpoints by default when consolidating completed work.
+
 ## [0.20.0] - 2026-04-04
 
 ### Added

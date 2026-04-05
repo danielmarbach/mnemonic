@@ -64,6 +64,8 @@ import {
   withinThemeScore,
   anchorScore,
   computeConnectionDiversity,
+  workingStateScore,
+  extractNextAction,
 } from "./project-introspection.js";
 import { getEffectiveMetadata } from "./role-suggestions.js";
 import { detectProject, getCurrentGitBranch, resolveProjectIdentity, type ProjectIdentityResolution } from "./project.js";
@@ -2296,10 +2298,11 @@ server.registerTool(
           "'global' = only unscoped memories (main/global storage), " +
           "'all' = both, with project notes boosted (default)"
         ),
+      lifecycle: z.enum(["temporary", "permanent"]).optional().describe("Filter results by lifecycle. Useful for recovering working-state with `lifecycle: temporary` after `project_memory_summary` orientation."),
     }),
     outputSchema: RecallResultSchema,
   },
-  async ({ query, cwd, limit, minSimilarity, mode, verbose, tags, scope }) => {
+  async ({ query, cwd, limit, minSimilarity, mode, verbose, tags, scope, lifecycle }) => {
     const t0Recall = performance.now();
     await ensureBranchSynced(cwd);
 
@@ -2350,6 +2353,10 @@ server.registerTool(
         if (tags && tags.length > 0) {
           const noteTags = new Set(note.tags);
           if (!tags.every((t) => noteTags.has(t))) continue;
+        }
+
+        if (lifecycle && note.lifecycle !== lifecycle) {
+          continue;
         }
 
         const isProjectNote = note.project !== undefined;
@@ -3471,14 +3478,19 @@ server.registerTool(
       limit: z.number().int().min(1).max(20).optional().default(5),
       includePreview: z.boolean().optional().default(true),
       includeStorage: z.boolean().optional().default(true),
+      lifecycle: z.enum(["temporary", "permanent"]).optional().describe("Filter results by lifecycle. Useful for recovering working-state with `lifecycle: temporary` after `project_memory_summary` orientation."),
     }),
     outputSchema: RecentResultSchema,
   },
-  async ({ cwd, scope, storedIn, limit, includePreview, includeStorage }) => {
+  async ({ cwd, scope, storedIn, limit, includePreview, includeStorage, lifecycle }) => {
     await ensureBranchSynced(cwd);
 
     const { project, entries } = await collectVisibleNotes(cwd, scope, undefined, storedIn);
-    const recent = [...entries]
+    let filteredEntries = entries;
+    if (lifecycle) {
+      filteredEntries = entries.filter(({ note }) => note.lifecycle === lifecycle);
+    }
+    const recent = [...filteredEntries]
       .sort((a, b) => b.note.updatedAt.localeCompare(a.note.updatedAt))
       .slice(0, limit);
 
@@ -3632,6 +3644,7 @@ server.registerTool(
       "Returns:\n" +
       "- A synthesized project-level summary based on stored memories\n" +
       "- Bounded 1-hop relationship previews on orientation entry points (primaryEntry and suggestedNext)\n\n" +
+      "- Optional compact working-state recovery hints when relevant temporary notes exist\n\n" +
       "Read-only.\n\n" +
       "Typical next step:\n" +
       "- Use `recall` or `list` to drill down into specific areas.",
@@ -3798,6 +3811,49 @@ server.registerTool(
     
     sections.push(`\nRecent activity (start here):`);
     sections.push(...recent.map(e => `- ${e.note.updatedAt} — ${e.note.title}`));
+
+    const temporaryEntries = projectEntries
+      .filter((entry) => entry.note.lifecycle === "temporary")
+      .map((entry) => {
+        const metadata = effectiveMetadataById.get(entry.note.id)?.metadata;
+        const score = workingStateScore(entry.note, metadata);
+        const nextAction = extractNextAction(entry.note);
+        const relatedCount = entry.note.relatedTo?.length ?? 0;
+        const days = daysSinceUpdate(entry.note.updatedAt);
+        const rationaleParts = [`updated ${days < 1 ? "today" : `${Math.round(days)}d ago`}`];
+        if (relatedCount > 0) rationaleParts.push(`${relatedCount} linked note${relatedCount === 1 ? "" : "s"}`);
+        if (nextAction) rationaleParts.push("explicit next action");
+        if (metadata?.role === "plan" || metadata?.role === "context") rationaleParts.push(`${metadata.role} note`);
+
+        return {
+          entry,
+          score,
+          rationale: rationaleParts.join(", "),
+          preview: summarizePreview(entry.note.content, 120),
+          nextAction,
+        };
+      })
+      .filter((candidate) => candidate.score > -Infinity)
+      .sort((a, b) => b.score - a.score || b.entry.note.updatedAt.localeCompare(a.entry.note.updatedAt))
+      .slice(0, 3);
+
+    const workingState = temporaryEntries.length > 0
+      ? {
+          summary:
+            temporaryEntries.length === 1
+              ? `1 temporary note may help resume active work.`
+              : `${temporaryEntries.length} temporary notes may help resume active work.`,
+          recoveryHint: "Orient with project_memory_summary first, then inspect these temporary notes if you need to continue in-progress work.",
+          notes: temporaryEntries.map(({ entry, rationale, preview, nextAction }) => ({
+            id: entry.note.id,
+            title: entry.note.title,
+            updatedAt: entry.note.updatedAt,
+            rationale,
+            preview,
+            nextAction,
+          })),
+        }
+      : undefined;
 
     // Anchor notes with diversity constraint (project-scoped only)
     const scoredAnchorCandidates = projectEntries
@@ -3972,11 +4028,15 @@ server.registerTool(
     const suggestedEnriched = await Promise.all(suggestedCandidates.map(enrichOrientationNote));
     const suggestedRelationships = await Promise.all(suggestedCandidates.map(enrichOrientationNoteWithRelationships));
 
+    const recentPermanent = recent.find((entry) => entry.note.lifecycle === "permanent");
+    const fallbackEntry = recentPermanent ?? recent[0];
+    const permanentOverrideUsed = Boolean(recentPermanent && recent[0] && recentPermanent.note.id !== recent[0].note.id);
+
     // Enrich fallback primaryEntry when no anchors exist
     let fallbackEnriched: { provenance?: { lastUpdatedAt: string; lastCommitHash: string; lastCommitMessage: string; recentlyChanged: boolean }; confidence?: "high" | "medium" | "low" } = {};
     let fallbackRelationships: { relationships?: RelationshipPreview } = {};
-    if (!primaryAnchor && recent[0]) {
-      const fallbackNote = recent[0].note;
+    if (!primaryAnchor && fallbackEntry) {
+      const fallbackNote = fallbackEntry.note;
       const vault = noteVaultMap.get(fallbackNote.id);
       if (vault) {
         const filePath = `${vault.notesRelDir}/${fallbackNote.id}.md`;
@@ -4002,9 +4062,11 @@ server.registerTool(
             ...primaryRelationships,
           }
         : {
-            id: recent[0]?.note.id ?? projectEntries[0]?.note.id ?? "",
-            title: recent[0]?.note.title ?? projectEntries[0]?.note.title ?? "No notes",
-            rationale: recent[0]
+            id: fallbackEntry?.note.id ?? projectEntries[0]?.note.id ?? "",
+            title: fallbackEntry?.note.title ?? projectEntries[0]?.note.title ?? "No notes",
+            rationale: permanentOverrideUsed
+              ? "Most recent permanent note — no high-centrality anchors found"
+              : fallbackEntry
               ? "Most recent note — no high-centrality anchors found"
               : "Only note available",
             ...fallbackEnriched,
@@ -4055,6 +4117,19 @@ server.registerTool(
       }
     }
 
+    if (workingState) {
+      sections.push(`\nWorking state:`);
+      sections.push(workingState.summary);
+      sections.push(`Recovery hint: ${workingState.recoveryHint}`);
+      for (const note of workingState.notes) {
+        sections.push(`- ${note.title} (\`${note.id}\`) — ${note.rationale}`);
+        sections.push(`  Preview: ${note.preview}`);
+        if (note.nextAction) {
+          sections.push(`  Next action: ${note.nextAction}`);
+        }
+      }
+    }
+
     // Related global notes (optional, anchor-based similarity)
 
     const structuredContent: ProjectSummaryResult = {
@@ -4075,6 +4150,7 @@ server.registerTool(
       })),
       anchors,
       orientation,
+      workingState,
       relatedGlobal,
     };
 
@@ -5789,11 +5865,32 @@ server.registerPrompt(
             "- For repo-related tasks, pass `cwd` so mnemonic can route project memories correctly.\n\n" +
             "Workflow: `recall`/`list` -> `get` -> `update` or `remember` -> `relate`/`consolidate`/`move_memory`. Use `discover_tags` only when tag choice is ambiguous.\n\n" +
             "Roles are optional prioritization hints, not schema. Lifecycle still governs durability. `role: plan` does not imply `temporary`. Inferred roles are internal hints only. Prioritization is language-independent by default.\n\n" +
+            "### Working-state continuity\n\n" +
+            "Preserve in-progress work as temporary notes when continuation value is high. Recovery happens after project orientation.\n\n" +
+            "**Checkpoint note structure (temporary notes):**\n" +
+            "- Title pattern: 'WIP: <topic>' or 'Checkpoint: <description>'\n" +
+            "- Opening paragraph: current status and next immediate step\n" +
+            "- Body: what was attempted, what worked, blockers, alternatives considered\n" +
+            "- End with explicit next action and confidence level\n\n" +
+            "**Checkpoint note guidance:**\n" +
+            "- One checkpoint per active task or investigation thread\n" +
+            "- Update the same checkpoint note as work progresses (don't create new ones)\n" +
+            "- Link to related decisions: use `relate` to connect temporary checkpoints to permanent decisions\n" +
+            "- Consolidate into a durable note when complete; let lifecycle defaults delete temporary scaffolding unless you intentionally need preserved history\n\n" +
+            "**Recovery workflow:**\n" +
+            "- Call `project_memory_summary` first for orientation (do not skip to recovery)\n" +
+            "- Use `lifecycle: temporary` for active plans, WIP checkpoints, draft investigations, and unvalidated options\n" +
+            "- Use `lifecycle: permanent` for decisions, discovered constraints, bug causes, and reusable lessons\n" +
+            "- After orientation, recover working-state from temporary notes via `recall` with lifecycle filter\n" +
+            "- Consolidate temporary notes into durable ones once knowledge stabilizes\n" +
+            "- Recovery is a follow-on step, not a replacement for orientation\n\n" +
             "### Anti-patterns\n\n" +
             "- Bad: call `remember` immediately because the user said 'remember'.\n" +
             "- Good: `recall` or `list` first, then `get`, then `update` or `remember`.\n" +
             "- Bad: create another note when `recall` or `list` already found the same decision.\n" +
-            "- Good: `update` the existing memory and relate it if needed.\n\n" +
+            "- Good: `update` the existing memory and relate it if needed.\n" +
+            "- Bad: skip orientation and jump straight to working-state recovery.\n" +
+            "- Good: `project_memory_summary` first, then recover temporary notes.\n\n" +
             "### Storage model\n\n" +
             "Memories can live in:\n" +
             "- `main-vault` for global knowledge\n" +
@@ -5806,7 +5903,8 @@ server.registerPrompt(
             "### Tiny examples\n\n" +
             "- Existing bug note found by `recall` -> inspect with `get` -> refine with `update`.\n" +
             "- No matching note found by `recall` -> optional `discover_tags` with note context -> create with `remember`.\n" +
-            "- Two notes overlap heavily -> inspect -> clean up with `consolidate`.",
+            "- Two notes overlap heavily -> inspect -> clean up with `consolidate`.\n" +
+            "- Resume work: `project_memory_summary` -> `recall` (lifecycle: temporary) -> continue from temporary notes.",
         },
       },
     ],

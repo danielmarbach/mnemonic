@@ -7,7 +7,9 @@ import {
   classifyThemeWithGraduation,
   computeConnectionDiversity,
   computeThemesWithGraduation,
+  extractNextAction,
   withinThemeScore,
+  workingStateScore,
 } from "../src/project-introspection.js";
 import type { Note } from "../src/storage.js";
 
@@ -284,6 +286,87 @@ describe("project summary scoring helpers", () => {
       });
 
       expect(explicitScore).toBeGreaterThan(suggestedScore);
+    });
+  });
+
+  describe("workingStateScore", () => {
+    it("rejects permanent notes from working-state ranking", () => {
+      const permanent = makeNote({
+        id: "permanent-note",
+        lifecycle: "permanent",
+      });
+
+      expect(workingStateScore(permanent)).toBe(-Infinity);
+    });
+
+    it("prefers recent structured temporary notes", () => {
+      const recentWithNextStep = makeNote({
+        id: "recent-next",
+        lifecycle: "temporary",
+        updatedAt: new Date().toISOString(),
+        content: "## Status\n\nCurrent progress.\n\n- run the integration check",
+      });
+      const staleWithoutSignal = makeNote({
+        id: "stale-note",
+        lifecycle: "temporary",
+        updatedAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(),
+        content: "Old scratch note.",
+      });
+
+      expect(workingStateScore(recentWithNextStep)).toBeGreaterThan(workingStateScore(staleWithoutSignal));
+    });
+
+    it("keeps identical structure language-independent", () => {
+      const sharedUpdatedAt = "2026-03-20T10:00:00.000Z";
+      const english = makeNote({
+        id: "english-structure",
+        lifecycle: "temporary",
+        updatedAt: sharedUpdatedAt,
+        content: "## Status\n\nBlocked on one issue.\n\n- verify integration path\n- capture checkpoint",
+      });
+      const german = makeNote({
+        id: "german-structure",
+        lifecycle: "temporary",
+        updatedAt: sharedUpdatedAt,
+        content: "## Status\n\nBlockiert durch ein Problem.\n\n- Integrationspfad pruefen\n- Checkpoint erfassen",
+      });
+
+      expect(workingStateScore(english, noMetadata)).toBe(workingStateScore(german, noMetadata));
+    });
+
+    it("gives plan metadata a boost for temporary checkpoints", () => {
+      const note = makeNote({
+        id: "temporary-plan",
+        lifecycle: "temporary",
+        updatedAt: "2026-03-20T10:00:00.000Z",
+      });
+
+      expect(workingStateScore(note, {
+        role: "plan",
+        roleSource: "explicit",
+        importanceSource: "none",
+        alwaysLoadSource: "none",
+      })).toBeGreaterThan(workingStateScore(note, noMetadata));
+    });
+  });
+
+  describe("extractNextAction", () => {
+    it("extracts explicit next action labels", () => {
+      expect(extractNextAction({
+        content: "Status update.\n\nNext action: verify the summary output.",
+      })).toBe("verify the summary output.");
+    });
+
+    it("falls back to imperative action lines", () => {
+      expect(extractNextAction({
+        content: "Tried one approach.\n\nContinue with the project summary integration test.",
+      })).toBe("Continue with the project summary integration test.");
+    });
+
+    it("can recover next actions from list structure without labels", () => {
+      expect(extractNextAction({
+        content: "## Status\n\nDone so far.\n\n- verify summary output\n- update the checkpoint",
+      })).toBe("update the checkpoint");
     });
   });
 

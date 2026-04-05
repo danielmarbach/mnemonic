@@ -17,8 +17,9 @@ When working on mnemonic itself:
 
 Before doing any substantive work:
 1. Resolve the active project context first; if you are in a repo, treat its absolute working directory as required input for project-scoped memory operations.
-2. Call `project_memory_summary` (or `recent_memories`) with `cwd` to orient on what's already known.
+2. Call `project_memory_summary` with `cwd` to orient on what's already known.
 3. Call `recall` with `cwd` and a broad query to surface relevant prior context.
+4. After orientation, recover working-state: call `recall` or `recent_memories` with `lifecycle: temporary` to restore in-progress work.
 
 ### Before capturing
 
@@ -29,7 +30,8 @@ Before calling `remember`:
    - Use `mode: "browse"` only when you intentionally need broader inventory output.
    - Create new tags when genuinely novel, but prefer canonical forms when they exist.
 2. `recall` first — if a related note exists, call `update` instead to avoid fragmentation.
-2. If you've made several closely-related captures in this session, consider `consolidate` before wrapping up.
+3. Consider lifecycle: use `lifecycle: temporary` for plans and WIP; use `permanent` for decisions and durable knowledge.
+4. If you've made several closely-related captures in this session, consider `consolidate` before wrapping up.
 3. Write the note summary-first: put the main fact, decision, or outcome in the opening sentences, then follow with supporting detail.
 4. Pass `cwd` for anything about the current repo, even if you intend to store it in the main vault with `scope: "global"`.
 5. Omit `cwd` only for truly cross-project or personal memories; missing `cwd` makes the note global and unassociated.
@@ -259,7 +261,7 @@ Keep these high-level anchors in mind:
 
 | Prompt | Description |
 |--------|-------------|
-| `mnemonic-workflow-hint` | Optional. Returns a compact decision protocol: use `recall` or `list` first, inspect with `get`, update existing memories, remember only when nothing matches, then organize with `relate`, `consolidate`, or `move_memory`. Also reminds models that roles are optional hints, inferred roles stay internal-only, prioritization is language-independent by default, and lifecycle remains separate. |
+| `mnemonic-workflow-hint` | Optional. Returns a compact decision protocol: use `recall` or `list` first, inspect with `get`, update existing memories, remember only when nothing matches, then organize with `relate`, `consolidate`, or `move_memory`. It also reinforces summary-first orientation via `project_memory_summary`, recovery of temporary working state only after orientation, and that roles are optional hints while lifecycle remains separate. |
 
 ## Tools
 

@@ -845,6 +845,118 @@ describe("project-memory-summary", () => {
     }
   }, 20000);
 
+  it("includes a bounded working-state section for temporary notes after orientation", async () => {
+    const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-vault-"));
+    const repoDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-project-"));
+    tempDirs.push(vaultDir, repoDir);
+
+    await initTestRepo(repoDir);
+
+    const embeddingServer = await startFakeEmbeddingServer();
+
+    try {
+      await callLocalMcp(vaultDir, "remember", {
+        title: "Project overview anchor",
+        content: "Permanent overview for orientation.",
+        tags: ["overview", "integration"],
+        summary: "Create overview anchor",
+        cwd: repoDir,
+        scope: "project",
+        lifecycle: "permanent",
+      }, embeddingServer.url);
+
+      const topWip = extractRememberedId(await callLocalMcp(vaultDir, "remember", {
+        title: "Checkpoint: summary integration",
+        content: "## Status\n\nProject summary integration is partially done.\n\n- verify working-state section\n- add schema assertions",
+        tags: ["integration", "workflow"],
+        summary: "Create top working-state note",
+        cwd: repoDir,
+        scope: "project",
+        lifecycle: "temporary",
+      }, embeddingServer.url));
+
+      await callLocalMcp(vaultDir, "remember", {
+        title: "Checkpoint: docs follow-up",
+        content: "## Status\n\nDocs alignment remains.\n\n- update README",
+        tags: ["integration", "workflow"],
+        summary: "Create second working-state note",
+        cwd: repoDir,
+        scope: "project",
+        lifecycle: "temporary",
+      }, embeddingServer.url);
+
+      await callLocalMcp(vaultDir, "remember", {
+        title: "Temporary scratch",
+        content: "scratch",
+        tags: ["integration"],
+        summary: "Create low-value temporary note",
+        cwd: repoDir,
+        scope: "project",
+        lifecycle: "temporary",
+      }, embeddingServer.url);
+
+      const summary = await callLocalMcpResponse(vaultDir, "project_memory_summary", {
+        cwd: repoDir,
+      }, embeddingServer.url);
+
+      expect(() => ProjectSummaryResultSchema.parse(summary.structuredContent)).not.toThrow();
+      const parsed = ProjectSummaryResultSchema.parse(summary.structuredContent);
+
+      expect(parsed.orientation.primaryEntry.title).toBe("Project overview anchor");
+      expect(parsed.workingState).toBeDefined();
+      expect(parsed.workingState?.notes.length).toBeGreaterThan(0);
+      expect(parsed.workingState?.notes[0]?.id).toBe(topWip);
+      expect(parsed.workingState?.notes[0]?.nextAction).toBe("add schema assertions");
+      expect(parsed.workingState?.recoveryHint).toContain("Orient with project_memory_summary first");
+      expect(summary.text).toContain("Working state:");
+      expect(summary.text).toContain("Recovery hint:");
+    } finally {
+      await embeddingServer.close();
+    }
+  }, 20000);
+
+  it("falls back to the most recent permanent note for orientation before temporary working-state notes", async () => {
+    const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-vault-"));
+    const repoDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-project-"));
+    tempDirs.push(vaultDir, repoDir);
+
+    await initTestRepo(repoDir);
+
+    const embeddingServer = await startFakeEmbeddingServer();
+
+    try {
+      await callLocalMcp(vaultDir, "remember", {
+        title: "Permanent orientation note",
+        content: "Permanent overview that should anchor orientation when no graph anchors exist.",
+        tags: ["overview", "integration"],
+        summary: "Create permanent orientation fallback note",
+        cwd: repoDir,
+        scope: "project",
+        lifecycle: "permanent",
+      }, embeddingServer.url);
+
+      await callLocalMcp(vaultDir, "remember", {
+        title: "Temporary checkpoint note",
+        content: "## Status\n\nPartial work remains.\n\n- verify fallback ordering",
+        tags: ["workflow", "integration"],
+        summary: "Create temporary checkpoint note",
+        cwd: repoDir,
+        scope: "project",
+        lifecycle: "temporary",
+      }, embeddingServer.url);
+
+      const summary = await callLocalMcpResponse(vaultDir, "project_memory_summary", {
+        cwd: repoDir,
+      }, embeddingServer.url);
+
+      const parsed = ProjectSummaryResultSchema.parse(summary.structuredContent);
+      expect(parsed.orientation.primaryEntry.title).toBe("Permanent orientation note");
+      expect(parsed.workingState?.notes[0]?.title).toBe("Temporary checkpoint note");
+    } finally {
+      await embeddingServer.close();
+    }
+  }, 20000);
+
   it("emits taxonomy dilution warnings only when other exceeds thirty percent", async () => {
     const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-vault-"));
     const repoDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-project-"));

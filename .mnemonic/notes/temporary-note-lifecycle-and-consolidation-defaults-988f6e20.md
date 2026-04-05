@@ -8,9 +8,14 @@ tags:
   - plans
 lifecycle: permanent
 createdAt: '2026-03-09T09:07:22.778Z'
-updatedAt: '2026-03-09T10:09:30.616Z'
+updatedAt: '2026-04-05T09:27:10.252Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: phase-2-design-workflow-hint-first-working-state-continuity-07153fcb
+    type: related-to
+  - id: phase-2-implementation-plan-workflow-hint-first-working-stat-d321a64a
+    type: related-to
 memoryVersion: 1
 ---
 Decision: temporary notes should be a first-class lifecycle concept, not a tag or folder convention. Use `lifecycle: temporary` for planning and WIP scaffolding that mainly helps during active execution, and use `lifecycle: permanent` for durable knowledge future sessions should keep.

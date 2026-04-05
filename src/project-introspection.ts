@@ -204,6 +204,88 @@ export function anchorScore(
   return 0.4 * centrality + 0.4 * connectionDiversity + 0.2 * recency + metadataRoleBonus + metadataImportanceBonus + alwaysLoadBonus;
 }
 
+function workingStateMetadataBonus(metadata?: ScoringMetadata): number {
+  if (!metadata) return 0;
+
+  return roleBonus(
+    metadata.role,
+    metadata.roleSource,
+    { plan: 0.18, context: 0.12, summary: 0.08, decision: 0.04, reference: 0.02 },
+    { plan: 0.06, context: 0.04, summary: 0.025, decision: 0.015, reference: 0.01 },
+  ) + importanceBonus(
+    metadata.importance,
+    metadata.importanceSource,
+    { high: 0.16, normal: 0.08 },
+    { high: 0.05, normal: 0.025 },
+  );
+}
+
+function workingStateStructureBonus(note: Note): number {
+  const lines = note.content
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  const headingCount = lines.filter((line) => /^#{1,3}\s+/.test(line)).length;
+  const bulletCount = lines.filter((line) => /^[-*]\s+/.test(line)).length;
+  const numberedCount = lines.filter((line) => /^\d+\.\s+/.test(line)).length;
+  const taskCount = lines.filter((line) => /^[-*]\s+\[[ xX]\]\s+/.test(line)).length;
+  const paragraphCount = note.content
+    .split(/\n\s*\n/)
+    .map((block) => block.trim())
+    .filter(Boolean).length;
+
+  return Math.min(
+    0.22,
+    headingCount * 0.05 +
+      bulletCount * 0.02 +
+      numberedCount * 0.03 +
+      taskCount * 0.03 +
+      Math.min(0.04, Math.max(0, paragraphCount - 1) * 0.01),
+  );
+}
+
+export function workingStateScore(note: Note, metadata?: ScoringMetadata): number {
+  if (note.lifecycle !== "temporary") return -Infinity;
+
+  const days = daysSinceUpdate(note.updatedAt);
+  const recency = Math.min(1.2, 1.2 / (1 + days / 3));
+  const connectivity = Math.min(0.3, Math.log((note.relatedTo?.length ?? 0) + 1) * 0.12);
+  const structureBonus = workingStateStructureBonus(note);
+
+  return recency + connectivity + structureBonus + workingStateMetadataBonus(metadata);
+}
+
+export function extractNextAction(note: Pick<Note, "content">): string | undefined {
+  const lines = note.content
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  for (const line of lines) {
+    const normalized = line.replace(/^[-*]\s*/, "");
+    if (/^(next step|next action|todo|follow-up)\s*:/i.test(normalized)) {
+      return normalized.replace(/^(next step|next action|todo|follow-up)\s*:\s*/i, "").trim() || undefined;
+    }
+  }
+
+  for (let i = lines.length - 1; i >= 0; i -= 1) {
+    const line = lines[i]!;
+    if (/^\d+\.\s+/.test(line) || /^[-*]\s+\[[ xX]\]\s+/.test(line) || /^[-*]\s+/.test(line)) {
+      return line.replace(/^\d+\.\s+/, "").replace(/^[-*]\s+\[[ xX]\]\s+/, "").replace(/^[-*]\s+/, "").trim() || undefined;
+    }
+  }
+
+  for (const line of lines) {
+    const normalized = line.replace(/^[-*]\s*/, "");
+    if (/^(continue|implement|investigate|fix|update|verify|run|add|remove|check|resume)\b/i.test(normalized)) {
+      return normalized;
+    }
+  }
+
+  return undefined;
+}
+
 export function buildThemeCache(notes: Note[]): Map<string, string> {
   const cache = new Map<string, string>();
   for (const note of notes) {
