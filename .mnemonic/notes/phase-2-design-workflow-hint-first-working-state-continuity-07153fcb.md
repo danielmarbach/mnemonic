@@ -7,13 +7,15 @@ tags:
   - phases
 lifecycle: permanent
 createdAt: '2026-04-05T09:26:46.284Z'
-updatedAt: '2026-04-05T09:27:08.361Z'
+updatedAt: '2026-04-05T09:27:08.850Z'
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
   - id: phase-2-implementation-plan-workflow-hint-first-working-stat-d321a64a
     type: explains
+  - id: mcp-workflow-ux-hint-prompt-tool-descriptions-and-session-st-e89a18fc
+    type: related-to
 memoryVersion: 1
 ---
 Decision: Phase 2 should improve working-state continuity inside the existing mnemonic workflow rather than introducing a new ritual or a parallel memory system.
