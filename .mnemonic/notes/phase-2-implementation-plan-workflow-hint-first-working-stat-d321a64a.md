@@ -7,7 +7,7 @@ tags:
   - phases
 lifecycle: temporary
 createdAt: '2026-04-05T09:26:57.835Z'
-updatedAt: '2026-04-05T10:18:19.779Z'
+updatedAt: '2026-04-05T10:39:18.178Z'
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
@@ -23,25 +23,27 @@ memoryVersion: 1
 Implementation plan for Phase 2 working-state continuity.
 
 Status:
-Partially implemented. The current codebase adds lifecycle-based recovery filters and aligns the workflow guidance, but it does not yet complete every originally listed milestone.
+Mostly implemented. The codebase now supports lifecycle-based recovery filters, summary-first workflow guidance, and bounded working-state integration inside `project_memory_summary`. The remaining work is narrower and centered on further refinement and broader integration validation rather than foundational feature work.
 
 Objective:
 Implement working-state continuity aligned with the existing mnemonic workflow.
 
 ## Implemented so far
 
-1. Workflow hints and tool descriptions now document summary-first orientation followed by optional temporary-note recovery.
+1. Workflow hints and tool descriptions document summary-first orientation followed by optional temporary-note recovery.
 2. `recall` accepts an optional `lifecycle` filter.
 3. `recent_memories` accepts an optional `lifecycle` filter.
-4. AGENT, README, and mirrored docs now describe temporary-note recovery as a follow-on step after `project_memory_summary`.
-5. Review coverage now checks that the workflow hint keeps orientation first and does not force `consolidate` with `strategy: "supersedes"` for temporary checkpoints.
+4. AGENT, README, and mirrored docs describe temporary-note recovery as a follow-on step after `project_memory_summary`.
+5. `project_memory_summary` now includes a bounded `workingState` section when relevant temporary notes exist.
+6. Temporary working-state notes are ranked using language-agnostic signals: lifecycle, recency, connectivity, structural shape, and explicit metadata when present.
+7. Working-state output now includes a compact recovery hint plus bounded previews and optional extracted next actions.
+8. Unit coverage protects the language-independence constraint for working-state ranking, and integration coverage was added for the new summary section.
 
 ## Still pending
 
-1. A dedicated ranking or prioritization layer for temporary working-state notes beyond the explicit lifecycle filter.
-2. Compact synthesis of recovered working state.
-3. Direct integration of working-state recovery into `project_memory_summary` output rather than requiring a follow-on tool call.
-4. End-to-end tests that cover the broader remaining milestones beyond lifecycle filtering and prompt guidance.
+1. Broader end-to-end integration validation of the new `project_memory_summary` working-state section in an environment that can run the fake embedding server-backed integration tests.
+2. Possible refinement of temporary-note prioritization if dogfooding shows that continuation value is still not ranked well enough.
+3. Possible refinement of compact synthesis if real blind interruption/resumption runs show the current previews are insufficient.
 
 ## Design constraints honored by the implemented subset
 
@@ -49,8 +51,9 @@ Implement working-state continuity aligned with the existing mnemonic workflow.
 - Temporary notes remain the working-state substrate.
 - Recovery is a follow-on step after orientation, not a replacement for orientation.
 - No new persistence layer is introduced.
+- Working-state ranking remains language-independent at its core; wording cues are not the backbone of prioritization.
 - Guidance no longer conflicts with the lifecycle design for temporary-note consolidation.
 
 ## Next implementation focus
 
-If Phase 2 continues, the next work should add bounded ranking and compact synthesis for temporary notes without turning recovery into a parallel entrypoint or introducing a separate persistence model.
+If Phase 2 continues, the next work should come from dogfooding feedback rather than speculation: validate the new summary integration in a full integration-test environment, run blind interruption/resumption usefulness tests, and then tune ranking or synthesis only if those runs expose concrete weaknesses.
