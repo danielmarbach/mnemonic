@@ -2296,10 +2296,11 @@ server.registerTool(
           "'global' = only unscoped memories (main/global storage), " +
           "'all' = both, with project notes boosted (default)"
         ),
+      lifecycle: z.enum(["temporary", "permanent"]).optional().describe("Filter results by lifecycle. Useful for recovering working-state with `lifecycle: temporary` after `project_memory_summary` orientation."),
     }),
     outputSchema: RecallResultSchema,
   },
-  async ({ query, cwd, limit, minSimilarity, mode, verbose, tags, scope }) => {
+  async ({ query, cwd, limit, minSimilarity, mode, verbose, tags, scope, lifecycle }) => {
     const t0Recall = performance.now();
     await ensureBranchSynced(cwd);
 
@@ -2350,6 +2351,10 @@ server.registerTool(
         if (tags && tags.length > 0) {
           const noteTags = new Set(note.tags);
           if (!tags.every((t) => noteTags.has(t))) continue;
+        }
+
+        if (lifecycle && note.lifecycle !== lifecycle) {
+          continue;
         }
 
         const isProjectNote = note.project !== undefined;
@@ -3471,14 +3476,19 @@ server.registerTool(
       limit: z.number().int().min(1).max(20).optional().default(5),
       includePreview: z.boolean().optional().default(true),
       includeStorage: z.boolean().optional().default(true),
+      lifecycle: z.enum(["temporary", "permanent"]).optional().describe("Filter results by lifecycle. Useful for recovering working-state with `lifecycle: temporary` after `project_memory_summary` orientation."),
     }),
     outputSchema: RecentResultSchema,
   },
-  async ({ cwd, scope, storedIn, limit, includePreview, includeStorage }) => {
+  async ({ cwd, scope, storedIn, limit, includePreview, includeStorage, lifecycle }) => {
     await ensureBranchSynced(cwd);
 
     const { project, entries } = await collectVisibleNotes(cwd, scope, undefined, storedIn);
-    const recent = [...entries]
+    let filteredEntries = entries;
+    if (lifecycle) {
+      filteredEntries = entries.filter(({ note }) => note.lifecycle === lifecycle);
+    }
+    const recent = [...filteredEntries]
       .sort((a, b) => b.note.updatedAt.localeCompare(a.note.updatedAt))
       .slice(0, limit);
 
@@ -5789,11 +5799,32 @@ server.registerPrompt(
             "- For repo-related tasks, pass `cwd` so mnemonic can route project memories correctly.\n\n" +
             "Workflow: `recall`/`list` -> `get` -> `update` or `remember` -> `relate`/`consolidate`/`move_memory`. Use `discover_tags` only when tag choice is ambiguous.\n\n" +
             "Roles are optional prioritization hints, not schema. Lifecycle still governs durability. `role: plan` does not imply `temporary`. Inferred roles are internal hints only. Prioritization is language-independent by default.\n\n" +
+            "### Working-state continuity\n\n" +
+            "Preserve in-progress work as temporary notes when continuation value is high. Recovery happens after project orientation.\n\n" +
+            "**Checkpoint note structure (temporary notes):**\n" +
+            "- Title pattern: 'WIP: <topic>' or 'Checkpoint: <description>'\n" +
+            "- Opening paragraph: current status and next immediate step\n" +
+            "- Body: what was attempted, what worked, blockers, alternatives considered\n" +
+            "- End with explicit next action and confidence level\n\n" +
+            "**Checkpoint note guidance:**\n" +
+            "- One checkpoint per active task or investigation thread\n" +
+            "- Update the same checkpoint note as work progresses (don't create new ones)\n" +
+            "- Link to related decisions: use `relate` to connect temporary checkpoints to permanent decisions\n" +
+            "- Consolidate into a durable note when complete; let lifecycle defaults delete temporary scaffolding unless you intentionally need preserved history\n\n" +
+            "**Recovery workflow:**\n" +
+            "- Call `project_memory_summary` first for orientation (do not skip to recovery)\n" +
+            "- Use `lifecycle: temporary` for active plans, WIP checkpoints, draft investigations, and unvalidated options\n" +
+            "- Use `lifecycle: permanent` for decisions, discovered constraints, bug causes, and reusable lessons\n" +
+            "- After orientation, recover working-state from temporary notes via `recall` with lifecycle filter\n" +
+            "- Consolidate temporary notes into durable ones once knowledge stabilizes\n" +
+            "- Recovery is a follow-on step, not a replacement for orientation\n\n" +
             "### Anti-patterns\n\n" +
             "- Bad: call `remember` immediately because the user said 'remember'.\n" +
             "- Good: `recall` or `list` first, then `get`, then `update` or `remember`.\n" +
             "- Bad: create another note when `recall` or `list` already found the same decision.\n" +
-            "- Good: `update` the existing memory and relate it if needed.\n\n" +
+            "- Good: `update` the existing memory and relate it if needed.\n" +
+            "- Bad: skip orientation and jump straight to working-state recovery.\n" +
+            "- Good: `project_memory_summary` first, then recover temporary notes.\n\n" +
             "### Storage model\n\n" +
             "Memories can live in:\n" +
             "- `main-vault` for global knowledge\n" +
@@ -5806,7 +5837,8 @@ server.registerPrompt(
             "### Tiny examples\n\n" +
             "- Existing bug note found by `recall` -> inspect with `get` -> refine with `update`.\n" +
             "- No matching note found by `recall` -> optional `discover_tags` with note context -> create with `remember`.\n" +
-            "- Two notes overlap heavily -> inspect -> clean up with `consolidate`.",
+            "- Two notes overlap heavily -> inspect -> clean up with `consolidate`.\n" +
+            "- Resume work: `project_memory_summary` -> `recall` (lifecycle: temporary) -> continue from temporary notes.",
         },
       },
     ],

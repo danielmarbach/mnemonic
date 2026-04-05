@@ -442,7 +442,7 @@ Imported notes are written to the main vault with `lifecycle: permanent` and `sc
 
 | Prompt | Description |
 |--------|-------------|
-| `mnemonic-workflow-hint` | Optional. Returns a compact decision protocol: use `recall` or `list` first, inspect with `get`, update existing memories, remember only when nothing matches, then organize with `relate`, `consolidate`, or `move_memory`. Also reminds models that roles are optional prioritization hints, inferred roles are internal-only, prioritization is language-independent by default, and lifecycle stays separate. |
+| `mnemonic-workflow-hint` | Optional. Returns a compact decision protocol: use `recall` or `list` first, inspect with `get`, update existing memories, remember only when nothing matches, then organize with `relate`, `consolidate`, or `move_memory`. It also reinforces summary-first orientation via `project_memory_summary`, temporary-note recovery only after orientation, and that roles are optional prioritization hints while lifecycle stays separate. |
 
 ## Tools
 

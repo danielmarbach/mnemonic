@@ -32,6 +32,9 @@ describe("tool-descriptions", () => {
     expect(promptText).toContain("`role: plan` does not imply `temporary`.");
     expect(promptText).toContain("Inferred roles are internal hints only.");
     expect(promptText).toContain("Prioritization is language-independent by default.");
+    expect(promptText).toContain("Call `project_memory_summary` first for orientation");
+    expect(promptText).toContain("Recovery is a follow-on step, not a replacement for orientation");
+    expect(promptText).not.toContain("strategy `supersedes`");
   }, 15000);
 
   it("surfaces prerequisite-first workflow wording in phase-aware tool descriptions", async () => {
