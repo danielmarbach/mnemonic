@@ -64,6 +64,8 @@ import {
   withinThemeScore,
   anchorScore,
   computeConnectionDiversity,
+  workingStateScore,
+  extractNextAction,
 } from "./project-introspection.js";
 import { getEffectiveMetadata } from "./role-suggestions.js";
 import { detectProject, getCurrentGitBranch, resolveProjectIdentity, type ProjectIdentityResolution } from "./project.js";
@@ -3642,6 +3644,7 @@ server.registerTool(
       "Returns:\n" +
       "- A synthesized project-level summary based on stored memories\n" +
       "- Bounded 1-hop relationship previews on orientation entry points (primaryEntry and suggestedNext)\n\n" +
+      "- Optional compact working-state recovery hints when relevant temporary notes exist\n\n" +
       "Read-only.\n\n" +
       "Typical next step:\n" +
       "- Use `recall` or `list` to drill down into specific areas.",
@@ -3808,6 +3811,49 @@ server.registerTool(
     
     sections.push(`\nRecent activity (start here):`);
     sections.push(...recent.map(e => `- ${e.note.updatedAt} — ${e.note.title}`));
+
+    const temporaryEntries = projectEntries
+      .filter((entry) => entry.note.lifecycle === "temporary")
+      .map((entry) => {
+        const metadata = effectiveMetadataById.get(entry.note.id)?.metadata;
+        const score = workingStateScore(entry.note, metadata);
+        const nextAction = extractNextAction(entry.note);
+        const relatedCount = entry.note.relatedTo?.length ?? 0;
+        const days = daysSinceUpdate(entry.note.updatedAt);
+        const rationaleParts = [`updated ${days < 1 ? "today" : `${Math.round(days)}d ago`}`];
+        if (relatedCount > 0) rationaleParts.push(`${relatedCount} linked note${relatedCount === 1 ? "" : "s"}`);
+        if (nextAction) rationaleParts.push("explicit next action");
+        if (metadata?.role === "plan" || metadata?.role === "context") rationaleParts.push(`${metadata.role} note`);
+
+        return {
+          entry,
+          score,
+          rationale: rationaleParts.join(", "),
+          preview: summarizePreview(entry.note.content, 120),
+          nextAction,
+        };
+      })
+      .filter((candidate) => candidate.score > -Infinity)
+      .sort((a, b) => b.score - a.score || b.entry.note.updatedAt.localeCompare(a.entry.note.updatedAt))
+      .slice(0, 3);
+
+    const workingState = temporaryEntries.length > 0
+      ? {
+          summary:
+            temporaryEntries.length === 1
+              ? `1 temporary note may help resume active work.`
+              : `${temporaryEntries.length} temporary notes may help resume active work.`,
+          recoveryHint: "Orient with project_memory_summary first, then inspect these temporary notes if you need to continue in-progress work.",
+          notes: temporaryEntries.map(({ entry, rationale, preview, nextAction }) => ({
+            id: entry.note.id,
+            title: entry.note.title,
+            updatedAt: entry.note.updatedAt,
+            rationale,
+            preview,
+            nextAction,
+          })),
+        }
+      : undefined;
 
     // Anchor notes with diversity constraint (project-scoped only)
     const scoredAnchorCandidates = projectEntries
@@ -4065,6 +4111,19 @@ server.registerTool(
       }
     }
 
+    if (workingState) {
+      sections.push(`\nWorking state:`);
+      sections.push(workingState.summary);
+      sections.push(`Recovery hint: ${workingState.recoveryHint}`);
+      for (const note of workingState.notes) {
+        sections.push(`- ${note.title} (\`${note.id}\`) — ${note.rationale}`);
+        sections.push(`  Preview: ${note.preview}`);
+        if (note.nextAction) {
+          sections.push(`  Next action: ${note.nextAction}`);
+        }
+      }
+    }
+
     // Related global notes (optional, anchor-based similarity)
 
     const structuredContent: ProjectSummaryResult = {
@@ -4085,6 +4144,7 @@ server.registerTool(
       })),
       anchors,
       orientation,
+      workingState,
       relatedGlobal,
     };
 
