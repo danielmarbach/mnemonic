@@ -96,8 +96,11 @@ export function invalidateActiveProjectCache(): void {
  */
 export function getActiveProjectCache(projectId: string): SessionProjectCache | undefined {
   const cache = sessionCaches.activeProject;
-  if (cache?.projectId === projectId) return cache;
-  return undefined;
+  if (!cache || cache.projectId !== projectId) return undefined;
+  if (cache.vaultCaches.size === 0 && cache.projectionsById.size === 0) {
+    return undefined;
+  }
+  return cache;
 }
 
 /**
