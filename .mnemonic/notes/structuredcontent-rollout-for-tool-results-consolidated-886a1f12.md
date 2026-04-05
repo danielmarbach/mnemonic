@@ -8,12 +8,14 @@ tags:
   - structured-data
 lifecycle: permanent
 createdAt: '2026-03-14T23:34:02.743Z'
-updatedAt: '2026-04-05T10:57:18.662Z'
+updatedAt: '2026-04-05T12:36:49.594Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
   - id: checkpoint-structured-content-follow-up-after-orientation-fa-9d8bdebf
     type: explains
+  - id: structuredcontent-rollout-for-tool-results-consolidated-454809cf
+    type: supersedes
 memoryVersion: 1
 ---
 Consolidate the initial structuredContent initiative, the intermediate status summary, and the get-tool milestone into one final authoritative rollout memory.

@@ -7,13 +7,15 @@ tags:
   - schema
 lifecycle: temporary
 createdAt: '2026-04-05T10:56:31.566Z'
-updatedAt: '2026-04-05T10:57:18.662Z'
+updatedAt: '2026-04-05T12:36:49.594Z'
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
   - id: structuredcontent-rollout-for-tool-results-consolidated-886a1f12
     type: explains
+  - id: structuredcontent-rollout-for-tool-results-consolidated-454809cf
+    type: supersedes
 memoryVersion: 1
 ---
 Structured-content follow-up can be implemented later in a separate change; it is not required to complete the Phase 2 orientation fallback work on `checkpoint`.
