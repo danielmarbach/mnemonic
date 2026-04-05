@@ -75,6 +75,7 @@ import { Migrator } from "./migration.js";
 import { parseMemorySections } from "./import.js";
 import { defaultClaudeHome, defaultVaultPath, resolveUserPath } from "./paths.js";
 import type {
+  ProjectRef,
   StructuredResponse,
   RememberResult,
   RecallResult,
@@ -468,6 +469,21 @@ async function resolveProject(cwd?: string) {
   return detectProject(cwd, {
     getProjectIdentityOverride: async (projectId) => configStore.getProjectIdentityOverride(projectId),
   });
+}
+
+function toProjectRef(project?: { id: string; name: string } | null): ProjectRef | undefined {
+  return project ? { id: project.id, name: project.name } : undefined;
+}
+
+function noteProjectRef(note: { project?: string; projectName?: string }): ProjectRef | undefined {
+  if (!note.project || !note.projectName) {
+    return undefined;
+  }
+
+  return {
+    id: note.project,
+    name: note.projectName,
+  };
 }
 
 async function resolveProjectIdentityForCwd(cwd?: string): Promise<ProjectIdentityResolution | undefined> {
@@ -2437,8 +2453,7 @@ server.registerTool(
       title: string;
       score: number;
       boosted: number;
-      project?: string;
-      projectName?: string;
+      project?: ProjectRef;
       vault: string;
       tags: string[];
       lifecycle: NoteLifecycle;
@@ -2533,8 +2548,7 @@ server.registerTool(
           title: note.title,
           score,
           boosted,
-          project: note.project,
-          projectName: note.projectName,
+          project: noteProjectRef(note),
           vault: storageLabel(vault),
           tags: note.tags,
           lifecycle: note.lifecycle,
@@ -2725,8 +2739,7 @@ server.registerTool(
       title: updated.title,
       fieldsModified: changes,
       timestamp: now,
-      project: updated.project,
-      projectName: updated.projectName,
+      project: noteProjectRef(updated),
       lifecycle: updated.lifecycle,
       persistence,
     };
@@ -2846,8 +2859,7 @@ server.registerTool(
       action: "forgotten",
       id,
       title: note.title,
-      project: note.project,
-      projectName: note.projectName,
+      project: noteProjectRef(note),
       relationshipsCleaned: vaultChanges.size > 0 ? Array.from(vaultChanges.values()).reduce((sum, files) => sum + files.length - 1, 0) : 0,
       vaultsModified: Array.from(vaultChanges.keys()).map(v => storageLabel(v)),
       retry,
@@ -2940,10 +2952,10 @@ server.registerTool(
         id: note.id,
         title: note.title,
         content: note.content,
-        project: note.project,
-        projectName: note.projectName,
+        project: noteProjectRef(note),
         tags: note.tags,
         lifecycle: note.lifecycle,
+        alwaysLoad: note.alwaysLoad,
         relatedTo: note.relatedTo,
         createdAt: note.createdAt,
         updatedAt: note.updatedAt,
@@ -2955,7 +2967,7 @@ server.registerTool(
     const lines: string[] = [];
     for (const note of found) {
       lines.push(`## ${note.title} (${note.id})`);
-      lines.push(`project: ${note.projectName ?? note.project ?? "global"} | stored: ${note.vault} | lifecycle: ${note.lifecycle}`);
+      lines.push(`project: ${note.project?.name ?? "global"} | stored: ${note.vault} | lifecycle: ${note.lifecycle}`);
       if (note.tags.length > 0) lines.push(`tags: ${note.tags.join(", ")}`);
       lines.push("");
       lines.push(note.content);
@@ -3030,8 +3042,7 @@ server.registerTool(
       action: "located",
       id: note.id,
       title: note.title,
-      project: note.project,
-      projectName: note.projectName,
+      project: noteProjectRef(note),
       vault: vaultLabel,
       updatedAt: note.updatedAt,
       relatedCount,
@@ -3126,8 +3137,7 @@ server.registerTool(
     const structuredNotes: Array<{
       id: string;
       title: string;
-      project?: string;
-      projectName?: string;
+      project?: ProjectRef;
       tags: string[];
       lifecycle: NoteLifecycle;
       vault: string;
@@ -3136,8 +3146,7 @@ server.registerTool(
     }> = entries.map(({ note, vault }) => ({
       id: note.id,
       title: note.title,
-      project: note.project,
-      projectName: note.projectName,
+      project: noteProjectRef(note),
       tags: note.tags,
       lifecycle: note.lifecycle,
       vault: storageLabel(vault),
@@ -3495,7 +3504,7 @@ server.registerTool(
       .slice(0, limit);
 
     if (recent.length === 0) {
-      const structuredContent: RecentResult = { action: "recent_shown", project: project?.id, projectName: project?.name, count: 0, limit: limit || 5, notes: [] };
+      const structuredContent: RecentResult = { action: "recent_shown", project: toProjectRef(project), count: 0, limit: limit || 5, notes: [] };
       return { content: [{ type: "text", text: "No memories found." }], structuredContent };
     }
 
@@ -3513,8 +3522,7 @@ server.registerTool(
       const structuredNotes = recent.map(({ note, vault }) => ({
         id: note.id,
         title: note.title,
-        project: note.project,
-        projectName: note.projectName,
+        project: noteProjectRef(note),
         tags: note.tags,
         lifecycle: note.lifecycle,
         vault: storageLabel(vault),
@@ -3524,8 +3532,7 @@ server.registerTool(
     
     const structuredContent: RecentResult = {
       action: "recent_shown",
-      project: project?.id,
-      projectName: project?.name,
+      project: toProjectRef(project),
       count: recent.length,
       limit: limit || 5,
       notes: structuredNotes,
@@ -3572,7 +3579,7 @@ server.registerTool(
 
     const { project, entries } = await collectVisibleNotes(cwd, scope, undefined, storedIn);
     if (entries.length === 0) {
-      const structuredContent: MemoryGraphResult = { action: "graph_shown", project: project?.id, projectName: project?.name, nodes: [], limit, truncated: false };
+      const structuredContent: MemoryGraphResult = { action: "graph_shown", project: toProjectRef(project), nodes: [], limit, truncated: false };
       return { content: [{ type: "text", text: "No memories found." }], structuredContent };
     }
 
@@ -3589,7 +3596,7 @@ server.registerTool(
       .filter(Boolean);
 
     if (lines.length === 0) {
-      const structuredContent: MemoryGraphResult = { action: "graph_shown", project: project?.id, projectName: project?.name, nodes: [], limit, truncated: false };
+      const structuredContent: MemoryGraphResult = { action: "graph_shown", project: toProjectRef(project), nodes: [], limit, truncated: false };
       return { content: [{ type: "text", text: "No relationships found for that scope." }], structuredContent };
     }
 
@@ -3617,8 +3624,7 @@ server.registerTool(
     
     const structuredContent: MemoryGraphResult = {
       action: "graph_shown",
-      project: project?.id,
-      projectName: project?.name,
+      project: toProjectRef(project),
       nodes: structuredNodes,
       limit,
       truncated: structuredNodes.length < entries.filter(e => (e.note.relatedTo?.length ?? 0) > 0).length,
@@ -5010,8 +5016,7 @@ async function detectDuplicates(
   const structuredContent: ConsolidateResult = {
     action: "consolidated",
     strategy: "detect-duplicates",
-    project: project?.id,
-    projectName: project?.name,
+    project: toProjectRef(project),
     notesProcessed: entries.length,
     notesModified: 0,
   };
@@ -5113,8 +5118,7 @@ function findClusters(
   const structuredContent: ConsolidateResult = {
     action: "consolidated",
     strategy: "find-clusters",
-    project: project?.id,
-    projectName: project?.name,
+    project: toProjectRef(project),
     notesProcessed: entries.length,
     notesModified: 0,
     themeGroups,
@@ -5224,8 +5228,7 @@ async function suggestMerges(
   const structuredContent: ConsolidateResult = {
     action: "consolidated",
     strategy: "suggest-merges",
-    project: project?.id,
-    projectName: project?.name,
+    project: toProjectRef(project),
     notesProcessed: entries.length,
     notesModified: 0,
   };
@@ -5264,8 +5267,7 @@ async function executeMerge(
     const structuredContent: ConsolidateResult = {
       action: "consolidated",
       strategy: "execute-merge",
-      project: project?.id,
-      projectName: project?.name,
+      project: toProjectRef(project),
       notesProcessed: entries.length,
       notesModified: 0,
       warnings: ["execute-merge requires at least two distinct sourceIds."],
@@ -5277,8 +5279,7 @@ async function executeMerge(
     const structuredContent: ConsolidateResult = {
       action: "consolidated",
       strategy: "execute-merge",
-      project: project?.id,
-      projectName: project?.name,
+      project: toProjectRef(project),
       notesProcessed: entries.length,
       notesModified: 0,
       warnings: ["execute-merge requires a non-empty targetTitle."],
@@ -5294,8 +5295,7 @@ async function executeMerge(
       const structuredContent: ConsolidateResult = {
         action: "consolidated",
         strategy: "execute-merge",
-        project: project?.id,
-        projectName: project?.name,
+        project: toProjectRef(project),
         notesProcessed: entries.length,
         notesModified: 0,
         warnings: [`Source note '${id}' not found.`],
@@ -5337,8 +5337,7 @@ async function executeMerge(
       const structuredContent: ConsolidateResult = {
         action: "consolidated",
         strategy: "execute-merge",
-        project: project?.id,
-        projectName: project?.name,
+        project: toProjectRef(project),
         notesProcessed: entries.length,
         notesModified: 0,
         warnings: [message],
@@ -5568,8 +5567,7 @@ async function executeMerge(
   const structuredContent: ConsolidateResult = {
     action: "consolidated",
     strategy: "execute-merge",
-    project: project?.id,
-    projectName: project?.name,
+    project: toProjectRef(project),
     notesProcessed: entries.length,
     notesModified: vaultChanges.size,
     persistence,
@@ -5631,8 +5629,7 @@ async function pruneSuperseded(
     const structuredContent: ConsolidateResult = {
       action: "consolidated",
       strategy: "prune-superseded",
-      project: project?.id,
-      projectName: project?.name,
+      project: toProjectRef(project),
       notesProcessed: entries.length,
       notesModified: 0,
       warnings: [`prune-superseded requires consolidationMode="delete". Current mode: ${consolidationMode}.`],
@@ -5668,8 +5665,7 @@ async function pruneSuperseded(
     const structuredContent: ConsolidateResult = {
       action: "consolidated",
       strategy: "prune-superseded",
-      project: project?.id,
-      projectName: project?.name,
+      project: toProjectRef(project),
       notesProcessed: entries.length,
       notesModified: 0,
     };
@@ -5699,8 +5695,7 @@ async function pruneSuperseded(
       const structuredContent: ConsolidateResult = {
         action: "consolidated",
         strategy: "prune-superseded",
-        project: project?.id,
-        projectName: project?.name,
+        project: toProjectRef(project),
         notesProcessed: entries.length,
         notesModified: 0,
         warnings: [message],
@@ -5762,8 +5757,7 @@ async function pruneSuperseded(
   const structuredContent: ConsolidateResult = {
     action: "consolidated",
     strategy: "prune-superseded",
-    project: project?.id,
-    projectName: project?.name,
+    project: toProjectRef(project),
     notesProcessed: entries.length,
     notesModified: vaultChanges.size,
     retry,
@@ -5803,8 +5797,7 @@ async function dryRunAll(
   const structuredContent: ConsolidateResult = {
     action: "consolidated",
     strategy: "dry-run",
-    project: project?.id,
-    projectName: project?.name,
+    project: toProjectRef(project),
     notesProcessed: entries.length,
     notesModified: 0,
   };

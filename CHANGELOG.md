@@ -13,6 +13,8 @@ The format is loosely based on Keep a Changelog and uses semver-style version he
 ### Changed
 
 - `mnemonic-workflow-hint`, `AGENT.md`, `README.md`, and the mirrored website guidance now describe working-state continuity as a summary-first workflow: start with `project_memory_summary`, then recover temporary notes if needed.
+- Structured MCP results now use a consistent `project: { id, name }` shape across the affected tool responses instead of mixing object and `project`/`projectName` string pairs.
+- `get` structured output now includes persisted `alwaysLoad` metadata, making the typed note view a more complete representation of stored note state.
 
 ### Fixed
 

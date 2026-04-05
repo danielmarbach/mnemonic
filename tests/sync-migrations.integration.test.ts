@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mkdtemp, stat, readFile } from "fs/promises";
+import { mkdtemp, stat, readFile, writeFile } from "fs/promises";
 import os from "os";
 import path from "path";
 
@@ -16,10 +16,15 @@ import {
 
 import {
   ConsolidateResultSchema,
+  GetResultSchema,
+  ListResultSchema,
   MemoryGraphResultSchema,
   MigrationExecuteResultSchema,
   MigrationListResultSchema,
+  RecallResultSchema,
+  RecentResultSchema,
   SyncResultSchema,
+  WhereIsResultSchema,
 } from "../src/structured-content.js";
 
 describe("sync-migrations", () => {
@@ -118,6 +123,98 @@ describe("sync-migrations", () => {
         limit: 10,
       }, embeddingServer.url);
       expect(() => MemoryGraphResultSchema.parse(graphResponse.structuredContent)).not.toThrow();
+    } finally {
+      await embeddingServer.close();
+    }
+  }, 15000);
+
+  it("uses canonical project objects and exposes alwaysLoad in typed note results", async () => {
+    const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-vault-"));
+    const repoDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-project-"));
+    tempDirs.push(vaultDir, repoDir);
+
+    await initTestRepo(repoDir);
+    const embeddingServer = await startFakeEmbeddingServer();
+
+    try {
+      const rememberText = await callLocalMcp(vaultDir, "remember", {
+        title: "Canonical project metadata note",
+        content: "Project-scoped note used to validate structured project identity and alwaysLoad.",
+        tags: ["audit", "structured-content"],
+        lifecycle: "permanent",
+        alwaysLoad: true,
+        cwd: repoDir,
+        scope: "project",
+        summary: "Create note for structured project metadata audit",
+      }, embeddingServer.url);
+
+      const noteId = extractRememberedId(rememberText);
+
+      const [listResponse, getResponse, recallResponse, recentResponse, whereIsResponse] = await Promise.all([
+        callLocalMcpResponse(vaultDir, "list", { cwd: repoDir, scope: "project" }, embeddingServer.url),
+        callLocalMcpResponse(vaultDir, "get", { ids: [noteId], cwd: repoDir }, embeddingServer.url),
+        callLocalMcpResponse(vaultDir, "recall", { query: "canonical project metadata", cwd: repoDir, scope: "project" }, embeddingServer.url),
+        callLocalMcpResponse(vaultDir, "recent_memories", { cwd: repoDir, scope: "project", limit: 5 }, embeddingServer.url),
+        callLocalMcpResponse(vaultDir, "where_is_memory", { id: noteId, cwd: repoDir }, embeddingServer.url),
+      ]);
+
+      const listed = ListResultSchema.parse(listResponse.structuredContent);
+      expect(listed.project).toBeDefined();
+      expect(listed.notes[0]?.project).toEqual(listed.project);
+
+      const got = GetResultSchema.parse(getResponse.structuredContent);
+      expect(got.notes[0]?.project).toEqual(listed.project);
+      expect(got.notes[0]?.alwaysLoad).toBe(true);
+
+      const recalled = RecallResultSchema.parse(recallResponse.structuredContent);
+      expect(recalled.results[0]?.project).toEqual(listed.project);
+
+      const recent = RecentResultSchema.parse(recentResponse.structuredContent);
+      expect(recent.project).toEqual(listed.project);
+      expect(recent.notes[0]?.project).toEqual(listed.project);
+
+      const located = WhereIsResultSchema.parse(whereIsResponse.structuredContent);
+      expect(located.project).toEqual(listed.project);
+    } finally {
+      await embeddingServer.close();
+    }
+  }, 15000);
+
+  it("does not fabricate project objects for legacy notes missing projectName metadata", async () => {
+    const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-vault-"));
+    const repoDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-project-"));
+    tempDirs.push(vaultDir, repoDir);
+
+    await initTestRepo(repoDir);
+    const embeddingServer = await startFakeEmbeddingServer();
+
+    try {
+      const rememberText = await callLocalMcp(vaultDir, "remember", {
+        title: "Legacy project metadata note",
+        content: "Project-scoped note rewritten to simulate missing projectName metadata.",
+        tags: ["audit", "legacy"],
+        lifecycle: "permanent",
+        cwd: repoDir,
+        scope: "project",
+        summary: "Create note for legacy project metadata audit",
+      }, embeddingServer.url);
+
+      const noteId = extractRememberedId(rememberText);
+      const notePath = path.join(repoDir, ".mnemonic", "notes", `${noteId}.md`);
+      const noteContents = await readFile(notePath, "utf-8");
+      await writeFile(notePath, noteContents.replace(/^projectName: .*\n/m, ""), "utf-8");
+
+      const [listResponse, getResponse] = await Promise.all([
+        callLocalMcpResponse(vaultDir, "list", { cwd: repoDir, scope: "project" }, embeddingServer.url),
+        callLocalMcpResponse(vaultDir, "get", { ids: [noteId], cwd: repoDir }, embeddingServer.url),
+      ]);
+
+      const listed = ListResultSchema.parse(listResponse.structuredContent);
+      expect(listed.project).toBeDefined();
+      expect(listed.notes[0]?.project).toBeUndefined();
+
+      const got = GetResultSchema.parse(getResponse.structuredContent);
+      expect(got.notes[0]?.project).toBeUndefined();
     } finally {
       await embeddingServer.close();
     }

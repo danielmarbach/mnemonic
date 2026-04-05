@@ -67,6 +67,11 @@ export interface StructuredResponse {
   structuredContent?: Record<string, unknown>;
 }
 
+export interface ProjectRef {
+  id: string;
+  name: string;
+}
+
 export interface RememberResult extends Record<string, unknown> {
   action: "remembered";
   id: string;
@@ -89,8 +94,7 @@ export interface RecallResult extends Record<string, unknown> {
     title: string;
     score: number;
     boosted: number;
-    project?: string;
-    projectName?: string;
+    project?: ProjectRef;
     vault: string;
     tags: string[];
     lifecycle: NoteLifecycle;
@@ -121,12 +125,11 @@ export interface ListResult extends Record<string, unknown> {
   count: number;
   scope: "project" | "global" | "all";
   storedIn: "project-vault" | "main-vault" | "any";
-  project?: { id: string; name: string };
+  project?: ProjectRef;
   notes: Array<{
     id: string;
     title: string;
-    project?: string;
-    projectName?: string;
+    project?: ProjectRef;
     tags: string[];
     lifecycle: NoteLifecycle;
     vault: string;
@@ -148,10 +151,10 @@ export interface GetResult extends Record<string, unknown> {
     id: string;
     title: string;
     content: string;
-    project?: string;
-    projectName?: string;
+    project?: ProjectRef;
     tags: string[];
     lifecycle: NoteLifecycle;
+    alwaysLoad?: boolean;
     relatedTo?: Array<{ id: string; type: RelationshipType }>;
     createdAt: string;
     updatedAt: string;
@@ -188,8 +191,7 @@ export interface UpdateResult extends Record<string, unknown> {
   title: string;
   fieldsModified: string[];
   timestamp: string;
-  project?: string;
-  projectName?: string;
+  project?: ProjectRef;
   lifecycle: NoteLifecycle;
   persistence: PersistenceStatus;
 }
@@ -198,8 +200,7 @@ export interface ForgetResult extends Record<string, unknown> {
   action: "forgotten";
   id: string;
   title: string;
-  project?: string;
-  projectName?: string;
+  project?: ProjectRef;
   relationshipsCleaned: number;
   vaultsModified: string[];
   retry?: MutationRetryContract;
@@ -240,8 +241,7 @@ export interface ReindexResult extends Record<string, unknown> {
 export interface ConsolidateResult extends Record<string, unknown> {
   action: "consolidated";
   strategy: string;
-  project?: string;
-  projectName?: string;
+  project?: ProjectRef;
   notesProcessed: number;
   notesModified: number;
   warnings?: string[];
@@ -300,8 +300,7 @@ export interface WhereIsResult extends Record<string, unknown> {
   action: "located";
   id: string;
   title: string;
-  project?: string;
-  projectName?: string;
+  project?: ProjectRef;
   vault: string;
   updatedAt: string;
   relatedCount: number;
@@ -309,9 +308,8 @@ export interface WhereIsResult extends Record<string, unknown> {
 
 export interface MemoryGraphResult extends Record<string, unknown> {
   action: "graph_shown";
-  project?: string;
-  projectName?: string;
-    nodes: Array<{
+  project?: ProjectRef;
+  nodes: Array<{
     id: string;
     title: string;
     edges: Array<{ toId: string; type: RelationshipType }>;
@@ -322,15 +320,13 @@ export interface MemoryGraphResult extends Record<string, unknown> {
 
 export interface RecentResult extends Record<string, unknown> {
   action: "recent_shown";
-  project?: string;
-  projectName?: string;
+  project?: ProjectRef;
   count: number;
   limit: number;
   notes: Array<{
     id: string;
     title: string;
-    project?: string;
-    projectName?: string;
+    project?: ProjectRef;
     tags: string[];
     lifecycle: NoteLifecycle;
     vault: string;
@@ -430,7 +426,7 @@ export interface NoteProjection {
 
 export interface ProjectSummaryResult extends Record<string, unknown> {
   action: "project_summary_shown";
-  project: { id: string; name: string };
+  project: ProjectRef;
   notes: ProjectSummaryNotes;
   themes: Record<string, ThemeSection>;
   recent: RecentNote[];
@@ -454,6 +450,7 @@ const _RelationshipType = z.enum(["related-to", "explains", "example-of", "super
  * - "sub-vault:.mnemonic-<name>" for submodule-specific project vaults.
  */
 const _VaultLabel = z.string();
+const ProjectRefSchema = z.object({ id: z.string(), name: z.string() });
 
 export const RelatedNotePreviewSchema = z.object({
   id: z.string(),
@@ -527,7 +524,7 @@ export const RememberResultSchema = z.object({
   action: z.literal("remembered"),
   id: z.string(),
   title: z.string(),
-  project: z.object({ id: z.string(), name: z.string() }).optional(),
+  project: ProjectRefSchema.optional(),
   scope: z.enum(["project", "global"]),
   vault: _VaultLabel,
   tags: z.array(z.string()),
@@ -545,8 +542,7 @@ export const RecallResultSchema = z.object({
     title: z.string(),
     score: z.number(),
     boosted: z.number(),
-    project: z.string().optional(),
-    projectName: z.string().optional(),
+    project: ProjectRefSchema.optional(),
     vault: _VaultLabel,
     tags: z.array(z.string()),
     lifecycle: _NoteLifecycle,
@@ -582,12 +578,11 @@ export const ListResultSchema = z.object({
   count: z.number(),
   scope: z.enum(["project", "global", "all"]),
   storedIn: z.enum(["project-vault", "main-vault", "any"]),
-  project: z.object({ id: z.string(), name: z.string() }).optional(),
+  project: ProjectRefSchema.optional(),
   notes: z.array(z.object({
     id: z.string(),
     title: z.string(),
-    project: z.string().optional(),
-    projectName: z.string().optional(),
+    project: ProjectRefSchema.optional(),
     tags: z.array(z.string()),
     lifecycle: _NoteLifecycle,
     vault: _VaultLabel,
@@ -608,8 +603,7 @@ export const UpdateResultSchema = z.object({
   title: z.string(),
   fieldsModified: z.array(z.string()),
   timestamp: z.string(),
-  project: z.string().optional(),
-  projectName: z.string().optional(),
+  project: ProjectRefSchema.optional(),
   lifecycle: _NoteLifecycle,
   persistence: PersistenceStatusSchema,
 });
@@ -618,8 +612,7 @@ export const ForgetResultSchema = z.object({
   action: z.literal("forgotten"),
   id: z.string(),
   title: z.string(),
-  project: z.string().optional(),
-  projectName: z.string().optional(),
+  project: ProjectRefSchema.optional(),
   relationshipsCleaned: z.number(),
   vaultsModified: z.array(z.string()),
   retry: PersistenceStatusSchema.shape.retry,
@@ -648,15 +641,13 @@ export const RelateResultSchema = z.object({
 
 export const RecentResultSchema = z.object({
   action: z.literal("recent_shown"),
-  project: z.string().optional(),
-  projectName: z.string().optional(),
+  project: ProjectRefSchema.optional(),
   count: z.number(),
   limit: z.number(),
   notes: z.array(z.object({
     id: z.string(),
     title: z.string(),
-    project: z.string().optional(),
-    projectName: z.string().optional(),
+    project: ProjectRefSchema.optional(),
     tags: z.array(z.string()),
     lifecycle: _NoteLifecycle,
     vault: _VaultLabel,
@@ -667,8 +658,7 @@ export const RecentResultSchema = z.object({
 
 export const MemoryGraphResultSchema = z.object({
   action: z.literal("graph_shown"),
-  project: z.string().optional(),
-  projectName: z.string().optional(),
+  project: ProjectRefSchema.optional(),
   nodes: z.array(z.object({
     id: z.string(),
     title: z.string(),
@@ -753,10 +743,7 @@ export const WorkingStateSchema = z.object({
 
 export const ProjectSummaryResultSchema = z.object({
   action: z.literal("project_summary_shown"),
-  project: z.object({
-    id: z.string(),
-    name: z.string(),
-  }),
+  project: ProjectRefSchema,
   notes: ProjectSummaryNotesSchema,
   themes: z.record(z.string(), ThemeSectionSchema),
   recent: z.array(RecentNoteSchema),
@@ -804,10 +791,10 @@ export const GetResultSchema = z.object({
     id: z.string(),
     title: z.string(),
     content: z.string(),
-    project: z.string().optional(),
-    projectName: z.string().optional(),
+    project: ProjectRefSchema.optional(),
     tags: z.array(z.string()),
     lifecycle: _NoteLifecycle,
+    alwaysLoad: z.boolean().optional(),
     relatedTo: z.array(z.object({ id: z.string(), type: _RelationshipType })).optional(),
     createdAt: z.string(),
     updatedAt: z.string(),
@@ -821,8 +808,7 @@ export const WhereIsResultSchema = z.object({
   action: z.literal("located"),
   id: z.string(),
   title: z.string(),
-  project: z.string().optional(),
-  projectName: z.string().optional(),
+  project: ProjectRefSchema.optional(),
   vault: _VaultLabel,
   updatedAt: z.string(),
   relatedCount: z.number(),
@@ -831,8 +817,7 @@ export const WhereIsResultSchema = z.object({
 export const ConsolidateResultSchema = z.object({
   action: z.literal("consolidated"),
   strategy: z.string(),
-  project: z.string().optional(),
-  projectName: z.string().optional(),
+  project: ProjectRefSchema.optional(),
   notesProcessed: z.number(),
   notesModified: z.number(),
   warnings: z.array(z.string()).optional(),
