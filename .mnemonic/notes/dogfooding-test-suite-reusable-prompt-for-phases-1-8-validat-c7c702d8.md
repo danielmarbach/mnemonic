@@ -1,14 +1,14 @@
 ---
-title: 'Dogfooding test suite: reusable prompt for Phases 1–8 validation'
+title: 'Dogfooding test packs: reusable prompts and scorecards'
 tags:
   - dogfooding
   - testing
-  - phases
   - prompt
   - reusable
+  - scorecard
 lifecycle: permanent
 createdAt: '2026-03-28T18:54:38.792Z'
-updatedAt: '2026-04-04T20:37:07.773Z'
+updatedAt: '2026-04-05T10:27:02.743Z'
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
@@ -17,15 +17,19 @@ relatedTo:
     type: related-to
 memoryVersion: 1
 ---
-# Dogfooding test suite: reusable prompt for Phases 1–8 validation
+# Dogfooding test packs: reusable prompts and scorecards
 
-Use this prompt verbatim to re-run the full Phase 1–8 dogfooding test suite against any released version of mnemonic-mcp. Designed to be model-agnostic — works with non-SOTA models.
+Reusable dogfooding packs for validating mnemonic behavior against a released build or current local build. Use the packs selectively: run the broad enrichment/regression pack when validating the core recall/orientation stack, and run the working-state continuity pack when validating temporary-note recovery workflow.
 
-After running, capture all results in a new note titled "Dogfooding test suite results: Phases 1–8 validation (YYYY-MM-DD)" using the scorecard at the bottom.
+After running a pack, capture results in a new project note with a dated title and the relevant scorecard.
 
 ---
 
-## Executable prompt
+## Pack A — Core enrichment and orientation regression pack
+
+This is the evolved version of the original Phases 1–8 validation prompt. The old phase labels are now historical context only; the pack should be treated as a standing regression suite for the current enrichment/orientation stack.
+
+### Pack A executable prompt
 
 Paste this into a new session with cwd set to the mnemonic repo root:
 
@@ -47,17 +51,17 @@ Run a structured dogfooding test of the mnemonic MCP against the released versio
 
 **C1 — Relationship follow-up from recent note:** Identify the most recent note from the summary's recent section. Call `get` with that id, cwd, includeRelationships=true. Follow one relationship: does it lead to a useful connected note? Rate: Pass / Pass with friction / Fail.
 
-**D1 — Warm session (Phase 5 cache):** Call `project_memory_summary` a second time (same session, same cwd). Same structure? Any dropped results? Felt faster? Rate: Pass / Pass with friction / Fail.
+**D1 — Warm session:** Call `project_memory_summary` a second time (same session, same cwd). Same structure? Any dropped results? Felt faster? Rate: Pass / Pass with friction / Fail.
 
-**E1 — Theme quality (Phase 6):** Count themes from the summary output. How many have only 1 note? Does "other" appear? Are the top 3 themes meaningful? Rate: Pass / Pass with friction / Fail.
+**E1 — Theme quality:** Count themes from the summary output. How many have only 1 note? Does "other" appear? Are the top 3 themes meaningful? Rate: Pass / Pass with friction / Fail.
 
-**F1 — Provenance and confidence (Phase 7):** From recall results (B1 or B2), inspect provenance: lastUpdatedAt, lastCommitHash, recentlyChanged. Is confidence "high" on anchor notes? "medium" on others? Rate: Pass / Pass with friction / Fail.
+**F1 — Provenance and confidence:** From recall results (B1 or B2), inspect provenance: lastUpdatedAt, lastCommitHash, recentlyChanged. Is confidence "high" on anchor notes? "medium" on others? Rate: Pass / Pass with friction / Fail.
 
-**F2 — AlwaysLoad via MCP (Phase 7):** Create a test note with `remember` including `alwaysLoad: true`, then update it with `alwaysLoad: false`. Use the returned note id to inspect `/path/to/mnemonic/.mnemonic/notes/<id>.md` directly and verify the frontmatter changes from `alwaysLoad: true` to `alwaysLoad: false`. Rate: Pass / Pass with friction / Fail.
+**F2 — AlwaysLoad via MCP:** Create a test note with `remember` including `alwaysLoad: true`, then update it with `alwaysLoad: false`. Use the returned note id to inspect `/path/to/mnemonic/.mnemonic/notes/<id>.md` directly and verify the frontmatter changes from `alwaysLoad: true` to `alwaysLoad: false`. Rate: Pass / Pass with friction / Fail.
 
-**G1 — Single-commit note history (Phase 8):** From B2 temporal results, find a note with 1 commit. Is `historySummary` "This note was created and has not been modified since."? Rate: Pass / Pass with friction / Fail.
+**G1 — Single-commit note history:** From temporal results, find a note with 1 commit. Is `historySummary` "This note was created and has not been modified since."? Rate: Pass / Pass with friction / Fail.
 
-**G2 — Multi-commit note evolution (Phase 8):** Find a note with 3+ commits from B2 temporal results. Is `historySummary` informative or generic? Is `changeDescription` for unknown category helpful or just "Updated the note."? Rate: Pass / Pass with friction / Fail.
+**G2 — Multi-commit note evolution:** Find a note with 3+ commits from temporal results. Is `historySummary` informative or generic? Is `changeDescription` for unknown category helpful or just "Updated the note."? Rate: Pass / Pass with friction / Fail.
 
 **E2E-1 — Resume after a week:** From `project_memory_summary` alone (no recall), can you re-orient on current project work? Rate: Pass / Pass with friction / Fail.
 
@@ -69,64 +73,22 @@ Run a structured dogfooding test of the mnemonic MCP against the released versio
 
 **CLEANUP:** Call `forget` on any test notes created during F2.
 
-**CAPTURE:** Call `remember` with title "Dogfooding test suite results: Phases 1–8 validation (YYYY-MM-DD)", lifecycle permanent, scope project, tags [dogfooding, testing, phases, validation, scorecard], containing all test results and completed scorecard.
+**CAPTURE:** Call `remember` with title "Dogfooding results: core enrichment/orientation pack (YYYY-MM-DD)", lifecycle permanent, scope project, tags [dogfooding, testing, scorecard, regression], containing all test results and the completed scorecard.
 
----
+### Pack A scorecard template
 
-## Scorecard template (copy into results note)
-
-### Phase 1: Provenance + confidence
-
-- [ ] provenance useful
-- [ ] confidence sensible
-- [ ] freshness easy to judge
-
-### Phase 2: Temporal recall
-
-- [ ] temporal mode useful
-- [ ] output bounded
-- [ ] history retrieval reliable
-
-### Phase 3: Projections
-
-- [ ] previews feel concise and useful
-- [ ] recall quality preserved
-- [ ] no obvious loss from projection-based embedding input
-- [ ] cold hybrid recall reranking works for projection-heavy phrasing
-
-### Phase 4: Relationships
-
-- [ ] related notes are useful next steps
-- [ ] relationship previews are bounded
-- [ ] recent notes connect back to durable knowledge
-
-### Phase 5: Active session caching
-
-- [ ] repeated calls feel faster
-- [ ] no stale cache surprises
-- [ ] mutation invalidation works
-
-### Phase 6: Themes
-
-- [ ] themes are meaningful
-- [ ] "other" is acceptable/refined
-- [ ] theme emergence looks real
-- [ ] non-English/mixed notes degrade gracefully
-
-### Phase 7: Roles / importance
-
-- [ ] explicit metadata improves prioritization
-- [ ] inferred roles help without noise
-- [ ] alwaysLoad behaves cleanly (F2 test: remember/update via MCP, verify frontmatter in note file)
-
-### Phase 8: Temporal interpretation
-
-- [ ] changeDescription is informative
-- [ ] historySummary tells the evolution story
-- [ ] no need for raw diffs in normal workflow
-
-### End-to-end
-
+- [ ] cold-start orientation useful
+- [ ] design entry path coherent
+- [ ] recall answers canonical design questions
+- [ ] temporal recall bounded and informative
+- [ ] cold hybrid phrasing still works
+- [ ] relationship follow-ups useful
+- [ ] warm-session behavior stable
+- [ ] themes meaningful
+- [ ] provenance and confidence sensible
+- [ ] alwaysLoad persistence behaves cleanly
+- [ ] single-commit history summary correct
+- [ ] multi-commit history summary useful
 - [ ] resume-after-a-week works
 - [ ] design archaeology works
 - [ ] recent-to-architecture navigation works
@@ -134,7 +96,54 @@ Run a structured dogfooding test of the mnemonic MCP against the released versio
 
 ---
 
+## Pack B — Working-state continuity pack
+
+Use this when validating workflow-hint-first continuity based on temporary notes.
+
+### Pack B executable prompt
+
+Paste this into a new session with cwd set to the mnemonic repo root:
+
+Run a focused dogfooding test of working-state continuity in mnemonic. Use cwd=/path/to/mnemonic for all calls. Capture results in a project note when done.
+
+**SETUP:** Call `detect_project` with cwd. Call `project_memory_summary` first for orientation.
+
+**W1 — Orientation first:** Confirm the summary provides a useful starting point before any recovery step. Rate: Pass / Pass with friction / Fail.
+
+**W2 — Temporary recovery via recall:** Call `recall` with a query targeting active work and `lifecycle="temporary"`. Does it return only temporary notes? Are the results useful for resuming work? Rate: Pass / Pass with friction / Fail.
+
+**W3 — Temporary recovery via recent:** Call `recent_memories` with `lifecycle="temporary"` and confirm it returns only temporary notes. Rate: Pass / Pass with friction / Fail.
+
+**W4 — Guidance alignment:** Inspect `mnemonic-workflow-hint`. Does it clearly say orientation comes first, recovery comes second, and temporary checkpoints should not be preserved by default when consolidating finished work? Rate: Pass / Pass with friction / Fail.
+
+**W5 — Lifecycle distinction:** Confirm the guidance still separates `temporary` plans/WIP from `permanent` decisions and durable lessons. Rate: Pass / Pass with friction / Fail.
+
+**W6 — Consolidation behavior:** Create temporary test notes if needed and verify the guidance and tool behavior do not push agents toward preserving temporary scaffolding by default after consolidation. Rate: Pass / Pass with friction / Fail.
+
+**W7 — End-to-end resume flow:** Start from summary output, recover temporary notes, choose the right next step, and verify the flow feels like a continuation of project orientation rather than a parallel system. Rate: Pass / Pass with friction / Fail.
+
+**CLEANUP:** Call `forget` on any temporary test notes created only for this run.
+
+**CAPTURE:** Call `remember` with title "Dogfooding results: working-state continuity pack (YYYY-MM-DD)", lifecycle permanent, scope project, tags [dogfooding, testing, scorecard, workflow, temporary-notes], containing all test results and the completed scorecard.
+
+### Pack B scorecard template
+
+- [ ] summary-first orientation still holds
+- [ ] `recall(lifecycle: temporary)` is useful
+- [ ] `recent_memories(lifecycle: temporary)` is useful
+- [ ] workflow hint matches the design
+- [ ] lifecycle distinction stays clear
+- [ ] temporary scaffolding is not preserved by default
+- [ ] end-to-end resume flow feels coherent
+
+---
+
 ## Known runs
 
-- 2026-03-28: note `dogfooding-test-suite-results-phases-1-8-validation-2026-03--86866b21`, run by Claude Sonnet 4.6, result 22/28 passing.
-- 2026-03-29: note `dogfooding-test-suite-results-phases-1-8-validation-2026-03--86866b21`, run by Claude Sonnet 4.6, result 28/28 passing (v0.19.2).
+- 2026-03-28 / 2026-04-04: original core pack runs captured in `dogfooding-test-suite-results-phases-1-8-validation-2026-03--86866b21`.
+
+## Naming guidance
+
+- Use "core enrichment/orientation pack" for the broad regression run.
+- Use "working-state continuity pack" for the temporary-note recovery workflow run.
+- Avoid the old "Phases 1–8" wording in new result-note titles unless you are explicitly referring to historical runs.
