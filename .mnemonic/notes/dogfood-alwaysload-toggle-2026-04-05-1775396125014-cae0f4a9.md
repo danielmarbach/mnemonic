@@ -6,12 +6,13 @@ tags:
   - alwaysload
 lifecycle: temporary
 createdAt: '2026-04-05T13:35:25.522Z'
-updatedAt: '2026-04-05T13:35:25.522Z'
-alwaysLoad: true
+updatedAt: '2026-04-05T13:35:26.492Z'
+alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 memoryVersion: 1
 ---
 Temporary dogfooding note to validate alwaysLoad frontmatter persistence.
 
-Next action: update alwaysLoad to false and verify the markdown frontmatter flips cleanly.
+Status: updated to verify alwaysLoad false persists correctly.
+Next action: delete this temporary note after verification.
