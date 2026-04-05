@@ -4,6 +4,17 @@ All notable changes to `mnemonic` will be documented in this file.
 
 The format is loosely based on Keep a Changelog and uses semver-style version headings.
 
+## [0.22.0] - Unreleased
+
+### Added
+
+- Session-aware relationship carry-forward: when a new memory clearly continues durable context inspected earlier in the same MCP session, `remember` and `update` can now attach bounded `related-to` links automatically without relying on repo-specific rules or English-only cues.
+
+### Changed
+
+- Active session cache now preserves recently inspected note context across unrelated mutations, so follow-up writes can still reuse durable session context after intermediate note changes.
+- Hybrid recall reranking now adds rare-token coverage and contiguous significant-token phrase signals on top of the existing semantic-plus-lexical scoring, improving generic rationale-style query handling without changing storage or requiring project-specific heuristics.
+
 ## [0.21.0] - 2026-04-05
 
 ### Added
