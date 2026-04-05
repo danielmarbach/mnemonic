@@ -2,6 +2,8 @@ import { access } from "fs/promises";
 import path from "path";
 import { simpleGit, SimpleGit } from "simple-git";
 
+const mutationLocks = new Map<string, Promise<void>>();
+
 export class GitOperationError extends Error {
   constructor(operation: "add" | "commit" | "push", cause: unknown) {
     const detail = cause instanceof Error ? cause.message : String(cause);
@@ -69,7 +71,7 @@ export class GitOps {
   private enabled: boolean;
 
   constructor(gitRoot: string, notesRelDir: string = "notes") {
-    this.gitRoot = gitRoot;
+    this.gitRoot = path.resolve(gitRoot);
     this.notesRelDir = notesRelDir;
     this.enabled = process.env["DISABLE_GIT"] !== "true";
   }
@@ -116,36 +118,33 @@ export class GitOps {
   async commitWithStatus(message: string, files: string[], body?: string): Promise<CommitResult> {
     if (!this.enabled) return { status: "skipped", reason: "git-disabled" };
 
-    // Scope every add+commit to only the paths mnemonic manages.
-    // Never commit files outside the vault — e.g. src/ or test/ changes
-    // that happen to be staged in the same repo.
-    const scopedFiles = files.length > 0 ? files : [`${this.notesRelDir}/`];
+    return this.withMutationLock(async () => {
+      // Scope every add+commit to only the paths mnemonic manages.
+      // Never commit files outside the vault — e.g. src/ or test/ changes
+      // that happen to be staged in the same repo.
+      const scopedFiles = files.length > 0 ? files : [`${this.notesRelDir}/`];
 
-    // Retry git.add() with exponential backoff for transient index.lock errors.
-    // git.add() can fail with "Unable to create '.git/index.lock': File exists"
-    // when concurrent git operations race for the index. This is recoverable
-    // by retrying after a short delay.
-    const addResult = await this.addWithRetry(scopedFiles);
-    if (addResult.status === "failed") {
-      return addResult;
-    }
+      const addResult = await this.addWithRetry(scopedFiles);
+      if (addResult.status === "failed") {
+        return addResult;
+      }
 
-    try {
-      const status = await this.git.status();
-      if (status.staged.length === 0) return { status: "skipped", reason: "no-changes" };
+      try {
+        const status = await this.git.status();
+        if (status.staged.length === 0) return { status: "skipped", reason: "no-changes" };
 
-      // Build commit message with optional body
-      const fullMessage = body ? `${message}\n\n${body}` : message;
-      await this.git.commit(fullMessage, scopedFiles);
+        const fullMessage = body ? `${message}\n\n${body}` : message;
+        await this.retryLockErrors("commit", () => this.git.commit(fullMessage, scopedFiles));
 
-      const displayMessage = body ? `${message} [...]` : message;
-      console.error(`[git] Committed: ${displayMessage}`);
-      return { status: "committed" };
-    } catch (err) {
-      const errMessage = err instanceof Error ? err.message : String(err);
-      console.error(`[git] Commit failed: ${errMessage}`);
-      return { status: "failed", reason: "error", operation: "commit", error: errMessage };
-    }
+        const displayMessage = body ? `${message} [...]` : message;
+        console.error(`[git] Committed: ${displayMessage}`);
+        return { status: "committed" };
+      } catch (err) {
+        const errMessage = err instanceof Error ? err.message : String(err);
+        console.error(`[git] Commit failed: ${errMessage}`);
+        return { status: "failed", reason: "error", operation: "commit", error: errMessage };
+      }
+    });
   }
 
   /**
@@ -153,31 +152,14 @@ export class GitOps {
    * Returns a CommitResult-like object for add failures.
    */
   private async addWithRetry(files: string[]): Promise<CommitResult> {
-    const maxRetries = 3;
-    const baseDelayMs = 50;
-
-    for (let attempt = 0; attempt < maxRetries; attempt++) {
-      try {
-        await this.git.add(files);
-        return { status: "committed" };
-      } catch (err) {
-        const errMessage = err instanceof Error ? err.message : String(err);
-        const isLockError = errMessage.includes("index.lock") || errMessage.includes("File exists");
-
-        if (isLockError && attempt < maxRetries - 1) {
-          const delayMs = baseDelayMs * Math.pow(2, attempt);
-          console.error(`[git] add() lock contention, retrying in ${delayMs}ms (attempt ${attempt + 1}/${maxRetries})`);
-          await new Promise((resolve) => setTimeout(resolve, delayMs));
-          continue;
-        }
-
-        console.error(`[git] add() failed: ${errMessage}`);
-        return { status: "failed", reason: "error", operation: "add", error: errMessage };
-      }
+    try {
+      await this.retryLockErrors("add", () => this.git.add(files));
+      return { status: "committed" };
+    } catch (err) {
+      const errMessage = err instanceof Error ? err.message : String(err);
+      console.error(`[git] add() failed: ${errMessage}`);
+      return { status: "failed", reason: "error", operation: "add", error: errMessage };
     }
-
-    // Should be unreachable, but TypeScript needs a return
-    return { status: "failed", reason: "error", operation: "add", error: "max retries exceeded" };
   }
 
   /**
@@ -212,71 +194,66 @@ export class GitOps {
 
     if (!this.enabled) return empty;
 
-    const remotes = await this.git.getRemotes();
-    if (remotes.length === 0) return empty;
+    return this.withMutationLock(async () => {
+      const remotes = await this.git.getRemotes();
+      if (remotes.length === 0) return empty;
 
-    const withRemote: Pick<SyncResult, "hasRemote" | "pulledNoteIds" | "deletedNoteIds" | "pushedCommits"> = {
-      hasRemote: true,
-      pulledNoteIds: [],
-      deletedNoteIds: [],
-      pushedCommits: 0,
-    };
-
-    // Phase 1: fetch
-    try {
-      await this.git.fetch();
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      console.error(`[git] Sync fetch failed: ${message}`);
-      return { ...withRemote, gitError: { phase: "fetch", message, isConflict: false } };
-    }
-
-    const unpushed = await this.countUnpushedCommits();
-    const localHead = await this.currentHead();
-
-    // Phase 2: pull (rebase)
-    try {
-      await this.git.pull(["--rebase"]);
-      console.error("[git] Pulled (rebase)");
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      console.error(`[git] Sync pull failed: ${message}`);
-      // Use language-independent checks: conflicted files from git status (porcelain codes,
-      // not localized) and git internal state files (.git/rebase-merge, .git/rebase-apply,
-      // .git/MERGE_HEAD) rather than error message keywords.
-      const conflictFiles = await this.getConflictFiles();
-      const isConflict = conflictFiles.length > 0 || await this.isConflictInProgress();
-      return {
-        ...withRemote,
-        gitError: {
-          phase: "pull",
-          message,
-          isConflict,
-          conflictFiles: conflictFiles.length > 0 ? conflictFiles : undefined,
-        },
-      };
-    }
-
-    const { pulledNoteIds, deletedNoteIds } = await this.diffNotesSince(localHead);
-
-    // Phase 3: push
-    try {
-      await this.git.push();
-      console.error(`[git] Pushed ${unpushed} local commit(s)`);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      console.error(`[git] Sync push failed: ${message}`);
-      // Pull succeeded — return partial success with the pulled notes and the push error
-      return {
+      const withRemote: Pick<SyncResult, "hasRemote" | "pulledNoteIds" | "deletedNoteIds" | "pushedCommits"> = {
         hasRemote: true,
-        pulledNoteIds,
-        deletedNoteIds,
+        pulledNoteIds: [],
+        deletedNoteIds: [],
         pushedCommits: 0,
-        gitError: { phase: "push", message, isConflict: false },
       };
-    }
 
-    return { hasRemote: true, pulledNoteIds, deletedNoteIds, pushedCommits: unpushed };
+      try {
+        await this.retryLockErrors("fetch", () => this.git.fetch());
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        console.error(`[git] Sync fetch failed: ${message}`);
+        return { ...withRemote, gitError: { phase: "fetch", message, isConflict: false } };
+      }
+
+      const unpushed = await this.countUnpushedCommits();
+      const localHead = await this.currentHead();
+
+      try {
+        await this.retryLockErrors("pull", () => this.git.pull(["--rebase"]));
+        console.error("[git] Pulled (rebase)");
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        console.error(`[git] Sync pull failed: ${message}`);
+        const conflictFiles = await this.getConflictFiles();
+        const isConflict = conflictFiles.length > 0 || await this.isConflictInProgress();
+        return {
+          ...withRemote,
+          gitError: {
+            phase: "pull",
+            message,
+            isConflict,
+            conflictFiles: conflictFiles.length > 0 ? conflictFiles : undefined,
+          },
+        };
+      }
+
+      const { pulledNoteIds, deletedNoteIds } = await this.diffNotesSince(localHead);
+
+      try {
+        await this.retryLockErrors("push", () => this.git.push());
+        console.error(`[git] Pushed ${unpushed} local commit(s)`);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        console.error(`[git] Sync push failed: ${message}`);
+        return {
+          hasRemote: true,
+          pulledNoteIds,
+          deletedNoteIds,
+          pushedCommits: 0,
+          gitError: { phase: "push", message, isConflict: false },
+        };
+      }
+
+      return { hasRemote: true, pulledNoteIds, deletedNoteIds, pushedCommits: unpushed };
+    });
   }
 
   private async getConflictFiles(): Promise<string[]> {
@@ -317,17 +294,67 @@ export class GitOps {
 
   async pushWithStatus(): Promise<PushResult> {
     if (!this.enabled) return { status: "skipped", reason: "git-disabled" };
+    return this.withMutationLock(async () => {
+      try {
+        const remotes = await this.git.getRemotes();
+        if (remotes.length === 0) return { status: "skipped", reason: "no-remote" };
+        await this.retryLockErrors("push", () => this.git.push());
+        console.error("[git] Pushed");
+        return { status: "pushed" };
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        console.error(`[git] Push failed: ${message}`);
+        return { status: "failed", error: message };
+      }
+    });
+  }
+
+  private async withMutationLock<T>(operation: () => Promise<T>): Promise<T> {
+    const previous = mutationLocks.get(this.gitRoot) ?? Promise.resolve();
+    let release!: () => void;
+    const current = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+
+    mutationLocks.set(this.gitRoot, current);
+
+    await previous;
+
     try {
-      const remotes = await this.git.getRemotes();
-      if (remotes.length === 0) return { status: "skipped", reason: "no-remote" };
-      await this.git.push();
-      console.error("[git] Pushed");
-      return { status: "pushed" };
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      console.error(`[git] Push failed: ${message}`);
-      return { status: "failed", error: message };
+      return await operation();
+    } finally {
+      release();
+      if (mutationLocks.get(this.gitRoot) === current) {
+        mutationLocks.delete(this.gitRoot);
+      }
     }
+  }
+
+  private async retryLockErrors<T>(operationName: string, operation: () => Promise<T>): Promise<T> {
+    const maxRetries = 3;
+    const baseDelayMs = 50;
+
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        return await operation();
+      } catch (err) {
+        const errMessage = err instanceof Error ? err.message : String(err);
+        if (this.isLockError(errMessage) && attempt < maxRetries - 1) {
+          const delayMs = baseDelayMs * Math.pow(2, attempt);
+          console.error(`[git] ${operationName}() lock contention, retrying in ${delayMs}ms (attempt ${attempt + 1}/${maxRetries})`);
+          await new Promise((resolve) => setTimeout(resolve, delayMs));
+          continue;
+        }
+
+        throw err;
+      }
+    }
+
+    throw new Error(`[git] ${operationName}() lock retries exhausted`);
+  }
+
+  private isLockError(errMessage: string): boolean {
+    return errMessage.includes("index.lock") || errMessage.includes("File exists");
   }
 
   /**

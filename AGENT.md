@@ -36,6 +36,8 @@ Before calling `remember`:
 4. Pass `cwd` for anything about the current repo, even if you intend to store it in the main vault with `scope: "global"`.
 5. Omit `cwd` only for truly cross-project or personal memories; missing `cwd` makes the note global and unassociated.
 6. After `remember`, `update`, `move_memory`, or consolidation writes, inspect the returned structured persistence status before doing extra verification calls. It tells you the note path, embedding path, embedding outcome, and git commit/push outcome, including when push is intentionally skipped by config.
+7. Memory work is not complete after `remember`, `update`, or `consolidate` alone. If the note extends, implements, or was informed by an existing note surfaced via `recall`, `list`, `recent_memories`, or `get`, explicitly decide whether to `relate` or `consolidate` before finishing.
+8. Default stance: if a note continues a prior design, bug, decision, or implementation arc, create a relationship unless there is a concrete reason not to. Treat skipped relationships as something you should be able to justify, not as optional cleanup.
 
 ### Choosing note lifecycle
 

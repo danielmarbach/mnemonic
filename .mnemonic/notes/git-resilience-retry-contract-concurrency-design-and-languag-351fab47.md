@@ -11,7 +11,7 @@ tags:
   - decision
 lifecycle: permanent
 createdAt: '2026-03-24T10:53:27.605Z'
-updatedAt: '2026-03-26T21:00:32.043Z'
+updatedAt: '2026-04-05T12:54:17.658Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
@@ -20,6 +20,8 @@ relatedTo:
   - id: parallel-consolidate-operations-can-leave-staged-local-only--e8c33780
     type: example-of
   - id: manual-exact-git-recovery-contract-for-partial-mnemonic-pers-ffae4896
+    type: explains
+  - id: git-mutation-coordination-per-repo-mutex-plus-retry-fallback-56264a36
     type: explains
 memoryVersion: 1
 ---
