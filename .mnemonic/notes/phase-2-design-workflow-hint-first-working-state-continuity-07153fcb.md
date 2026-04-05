@@ -12,8 +12,6 @@ alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
-  - id: phase-2-implementation-plan-workflow-hint-first-working-stat-d321a64a
-    type: explains
   - id: mcp-workflow-ux-hint-prompt-tool-descriptions-and-session-st-e89a18fc
     type: related-to
   - id: temporary-note-lifecycle-and-consolidation-defaults-988f6e20
