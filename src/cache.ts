@@ -11,12 +11,24 @@ interface VaultCache {
   embeddings: EmbeddingRecord[];
 }
 
+interface SessionAccessRecord {
+  noteId: string;
+  vaultPath: string;
+  accessedAt: string;
+  accessKind: "get" | "recall" | "summary";
+  score?: number;
+}
+
 export interface SessionProjectCache {
   projectId: string;
   /** Per-vault caches keyed by vaultPath. Built lazily per vault on first access. */
   vaultCaches: Map<string, VaultCache>;
   /** Projection cache shared across all cached vaults for this project. */
   projectionsById: Map<string, NoteProjection>;
+  /** Recently inspected notes in the current MCP session. */
+  recentAccesses: SessionAccessRecord[];
+  /** Snapshots of recently inspected notes that survive cache invalidation. */
+  recentNotesByKey: Map<string, Note>;
   /** ISO timestamp of when this cache entry was first created. */
   lastBuiltAt: string;
 }
@@ -48,6 +60,8 @@ function ensureActiveProjectCache(projectId: string): SessionProjectCache {
     projectId,
     vaultCaches: new Map(),
     projectionsById: new Map(),
+    recentAccesses: [],
+    recentNotesByKey: new Map(),
     lastBuiltAt: new Date().toISOString(),
   };
   sessionCaches.activeProject = fresh;
@@ -65,7 +79,14 @@ function ensureActiveProjectCache(projectId: string): SessionProjectCache {
 export function invalidateActiveProjectCache(): void {
   if (sessionCaches.activeProject) {
     debugLog("cache:invalidate", `project=${sessionCaches.activeProject.projectId}`);
-    sessionCaches.activeProject = undefined;
+    sessionCaches.activeProject = {
+      projectId: sessionCaches.activeProject.projectId,
+      vaultCaches: new Map(),
+      projectionsById: new Map(),
+      recentAccesses: sessionCaches.activeProject.recentAccesses,
+      recentNotesByKey: sessionCaches.activeProject.recentNotesByKey,
+      lastBuiltAt: new Date().toISOString(),
+    };
   }
 }
 
@@ -192,6 +213,42 @@ export function getSessionCachedProjection(
   return cache.projectionsById.get(noteId);
 }
 
+export function setSessionCachedNote(
+  projectId: string,
+  vaultPath: string,
+  note: Note,
+): void {
+  const cache = ensureActiveProjectCache(projectId);
+  cache.recentNotesByKey.set(`${vaultPath}::${note.id}`, note);
+  const existing = cache.vaultCaches.get(vaultPath);
+  if (existing) {
+    existing.notesById.set(note.id, note);
+    if (!existing.noteList.some((entry) => entry.id === note.id)) {
+      existing.noteList.push(note);
+    }
+    return;
+  }
+
+  cache.vaultCaches.set(vaultPath, {
+    notesById: new Map([[note.id, note]]),
+    noteList: [note],
+    embeddings: [],
+  });
+}
+
+export function getRecentSessionAccessNote(
+  projectId: string,
+  vaultPath: string,
+  noteId: string,
+): Note | undefined {
+  const cache = sessionCaches.activeProject;
+  if (!cache || cache.projectId !== projectId) {
+    return undefined;
+  }
+
+  return cache.recentNotesByKey.get(`${vaultPath}::${noteId}`);
+}
+
 /**
  * Store a projection in the session cache.
  * No-op when no active cache exists for this project.
@@ -204,4 +261,34 @@ export function setSessionCachedProjection(
   const cache = sessionCaches.activeProject;
   if (!cache || cache.projectId !== projectId) return;
   cache.projectionsById.set(noteId, projection);
+}
+
+export function recordSessionNoteAccess(
+  projectId: string,
+  vaultPath: string,
+  noteId: string,
+  accessKind: "get" | "recall" | "summary",
+  score?: number,
+): void {
+  const cache = ensureActiveProjectCache(projectId);
+
+  cache.recentAccesses = cache.recentAccesses
+    .filter((entry) => !(entry.noteId === noteId && entry.vaultPath === vaultPath))
+    .concat({ noteId, vaultPath, accessedAt: new Date().toISOString(), accessKind, score })
+    .slice(-25);
+}
+
+export function getRecentSessionNoteAccesses(projectId: string): Array<{
+  noteId: string;
+  vaultPath: string;
+  accessedAt: string;
+  accessKind: "get" | "recall" | "summary";
+  score?: number;
+}> {
+  const cache = sessionCaches.activeProject;
+  if (!cache || cache.projectId !== projectId) {
+    return [];
+  }
+
+  return [...cache.recentAccesses].reverse();
 }

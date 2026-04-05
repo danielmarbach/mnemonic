@@ -7,7 +7,7 @@ tags:
   - regression
 lifecycle: permanent
 createdAt: '2026-04-05T13:21:41.304Z'
-updatedAt: '2026-04-05T13:49:17.322Z'
+updatedAt: '2026-04-05T14:08:27.888Z'
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
@@ -22,8 +22,8 @@ Unchecked items:
 
 Observations:
 
-- Theme count: 9
+- Theme count: 10
 - Top embeddings recall hit: Sync redesign: decouple embedding from git, force flag, remove reindex
-- Recent navigation note: Git mutation coordination: per-repo mutex plus retry fallback
+- Recent navigation note: WIP consolidate B 1775397710060
 - Recent navigation reaches architecture/decision notes within three steps: false
-- Working-state note count: 2
+- Working-state note count: 3

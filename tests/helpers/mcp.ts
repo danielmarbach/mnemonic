@@ -258,6 +258,94 @@ export async function callLocalMcpPrompt(vaultDir: string, promptName: string): 
   return text;
 }
 
+export async function createPersistentMcpSession(
+  vaultDir: string,
+  options?: { ollamaUrl?: string; disableGit?: boolean },
+): Promise<{
+  callTool: (toolName: string, arguments_: Record<string, unknown>) => Promise<{ text: string; structuredContent?: Record<string, unknown> }>;
+  close: () => Promise<void>;
+}> {
+  const child = spawn("node", [builtEntryPoint], {
+    cwd: repoRoot,
+    env: {
+      ...process.env,
+      DISABLE_GIT: options?.disableGit === false ? "false" : "true",
+      VAULT_PATH: vaultDir,
+      ...(options?.ollamaUrl ? { OLLAMA_URL: options.ollamaUrl } : {}),
+    },
+    stdio: ["pipe", "pipe", "pipe"],
+  });
+
+  let stdoutBuffer = "";
+  let stderrBuffer = "";
+  let nextId = 1;
+  const pending = new Map<number, { resolve: (value: any) => void; reject: (error: Error) => void }>();
+
+  child.stdout.on("data", (chunk) => {
+    stdoutBuffer += chunk.toString();
+    const lines = stdoutBuffer.split("\n");
+    stdoutBuffer = lines.pop() ?? "";
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      const message = JSON.parse(line) as { id?: number; result?: Record<string, unknown> };
+      if (message.id === undefined) continue;
+      const waiter = pending.get(message.id);
+      if (!waiter) continue;
+      pending.delete(message.id);
+      waiter.resolve(message.result);
+    }
+  });
+
+  child.stderr.on("data", (chunk) => {
+    stderrBuffer += chunk.toString();
+  });
+
+  child.on("close", (code) => {
+    if (code === 0) return;
+    const error = new Error(`Persistent MCP session exited with code ${code}: ${stderrBuffer}`);
+    for (const waiter of pending.values()) {
+      waiter.reject(error);
+    }
+    pending.clear();
+  });
+
+  child.stdin.write(JSON.stringify({
+    jsonrpc: "2.0",
+    id: 0,
+    method: "initialize",
+    params: {
+      protocolVersion: "2024-11-05",
+      capabilities: {},
+      clientInfo: { name: "vitest-persistent", version: "1.0" },
+    },
+  }) + "\n");
+
+  return {
+    callTool: async (toolName, arguments_) => {
+      const id = nextId++;
+      const resultPromise = new Promise<Record<string, unknown> | undefined>((resolve, reject) => {
+        pending.set(id, { resolve, reject });
+      });
+      child.stdin.write(JSON.stringify({
+        jsonrpc: "2.0",
+        id,
+        method: "tools/call",
+        params: { name: toolName, arguments: arguments_ },
+      }) + "\n");
+      const result = await resultPromise;
+      const text = result?.content?.[0]?.text as string | undefined;
+      if (!text) {
+        throw new Error(`Missing tool response for ${toolName}`);
+      }
+      return { text, structuredContent: result?.structuredContent as Record<string, unknown> | undefined };
+    },
+    close: async () => {
+      child.stdin.end();
+      await new Promise<void>((resolve) => child.once("close", () => resolve()));
+    },
+  };
+}
+
 export async function listLocalMcpTools(vaultDir: string): Promise<Array<{ name: string; description?: string }>> {
   const response = await callLocalMcpMethod(vaultDir, 1, "tools/list", {});
   const tools = response?.result?.tools as Array<{ name: string; description?: string }> | undefined;

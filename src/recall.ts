@@ -1,6 +1,6 @@
 import type { Vault } from "./vault.js";
 import type { EffectiveNoteMetadata } from "./role-suggestions.js";
-import { computeLexicalScore } from "./lexical.js";
+import { computeLexicalScore, tokenize } from "./lexical.js";
 
 const RECALL_ALWAYS_LOAD_BOOST = 0.01;
 const RECALL_SUMMARY_BOOST = 0.012;
@@ -9,6 +9,8 @@ const RECALL_HIGH_IMPORTANCE_BOOST = 0.006;
 
 /** Weight applied to lexical score when computing hybrid boosted score. */
 const LEXICAL_HYBRID_WEIGHT = 0.12;
+const COVERAGE_HYBRID_WEIGHT = 0.08;
+const PHRASE_HYBRID_WEIGHT = 0.16;
 
 export interface ScoredRecallCandidate {
   id: string;
@@ -18,6 +20,10 @@ export interface ScoredRecallCandidate {
   isCurrentProject: boolean;
   /** Lexical overlap score in [0, 1]. Undefined when not computed. */
   lexicalScore?: number;
+  /** Coverage of rarer query tokens across the current candidate set. */
+  coverageScore?: number;
+  /** Exact contiguous phrase coverage across significant query tokens. */
+  phraseScore?: number;
 }
 
 export function computeRecallMetadataBoost(metadata?: EffectiveNoteMetadata): number {
@@ -54,7 +60,42 @@ export function computeRecallMetadataBoost(metadata?: EffectiveNoteMetadata): nu
  */
 export function computeHybridScore(candidate: ScoredRecallCandidate): number {
   const lexical = candidate.lexicalScore ?? 0;
-  return candidate.boosted + LEXICAL_HYBRID_WEIGHT * lexical;
+  const coverage = candidate.coverageScore ?? 0;
+  const phrase = candidate.phraseScore ?? 0;
+  return candidate.boosted + LEXICAL_HYBRID_WEIGHT * lexical + COVERAGE_HYBRID_WEIGHT * coverage + PHRASE_HYBRID_WEIGHT * phrase;
+}
+
+function computeSignificantPhraseScore(query: string, candidateText: string): number {
+  const phraseTokens = Array.from(new Set(tokenize(query))).filter((token) => token.length >= 4);
+  if (phraseTokens.length < 2) {
+    return 0;
+  }
+
+  const normalizedCandidate = tokenize(candidateText).join(" ");
+  return normalizedCandidate.includes(phraseTokens.join(" ")) ? 1 : 0;
+}
+
+function computeWeightedQueryCoverage(query: string, candidateText: string, corpusTexts: string[]): number {
+  const queryTokens = Array.from(new Set(tokenize(query))).filter((token) => token.length >= 4);
+  if (queryTokens.length === 0) {
+    return 0;
+  }
+
+  const candidateTokens = new Set(tokenize(candidateText));
+  const corpusTokenSets = corpusTexts.map((text) => new Set(tokenize(text)));
+  let matchedWeight = 0;
+  let totalWeight = 0;
+
+  for (const token of queryTokens) {
+    const documentFrequency = corpusTokenSets.reduce((count, tokens) => count + (tokens.has(token) ? 1 : 0), 0);
+    const weight = 1 / Math.max(documentFrequency, 1);
+    totalWeight += weight;
+    if (candidateTokens.has(token)) {
+      matchedWeight += weight;
+    }
+  }
+
+  return totalWeight === 0 ? 0 : matchedWeight / totalWeight;
 }
 
 /**
@@ -71,10 +112,16 @@ export function applyLexicalReranking(
   query: string,
   getProjectionText: (id: string) => string | undefined
 ): ScoredRecallCandidate[] {
+  const corpusTexts = candidates
+    .map((candidate) => getProjectionText(candidate.id))
+    .filter((text): text is string => Boolean(text));
+
   for (const candidate of candidates) {
     const projText = getProjectionText(candidate.id);
     if (projText) {
       candidate.lexicalScore = computeLexicalScore(query, projText);
+      candidate.coverageScore = computeWeightedQueryCoverage(query, projText, corpusTexts);
+      candidate.phraseScore = computeSignificantPhraseScore(query, projText);
     }
   }
 

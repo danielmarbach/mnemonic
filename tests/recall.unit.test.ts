@@ -153,6 +153,41 @@ describe("applyLexicalReranking", () => {
     expect(reranked[0].id).toBe("a");
   });
 
+  it("prefers candidates covering rarer query tokens when semantic scores are close", () => {
+    const candidates: ScoredRecallCandidate[] = [
+      { id: "canonical", score: 0.55, boosted: 0.55, vault, isCurrentProject: true },
+      { id: "broad", score: 0.58, boosted: 0.58, vault, isCurrentProject: true },
+    ];
+
+    const projectionTexts = new Map([
+      ["canonical", "Title: Key design decisions\nSummary: embeddings gitignored because they are derived data and recomputable"],
+      ["broad", "Title: Sync redesign\nSummary: embeddings sync redesign and reindex behavior"],
+    ]);
+
+    const reranked = applyLexicalReranking(candidates, "why are embeddings gitignored", (id) => projectionTexts.get(id));
+
+    expect(reranked[0].id).toBe("canonical");
+    expect(reranked[0].coverageScore).toBeGreaterThan(reranked[1].coverageScore ?? 0);
+  });
+
+  it("rewards contiguous significant-token phrase matches", () => {
+    const candidates: ScoredRecallCandidate[] = [
+      { id: "canonical", score: 0.5, boosted: 0.5, vault, isCurrentProject: true },
+      { id: "broad", score: 0.6, boosted: 0.6, vault, isCurrentProject: true },
+    ];
+
+    const projectionTexts = new Map([
+      ["canonical", "Title: Key design decisions\nSummary: embeddings gitignored because they are derived data and recomputable"],
+      ["broad", "Title: Sync redesign\nSummary: embeddings redesign for sync and reindex behavior"],
+    ]);
+
+    const reranked = applyLexicalReranking(candidates, "why are embeddings gitignored", (id) => projectionTexts.get(id));
+
+    expect(reranked[0].id).toBe("canonical");
+    expect(reranked[0].phraseScore).toBe(1);
+    expect(reranked[1].phraseScore ?? 0).toBe(0);
+  });
+
   it("handles missing projection text gracefully", () => {
     const candidates: ScoredRecallCandidate[] = [
       { id: "a", score: 0.6, boosted: 0.6, vault, isCurrentProject: true },
