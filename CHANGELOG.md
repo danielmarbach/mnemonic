@@ -19,6 +19,7 @@ The format is loosely based on Keep a Changelog and uses semver-style version he
 ### Fixed
 
 - Working-state continuity guidance no longer tells agents to preserve temporary checkpoints by default when consolidating completed work.
+- Same-repo git mutations inside mnemonic are now serialized, reducing transient `.git/index.lock` failures during concurrent mutating operations while keeping bounded retry fallback for external contention.
 
 ## [0.20.0] - 2026-04-04
 

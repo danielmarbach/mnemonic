@@ -1,5 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+function deferred<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+}
+
 const add = vi.fn();
 const status = vi.fn();
 const commit = vi.fn();
@@ -166,6 +176,77 @@ describe("GitOps", () => {
     expect(result.status).toBe("failed");
     expect(result.operation).toBe("commit");
     expect(result.error).toContain("signing failed");
+  });
+
+  it("serializes concurrent same-repo commit mutations", async () => {
+    const { GitOps } = await import("../src/git.js");
+    const firstCommitGate = deferred<void>();
+    const firstAddStarted = deferred<void>();
+    let activeAdds = 0;
+    let maxConcurrentAdds = 0;
+    let addCallCount = 0;
+
+    add.mockImplementation(async () => {
+      addCallCount += 1;
+      activeAdds += 1;
+      maxConcurrentAdds = Math.max(maxConcurrentAdds, activeAdds);
+
+      if (addCallCount === 1) {
+        firstAddStarted.resolve();
+      }
+
+      await Promise.resolve();
+      activeAdds -= 1;
+    });
+
+    status.mockResolvedValue({ staged: ["notes/test.md"] });
+    commit.mockImplementation(async () => {
+      if (addCallCount === 1) {
+        await firstCommitGate.promise;
+      }
+    });
+
+    const gitA = new GitOps("/tmp/repo");
+    const gitB = new GitOps("/tmp/repo");
+    await gitA.init();
+    await gitB.init();
+
+    const first = gitA.commitWithStatus("remember: first", ["notes/first.md"]);
+    await firstAddStarted.promise;
+    const second = gitB.commitWithStatus("remember: second", ["notes/second.md"]);
+    await Promise.resolve();
+
+    expect(addCallCount).toBe(1);
+    expect(maxConcurrentAdds).toBe(1);
+
+    firstCommitGate.resolve();
+
+    await expect(first).resolves.toMatchObject({ status: "committed" });
+    await expect(second).resolves.toMatchObject({ status: "committed" });
+    expect(addCallCount).toBe(2);
+    expect(maxConcurrentAdds).toBe(1);
+  });
+
+  it("releases the same-repo mutation lock after a commit failure", async () => {
+    const { GitOps } = await import("../src/git.js");
+    const gitA = new GitOps("/tmp/repo");
+    const gitB = new GitOps("/tmp/repo");
+    await gitA.init();
+    await gitB.init();
+
+    add.mockResolvedValue(undefined);
+    status.mockResolvedValue({ staged: ["notes/test.md"] });
+    commit.mockRejectedValueOnce(new Error("signing failed"));
+    commit.mockResolvedValueOnce(undefined);
+
+    await expect(gitA.commitWithStatus("remember: first", ["notes/first.md"])).resolves.toMatchObject({
+      status: "failed",
+      operation: "commit",
+    });
+
+    await expect(gitB.commitWithStatus("remember: second", ["notes/second.md"])).resolves.toMatchObject({
+      status: "committed",
+    });
   });
 
   describe("sync", () => {
