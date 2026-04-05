@@ -4028,11 +4028,15 @@ server.registerTool(
     const suggestedEnriched = await Promise.all(suggestedCandidates.map(enrichOrientationNote));
     const suggestedRelationships = await Promise.all(suggestedCandidates.map(enrichOrientationNoteWithRelationships));
 
+    const recentPermanent = recent.find((entry) => entry.note.lifecycle === "permanent");
+    const fallbackEntry = recentPermanent ?? recent[0];
+    const permanentOverrideUsed = Boolean(recentPermanent && recent[0] && recentPermanent.note.id !== recent[0].note.id);
+
     // Enrich fallback primaryEntry when no anchors exist
     let fallbackEnriched: { provenance?: { lastUpdatedAt: string; lastCommitHash: string; lastCommitMessage: string; recentlyChanged: boolean }; confidence?: "high" | "medium" | "low" } = {};
     let fallbackRelationships: { relationships?: RelationshipPreview } = {};
-    if (!primaryAnchor && recent[0]) {
-      const fallbackNote = recent[0].note;
+    if (!primaryAnchor && fallbackEntry) {
+      const fallbackNote = fallbackEntry.note;
       const vault = noteVaultMap.get(fallbackNote.id);
       if (vault) {
         const filePath = `${vault.notesRelDir}/${fallbackNote.id}.md`;
@@ -4058,9 +4062,11 @@ server.registerTool(
             ...primaryRelationships,
           }
         : {
-            id: recent[0]?.note.id ?? projectEntries[0]?.note.id ?? "",
-            title: recent[0]?.note.title ?? projectEntries[0]?.note.title ?? "No notes",
-            rationale: recent[0]
+            id: fallbackEntry?.note.id ?? projectEntries[0]?.note.id ?? "",
+            title: fallbackEntry?.note.title ?? projectEntries[0]?.note.title ?? "No notes",
+            rationale: permanentOverrideUsed
+              ? "Most recent permanent note — no high-centrality anchors found"
+              : fallbackEntry
               ? "Most recent note — no high-centrality anchors found"
               : "Only note available",
             ...fallbackEnriched,

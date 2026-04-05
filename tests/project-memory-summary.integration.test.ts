@@ -915,6 +915,48 @@ describe("project-memory-summary", () => {
     }
   }, 20000);
 
+  it("falls back to the most recent permanent note for orientation before temporary working-state notes", async () => {
+    const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-vault-"));
+    const repoDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-project-"));
+    tempDirs.push(vaultDir, repoDir);
+
+    await initTestRepo(repoDir);
+
+    const embeddingServer = await startFakeEmbeddingServer();
+
+    try {
+      await callLocalMcp(vaultDir, "remember", {
+        title: "Permanent orientation note",
+        content: "Permanent overview that should anchor orientation when no graph anchors exist.",
+        tags: ["overview", "integration"],
+        summary: "Create permanent orientation fallback note",
+        cwd: repoDir,
+        scope: "project",
+        lifecycle: "permanent",
+      }, embeddingServer.url);
+
+      await callLocalMcp(vaultDir, "remember", {
+        title: "Temporary checkpoint note",
+        content: "## Status\n\nPartial work remains.\n\n- verify fallback ordering",
+        tags: ["workflow", "integration"],
+        summary: "Create temporary checkpoint note",
+        cwd: repoDir,
+        scope: "project",
+        lifecycle: "temporary",
+      }, embeddingServer.url);
+
+      const summary = await callLocalMcpResponse(vaultDir, "project_memory_summary", {
+        cwd: repoDir,
+      }, embeddingServer.url);
+
+      const parsed = ProjectSummaryResultSchema.parse(summary.structuredContent);
+      expect(parsed.orientation.primaryEntry.title).toBe("Permanent orientation note");
+      expect(parsed.workingState?.notes[0]?.title).toBe("Temporary checkpoint note");
+    } finally {
+      await embeddingServer.close();
+    }
+  }, 20000);
+
   it("emits taxonomy dilution warnings only when other exceeds thirty percent", async () => {
     const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-vault-"));
     const repoDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-project-"));
