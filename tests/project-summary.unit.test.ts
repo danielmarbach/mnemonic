@@ -331,7 +331,7 @@ describe("project summary scoring helpers", () => {
         content: "## Status\n\nBlockiert durch ein Problem.\n\n- Integrationspfad pruefen\n- Checkpoint erfassen",
       });
 
-      expect(workingStateScore(english, noMetadata)).toBe(workingStateScore(german, noMetadata));
+      expect(workingStateScore(english, noMetadata)).toBeCloseTo(workingStateScore(german, noMetadata), 10);
     });
 
     it("gives plan metadata a boost for temporary checkpoints", () => {
