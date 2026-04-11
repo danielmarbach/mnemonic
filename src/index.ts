@@ -16,8 +16,12 @@ import {
   invalidateActiveProjectCache,
   getOrBuildVaultEmbeddings,
   getOrBuildVaultNoteList,
+  getRecentSessionNoteAccesses,
+  getRecentSessionAccessNote,
   getSessionCachedNote,
   getSessionCachedProjection,
+  recordSessionNoteAccess,
+  setSessionCachedNote,
   setSessionCachedProjection,
 } from "./cache.js";
 import { performance } from "perf_hooks";
@@ -28,6 +32,7 @@ import {
   normalizeMergePlanSourceIds,
   resolveEffectiveConsolidationMode,
 } from "./consolidate.js";
+import { suggestAutoRelationships } from "./auto-relate.js";
 import { computeRecallMetadataBoost, computeHybridScore, selectRecallResults, applyLexicalReranking, type ScoredRecallCandidate } from "./recall.js";
 import {
   shouldTriggerLexicalRescue,
@@ -1917,6 +1922,22 @@ server.registerTool(
       memoryVersion: 1,
     };
 
+    if (project) {
+      const accessCandidates = getRecentSessionNoteAccesses(project.id)
+        .map((entry) => {
+          const cachedNote = getSessionCachedNote(project.id, entry.vaultPath, entry.noteId)
+            ?? getRecentSessionAccessNote(project.id, entry.vaultPath, entry.noteId);
+          return cachedNote
+            ? { note: cachedNote, accessedAt: entry.accessedAt, accessKind: entry.accessKind, score: entry.score }
+            : null;
+        })
+        .filter((entry): entry is NonNullable<typeof entry> => entry !== null);
+      const autoRelationships = suggestAutoRelationships(note, accessCandidates);
+      if (autoRelationships.length > 0) {
+        note.relatedTo = autoRelationships;
+      }
+    }
+
     await vault.storage.writeNote(note);
 
     let embeddingStatus: { status: "written" | "skipped"; reason?: string } = { status: "written" };
@@ -2559,6 +2580,17 @@ server.registerTool(
           historySummary,
           relationships,
         });
+
+        if (project) {
+          setSessionCachedNote(project.id, vault.storage.vaultPath, note);
+          recordSessionNoteAccess(project.id, vault.storage.vaultPath, id, "recall", computeHybridScore({
+            id,
+            score,
+            boosted,
+            vault,
+            isCurrentProject: note.project === project.id,
+          }));
+        }
       }
     }
 
@@ -2676,6 +2708,28 @@ server.registerTool(
       alwaysLoad: alwaysLoad !== undefined ? alwaysLoad : note.alwaysLoad,
       updatedAt: now,
     };
+
+    if (updated.project) {
+      const accessCandidates = getRecentSessionNoteAccesses(updated.project)
+        .map((entry) => {
+          const cachedNote = getSessionCachedNote(updated.project!, entry.vaultPath, entry.noteId)
+            ?? getRecentSessionAccessNote(updated.project!, entry.vaultPath, entry.noteId);
+          return cachedNote
+            ? { note: cachedNote, accessedAt: entry.accessedAt, accessKind: entry.accessKind, score: entry.score }
+            : null;
+        })
+        .filter((entry): entry is NonNullable<typeof entry> => entry !== null);
+      const autoRelationships = suggestAutoRelationships(updated, accessCandidates);
+      if (autoRelationships.length > 0) {
+        const existing = [...(updated.relatedTo ?? [])];
+        for (const relationship of autoRelationships) {
+          if (!existing.some((rel) => rel.id === relationship.id && rel.type === relationship.type)) {
+            existing.push(relationship);
+          }
+        }
+        updated.relatedTo = existing;
+      }
+    }
 
     await vault.storage.writeNote(updated);
 
@@ -2962,6 +3016,11 @@ server.registerTool(
         vault: storageLabel(vault),
         relationships,
       });
+
+      if (project) {
+        setSessionCachedNote(project.id, vault.storage.vaultPath, note);
+        recordSessionNoteAccess(project.id, vault.storage.vaultPath, note.id, "get");
+      }
     }
 
     const lines: string[] = [];

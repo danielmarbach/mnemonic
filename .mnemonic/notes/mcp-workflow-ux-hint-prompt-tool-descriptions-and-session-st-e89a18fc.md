@@ -21,8 +21,6 @@ relatedTo:
     type: related-to
   - id: phase-2-design-workflow-hint-first-working-state-continuity-07153fcb
     type: related-to
-  - id: phase-2-implementation-plan-workflow-hint-first-working-stat-d321a64a
-    type: related-to
 memoryVersion: 1
 ---
 ## Decision: MCP prompt over system prompt injection
