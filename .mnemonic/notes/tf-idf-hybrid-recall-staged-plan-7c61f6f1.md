@@ -8,7 +8,7 @@ tags:
   - projections
 lifecycle: temporary
 createdAt: '2026-04-16T19:32:34.302Z'
-updatedAt: '2026-04-16T19:58:30.409Z'
+updatedAt: '2026-04-16T20:04:25.651Z'
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
@@ -34,8 +34,11 @@ Determine whether TF-IDF improves lexical-heavy recall enough to keep, while pre
 Implemented so far:
 
 - baseline semantic paraphrase safety integration coverage was added
+- explicit repo-jargon rescue coverage was added
+- explicit stronger-non-English semantic guardrail coverage was added
 - pure TF-IDF helpers were added in `src/lexical.ts`
 - lexical rescue candidate collection now ranks the whole eligible rescue pool with TF-IDF before applying the bounded rescue limit
+- late-candidate rescue coverage now verifies that a stronger lexical match can still win even when it appears after many weaker decoys
 - targeted lexical and recall-focused verification passed after the change
 
 Implemented files:
@@ -48,7 +51,7 @@ Implemented files:
 Verified command and result:
 
 - `npm test -- tests/lexical.unit.test.ts tests/recall.unit.test.ts tests/recall-embeddings.integration.test.ts`
-- result: 3 files passed, 69 tests passed, 0 failed
+- result: 3 files passed, 71 tests passed, 0 failed
 
 ## Language-independence reference
 
@@ -68,19 +71,21 @@ This does not mean TF-IDF must become language-neutral. It means the experiment 
 
 ### Checkpoint 1: Freeze the current baseline behavior
 
-Status: partially complete.
+Status: substantially complete.
 
 Completed baseline coverage:
 
 - semantic paraphrase safety
 - exact lexical tie-break coverage remains present from the existing cold-projection reranking test
-- weak semantic rescue quality remains present from the existing rescue ranking test
-
-Still to add for a fuller baseline matrix:
-
 - explicit identifier and repo-jargon lookup regression case
-- explicit cross-language sanity integration case
-- explicit cold-start operational simplicity assertion for TF-IDF-aware recall behavior if the existing MCP integration coverage is judged insufficient
+- weak semantic rescue quality remains present from the existing rescue ranking test
+- late-candidate rescue coverage for stronger lexical matches beyond many weaker decoys
+- explicit cross-language semantic guardrail case
+- project-first widening invariants remain covered in `tests/recall.unit.test.ts`
+
+Still optional to add later if needed:
+
+- a dedicated TF-IDF-aware cold-start operational simplicity assertion, if current MCP integration coverage proves too implicit during later review
 
 Files to inspect or extend:
 
@@ -88,9 +93,9 @@ Files to inspect or extend:
 - `src/recall.ts`
 - `tests/lexical.unit.test.ts`
 - `tests/recall-embeddings.integration.test.ts`
-- `tests/recall.unit.test.ts` if project-bias assertions fit better there
+- `tests/recall.unit.test.ts`
 
-Baseline matrix to lock down before broader TF-IDF changes:
+Baseline matrix status:
 
 1. Semantic paraphrase safety
 
@@ -107,8 +112,8 @@ Baseline matrix to lock down before broader TF-IDF changes:
 1. Identifier and repo-jargon lookup
 
 - target file: `tests/recall-embeddings.integration.test.ts`
-- status: not yet added as an explicit regression test
-- proposed test name: `it("rescues rare repo-jargon queries with the strongest lexical match", async () => { ... })`
+- status: implemented
+- test name: `it("rescues rare repo-jargon queries with the strongest lexical match", async () => { ... })`
 
 1. Weak semantic rescue quality
 
@@ -125,18 +130,18 @@ Baseline matrix to lock down before broader TF-IDF changes:
 1. Cold-start operational simplicity
 
 - target file: `tests/recall-embeddings.integration.test.ts` or MCP smoke coverage using `tests/helpers/mcp.ts`
-- status: partially covered by existing MCP integration style, but not yet called out with a TF-IDF-specific assertion
+- status: indirectly covered by current MCP integration style, but not yet called out with a dedicated TF-IDF-specific assertion
 
 1. Cross-language sanity check
 
 - target file: `tests/recall-embeddings.integration.test.ts`
-- status: not yet implemented
-- proposed test name: `it("does not let lexical boosts displace an equally strong non-English semantic match", async () => { ... })`
+- status: implemented
+- test name: `it("does not let lexical boosts displace a stronger non-English semantic match", async () => { ... })`
 
 Success condition:
 
 - current behavior is locked down tightly enough that further TF-IDF changes can be judged against a fixed matrix instead of memory or intuition
-- at least one explicit baseline test exists for each of the seven categories above
+- the main baseline categories are now explicitly covered, with only the cold-start TF-IDF-specific assertion remaining optional
 
 ### Checkpoint 2: Add isolated TF-IDF primitives in `src/lexical.ts`
 
@@ -175,46 +180,46 @@ Implemented behavior:
 Current implementation shape:
 
 - TF-IDF is now used to shortlist rescue candidates across the whole eligible pool rather than stopping at the first qualifying notes in file order
-- current final rescue lexical score is `max(computeLexicalScore(...), tfIdfScore)` for shortlisted candidates
+- current final rescue lexical score is based on the TF-IDF shortlist score for rescue candidates
+- the rescue-only path now behaves more like a rare-term lexical recovery pass than a broad fuzzy scan
 
 Still to evaluate:
 
-- whether this lexical-score combination is the right long-term Phase 1 choice or just an acceptable prototype step
-- whether repo-jargon and identifier-heavy cases improve enough in practice
-- whether a cross-language sanity case still passes cleanly
+- whether the current TF-IDF plus thresholding combination is the right long-term Phase 1 choice or just an acceptable prototype step
+- whether a dedicated cold-start TF-IDF-aware assertion adds useful signal beyond the existing integration tests
 
 ### Checkpoint 4: Verify Phase 1 quality against explicit scenarios
 
-Status: in progress.
+Status: substantially complete for baseline verification, but still incomplete for measurement.
 
 Verified so far:
 
 - semantic paraphrase remains dominant in the added baseline integration test
+- repo-jargon and identifier-heavy lexical recovery scenarios are now covered
 - lexical rescue still surfaces strongest late candidates after TF-IDF shortlist ranking
+- stronger non-English semantic matches are not displaced by English lexical overlap in the added cross-language guardrail test
 - lexical and recall-focused suites pass after the rescue-path change
 
 Still to verify explicitly:
 
-- identifier and repo-jargon gains
-- cross-language semantic correctness guardrail
-- whether a dedicated cold-start TF-IDF-aware MCP assertion is needed beyond current integration coverage
+- whether a dedicated cold-start TF-IDF-aware MCP assertion adds value beyond current integration coverage
 
 Candidate scenario-to-test mapping:
 
 - paraphrase safety: implemented
 - exact lexical tie-break: existing coverage remains
 - rescue quality: existing coverage plus late-candidate regression remains
-- repo jargon gain: still to add
-- cold-start simplicity: may need explicit targeted assertion
-- cross-language sanity: still to add
+- repo jargon gain: implemented
+- cold-start simplicity: may still need explicit targeted assertion
+- cross-language sanity: implemented
 
 Success condition:
 
-- the test suite demonstrates clear improvement for lexical-heavy cases with no visible semantic-first regression and no obvious language-independence regression
+- the test suite demonstrates lexical-heavy coverage with no visible semantic-first regression and no obvious language-independence regression
 
 ### Checkpoint 5: Measure Phase 1 cost before proceeding
 
-Status: not started.
+Status: next major step. Not started yet.
 
 Still needed:
 
@@ -275,11 +280,10 @@ Do not add any of the following during the experiment:
 
 These are the places where I would stop and confirm direction instead of silently pushing forward:
 
-1. After the remaining baseline tests are frozen, to confirm the comparison corpus is representative enough.
-2. After repo-jargon and cross-language cases are added, to confirm the Phase 1 signal is still acceptable.
-3. After Phase 1 verification and measurements, to decide stop vs proceed.
-4. After any Phase 2 large-corpus comparison, to decide keep current, rescue-only, or candidate-generation.
-5. Before changing the reusable dogfooding packs, to confirm whether that change is actually warranted.
+1. Before Phase 1 measurement, to confirm the comparison corpus is representative enough.
+2. After Phase 1 verification and measurements, to decide stop vs proceed.
+3. After any Phase 2 large-corpus comparison, to decide keep current, rescue-only, or candidate-generation.
+4. Before changing the reusable dogfooding packs, to confirm whether that change is actually warranted.
 
 ## Current status
 
@@ -287,6 +291,6 @@ This note is intentionally temporary. It is execution scaffolding for the experi
 
 Current state in plain terms:
 
-- baseline and TF-IDF primitive work has started well
-- rescue-only TF-IDF shortlist behavior is implemented
-- Phase 1 is not complete until the remaining baseline cases and measurement work are done
+- the baseline and guardrail coverage for Phase 1 is now in good shape
+- the rescue-only TF-IDF shortlist behavior is implemented and verified against targeted recall suites
+- the next useful step is measurement, not more baseline scaffolding
