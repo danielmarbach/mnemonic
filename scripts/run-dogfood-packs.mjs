@@ -10,8 +10,10 @@ import {
   getWorkingStateNotes,
   pickRecentNoteForRelationshipNavigation,
 } from "./dogfooding-runner-helpers.mjs";
+import { createIsolatedDogfoodVault } from "./dogfooding-isolated-vault.mjs";
 
-const cwd = process.argv[2] ? new URL(`file://${process.argv[2]}`).pathname : process.cwd();
+const useIsolated = process.argv.includes("--isolated");
+let cwd = process.argv[2] && !process.argv[2].startsWith("--") ? new URL(`file://${process.argv[2]}`).pathname : process.cwd();
 const today = new Date().toISOString().slice(0, 10);
 const mnemonicEntrypoint = process.env.MNEMONIC_ENTRYPOINT;
 let sessionChild;
@@ -148,7 +150,19 @@ async function forgetIfPresent(id) {
   await callTool("forget", { id, cwd, allowProtectedBranch: true });
 }
 
+let _isolated = null;
+
 async function main() {
+  let isolated = null;
+
+  if (useIsolated) {
+    const sourceVault = path.join(cwd, ".mnemonic");
+    isolated = await createIsolatedDogfoodVault(sourceVault);
+    _isolated = isolated;
+    cwd = path.dirname(isolated.vaultPath);
+    console.error(`[isolated] vault at ${isolated.vaultPath}`);
+  }
+
   const report = {};
   const summary1 = await callTool("project_memory_summary", { cwd });
   const summary2 = await callTool("project_memory_summary", { cwd });
@@ -283,16 +297,20 @@ async function main() {
   report.packB = packB;
   report.packC = packC;
 
-  const packAContent = `Dogfooding results for the core enrichment/orientation pack on ${today} using the installed mnemonic server.\n\nUnchecked items:\n${packA.unchecked.length === 0 ? "- none" : packA.unchecked.map((item) => `- ${item}`).join("\n")}\n\nObservations:\n- Theme count: ${packA.themeCount}\n- Top embeddings recall hit: ${packA.topEmbeddingResult}\n- Recent navigation note: ${packA.recentNavigationNote}\n- Recent navigation reaches architecture/decision notes within three steps: ${packA.reachesArchitectureWithinThreeSteps}\n- Working-state note count: ${packA.workingStateCount}`;
+  const vaultLabel = useIsolated ? "isolated vault" : "installed mnemonic server";
 
-  const packBContent = `Dogfooding results for the working-state continuity pack on ${today} using the installed mnemonic server.\n\nUnchecked items:\n${packB.unchecked.length === 0 ? "- none" : packB.unchecked.map((item) => `- ${item}`).join("\n")}\n\nObservations:\n- Temporary recent titles: ${packB.recentTemporaryTitles.map((title) => `\`${title}\``).join(", ") || "none"}\n- Temporary recall titles: ${packB.recalledTemporaryTitles.map((title) => `\`${title}\``).join(", ") || "none"}\n- All-temporary merges auto-delete by default: ${packB.allTemporarySourcesAutoDelete}`;
+  const packAContent = `Dogfooding results for the core enrichment/orientation pack on ${today} using the ${vaultLabel}.\n\nUnchecked items:\n${packA.unchecked.length === 0 ? "- none" : packA.unchecked.map((item) => `- ${item}`).join("\n")}\n\nObservations:\n- Theme count: ${packA.themeCount}\n- Top embeddings recall hit: ${packA.topEmbeddingResult}\n- Recent navigation note: ${packA.recentNavigationNote}\n- Recent navigation reaches architecture/decision notes within three steps: ${packA.reachesArchitectureWithinThreeSteps}\n- Working-state note count: ${packA.workingStateCount}`;
 
-  const packCContent = `Dogfooding results for the blind interruption/resumption pack on ${today} using the installed mnemonic server.\n\nUnchecked items:\n- none`;
+  const packBContent = `Dogfooding results for the working-state continuity pack on ${today} using the ${vaultLabel}.\n\nUnchecked items:\n${packB.unchecked.length === 0 ? "- none" : packB.unchecked.map((item) => `- ${item}`).join("\n")}\n\nObservations:\n- Temporary recent titles: ${packB.recentTemporaryTitles.map((title) => `\`${title}\``).join(", ") || "none"}\n- Temporary recall titles: ${packB.recalledTemporaryTitles.map((title) => `\`${title}\``).join(", ") || "none"}\n- All-temporary merges auto-delete by default: ${packB.allTemporarySourcesAutoDelete}`;
+
+  const packCContent = `Dogfooding results for the blind interruption/resumption pack on ${today} using the ${vaultLabel}.\n\nUnchecked items:\n- none`;
+
+  const packTitleSuffix = useIsolated ? ` (${today}) (isolated vault)` : ` (${today})`;
 
   report.stored = {
-    packA: await upsertNote({ title: `Dogfooding results: core enrichment/orientation pack (${today})`, content: packAContent, tags: ["dogfooding", "testing", "scorecard", "regression"] }),
-    packB: await upsertNote({ title: `Dogfooding results: working-state continuity pack (${today})`, content: packBContent, tags: ["dogfooding", "testing", "scorecard", "workflow", "temporary-notes"] }),
-    packC: await upsertNote({ title: `Dogfooding results: blind interruption/resumption pack (${today})`, content: packCContent, tags: ["dogfooding", "testing", "scorecard", "workflow", "temporary-notes", "continuity"] }),
+    packA: await upsertNote({ title: `Dogfooding results: core enrichment/orientation pack${packTitleSuffix}`, content: packAContent, tags: ["dogfooding", "testing", "scorecard", "regression"] }),
+    packB: await upsertNote({ title: `Dogfooding results: working-state continuity pack${packTitleSuffix}`, content: packBContent, tags: ["dogfooding", "testing", "scorecard", "workflow", "temporary-notes"] }),
+    packC: await upsertNote({ title: `Dogfooding results: blind interruption/resumption pack${packTitleSuffix}`, content: packCContent, tags: ["dogfooding", "testing", "scorecard", "workflow", "temporary-notes", "continuity"] }),
   };
 
   console.log(JSON.stringify(report, null, 2));
@@ -301,8 +319,12 @@ async function main() {
 main().catch((error) => {
   console.error(error.stack || error.message || String(error));
   process.exit(1);
-}).finally(() => {
+}).finally(async () => {
   if (sessionChild) {
     sessionChild.stdin.end();
+  }
+  if (_isolated) {
+    await _isolated.cleanup();
+    console.error("[isolated] cleaned up");
   }
 });
