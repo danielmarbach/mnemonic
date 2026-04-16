@@ -2295,7 +2295,7 @@ async function collectLexicalRescueCandidates(
     const tfIdfScore = rankedRescueIds.get(candidate.id);
     if (tfIdfScore === undefined || tfIdfScore <= 0) continue;
 
-    const lexicalScore = Math.max(computeLexicalScore(query, candidate.projectionText), tfIdfScore);
+    const lexicalScore = tfIdfScore;
     if (lexicalScore < LEXICAL_RESCUE_THRESHOLD) continue;
 
     const boost = (candidate.isCurrentProject ? 0.15 : 0) + candidate.metadataBoost;

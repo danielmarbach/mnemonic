@@ -180,13 +180,46 @@ export function rankDocumentsByTfIdf(
   }
 
   const corpus = documents.map((document) => document.text);
+  const corpusTokens = corpus.map((entry) => tokenize(entry));
+  const queryTokens = tokenize(query);
+  const idf = computeInverseDocumentFrequency(corpusTokens);
+
   return documents
-    .map((document) => ({
-      id: document.id,
-      score: computeTfIdfCosineSimilarity(query, document.text, corpus),
-    }))
+    .map((document) => {
+      const tfIdfScore = computeTfIdfCosineSimilarity(query, document.text, corpus);
+      const coverageScore = computeTfIdfWeightedQueryCoverage(queryTokens, tokenize(document.text), idf);
+      return {
+        id: document.id,
+        score: tfIdfScore + 0.35 * coverageScore,
+      };
+    })
     .sort((a, b) => b.score - a.score)
     .slice(0, limit);
+}
+
+function computeTfIdfWeightedQueryCoverage(
+  queryTokens: string[],
+  documentTokens: string[],
+  idf: Map<string, number>
+): number {
+  const uniqueQueryTokens = Array.from(new Set(queryTokens));
+  if (uniqueQueryTokens.length === 0) {
+    return 0;
+  }
+
+  const documentTokenSet = new Set(documentTokens);
+  let matchedWeight = 0;
+  let totalWeight = 0;
+
+  for (const token of uniqueQueryTokens) {
+    const weight = idf.get(token) ?? 0;
+    totalWeight += weight;
+    if (documentTokenSet.has(token)) {
+      matchedWeight += weight;
+    }
+  }
+
+  return totalWeight === 0 ? 0 : matchedWeight / totalWeight;
 }
 
 /**

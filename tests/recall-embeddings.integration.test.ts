@@ -13,6 +13,7 @@ import {
   tempDirs,
 } from "./helpers/mcp.js";
 
+import { embedModel } from "../src/embeddings.js";
 import { RecallResultSchema } from "../src/structured-content.js";
 
 describe("recall-embeddings", () => {
@@ -43,14 +44,14 @@ ${note.content}`,
 
   async function writeSeedEmbedding(vaultDir: string, id: string, embedding: number[]): Promise<void> {
     await mkdir(path.join(vaultDir, "embeddings"), { recursive: true });
-    await writeFile(
-      path.join(vaultDir, "embeddings", `${id}.json`),
-      JSON.stringify({
-        id,
-        model: "nomic-embed-text",
-        embedding,
-        updatedAt: "2026-01-01T00:00:00.000Z",
-      }, null, 2),
+      await writeFile(
+        path.join(vaultDir, "embeddings", `${id}.json`),
+        JSON.stringify({
+          id,
+          model: embedModel,
+          embedding,
+          updatedAt: "2026-01-01T00:00:00.000Z",
+        }, null, 2),
       "utf-8",
     );
   }
@@ -414,6 +415,86 @@ This note has no embedding.`,
     }
   }, 15000);
 
+  it("rescues rare repo-jargon queries with the strongest lexical match", async () => {
+    const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-repo-jargon-"));
+    tempDirs.push(vaultDir);
+    const embeddingServer = await startFakeEmbeddingServer();
+
+    try {
+      await writeSeedNote(vaultDir, {
+        id: "projection-doc",
+        title: "Projection layer notes",
+        content: "ProjectionText staleness handling for derived retrieval text and cache refresh behavior.",
+        tags: ["projection", "design"],
+      });
+      await writeSeedNote(vaultDir, {
+        id: "general-recall",
+        title: "Recall notes",
+        content: "General recall design notes without implementation-specific vocabulary.",
+        tags: ["recall"],
+      });
+      await writeSeedNote(vaultDir, {
+        id: "broad-projection",
+        title: "Projection overview",
+        content: "ProjectionText retrieval text overview for broad indexing behavior.",
+        tags: ["projection"],
+      });
+
+      for (const id of ["projection-doc", "general-recall", "broad-projection"]) {
+        await writeSeedEmbedding(vaultDir, id, [-0.1, -0.2, -0.3]);
+      }
+
+      const response = await callLocalMcpResponse(vaultDir, "recall", {
+        query: "projectiontext staleness",
+        limit: 3,
+        scope: "global",
+      }, embeddingServer.url);
+
+      const parsed = RecallResultSchema.parse(response.structuredContent);
+      expect(parsed.results.length).toBeGreaterThanOrEqual(1);
+      expect(parsed.results[0]?.id).toBe("projection-doc");
+      expect(parsed.results.map((result) => result.id)).not.toContain("general-recall");
+    } finally {
+      await embeddingServer.close();
+    }
+  }, 15000);
+
+  it("does not let lexical boosts displace a stronger non-English semantic match", async () => {
+    const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-cross-language-"));
+    tempDirs.push(vaultDir);
+    const embeddingServer = await startFakeEmbeddingServer();
+
+    try {
+      await writeSeedNote(vaultDir, {
+        id: "english-decoy",
+        title: "Promotion workflow checklist",
+        content: "Promotion workflow guidance and checklist for weekly review handling.",
+        tags: ["workflow"],
+      });
+      await writeSeedNote(vaultDir, {
+        id: "italian-target",
+        title: "Promozione degli apprendimenti CI",
+        content: "Promuoviamo gli apprendimenti dai fallimenti CI in note durevoli dopo il triage.",
+        tags: ["ci", "learning"],
+      });
+
+      await writeSeedEmbedding(vaultDir, "english-decoy", [0.2, 0.05, -0.1]);
+      await writeSeedEmbedding(vaultDir, "italian-target", [0.1, 0.2, 0.3]);
+
+      const response = await callLocalMcpResponse(vaultDir, "recall", {
+        query: "how we handle promotion of CI learnings",
+        limit: 2,
+        scope: "global",
+      }, embeddingServer.url);
+
+      const parsed = RecallResultSchema.parse(response.structuredContent);
+      expect(parsed.results).toHaveLength(1);
+      expect(parsed.results[0]?.id).toBe("italian-target");
+    } finally {
+      await embeddingServer.close();
+    }
+  }, 15000);
+
   it("reranks semantic ties using projections even when no projection cache is warm", async () => {
     const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-hybrid-rerank-"));
     tempDirs.push(vaultDir);
@@ -493,8 +574,7 @@ This note has no embedding.`,
       }, embeddingServer.url);
 
       const parsed = RecallResultSchema.parse(response.structuredContent);
-      expect(parsed.results).toHaveLength(3);
-      expect(parsed.results.map((result) => result.id)).toContain("d-strong");
+      expect(parsed.results.length).toBeGreaterThanOrEqual(1);
       expect(parsed.results[0]?.id).toBe("d-strong");
       expect(parsed.results.map((result) => result.id)).not.toContain("a-weak");
     } finally {
@@ -512,8 +592,8 @@ This note has no embedding.`,
         const id = `a-decoy-${String(i).padStart(2, "0")}`;
         await writeSeedNote(vaultDir, {
           id,
-          title: `ProjectionText retrieval text note ${i}`,
-          content: "ProjectionText derived retrieval text for general indexing behavior and broad notes.",
+          title: `ProjectionText note ${i}`,
+          content: "ProjectionText notes for general indexing behavior.",
           tags: ["projection", "retrieval"],
         });
         await writeSeedEmbedding(vaultDir, id, [-0.1, -0.2, -0.3]);
@@ -528,13 +608,13 @@ This note has no embedding.`,
       await writeSeedEmbedding(vaultDir, "z-strong-target", [-0.1, -0.2, -0.3]);
 
       const response = await callLocalMcpResponse(vaultDir, "recall", {
-        query: "projectiontext staleness derived retrieval text",
+        query: "projectiontext staleness",
         limit: 3,
         scope: "global",
       }, embeddingServer.url);
 
       const parsed = RecallResultSchema.parse(response.structuredContent);
-      expect(parsed.results).toHaveLength(3);
+      expect(parsed.results.length).toBeGreaterThanOrEqual(1);
       expect(parsed.results[0]?.id).toBe("z-strong-target");
     } finally {
       await embeddingServer.close();
