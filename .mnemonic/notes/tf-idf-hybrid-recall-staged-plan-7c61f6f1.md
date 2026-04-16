@@ -8,7 +8,7 @@ tags:
   - projections
 lifecycle: temporary
 createdAt: '2026-04-16T19:32:34.302Z'
-updatedAt: '2026-04-16T19:34:48.372Z'
+updatedAt: '2026-04-16T19:36:22.485Z'
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
@@ -17,203 +17,218 @@ relatedTo:
     type: explains
 memoryVersion: 1
 ---
-Refine the TF-IDF experiment as a staged implementation and verification plan that can be executed without changing mnemonic's file-first, semantic-first architecture.
+Temporary execution plan for evaluating TF-IDF inside mnemonic's hybrid recall path without changing the current semantic-first architecture.
 
 ## Goal
 
-Determine whether TF-IDF materially improves the lexical lane of hybrid recall enough to justify keeping it, while preserving the current retrieval contract:
+Determine whether TF-IDF improves lexical-heavy recall enough to keep, while preserving these invariants:
 
-- semantic recall remains primary
-- project-first widening remains intact
-- derived data stays rebuildable and disposable
-- local MCP usage requires no new operational steps
+- semantic retrieval remains primary
+- project-first widening remains unchanged
+- all TF-IDF state is derived and disposable
+- local MCP startup and usage require no extra steps
 
-## Baseline and scope
+## Current baseline
 
-The baseline is the current shipped hybrid recall implementation described in `Hybrid recall design and implementation (completed 0.20.0)`.
+The current shipped implementation already has three lexical signals:
 
-The experiment must stay inside the existing retrieval architecture:
+- `computeLexicalScore()` in `src/lexical.ts`
+- rare-token coverage in `src/recall.ts`
+- significant-phrase coverage in `src/recall.ts`
 
-- source data remains markdown notes
-- projection text remains the lexical substrate
-- embeddings remain the primary recall path
-- TF-IDF is evaluated only as a helper inside the lexical lane
+The current test seam is also already in place:
 
-Do not widen scope into persistence, background indexing, raw-markdown parsing, or user-visible configuration until the retrieval value is proven.
+- unit tests: `tests/lexical.unit.test.ts`
+- reranking and rescue integration tests: `tests/recall-embeddings.integration.test.ts`
+- hybrid selection logic: `src/recall.ts`
 
-## Likely code areas
+This experiment should extend that seam rather than inventing a parallel retrieval subsystem.
+
+## Phase 1 checkpoints — Rescue-only TF-IDF
+
+### Checkpoint 1: Freeze the current baseline behavior
+
+Files to inspect or extend:
 
 - `src/lexical.ts`
-  Extend lexical helpers with TF, IDF, vector scoring, candidate lookup, and deterministic ranking utilities while preserving the current normalization story where practical.
 - `src/recall.ts`
-  Gate when TF-IDF participates, preserve semantic-first reranking boundaries, and keep project-biased widening behavior unchanged.
-- `src/index.ts`
-  Only touch if the current rescue path orchestration lives here and needs a narrower insertion point for TF-IDF candidate collection.
 - `tests/lexical.unit.test.ts`
-  Add deterministic scoring, token weighting, and candidate lookup coverage.
-- `tests/recall.unit.test.ts` and `tests/recall-embeddings.integration.test.ts`
-  Add regression coverage for paraphrase safety, lexical-heavy wins, and project-biased recall invariants.
-- `tests/helpers/mcp.ts` or existing MCP smoke coverage
-  Reuse the normal local entrypoint to prove cold-start simplicity remains unchanged.
+- `tests/recall-embeddings.integration.test.ts`
 
-## Phase 1 — Rescue-only TF-IDF prototype
+Actions:
 
-### Phase 1 objective and implementation shape
+- document the current rescue trigger, result limits, and ranking signals in the note or PR description
+- add any missing baseline regression tests before changing behavior
+- explicitly cover these baseline cases:
+  - semantic paraphrase still wins when lexical overlap is weak
+  - exact lexical query finds the intended note
+  - rescue does not promote first-seen weak matches over stronger lexical matches
+  - project-first widening still beats equally plausible global matches
 
-- Build the index from projection text already loaded for the request or retrievable through the existing derived-data path.
-- Keep the index request-scoped or otherwise ephemeral in-memory only.
-- Reuse existing normalization and tokenization behavior where possible so old and new lexical signals remain comparable.
-- Restrict TF-IDF to rescue mode only; strong semantic results should not route through TF-IDF-first ranking.
-- Fail soft to the current shipped behavior if TF-IDF construction or scoring fails.
+Success condition:
 
-### Phase 1 acceptance criteria
+- current behavior is locked down tightly enough that TF-IDF changes can be judged against it instead of against memory or intuition
 
-1. No architectural drift
+### Checkpoint 2: Add isolated TF-IDF primitives in `src/lexical.ts`
 
-- no database
-- no daemon or warm sidecar
-- no committed or synced TF-IDF artifacts
-- full rebuild possible from local derived retrieval text
+Primary file:
 
-1. No semantic-first regression
+- `src/lexical.ts`
 
-- paraphrase queries that currently succeed still rank the semantic match first
-- project-biased widening stays unchanged
-- TF-IDF does not become the primary ranker for already-strong semantic results
+Test file:
 
-1. Better lexical rescue quality
+- `tests/lexical.unit.test.ts`
 
-- exact identifiers, note titles, repo jargon, and other rare lexical queries produce equal or better top candidates than the current rescue path
-- fewer fuzzy but irrelevant rescue results appear on these queries
+Actions:
 
-1. Acceptable performance
+- add pure helpers for TF calculation, IDF calculation, query/document vector construction, and similarity scoring
+- keep normalization and tokenization aligned with the existing lexical path unless tests show a clear reason to diverge
+- keep the API small and request-local; avoid persistence, file writes, or hidden caches
 
-- index build cost is small enough for local dogfooding and tests
-- rescue query time is no worse than the current rescue path on realistic fixture corpora
-- memory overhead remains modest and clearly MCP-friendly
+Tests to add:
 
-### Phase 1 verification scenarios
+- deterministic TF values for repeated tokens
+- deterministic IDF values for rare vs common terms
+- deterministic ranking for a small fixed corpus
+- empty and degenerate corpus behavior
+- rare token queries outrank broad fuzzy matches
 
-A. Semantic paraphrase stays dominant
+Success condition:
 
-- Query with conceptually matching language that does not share strong lexical overlap.
-- Expected: semantic match still wins; TF-IDF does not displace it.
+- TF-IDF math is testable, deterministic, and independent from recall orchestration
 
-B. Exact repo jargon improves
+### Checkpoint 3: Build request-scoped TF-IDF rescue candidates
 
-- Query with rare feature names, identifiers, note ids, or implementation vocabulary.
-- Expected: rescue candidates are more precise than the current heuristic path.
+Primary files:
 
-C. Project bias remains correct
+- `src/lexical.ts`
+- `src/recall.ts`
+- `src/index.ts` only if rescue orchestration currently requires it
 
-- Query against both project-local and global matching notes.
-- Expected: project notes still fill first, then global notes widen in only as needed.
+Actions:
 
-D. Weak semantic fallback improves
+- build TF-IDF input only from projection text or the exact derived text already used by the lexical lane
+- limit candidate generation to the existing rescue situation: weak or absent semantic results
+- produce a bounded candidate set suitable for the existing rescue limits
+- fail soft to the current rescue behavior when TF-IDF inputs are unavailable or scoring fails
 
-- Use intentionally noisy or low-similarity queries.
-- Expected: TF-IDF surfaces plausible lexical candidates that the current rescue misses or ranks poorly.
+Tests to add:
 
-E. Cold-start simplicity is preserved
+- weak semantic query activates TF-IDF rescue
+- strong semantic query does not route through TF-IDF rescue
+- TF-IDF rescue favors exact identifier and repo-jargon matches
+- no projections or partial projection availability degrades cleanly
 
-- Start the server through the existing local helper and run recall normally.
-- Expected: no prebuild step, no extra service, no new operator behavior.
+Success condition:
 
-### Phase 1 smoke tests
+- TF-IDF can replace or narrow the current rescue candidate selection without changing the non-rescue path
 
-- unit tests for TF, IDF, cosine or equivalent vector scoring, and inverted-index candidate lookup
-- deterministic ranking tests for fixed documents and queries
-- integration tests comparing current rescue behavior against TF-IDF rescue on a fixed fixture corpus
-- MCP smoke test through the real entrypoint proving recall works without extra runtime setup
+### Checkpoint 4: Verify Phase 1 quality against explicit scenarios
 
-### Phase 1 exit criteria
+Primary files:
 
-Continue only if all are true:
+- `tests/recall-embeddings.integration.test.ts`
+- any fixture helpers needed by those tests
 
-- semantic paraphrase behavior is unchanged or clearly not worse
-- lexical-heavy rescue quality improves enough to justify the added logic
-- no operational burden is introduced
-- local performance cost stays acceptable
+Scenarios to encode:
 
-Otherwise stop and keep the current design.
+- semantic paraphrase remains dominant
+- exact repo jargon improves
+- note-title and identifier lookup improves
+- project-local note still wins over global fallback when both match
+- weak semantic queries gain plausible rescue candidates
+- cold MCP entrypoint still works with no pre-warm step
 
-## Phase 2 — TF-IDF candidate generation for hybrid mode
+Success condition:
 
-### Phase 2 objective and implementation shape
+- the test suite demonstrates clear improvement for lexical-heavy cases with no visible semantic-first regression
 
-- Keep semantic recall and project-biased widening exactly as today.
-- Use TF-IDF only to reduce lexical work or improve lexical candidate precision before final scoring.
-- Preserve the explainable ranking model: semantic first, lexical assists, project bias preserved.
-- Avoid adding persistent caches or lifecycle management complexity just to support this phase.
+### Checkpoint 5: Measure Phase 1 cost before proceeding
 
-### Phase 2 acceptance criteria
+Likely files:
 
-1. Hybrid quality is same or better than both current and rescue-only modes.
-2. Candidate generation reduces lexical scoring work or end-to-end recall time on larger corpora.
-3. Mixed project-plus-global queries still surface the right blend of local and global notes.
-4. Synonym-heavy or paraphrase-heavy queries still rely on semantic ranking rather than exact-token dependence.
+- existing tests plus a lightweight benchmark-style test if needed
 
-### Phase 2 verification scenarios
+Actions:
 
-F. Large mixed corpus scaling check
+- compare current rescue vs TF-IDF rescue on a larger synthetic or fixture corpus
+- record build-time cost, query-time cost, and whether memory overhead is still modest
+- capture whether the result feels like a helper layer rather than an indexing subsystem
 
-- Compare current hybrid mode, rescue-only TF-IDF, and candidate-generation TF-IDF on a larger fixture set.
-- Expected: same or better top-k relevance with reduced lexical work or neutral-to-better latency.
+Go / no-go rule:
 
-G. Project plus global blend
+- proceed to Phase 2 only if lexical-heavy quality clearly improves and the runtime cost remains acceptable
 
-- Query where the best answer spans a project-local note and a useful global note.
-- Expected: project note remains preferred while useful global memory still appears.
+## Phase 2 checkpoints — Candidate generation TF-IDF
 
-H. No exact-token dependence regression
+### Checkpoint 6: Limit TF-IDF to lexical candidate narrowing
 
-- Query with synonyms or paraphrases that share little lexical overlap.
-- Expected: semantic-first behavior still wins.
+Primary files:
 
-### Phase 2 smoke tests
+- `src/recall.ts`
+- `src/lexical.ts`
 
-- benchmark-style test over a synthetic larger fixture corpus
-- integration tests covering mixed semantic and lexical query suites
-- regression tests asserting project-first widening behavior remains unchanged
+Actions:
 
-### Phase 2 exit criteria
+- keep semantic recall and semantic ordering exactly as they are
+- use TF-IDF only to narrow or prioritize lexical candidates before final hybrid scoring
+- do not let TF-IDF become the top-level ranker for strong semantic queries
 
-Adopt TF-IDF candidate generation only if:
+Success condition:
 
-- retrieval quality is equal or better than both the current design and rescue-only TF-IDF
-- candidate scoring cost or recall latency measurably improves on larger corpora
-- the implementation stays simple, testable, and file-first
-- the feature still feels like a small derived helper rather than a new subsystem
+- the ranking story stays explainable: semantic first, lexical assists, project bias preserved
 
-Otherwise keep rescue-only TF-IDF or drop the experiment entirely.
+### Checkpoint 7: Add large-corpus comparison coverage
 
-## Decision matrix
+Likely files:
 
-### Keep current design
+- `tests/recall-embeddings.integration.test.ts`
+- new benchmark-style test file only if the existing integration suite becomes too noisy
 
-Choose this if:
+Scenarios to encode:
 
-- TF-IDF does not clearly improve lexical-heavy recall
-- paraphrase quality regresses
-- complexity rises more than the measured benefit justifies
+- larger mixed corpus with project and global notes
+- mixed semantic and lexical query set
+- synonym-heavy queries with low exact-token overlap
+- project-plus-global blend where a useful global note should still appear after project-local hits
 
-### Keep rescue-only TF-IDF
+Success condition:
 
-Choose this if:
+- TF-IDF candidate narrowing is equal or better than both the current design and rescue-only TF-IDF on relevance, while reducing lexical work or staying latency-neutral
 
-- lexical-heavy queries improve
-- paraphrase safety holds
-- candidate-generation gains are weak or inconclusive
+### Checkpoint 8: Decide final outcome and consolidate correctly
 
-### Adopt candidate-generation TF-IDF
+Possible outcomes:
 
-Choose this only if:
+- keep the current shipped design and discard the experiment
+- keep rescue-only TF-IDF and stop there
+- adopt candidate-generation TF-IDF
 
-- Phase 1 already shows strong rescue-only value
-- larger-corpus verification shows clear cost or latency wins
-- semantic-first behavior and project bias remain intact
-- the implementation still matches mnemonic's architectural guardrails
+Memory handling after decision:
 
-## Consolidation stance
+- if rejected, keep this note temporary and record the outcome in a durable design/result note
+- if rescue-only is adopted, create or update a permanent note describing the production design and supersede the temporary planning note
+- if candidate-generation is adopted, update the durable hybrid recall design memory or create a new canonical successor, then supersede this temporary planning note
 
-No consolidation is needed with the shipped hybrid recall memory right now. That note remains the canonical record of the current production design. This note is a forward-looking experiment plan and is intentionally temporary until the experiment is either executed and consolidated into a durable result or dropped.
+## Non-goals
+
+Do not add any of the following during the experiment:
+
+- persistent TF-IDF indexes
+- committed derived artifacts
+- background workers or always-on services
+- raw-markdown lexical indexing independent from projections
+- user-facing configuration surface before retrieval value is proven
+
+## Review points to consolidate with you
+
+These are the places where I would stop and confirm direction instead of silently pushing forward:
+
+1. After baseline tests are frozen, to confirm the comparison corpus is representative enough.
+2. After TF-IDF primitives are implemented, to confirm the weighting and tokenization choices are acceptable.
+3. After Phase 1 verification, to decide stop vs proceed.
+4. After any Phase 2 large-corpus comparison, to decide keep current, rescue-only, or candidate-generation.
+
+## Current status
+
+This note is intentionally temporary. It is execution scaffolding for the experiment, not a durable architectural decision by itself.
