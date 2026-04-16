@@ -8,7 +8,7 @@ tags:
   - projections
 lifecycle: temporary
 createdAt: '2026-04-16T19:32:34.302Z'
-updatedAt: '2026-04-16T19:36:22.485Z'
+updatedAt: '2026-04-16T19:38:50.661Z'
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
@@ -54,20 +54,55 @@ Files to inspect or extend:
 - `src/recall.ts`
 - `tests/lexical.unit.test.ts`
 - `tests/recall-embeddings.integration.test.ts`
+- `tests/recall.unit.test.ts` if project-bias assertions fit better there
 
 Actions:
 
 - document the current rescue trigger, result limits, and ranking signals in the note or PR description
 - add any missing baseline regression tests before changing behavior
-- explicitly cover these baseline cases:
-  - semantic paraphrase still wins when lexical overlap is weak
-  - exact lexical query finds the intended note
-  - rescue does not promote first-seen weak matches over stronger lexical matches
-  - project-first widening still beats equally plausible global matches
+- make the baseline comparison explicit rather than relying on informal recall quality judgments
+
+Baseline matrix to lock down before TF-IDF changes:
+
+1. Semantic paraphrase safety
+
+- query shape: wording differs from the note but meaning matches
+- expected: semantic match remains rank 1 even when lexical overlap is weak
+- suggested home: integration coverage, because this is a retrieval-contract assertion
+
+1. Exact lexical title match
+
+- query shape: exact note-title terms such as `hybrid recall design`
+- expected: intended note ranks above semantically tied but lexically weaker notes
+- suggested home: existing reranking integration coverage
+
+1. Identifier and repo-jargon lookup
+
+- query shape: rare feature name, implementation term, or note id-like token
+- expected: strongest lexical match surfaces; broad fuzzy notes do not outrank it
+- suggested home: integration coverage with small fixed corpora
+
+1. Weak semantic rescue quality
+
+- query shape: low-similarity or noisy query where semantic scores are weak
+- expected: rescue path returns plausible lexical candidates and does not prefer first-seen weak notes
+- suggested home: existing rescue integration coverage
+
+1. Project-first widening invariants
+
+- query shape: both project-local and global notes are plausible matches
+- expected: project results fill first, then global results widen only as needed
+- suggested home: `tests/recall.unit.test.ts` unless real entrypoint coverage is needed
+
+1. Cold-start operational simplicity
+
+- query shape: normal recall through the local MCP entrypoint in a fresh run
+- expected: no pre-warm step, no extra service, no TF-IDF-specific operator action
+- suggested home: existing MCP smoke-style integration coverage
 
 Success condition:
 
-- current behavior is locked down tightly enough that TF-IDF changes can be judged against it instead of against memory or intuition
+- current behavior is locked down tightly enough that TF-IDF changes can be judged against a fixed matrix instead of memory or intuition
 
 ### Checkpoint 2: Add isolated TF-IDF primitives in `src/lexical.ts`
 
@@ -196,7 +231,30 @@ Success condition:
 
 - TF-IDF candidate narrowing is equal or better than both the current design and rescue-only TF-IDF on relevance, while reducing lexical work or staying latency-neutral
 
-### Checkpoint 8: Decide final outcome and consolidate correctly
+### Checkpoint 8: Evaluate dogfooding test pack impact
+
+Relevant existing memory:
+
+- `dogfooding-test-suite-reusable-prompt-for-phases-1-8-validat-c7c702d8`
+
+Actions:
+
+- after the experiment outcome is known, review whether the reusable dogfooding packs need to change
+- keep the packs unchanged if TF-IDF is invisible at the product-behavior level and existing recall scenarios already cover the new behavior well enough
+- update the packs only if the final retrieval behavior introduces a genuinely new regression surface or a better canonical phrasing test
+
+Questions to answer at this checkpoint:
+
+- does the current cold hybrid phrasing scenario already cover the new behavior sufficiently?
+- should exact-jargon or identifier-heavy recall get its own standing dogfooding prompt?
+- if Phase 2 lands, do the packs need a larger-corpus or mixed project-plus-global retrieval check?
+- if the experiment is rejected, should any temporary validation prompts stay out of the reusable packs?
+
+Success condition:
+
+- the permanent dogfooding packs only change if the product's standing regression surface has actually changed
+
+### Checkpoint 9: Decide final outcome and consolidate correctly
 
 Possible outcomes:
 
@@ -228,6 +286,7 @@ These are the places where I would stop and confirm direction instead of silentl
 2. After TF-IDF primitives are implemented, to confirm the weighting and tokenization choices are acceptable.
 3. After Phase 1 verification, to decide stop vs proceed.
 4. After any Phase 2 large-corpus comparison, to decide keep current, rescue-only, or candidate-generation.
+5. Before changing the reusable dogfooding packs, to confirm whether that change is actually warranted.
 
 ## Current status
 
