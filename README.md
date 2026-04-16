@@ -63,6 +63,8 @@ npm run mcp:local
 
 This rebuilds first, then launches `build/index.js`, so MCP clients always point at the latest source.
 
+For reproducible dogfooding of recency and relationship-navigation behavior, prefer the isolated dogfood runner over the live project vault. The isolated runner copies the current `.mnemonic` notes into a temporary workspace, runs the chosen pack there, and deletes the workspace afterward.
+
 ### Docker
 
 ```bash
