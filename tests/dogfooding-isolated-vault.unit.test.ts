@@ -1,5 +1,5 @@
+import { access, mkdtemp, mkdir, readFile, writeFile } from "fs/promises";
 import { describe, expect, it } from "vitest";
-import { mkdtemp, mkdir, readFile, writeFile } from "fs/promises";
 import os from "os";
 import path from "path";
 
@@ -21,5 +21,18 @@ describe("isolated dogfood vault", () => {
     const copied = await readFile(path.join(isolated.vaultPath, "notes", "sample.md"), "utf-8");
     expect(copied).toContain("title: Sample");
     expect(isolated.vaultPath).not.toBe(sourceVault);
+  });
+
+  it("does not copy local-only derived directories into the isolated vault", async () => {
+    const sourceRoot = await mkdtemp(path.join(os.tmpdir(), "mnemonic-dogfood-source-"));
+    const sourceVault = path.join(sourceRoot, ".mnemonic");
+    await mkdir(path.join(sourceVault, "notes"), { recursive: true });
+    await mkdir(path.join(sourceVault, "embeddings"), { recursive: true });
+    await mkdir(path.join(sourceVault, "projections"), { recursive: true });
+
+    const isolated = await createIsolatedDogfoodVault(sourceVault);
+
+    await expect(access(path.join(isolated.vaultPath, "embeddings"))).rejects.toThrow();
+    await expect(access(path.join(isolated.vaultPath, "projections"))).rejects.toThrow();
   });
 });

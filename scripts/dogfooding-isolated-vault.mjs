@@ -5,7 +5,13 @@ import path from "path";
 export async function createIsolatedDogfoodVault(sourceVaultPath) {
   const tempRoot = await mkdtemp(path.join(os.tmpdir(), "mnemonic-dogfood-isolated-"));
   const targetVault = path.join(tempRoot, path.basename(sourceVaultPath));
-  await cp(sourceVaultPath, targetVault, { recursive: true });
+  await cp(sourceVaultPath, targetVault, {
+    recursive: true,
+    filter(source) {
+      const name = path.basename(source);
+      return name !== "embeddings" && name !== "projections";
+    },
+  });
 
   return {
     tempRoot,
