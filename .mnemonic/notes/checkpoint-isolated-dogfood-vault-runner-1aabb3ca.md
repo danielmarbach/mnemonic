@@ -8,46 +8,46 @@ tags:
   - runner
 lifecycle: temporary
 createdAt: '2026-04-05T17:41:52.947Z'
-updatedAt: '2026-04-16T20:41:04.152Z'
+updatedAt: '2026-04-16T20:58:57.104Z'
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 memoryVersion: 1
 ---
-Checkpoint for isolating dogfood pack runs from the live project vault.
+Isolated dogfood vault runner — implemented and merged on 2026-04-16.
 
-Current status: the need for an isolated runner is now reinforced by the 2026-04-16 real-note dogfooding runs.
+Status: DONE. The isolated dogfood runner is implemented and all tests pass.
 
-What was attempted:
+What was implemented:
 
-- Fixed the dogfood harness schema handling.
-- Added targeted tests for the runner helpers.
-- Added support for running the packs against a chosen server entrypoint.
-- Reran the packs against the local build and observed that local vault state still contaminated recent-navigation measurements.
-- Ran Pack A, Pack B, and a closest-honest approximation of Pack C against the live project vault on 2026-04-16.
+- `scripts/dogfooding-isolated-vault.mjs` — `createIsolatedDogfoodVault(sourceVaultPath)` copies notes into a temp directory (excluding `embeddings/` and `projections/`), returns `{ tempRoot, vaultPath, cleanup() }`
+- `scripts/dogfooding-isolated-vault.mjs` — `runDogfoodInIsolation({ sourceVaultPath, dryRun })` — orchestrates create + cleanup
+- `scripts/dogfooding-runner-helpers.mjs` — `resolveDogfoodVaultPath({ cwd, isolatedVaultPath })` — prefers explicit isolated path over live vault
+- `scripts/run-dogfood-packs.mjs` — `--isolated` flag creates a temporary vault copy, points the runner at it, and cleans up afterward; pack result titles include `(isolated vault)` suffix
+- Docs: README.md, CONTRIBUTING.md, AGENT.md updated with isolated runner guidance
 
-What worked:
+Tests (9 total across 3 files):
 
-- The runner can target the locally built server.
-- The harness measures the intended MCP fields correctly.
-- The latest dogfooding runs did not reveal a TF-IDF-specific regression in recall/orientation behavior.
-- The remaining noise still points to environment and vault-state contamination rather than harness parsing.
+- `tests/dogfooding-isolated-vault.unit.test.ts` — 2 tests: notes copied without modifying source, derived directories excluded
+- `tests/dogfooding-runner.unit.test.ts` — 1 new test: isolated vault path preferred over live vault
+- `tests/dogfooding-runner.integration.test.ts` — 1 test: creates and cleans up isolated vault around a run
 
-Blockers and constraints:
+Commits on branch `td-idf`:
 
-- Running against the live vault makes recent-note and relationship-navigation checks non-reproducible.
-- Local vault git/signing issues can produce local-only persistence states that are irrelevant to the product behavior being dogfooded.
-- Temporary dogfood notes and active experiment notes pollute recency-driven checks, especially Pack A's recent-to-architecture navigation.
-- The solution should improve measurement quality without changing product semantics.
+- test: add isolated dogfood vault helper
+- fix: exclude derived state from isolated dogfood vault
+- feat: let dogfood runner target isolated vaults
+- feat: isolate dogfooding runs from live vault state
+- docs: add isolated dogfood runner guidance
+- feat: add --isolated flag to run-dogfood-packs for vault isolation
 
-Alternatives considered:
+What this unblocks:
 
-- Keep using the live vault and manually interpret noise: possible but still low confidence.
-- Hardcode cleanup logic for this repo's dogfood notes: rejected because it is repo-specific and brittle.
-- Run the packs against an isolated temporary vault clone or copy: still preferred because it keeps the measurement clean and reproducible.
+- Running Pack A/B/C against a temporary vault copy so recency and relationship-navigation checks reflect product behavior rather than live-vault noise
+- Reproducible dogfooding without polluting the project vault with temporary test artifacts
 
-Current next action:
+Historical context (the problem this solved):
 
-- implement a small isolated dogfood runner that clones or copies the current project vault into a temporary workspace, runs the packs there against the chosen MCP entrypoint, and discards the workspace afterward so recency and relationship-navigation checks reflect product behavior rather than local live-vault state.
-
-Confidence: high.
+- Running against the live vault made recent-note and relationship-navigation checks non-reproducible
+- Local vault git/signing issues could produce local-only persistence states irrelevant to the product behavior being dogfooded
+- Temporary dogfood notes and active experiment notes polluted recency-driven checks, especially Pack A's recent-to-architecture navigation
