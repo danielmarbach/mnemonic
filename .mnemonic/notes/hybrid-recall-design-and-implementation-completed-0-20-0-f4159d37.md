@@ -8,12 +8,14 @@ tags:
   - projections
 lifecycle: permanent
 createdAt: '2026-04-04T12:32:49.862Z'
-updatedAt: '2026-04-04T12:32:49.862Z'
+updatedAt: '2026-04-16T19:34:48.379Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
   - id: mnemonic-key-design-decisions-3f2a6273
     type: example-of
+  - id: tf-idf-hybrid-recall-experiment-design-e33e51cf
+    type: related-to
 memoryVersion: 1
 ---
 Hybrid recall improves mnemonic recall quality by combining semantic retrieval with lexical reranking and lexical rescue over existing projection data, while preserving mnemonic's core simplicity constraints.
