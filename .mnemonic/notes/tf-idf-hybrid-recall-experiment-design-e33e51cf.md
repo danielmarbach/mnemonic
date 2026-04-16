@@ -7,10 +7,17 @@ tags:
   - projections
 lifecycle: permanent
 createdAt: '2026-04-16T19:32:34.301Z'
-updatedAt: '2026-04-16T19:32:34.301Z'
+updatedAt: '2026-04-16T19:34:48.386Z'
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: tf-idf-hybrid-recall-staged-plan-7c61f6f1
+    type: explains
+  - id: hybrid-recall-design-and-implementation-completed-0-20-0-f4159d37
+    type: related-to
+  - id: performance-principles-for-file-first-mcp-and-git-backed-wor-4e7d3bc8
+    type: related-to
 memoryVersion: 1
 ---
 Semantic-first recall remains the primary retrieval path in mnemonic. TF-IDF is acceptable only as a derived lexical helper over projection text if it produces measurable recall-quality or latency gains without changing mnemonic's file-first, MCP-first operational model.

@@ -8,10 +8,13 @@ tags:
   - projections
 lifecycle: temporary
 createdAt: '2026-04-16T19:32:34.302Z'
-updatedAt: '2026-04-16T19:34:39.571Z'
+updatedAt: '2026-04-16T19:34:48.372Z'
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: tf-idf-hybrid-recall-experiment-design-e33e51cf
+    type: explains
 memoryVersion: 1
 ---
 Refine the TF-IDF experiment as a staged implementation and verification plan that can be executed without changing mnemonic's file-first, semantic-first architecture.
