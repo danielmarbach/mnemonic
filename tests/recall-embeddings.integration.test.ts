@@ -377,6 +377,43 @@ This note has no embedding.`,
     }
   }, 15000);
 
+  it("keeps semantic paraphrase matches ahead when lexical overlap is weak", async () => {
+    const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-semantic-paraphrase-"));
+    tempDirs.push(vaultDir);
+    const embeddingServer = await startFakeEmbeddingServer();
+
+    try {
+      await writeSeedNote(vaultDir, {
+        id: "semantic-target",
+        title: "CI learning promotion guidance",
+        content: "We promote CI failure learnings into durable notes after triage so useful lessons are preserved.",
+        tags: ["ci", "learning", "design"],
+      });
+      await writeSeedNote(vaultDir, {
+        id: "lexical-decoy",
+        title: "Promotion workflow checklist",
+        content: "Promotion guidance and workflow checklist for weekly operational reviews.",
+        tags: ["workflow"],
+      });
+
+      await writeSeedEmbedding(vaultDir, "semantic-target", [0.1, 0.2, 0.3]);
+      await writeSeedEmbedding(vaultDir, "lexical-decoy", [0.05, 0.1, 0.15]);
+
+      const response = await callLocalMcpResponse(vaultDir, "recall", {
+        query: "how we handle promotion of CI learnings",
+        limit: 2,
+        scope: "global",
+      }, embeddingServer.url);
+
+      const parsed = RecallResultSchema.parse(response.structuredContent);
+      expect(parsed.results).toHaveLength(2);
+      expect(parsed.results[0]?.id).toBe("semantic-target");
+      expect(parsed.results[1]?.id).toBe("lexical-decoy");
+    } finally {
+      await embeddingServer.close();
+    }
+  }, 15000);
+
   it("reranks semantic ties using projections even when no projection cache is warm", async () => {
     const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-hybrid-rerank-"));
     tempDirs.push(vaultDir);
@@ -460,6 +497,45 @@ This note has no embedding.`,
       expect(parsed.results.map((result) => result.id)).toContain("d-strong");
       expect(parsed.results[0]?.id).toBe("d-strong");
       expect(parsed.results.map((result) => result.id)).not.toContain("a-weak");
+    } finally {
+      await embeddingServer.close();
+    }
+  }, 15000);
+
+  it("lexical rescue still finds the strongest late candidate beyond the initial rescue scan window", async () => {
+    const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-hybrid-rescue-window-"));
+    tempDirs.push(vaultDir);
+    const embeddingServer = await startFakeEmbeddingServer();
+
+    try {
+      for (let i = 0; i < 20; i++) {
+        const id = `a-decoy-${String(i).padStart(2, "0")}`;
+        await writeSeedNote(vaultDir, {
+          id,
+          title: `ProjectionText retrieval text note ${i}`,
+          content: "ProjectionText derived retrieval text for general indexing behavior and broad notes.",
+          tags: ["projection", "retrieval"],
+        });
+        await writeSeedEmbedding(vaultDir, id, [-0.1, -0.2, -0.3]);
+      }
+
+      await writeSeedNote(vaultDir, {
+        id: "z-strong-target",
+        title: "ProjectionText staleness design",
+        content: "ProjectionText staleness handling for derived retrieval text and precise rescue behavior.",
+        tags: ["projection", "design"],
+      });
+      await writeSeedEmbedding(vaultDir, "z-strong-target", [-0.1, -0.2, -0.3]);
+
+      const response = await callLocalMcpResponse(vaultDir, "recall", {
+        query: "projectiontext staleness derived retrieval text",
+        limit: 3,
+        scope: "global",
+      }, embeddingServer.url);
+
+      const parsed = RecallResultSchema.parse(response.structuredContent);
+      expect(parsed.results).toHaveLength(3);
+      expect(parsed.results[0]?.id).toBe("z-strong-target");
     } finally {
       await embeddingServer.close();
     }

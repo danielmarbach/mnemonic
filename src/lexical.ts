@@ -92,6 +92,104 @@ export function computeLexicalScore(query: string, projectionText: string): numb
 }
 
 /**
+ * Compute normalized term frequency for a token list.
+ */
+export function computeTermFrequency(tokens: string[]): Map<string, number> {
+  const frequencies = new Map<string, number>();
+  if (tokens.length === 0) return frequencies;
+
+  for (const token of tokens) {
+    frequencies.set(token, (frequencies.get(token) ?? 0) + 1);
+  }
+
+  for (const [token, count] of frequencies) {
+    frequencies.set(token, count / tokens.length);
+  }
+
+  return frequencies;
+}
+
+/**
+ * Compute smoothed inverse document frequency for a tokenized corpus.
+ */
+export function computeInverseDocumentFrequency(documents: string[][]): Map<string, number> {
+  const idf = new Map<string, number>();
+  if (documents.length === 0) return idf;
+
+  const documentFrequencies = new Map<string, number>();
+  for (const document of documents) {
+    for (const token of new Set(document)) {
+      documentFrequencies.set(token, (documentFrequencies.get(token) ?? 0) + 1);
+    }
+  }
+
+  for (const [token, frequency] of documentFrequencies) {
+    idf.set(token, Math.log((1 + documents.length) / (1 + frequency)) + 1);
+  }
+
+  return idf;
+}
+
+/**
+ * Compute cosine similarity between a query and document TF-IDF vectors.
+ */
+export function computeTfIdfCosineSimilarity(query: string, document: string, corpus: string[]): number {
+  const corpusTokens = corpus.map((entry) => tokenize(entry));
+  const queryTokens = tokenize(query);
+  const documentTokens = tokenize(document);
+
+  if (queryTokens.length === 0 || documentTokens.length === 0 || corpusTokens.length === 0) {
+    return 0;
+  }
+
+  const idf = computeInverseDocumentFrequency(corpusTokens);
+  const queryTf = computeTermFrequency(queryTokens);
+  const documentTf = computeTermFrequency(documentTokens);
+  const vocabulary = new Set([...queryTf.keys(), ...documentTf.keys()]);
+
+  let dotProduct = 0;
+  let queryMagnitude = 0;
+  let documentMagnitude = 0;
+
+  for (const token of vocabulary) {
+    const weight = idf.get(token) ?? 0;
+    const queryWeight = (queryTf.get(token) ?? 0) * weight;
+    const documentWeight = (documentTf.get(token) ?? 0) * weight;
+    dotProduct += queryWeight * documentWeight;
+    queryMagnitude += queryWeight * queryWeight;
+    documentMagnitude += documentWeight * documentWeight;
+  }
+
+  if (queryMagnitude === 0 || documentMagnitude === 0) {
+    return 0;
+  }
+
+  return dotProduct / (Math.sqrt(queryMagnitude) * Math.sqrt(documentMagnitude));
+}
+
+/**
+ * Rank documents by TF-IDF cosine similarity for a query.
+ */
+export function rankDocumentsByTfIdf(
+  query: string,
+  documents: Array<{ id: string; text: string }>,
+  limit: number
+): Array<{ id: string; score: number }> {
+  if (limit <= 0 || documents.length === 0) {
+    return [];
+  }
+
+  const corpus = documents.map((document) => document.text);
+  return documents
+    .map((document) => ({
+      id: document.id,
+      score: computeTfIdfCosineSimilarity(query, document.text, corpus),
+    }))
+    .sort((a, b) => b.score - a.score)
+    .slice(0, limit);
+}
+
+/**
  * Maximum number of candidates to consider for lexical rescue.
  */
 export const LEXICAL_RESCUE_CANDIDATE_LIMIT = 20;

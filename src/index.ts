@@ -37,6 +37,7 @@ import { computeRecallMetadataBoost, computeHybridScore, selectRecallResults, ap
 import {
   shouldTriggerLexicalRescue,
   computeLexicalScore,
+  rankDocumentsByTfIdf,
   LEXICAL_RESCUE_CANDIDATE_LIMIT,
   LEXICAL_RESCUE_THRESHOLD,
   LEXICAL_RESCUE_RESULT_LIMIT,
@@ -2243,7 +2244,13 @@ async function collectLexicalRescueCandidates(
   existingIds: ScoredRecallCandidate[]
 ): Promise<ScoredRecallCandidate[]> {
   const existingIdSet = new Set(existingIds.map((c) => c.id));
-  const candidates: ScoredRecallCandidate[] = [];
+  const rescuePool: Array<{
+    id: string;
+    vault: Vault;
+    isCurrentProject: boolean;
+    projectionText: string;
+    metadataBoost: number;
+  }> = [];
 
   for (const vault of vaults) {
     const notes = await vault.storage.listNotes().catch(() => []);
@@ -2264,24 +2271,42 @@ async function collectLexicalRescueCandidates(
       const projection = await getOrBuildProjection(vault.storage, note).catch(() => undefined);
       if (!projection) continue;
 
-      const lexicalScore = computeLexicalScore(query, projection.projectionText);
-      if (lexicalScore < LEXICAL_RESCUE_THRESHOLD) continue;
-
       const metadataBoost = computeRecallMetadataBoost(getEffectiveMetadata(note));
-      const boost = (isCurrentProject ? 0.15 : 0) + metadataBoost;
-
-      candidates.push({
+      rescuePool.push({
         id: note.id,
-        score: 0,
-        boosted: boost,
         vault,
         isCurrentProject: Boolean(isCurrentProject),
-        lexicalScore,
+        projectionText: projection.projectionText,
+        metadataBoost,
       });
-
-      if (candidates.length >= LEXICAL_RESCUE_CANDIDATE_LIMIT) break;
     }
-    if (candidates.length >= LEXICAL_RESCUE_CANDIDATE_LIMIT) break;
+  }
+
+  const rankedRescueIds = new Map(
+    rankDocumentsByTfIdf(
+      query,
+      rescuePool.map((candidate) => ({ id: candidate.id, text: candidate.projectionText })),
+      LEXICAL_RESCUE_CANDIDATE_LIMIT
+    ).map((candidate) => [candidate.id, candidate.score])
+  );
+
+  const candidates: ScoredRecallCandidate[] = [];
+  for (const candidate of rescuePool) {
+    const tfIdfScore = rankedRescueIds.get(candidate.id);
+    if (tfIdfScore === undefined || tfIdfScore <= 0) continue;
+
+    const lexicalScore = Math.max(computeLexicalScore(query, candidate.projectionText), tfIdfScore);
+    if (lexicalScore < LEXICAL_RESCUE_THRESHOLD) continue;
+
+    const boost = (candidate.isCurrentProject ? 0.15 : 0) + candidate.metadataBoost;
+    candidates.push({
+      id: candidate.id,
+      score: 0,
+      boosted: boost,
+      vault: candidate.vault,
+      isCurrentProject: candidate.isCurrentProject,
+      lexicalScore,
+    });
   }
 
   return candidates

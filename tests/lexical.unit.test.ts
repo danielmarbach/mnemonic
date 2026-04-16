@@ -7,6 +7,10 @@ import {
   bigramJaccardSimilarity,
   containsSubstring,
   computeLexicalScore,
+  computeTermFrequency,
+  computeInverseDocumentFrequency,
+  computeTfIdfCosineSimilarity,
+  rankDocumentsByTfIdf,
   shouldTriggerLexicalRescue,
   LEXICAL_RESCUE_CANDIDATE_LIMIT,
   LEXICAL_RESCUE_THRESHOLD,
@@ -139,6 +143,65 @@ describe("computeLexicalScore", () => {
     const score1 = computeLexicalScore("Hello World", "hello world");
     const score2 = computeLexicalScore("hello world", "hello world");
     expect(score1).toBe(score2);
+  });
+});
+
+describe("TF-IDF primitives", () => {
+  it("computes normalized term frequency for repeated tokens", () => {
+    const frequencies = computeTermFrequency(["alpha", "beta", "alpha"]);
+
+    expect(frequencies.get("alpha")).toBeCloseTo(2 / 3, 5);
+    expect(frequencies.get("beta")).toBeCloseTo(1 / 3, 5);
+  });
+
+  it("assigns higher inverse-document frequency to rarer terms", () => {
+    const idf = computeInverseDocumentFrequency([
+      ["projectiontext", "staleness", "retrieval"],
+      ["retrieval", "design"],
+      ["retrieval", "notes"],
+    ]);
+
+    expect(idf.get("projectiontext")!).toBeGreaterThan(idf.get("retrieval")!);
+    expect(idf.get("staleness")!).toBeGreaterThan(idf.get("retrieval")!);
+  });
+
+  it("prefers rare-token documents over broad fuzzy matches", () => {
+    const corpus = [
+      "projectiontext staleness derived retrieval text",
+      "staleness retrieval text notes design",
+      "cooking recipes weekly menu",
+    ];
+
+    const rareTargetScore = computeTfIdfCosineSimilarity("projectiontext staleness", corpus[0]!, corpus);
+    const broadRelatedScore = computeTfIdfCosineSimilarity("projectiontext staleness", corpus[1]!, corpus);
+    const unrelatedScore = computeTfIdfCosineSimilarity("projectiontext staleness", corpus[2]!, corpus);
+
+    expect(rareTargetScore).toBeGreaterThan(broadRelatedScore);
+    expect(broadRelatedScore).toBeGreaterThan(unrelatedScore);
+  });
+
+  it("preserves non-English tokens during tf-idf preparation", () => {
+    const frequencies = computeTermFrequency(tokenize("promozione apprendimento café"));
+
+    expect(frequencies.has("promozione")).toBe(true);
+    expect(frequencies.has("apprendimento")).toBe(true);
+    expect(frequencies.has("café")).toBe(true);
+  });
+
+  it("selects the strongest tf-idf matches even when they appear late in the corpus", () => {
+    const documents = Array.from({ length: 20 }, (_, index) => ({
+      id: `decoy-${index}`,
+      text: "projectiontext derived retrieval text broad notes",
+    }));
+    documents.push({
+      id: "late-target",
+      text: "projectiontext staleness derived retrieval text precise design",
+    });
+
+    const ranked = rankDocumentsByTfIdf("projectiontext staleness derived retrieval text", documents, 3);
+
+    expect(ranked[0]?.id).toBe("late-target");
+    expect(ranked.map((entry) => entry.id)).toContain("late-target");
   });
 });
 
