@@ -8,7 +8,7 @@ tags:
   - projections
 lifecycle: temporary
 createdAt: '2026-04-16T19:32:34.302Z'
-updatedAt: '2026-04-16T20:29:05.337Z'
+updatedAt: '2026-04-16T20:41:04.115Z'
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
@@ -43,7 +43,8 @@ Implemented so far:
 - a more realistic note-shaped comparison harness now measures tradeoffs on mixed design, checkpoint, temporal, dogfooding, and misc note patterns
 - the TF-IDF ranker was optimized to reuse prepared corpus tokenization and IDF data instead of rebuilding them repeatedly during ranking
 - the TF-IDF ranker now includes a small title-aware lexical boost so exact title matches can beat repeated generic design decoys in realistic note-shaped corpora
-- targeted lexical and recall-focused verification passed after the optimization and tuning
+- real-note dogfooding runs for Pack A and Pack B completed against the live project notes and did not reveal a new regression attributable to the TF-IDF experiment
+- the main dogfooding noise source remains live-vault recency pollution rather than the TF-IDF rescue behavior itself
 
 Implemented files:
 
@@ -56,7 +57,27 @@ Implemented files:
 Verified command and result:
 
 - `npm test -- tests/lexical.unit.test.ts tests/lexical-rescue-comparison.unit.test.ts tests/recall.unit.test.ts tests/recall-embeddings.integration.test.ts`
-- result: 4 files passed, 74 tests passed, 0 failed
+- result: 4 files passed, 75 tests passed, 0 failed
+
+## Dogfooding snapshot
+
+Real-note dogfooding results captured on 2026-04-16:
+
+- `dogfooding-results-core-enrichment-orientation-pack-2026-04--8ee44ddb`
+- `dogfooding-results-working-state-continuity-pack-2026-04-16-9217df0e`
+- `dogfooding-results-blind-interruption-resumption-pack-2026-0-42f05f1a`
+
+High-level reading:
+
+- Pack A was mostly pass with friction, not fail. Cold hybrid phrasing still worked on the real notes, temporal recall stayed bounded, and design archaeology still worked.
+- Pack B passed with friction. Temporary-note recovery remained useful and coherent.
+- Pack C was only a closest honest approximation because a truly blind second-session run was not available from the current session.
+- The main workflow noise was still live-vault contamination of recent-note navigation, matching the existing isolated-dogfood-runner checkpoint, rather than a regression caused by TF-IDF rescue.
+
+Interpretation:
+
+- Real-note dogfooding did not produce evidence that the current rescue-only TF-IDF work regressed the user-facing recall/orientation workflow.
+- The strongest remaining measurement-quality problem is environmental: live-vault dogfooding makes recent-note and relationship-navigation judgments noisy.
 
 ## Measurement snapshot
 
@@ -71,7 +92,7 @@ Before the prepared-corpus optimization, the observed synthetic measurement was:
 - previous bounded lexical rescue measurement time: about `9.5ms`
 - TF-IDF rescue measurement time: about `155.7ms`
 
-After the prepared-corpus optimization but before title-aware tuning, a direct measurement run produced:
+After the prepared-corpus optimization, a direct measurement run produced:
 
 - previous bounded lexical rescue rare-term MRR: `0.400`
 - TF-IDF rescue rare-term MRR: `0.607`
@@ -89,12 +110,6 @@ After title-aware tuning, a direct measurement run produced:
 - previous bounded lexical rescue measurement time: about `9.1ms`
 - TF-IDF rescue measurement time: about `15.8ms`
 
-Interpretation:
-
-- the rare-term improvement signal on the synthetic late-target corpus remained intact through optimization and title-aware tuning
-- the large timing gap originally observed was mostly implementation overhead from repeated corpus tokenization and IDF work, not an unavoidable property of TF-IDF itself in the current in-memory harness
-- after optimization and tuning, TF-IDF remains slower than the previous bounded lexical rescue on the synthetic harness, but only modestly so compared with the original gap
-
 ### More realistic note-shaped corpus
 
 Before the prepared-corpus optimization, the observed realistic-corpus measurement was:
@@ -106,7 +121,7 @@ Before the prepared-corpus optimization, the observed realistic-corpus measureme
 - previous bounded lexical rescue measurement time: about `13.2ms`
 - TF-IDF rescue measurement time: about `237.1ms`
 
-After the prepared-corpus optimization but before title-aware tuning, a direct measurement run produced:
+After the prepared-corpus optimization, a direct measurement run produced:
 
 - previous bounded lexical rescue rare-term MRR: `1.000`
 - TF-IDF rescue rare-term MRR: `1.000`
@@ -128,272 +143,13 @@ Interpretation:
 
 - the title-aware tuning removed the broad-query regression on the realistic note-shaped corpus used in the current harness
 - on this realistic harness, TF-IDF is now quality-neutral relative to the previous bounded lexical rescue path while remaining in the same rough timing range
-- the current evidence is materially better than before: the ranking-quality blocker that remained after the optimization step is no longer present on this realistic harness
+- the current evidence is materially better than before, and the dogfooding runs did not contradict the harness story
 
-## Language-independence reference
-
-Reference design note:
-
-- `mnemonic-language-independent-role-heuristics-f66619c1`
-
-Relevant principles to carry over into this experiment:
-
-- wording-based signals may help, but they must remain supplementary rather than primary
-- unsupported-language notes should behave similarly to cue-word variants when the underlying semantic match is equally strong
-- tuning should not optimize only for mnemonic's own English-heavy vocabulary
-
-This does not mean TF-IDF must become language-neutral. It means the experiment must verify that stronger lexical scoring does not create avoidable English-only regressions in the user-facing retrieval contract.
-
-## Phase 1 checkpoints — Rescue-only TF-IDF
-
-### Checkpoint 1: Freeze the current baseline behavior
-
-Status: substantially complete.
-
-Completed baseline coverage:
-
-- semantic paraphrase safety
-- exact lexical tie-break coverage remains present from the existing cold-projection reranking test
-- explicit identifier and repo-jargon lookup regression case
-- weak semantic rescue quality remains present from the existing rescue ranking test
-- late-candidate rescue coverage for stronger lexical matches beyond many weaker decoys
-- explicit cross-language semantic guardrail case
-- project-first widening invariants remain covered in `tests/recall.unit.test.ts`
-
-Still optional to add later if needed:
-
-- a dedicated TF-IDF-aware cold-start operational simplicity assertion, if current MCP integration coverage proves too implicit during later review
-
-Files to inspect or extend:
-
-- `src/lexical.ts`
-- `src/recall.ts`
-- `tests/lexical.unit.test.ts`
-- `tests/lexical-rescue-comparison.unit.test.ts`
-- `tests/recall-embeddings.integration.test.ts`
-- `tests/recall.unit.test.ts`
-
-Baseline matrix status:
-
-1. Semantic paraphrase safety
-
-- target file: `tests/recall-embeddings.integration.test.ts`
-- status: implemented
-- test name: `it("keeps semantic paraphrase matches ahead when lexical overlap is weak", async () => { ... })`
-
-1. Exact lexical title match
-
-- target file: `tests/recall-embeddings.integration.test.ts`
-- status: already covered by existing reranking test
-- existing nearby coverage: `reranks semantic ties using projections even when no projection cache is warm`
-
-1. Identifier and repo-jargon lookup
-
-- target file: `tests/recall-embeddings.integration.test.ts`
-- status: implemented
-- test name: `it("rescues rare repo-jargon queries with the strongest lexical match", async () => { ... })`
-
-1. Weak semantic rescue quality
-
-- target file: `tests/recall-embeddings.integration.test.ts`
-- status: covered by existing rescue test and strengthened by late-candidate coverage
-- existing nearby coverage: `lexical rescue keeps the strongest projection matches instead of first-seen notes`
-- added coverage: `it("lexical rescue still finds the strongest late candidate beyond the initial rescue scan window", async () => { ... })`
-
-1. Project-first widening invariants
-
-- target file: `tests/recall.unit.test.ts`
-- status: already covered by existing selection tests
-
-1. Cold-start operational simplicity
-
-- target file: `tests/recall-embeddings.integration.test.ts` or MCP smoke coverage using `tests/helpers/mcp.ts`
-- status: indirectly covered by current MCP integration style, but not yet called out with a dedicated TF-IDF-specific assertion
-
-1. Cross-language sanity check
-
-- target file: `tests/recall-embeddings.integration.test.ts`
-- status: implemented
-- test name: `it("does not let lexical boosts displace a stronger non-English semantic match", async () => { ... })`
-
-Success condition:
-
-- current behavior is locked down tightly enough that further TF-IDF changes can be judged against a fixed matrix instead of memory or intuition
-- the main baseline categories are now explicitly covered, with only the cold-start TF-IDF-specific assertion remaining optional
-
-### Checkpoint 2: Add isolated TF-IDF primitives in `src/lexical.ts`
-
-Status: substantially complete.
-
-Implemented helpers:
-
-- `computeTermFrequency`
-- `computeInverseDocumentFrequency`
-- `computeTfIdfCosineSimilarity`
-- `prepareTfIdfCorpus`
-- `rankDocumentsByTfIdf`
-
-Implemented unit coverage:
-
-- normalized term frequency for repeated tokens
-- inverse-document frequency weighting for rare terms
-- rare-token ranking over broader fuzzy matches
-- preservation of non-English tokens during TF-IDF preparation
-- strongest late-match selection from a larger corpus slice
-- prepared-corpus reuse without ranking drift
-- exact title match over repeated generic design decoys
-
-Remaining follow-up:
-
-- extend only if later measurement or candidate-generation work needs additional helper boundaries
-
-### Checkpoint 3: Build request-scoped TF-IDF rescue candidates
-
-Status: partially complete and functional.
-
-Implemented behavior:
-
-- build a rescue pool from the full eligible note set after scope and tag filtering
-- rank the pool with TF-IDF before applying `LEXICAL_RESCUE_CANDIDATE_LIMIT`
-- preserve bounded final rescue results with existing hybrid-score sorting
-- keep lexical thresholding and fail-soft behavior in place
-
-Current implementation shape:
-
-- TF-IDF is now used to shortlist rescue candidates across the whole eligible pool rather than stopping at the first qualifying notes in file order
-- current final rescue lexical score is based on the TF-IDF shortlist score for rescue candidates
-- the ranker also includes a small title-aware lexical boost to preserve exact-title quality against repeated generic decoys
-- the rescue-only path now behaves more like a rare-term lexical recovery pass than a broad fuzzy scan
-
-Still to evaluate:
-
-- whether the current TF-IDF plus thresholding plus title-aware boost combination is the right long-term Phase 1 choice or just an acceptable prototype step
-- whether a dedicated cold-start TF-IDF-aware assertion adds useful signal beyond the existing integration tests
-
-### Checkpoint 4: Verify Phase 1 quality against explicit scenarios
-
-Status: substantially complete for baseline verification and now has both synthetic and more realistic measurement signals.
-
-Verified so far:
-
-- semantic paraphrase remains dominant in the added baseline integration test
-- repo-jargon and identifier-heavy lexical recovery scenarios are now covered
-- lexical rescue still surfaces strongest late candidates after TF-IDF shortlist ranking
-- stronger non-English semantic matches are not displaced by English lexical overlap in the added cross-language guardrail test
-- the synthetic comparison harness shows a better rare-term MRR for TF-IDF rescue than for the previous bounded lexical rescue path on the current synthetic corpus
-- the more realistic note-shaped comparison harness is now quality-neutral in the observed run after title-aware tuning, with no broad-query regression remaining
-- lexical and recall-focused suites pass after the rescue-path change, optimization, and tuning
-
-Still to verify explicitly:
-
-- whether a dedicated cold-start TF-IDF-aware MCP assertion adds value beyond current integration coverage
-- whether the realistic note-shaped corpus is representative enough to treat as decision-quality evidence for Phase 1
-
-Candidate scenario-to-test mapping:
-
-- paraphrase safety: implemented
-- exact lexical tie-break: existing coverage remains
-- rescue quality: existing coverage plus late-candidate regression remains
-- repo jargon gain: implemented
-- cold-start simplicity: may still need explicit targeted assertion
-- cross-language sanity: implemented
-- synthetic rescue comparison: implemented
-- realistic note-shaped rescue comparison: implemented
-
-Success condition:
-
-- the test suite and measurement harnesses demonstrate lexical-heavy improvement with no visible semantic-first regression and no obvious language-independence regression, and measurement evidence is strong enough to justify keeping the added cost or complexity
-
-### Checkpoint 5: Measure Phase 1 cost before proceeding
-
-Status: materially progressed and currently more favorable, but still needs a representativeness decision.
-
-What is now measured:
-
-- a synthetic comparison harness exists and demonstrates rare-term ranking improvement on the current late-target corpus
-- a more realistic note-shaped comparison harness exists and now shows a quality-neutral outcome after title-aware tuning
-- prepared-corpus reuse removed the large timing penalty that earlier measurements showed in the in-memory harnesses
-
-Current reading of the evidence:
-
-- the earlier large timing gap was mostly implementation overhead from repeated corpus tokenization and IDF recomputation, not just an unavoidable complexity penalty in the current in-memory ranking path
-- after optimization and title-aware tuning, the current evidence is much stronger for rescue-only TF-IDF than it was before
-- the remaining question is no longer obvious regression; it is whether the realistic note-shaped corpus is representative enough to support a keep/proceed decision
-
-Still needed:
-
-- decide with the user whether the realistic note-shaped corpus is representative enough to treat as decisive
-- if not decisive, add one more representative comparison slice and re-measure
-- if decisive, decide whether rescue-only TF-IDF is now strong enough to keep or whether it should still stop here
-- include at least a small mixed-language fixture slice in any further broader comparison story if the current evidence is expanded again
-
-Go / no-go rule:
-
-- proceed to Phase 2 only if lexical-heavy quality clearly improves, runtime cost remains acceptable, and no meaningful language-independence regression appears
-
-## Phase 2 checkpoints — Candidate generation TF-IDF
-
-### Checkpoint 6: Limit TF-IDF to lexical candidate narrowing
-
-Status: not started beyond the Phase 1 rescue shortlist.
-
-### Checkpoint 7: Add large-corpus comparison coverage
-
-Status: not started.
-
-### Checkpoint 8: Evaluate dogfooding test pack impact
-
-Status: deferred until the Phase 1 or Phase 2 outcome is clearer.
-
-Relevant existing memory:
-
-- `dogfooding-test-suite-reusable-prompt-for-phases-1-8-validat-c7c702d8`
-
-### Checkpoint 9: Decide final outcome and consolidate correctly
-
-Status: pending later experiment results.
-
-Possible outcomes:
-
-- keep the current shipped design and discard the experiment
-- keep rescue-only TF-IDF and stop there
-- adopt candidate-generation TF-IDF
-
-Memory handling after decision:
-
-- if rejected, keep this note temporary and record the outcome in a durable design/result note
-- if rescue-only is adopted, create or update a permanent note describing the production design and supersede the temporary planning note
-- if candidate-generation is adopted, update the durable hybrid recall design memory or create a new canonical successor, then supersede this temporary planning note
-
-## Non-goals
-
-Do not add any of the following during the experiment:
-
-- persistent TF-IDF indexes
-- committed derived artifacts
-- background workers or always-on services
-- raw-markdown lexical indexing independent from projections
-- user-facing configuration surface before retrieval value is proven
-- language-specific heuristics as the backbone of recall
-
-## Review points to consolidate with you
-
-These are the places where I would stop and confirm direction instead of silently pushing forward:
-
-1. Decide whether the realistic note-shaped corpus is representative enough to guide the Phase 1 outcome.
-2. If not, decide whether to add one more representative comparison slice or stop the experiment.
-3. After any further Phase 1 measurement, decide stop vs proceed.
-4. After any Phase 2 large-corpus comparison, decide keep current, rescue-only, or candidate-generation.
-5. Before changing the reusable dogfooding packs, confirm whether that change is actually warranted.
-
-## Current status
-
-This note is intentionally temporary. It is execution scaffolding for the experiment, not a durable architectural decision by itself.
-
-Current state in plain terms:
+## Current state in plain terms
 
 - the baseline and guardrail coverage for Phase 1 is in good shape
 - the rescue-only TF-IDF shortlist behavior is implemented
 - the earlier timing concern was mostly removed by avoiding repeated corpus preparation work
 - the realistic note-shaped ranking regression was addressed by adding a small title-aware boost
-- the remaining question is whether the current realistic corpus is representative enough to support a keep/proceed decision
+- real-note dogfooding did not reveal a new regression attributable to the TF-IDF experiment
+- the remaining question is whether the current realistic corpus is representative enough to support a keep/proceed decision, and whether future dogfooding should move to an isolated temporary vault runner to reduce live-vault noise
