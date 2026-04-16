@@ -8,7 +8,7 @@ tags:
   - projections
 lifecycle: temporary
 createdAt: '2026-04-16T19:32:34.302Z'
-updatedAt: '2026-04-16T19:43:55.338Z'
+updatedAt: '2026-04-16T19:47:01.160Z'
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
@@ -27,6 +27,7 @@ Determine whether TF-IDF improves lexical-heavy recall enough to keep, while pre
 - project-first widening remains unchanged
 - all TF-IDF state is derived and disposable
 - local MCP startup and usage require no extra steps
+- language-independence does not regress as a side effect of stronger lexical scoring
 
 ## Current baseline
 
@@ -43,6 +44,20 @@ The current test seam is also already in place:
 - hybrid selection logic: `src/recall.ts`
 
 This experiment should extend that seam rather than inventing a parallel retrieval subsystem.
+
+## Language-independence reference
+
+Reference design note:
+
+- `mnemonic-language-independent-role-heuristics-f66619c1`
+
+Relevant principles to carry over into this experiment:
+
+- wording-based signals may help, but they must remain supplementary rather than primary
+- unsupported-language notes should behave similarly to cue-word variants when the underlying semantic match is equally strong
+- tuning should not optimize only for mnemonic's own English-heavy vocabulary
+
+This does not mean TF-IDF must become language-neutral. It means the experiment must verify that stronger lexical scoring does not create avoidable English-only regressions in the user-facing retrieval contract.
 
 ## Phase 1 checkpoints — Rescue-only TF-IDF
 
@@ -172,10 +187,30 @@ Baseline matrix to lock down before TF-IDF changes:
   - no extra setup step, file artifact, or service dependency is introduced
 - rationale: this protects the MCP-first operational shape while the experiment evolves
 
+1. Cross-language sanity check
+
+- target file: `tests/recall-embeddings.integration.test.ts`
+- proposed test name: `it("does not let lexical boosts displace an equally strong non-English semantic match", async () => { ... })`
+- fixture shape:
+  - note A id: `english-decoy`
+  - title: `Promotion workflow`
+  - content: English wording with strong lexical overlap to the query but only partial semantic relevance
+  - note B id: `italian-target` or another non-English target
+  - title: non-English equivalent of the intended concept
+  - content: semantically matching explanation in another language
+  - embeddings:
+    - non-English target gets the same vector as the query
+    - English decoy gets a weaker but nonzero vector
+  - query shape: English paraphrase aimed at the non-English note
+- expected assertions:
+  - result 0 id is the semantically correct non-English note
+  - lexical English overlap alone does not displace the semantic target
+- rationale: TF-IDF is inherently lexical, so the experiment needs at least one explicit guard against English-only tuning drift
+
 Success condition:
 
 - current behavior is locked down tightly enough that TF-IDF changes can be judged against a fixed matrix instead of memory or intuition
-- at least one explicit baseline test exists for each of the six categories above
+- at least one explicit baseline test exists for each of the seven categories above
 
 ### Checkpoint 2: Add isolated TF-IDF primitives in `src/lexical.ts`
 
@@ -192,6 +227,7 @@ Actions:
 - add pure helpers for TF calculation, IDF calculation, query/document vector construction, and similarity scoring
 - keep normalization and tokenization aligned with the existing lexical path unless tests show a clear reason to diverge
 - keep the API small and request-local; avoid persistence, file writes, or hidden caches
+- avoid any English-only token heuristics unless they are clearly optional and degradable
 
 Tests to add:
 
@@ -200,6 +236,7 @@ Tests to add:
 - deterministic ranking for a small fixed corpus
 - empty and degenerate corpus behavior
 - rare token queries outrank broad fuzzy matches
+- non-English tokens survive normalization and tokenization without corruption
 
 Proposed unit test names:
 
@@ -208,6 +245,7 @@ Proposed unit test names:
 - `it("builds deterministic tf-idf rankings for a fixed corpus", () => { ... })`
 - `it("returns empty or zero scores for empty corpora and empty queries", () => { ... })`
 - `it("prefers rare-token documents over broad fuzzy matches", () => { ... })`
+- `it("preserves non-English tokens during tf-idf preparation", () => { ... })`
 
 Suggested fixture corpus for ranking tests:
 
@@ -234,6 +272,7 @@ Actions:
 - limit candidate generation to the existing rescue situation: weak or absent semantic results
 - produce a bounded candidate set suitable for the existing rescue limits
 - fail soft to the current rescue behavior when TF-IDF inputs are unavailable or scoring fails
+- avoid language-specific candidate heuristics beyond basic normalization unless they remain clearly optional
 
 Tests to add:
 
@@ -241,6 +280,7 @@ Tests to add:
 - strong semantic query does not route through TF-IDF rescue
 - TF-IDF rescue favors exact identifier and repo-jargon matches
 - no projections or partial projection availability degrades cleanly
+- non-English content still participates normally in semantic-first paths even when TF-IDF is enabled
 
 Proposed test names:
 
@@ -248,6 +288,7 @@ Proposed test names:
 - `it("skips tf-idf rescue when semantic results are already strong", async () => { ... })`
 - `it("uses tf-idf rescue to prioritize identifier-heavy matches", async () => { ... })`
 - `it("fails soft when projection text is partially unavailable", async () => { ... })`
+- `it("keeps semantic-first behavior for non-English notes when tf-idf is enabled", async () => { ... })`
 
 Suggested fixture shape:
 
@@ -275,6 +316,7 @@ Scenarios to encode:
 - project-local note still wins over global fallback when both match
 - weak semantic queries gain plausible rescue candidates
 - cold MCP entrypoint still works with no pre-warm step
+- cross-language semantic correctness remains intact
 
 Candidate scenario-to-test mapping:
 
@@ -283,10 +325,11 @@ Candidate scenario-to-test mapping:
 - rescue quality: existing `lexical rescue keeps the strongest projection matches instead of first-seen notes`
 - repo jargon gain: `rescues rare repo-jargon queries with the strongest lexical match`
 - cold-start simplicity: `recall works through the local MCP entrypoint without TF-IDF prewarming`
+- cross-language sanity: `does not let lexical boosts displace an equally strong non-English semantic match`
 
 Success condition:
 
-- the test suite demonstrates clear improvement for lexical-heavy cases with no visible semantic-first regression
+- the test suite demonstrates clear improvement for lexical-heavy cases with no visible semantic-first regression and no obvious language-independence regression
 
 ### Checkpoint 5: Measure Phase 1 cost before proceeding
 
@@ -299,6 +342,7 @@ Actions:
 - compare current rescue vs TF-IDF rescue on a larger synthetic or fixture corpus
 - record build-time cost, query-time cost, and whether memory overhead is still modest
 - capture whether the result feels like a helper layer rather than an indexing subsystem
+- include at least a small mixed-language fixture slice so English-only tuning artifacts are easier to spot
 
 Suggested benchmark fixture shape:
 
@@ -309,10 +353,12 @@ Suggested benchmark fixture shape:
   - semantic paraphrase
   - exact jargon or identifier
   - mixed project-plus-global lookup
+- optional sanity slice:
+  - a small non-English or mixed-language subset used to detect gross regressions rather than to benchmark multilingual excellence
 
 Go / no-go rule:
 
-- proceed to Phase 2 only if lexical-heavy quality clearly improves and the runtime cost remains acceptable
+- proceed to Phase 2 only if lexical-heavy quality clearly improves, runtime cost remains acceptable, and no meaningful language-independence regression appears
 
 ## Phase 2 checkpoints — Candidate generation TF-IDF
 
@@ -328,6 +374,7 @@ Actions:
 - keep semantic recall and semantic ordering exactly as they are
 - use TF-IDF only to narrow or prioritize lexical candidates before final hybrid scoring
 - do not let TF-IDF become the top-level ranker for strong semantic queries
+- avoid candidate gates that disproportionately exclude mixed-language or unsupported-language notes before semantic ranking has had its normal chance to work
 
 Suggested unit-level guard test:
 
@@ -350,6 +397,7 @@ Scenarios to encode:
 - mixed semantic and lexical query set
 - synonym-heavy queries with low exact-token overlap
 - project-plus-global blend where a useful global note should still appear after project-local hits
+- a small mixed-language slice to catch major ranking regressions
 
 Proposed test names or benchmark labels:
 
@@ -357,6 +405,7 @@ Proposed test names or benchmark labels:
 - `large corpus: identifier-heavy query benefits from tf-idf candidate narrowing`
 - `large corpus: project-local results still fill before global fallback`
 - `large corpus: useful global companion note still appears when project results are incomplete`
+- `large corpus: mixed-language notes do not regress materially`
 
 Success condition:
 
@@ -373,12 +422,14 @@ Actions:
 - after the experiment outcome is known, review whether the reusable dogfooding packs need to change
 - keep the packs unchanged if TF-IDF is invisible at the product-behavior level and existing recall scenarios already cover the new behavior well enough
 - update the packs only if the final retrieval behavior introduces a genuinely new regression surface or a better canonical phrasing test
+- consider whether one mixed-language recall prompt is warranted only if the final behavior meaningfully shifts the standing regression surface
 
 Questions to answer at this checkpoint:
 
 - does the current cold hybrid phrasing scenario already cover the new behavior sufficiently?
 - should exact-jargon or identifier-heavy recall get its own standing dogfooding prompt?
 - if Phase 2 lands, do the packs need a larger-corpus or mixed project-plus-global retrieval check?
+- should there be a lightweight mixed-language regression prompt, or would that overfit the packs to an experiment-specific concern?
 - if the experiment is rejected, should any temporary validation prompts stay out of the reusable packs?
 
 Success condition:
@@ -408,6 +459,7 @@ Do not add any of the following during the experiment:
 - background workers or always-on services
 - raw-markdown lexical indexing independent from projections
 - user-facing configuration surface before retrieval value is proven
+- language-specific heuristics as the backbone of recall
 
 ## Review points to consolidate with you
 
