@@ -215,9 +215,10 @@ export function rankDocumentsByTfIdf(
     .map((document) => {
       const tfIdfScore = computeTfIdfCosineSimilarityWithPreparedData(queryTokens, document.tokens, idf);
       const coverageScore = computeTfIdfWeightedQueryCoverage(queryTokens, document.tokens, idf);
+      const titleScore = computeLexicalScore(query, extractProjectionTitle(document.text));
       return {
         id: document.id,
-        score: tfIdfScore + 0.35 * coverageScore,
+        score: tfIdfScore + 0.35 * coverageScore + 0.2 * titleScore,
       };
     })
     .sort((a, b) => b.score - a.score)
@@ -280,6 +281,17 @@ function computeTfIdfWeightedQueryCoverage(
   }
 
   return totalWeight === 0 ? 0 : matchedWeight / totalWeight;
+}
+
+function extractProjectionTitle(text: string): string {
+  const titleLine = text.split("\n", 1)[0]?.trim();
+  if (!titleLine) {
+    return "";
+  }
+
+  return titleLine.startsWith("Title:")
+    ? titleLine.slice("Title:".length).trim()
+    : titleLine;
 }
 
 /**

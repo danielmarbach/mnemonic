@@ -218,6 +218,40 @@ describe("TF-IDF primitives", () => {
 
     expect(preparedRanked).toEqual(directRanked);
   });
+
+  it("prefers an exact title match over repeated generic design decoys", () => {
+    const documents = Array.from({ length: 20 }, (_, index) => ({
+      id: `design-decoy-${index}`,
+      text: [
+        `Title: Design note ${index}`,
+        "Lifecycle: permanent",
+        "Tags: design, recall",
+        "Summary: General recall design notes for hybrid retrieval, ranking behavior, and projection usage.",
+        "Headings: Overview | Constraints | Tradeoffs",
+      ].join("\n"),
+    }));
+
+    documents.push(
+      {
+        id: "hybrid-design-target",
+        text: [
+          "Title: Hybrid recall design and implementation",
+          "Lifecycle: permanent",
+          "Tags: recall, hybrid-search, design",
+          "Summary: Hybrid recall design with reranking rescue and projections.",
+          "Headings: Design Principles | Implementation | Tests",
+        ].join("\n"),
+      },
+      {
+        id: "unrelated",
+        text: "Title: Cooking notes\nSummary: Weekly menu planning and recipes.",
+      }
+    );
+
+    const ranked = rankDocumentsByTfIdf("hybrid recall design", documents, documents.length);
+
+    expect(ranked[0]?.id).toBe("hybrid-design-target");
+  });
 });
 
 describe("shouldTriggerLexicalRescue", () => {
