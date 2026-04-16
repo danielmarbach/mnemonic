@@ -8,7 +8,7 @@ tags:
   - projections
 lifecycle: temporary
 createdAt: '2026-04-16T19:32:34.302Z'
-updatedAt: '2026-04-16T20:04:25.651Z'
+updatedAt: '2026-04-16T20:11:17.191Z'
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
@@ -39,6 +39,7 @@ Implemented so far:
 - pure TF-IDF helpers were added in `src/lexical.ts`
 - lexical rescue candidate collection now ranks the whole eligible rescue pool with TF-IDF before applying the bounded rescue limit
 - late-candidate rescue coverage now verifies that a stronger lexical match can still win even when it appears after many weaker decoys
+- a synthetic comparison harness now measures the previous bounded lexical rescue path against the TF-IDF rescue path
 - targeted lexical and recall-focused verification passed after the change
 
 Implemented files:
@@ -46,12 +47,30 @@ Implemented files:
 - `src/lexical.ts`
 - `src/index.ts`
 - `tests/lexical.unit.test.ts`
+- `tests/lexical-rescue-comparison.unit.test.ts`
 - `tests/recall-embeddings.integration.test.ts`
 
 Verified command and result:
 
-- `npm test -- tests/lexical.unit.test.ts tests/recall.unit.test.ts tests/recall-embeddings.integration.test.ts`
-- result: 3 files passed, 71 tests passed, 0 failed
+- `npm test -- tests/lexical.unit.test.ts tests/lexical-rescue-comparison.unit.test.ts tests/recall.unit.test.ts tests/recall-embeddings.integration.test.ts`
+- result: 4 files passed, 72 tests passed, 0 failed
+
+## Measurement snapshot
+
+Synthetic comparison run against a larger late-target corpus slice:
+
+- previous bounded lexical rescue rare-term MRR: `0.400`
+- TF-IDF rescue rare-term MRR: `0.607`
+- previous bounded lexical rescue broad-query MRR: `1.000`
+- TF-IDF rescue broad-query MRR: `1.000`
+- previous bounded lexical rescue measurement time: about `9.5ms`
+- TF-IDF rescue measurement time: about `155.7ms`
+
+Interpretation:
+
+- the current TF-IDF rescue path improves rare-term recovery on the synthetic late-target corpus used for Phase 1 measurement
+- the broad-query sanity slice did not regress on this synthetic corpus
+- query-time cost is noticeably higher in the synthetic harness, so performance remains an explicit go/no-go part of the Phase 1 decision rather than something already settled
 
 ## Language-independence reference
 
@@ -92,6 +111,7 @@ Files to inspect or extend:
 - `src/lexical.ts`
 - `src/recall.ts`
 - `tests/lexical.unit.test.ts`
+- `tests/lexical-rescue-comparison.unit.test.ts`
 - `tests/recall-embeddings.integration.test.ts`
 - `tests/recall.unit.test.ts`
 
@@ -190,7 +210,7 @@ Still to evaluate:
 
 ### Checkpoint 4: Verify Phase 1 quality against explicit scenarios
 
-Status: substantially complete for baseline verification, but still incomplete for measurement.
+Status: substantially complete for baseline verification and now has an initial synthetic comparison signal.
 
 Verified so far:
 
@@ -198,11 +218,13 @@ Verified so far:
 - repo-jargon and identifier-heavy lexical recovery scenarios are now covered
 - lexical rescue still surfaces strongest late candidates after TF-IDF shortlist ranking
 - stronger non-English semantic matches are not displaced by English lexical overlap in the added cross-language guardrail test
+- the synthetic comparison harness shows a better rare-term MRR for TF-IDF rescue than for the previous bounded lexical rescue path on the current synthetic corpus
 - lexical and recall-focused suites pass after the rescue-path change
 
 Still to verify explicitly:
 
 - whether a dedicated cold-start TF-IDF-aware MCP assertion adds value beyond current integration coverage
+- whether the measured performance cost is acceptable on more realistic note-growth scenarios, not just the current synthetic harness
 
 Candidate scenario-to-test mapping:
 
@@ -212,20 +234,26 @@ Candidate scenario-to-test mapping:
 - repo jargon gain: implemented
 - cold-start simplicity: may still need explicit targeted assertion
 - cross-language sanity: implemented
+- synthetic rescue comparison: implemented
 
 Success condition:
 
-- the test suite demonstrates lexical-heavy coverage with no visible semantic-first regression and no obvious language-independence regression
+- the test suite and comparison harness demonstrate lexical-heavy improvement with no visible semantic-first regression and no obvious language-independence regression
 
 ### Checkpoint 5: Measure Phase 1 cost before proceeding
 
-Status: next major step. Not started yet.
+Status: started, but not complete.
+
+What is now measured:
+
+- a synthetic comparison harness exists and demonstrates rare-term ranking improvement on the current late-target corpus
+- the same harness shows a noticeable query-time cost increase for TF-IDF versus the previous bounded lexical rescue path
 
 Still needed:
 
-- compare current rescue vs TF-IDF rescue on a larger synthetic or fixture corpus
-- record build-time cost, query-time cost, and memory overhead
-- include at least a small mixed-language fixture slice so English-only tuning artifacts are easier to spot
+- compare current rescue vs TF-IDF rescue on a more realistic synthetic or fixture corpus closer to actual note growth patterns
+- record whether the higher measurement cost remains acceptable once the corpus better matches expected use
+- include at least a small mixed-language fixture slice so English-only tuning artifacts are easier to spot in the broader comparison story
 
 Go / no-go rule:
 
@@ -280,8 +308,8 @@ Do not add any of the following during the experiment:
 
 These are the places where I would stop and confirm direction instead of silently pushing forward:
 
-1. Before Phase 1 measurement, to confirm the comparison corpus is representative enough.
-2. After Phase 1 verification and measurements, to decide stop vs proceed.
+1. Before expanding beyond the current synthetic comparison harness, to confirm the next corpus shape is representative enough.
+2. After Phase 1 verification and broader measurements, to decide stop vs proceed.
 3. After any Phase 2 large-corpus comparison, to decide keep current, rescue-only, or candidate-generation.
 4. Before changing the reusable dogfooding packs, to confirm whether that change is actually warranted.
 
@@ -292,5 +320,5 @@ This note is intentionally temporary. It is execution scaffolding for the experi
 Current state in plain terms:
 
 - the baseline and guardrail coverage for Phase 1 is now in good shape
-- the rescue-only TF-IDF shortlist behavior is implemented and verified against targeted recall suites
-- the next useful step is measurement, not more baseline scaffolding
+- the rescue-only TF-IDF shortlist behavior is implemented and has an initial positive synthetic measurement signal
+- the next useful step is a broader, more realistic measurement pass before deciding whether Phase 1 is strong enough to keep as rescue-only or advance further
