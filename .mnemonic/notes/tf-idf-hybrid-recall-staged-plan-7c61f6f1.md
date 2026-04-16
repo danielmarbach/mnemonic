@@ -8,7 +8,7 @@ tags:
   - projections
 lifecycle: temporary
 createdAt: '2026-04-16T19:32:34.302Z'
-updatedAt: '2026-04-16T20:11:17.191Z'
+updatedAt: '2026-04-16T20:17:29.326Z'
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
@@ -40,6 +40,7 @@ Implemented so far:
 - lexical rescue candidate collection now ranks the whole eligible rescue pool with TF-IDF before applying the bounded rescue limit
 - late-candidate rescue coverage now verifies that a stronger lexical match can still win even when it appears after many weaker decoys
 - a synthetic comparison harness now measures the previous bounded lexical rescue path against the TF-IDF rescue path
+- a more realistic note-shaped comparison harness now measures tradeoffs on mixed design, checkpoint, temporal, dogfooding, and misc note patterns
 - targeted lexical and recall-focused verification passed after the change
 
 Implemented files:
@@ -53,11 +54,11 @@ Implemented files:
 Verified command and result:
 
 - `npm test -- tests/lexical.unit.test.ts tests/lexical-rescue-comparison.unit.test.ts tests/recall.unit.test.ts tests/recall-embeddings.integration.test.ts`
-- result: 4 files passed, 72 tests passed, 0 failed
+- result: 4 files passed, 73 tests passed, 0 failed
 
 ## Measurement snapshot
 
-Synthetic comparison run against a larger late-target corpus slice:
+### Synthetic late-target corpus
 
 - previous bounded lexical rescue rare-term MRR: `0.400`
 - TF-IDF rescue rare-term MRR: `0.607`
@@ -71,6 +72,23 @@ Interpretation:
 - the current TF-IDF rescue path improves rare-term recovery on the synthetic late-target corpus used for Phase 1 measurement
 - the broad-query sanity slice did not regress on this synthetic corpus
 - query-time cost is noticeably higher in the synthetic harness, so performance remains an explicit go/no-go part of the Phase 1 decision rather than something already settled
+
+### More realistic note-shaped corpus
+
+Observed measurement from the initial realistic-corpus run before the harness assertions were relaxed into pure measurement mode:
+
+- previous bounded lexical rescue rare-term MRR: `1.000`
+- TF-IDF rescue rare-term MRR: `1.000`
+- previous bounded lexical rescue broad-query MRR: `1.000`
+- TF-IDF rescue broad-query MRR: `0.676`
+- previous bounded lexical rescue measurement time: about `13.2ms`
+- TF-IDF rescue measurement time: about `237.1ms`
+
+Interpretation:
+
+- on the more realistic note-shaped corpus, the current TF-IDF rescue path did not improve the measured rare-term slice over the previous bounded rescue path
+- the same corpus showed worse broad-query ranking behavior for the TF-IDF path in this harness
+- the broader measurement story is therefore mixed, not uniformly positive: the current rescue-only TF-IDF implementation helps on the synthetic late-target corpus but is not yet clearly superior on the more realistic note-shaped corpus
 
 ## Language-independence reference
 
@@ -207,10 +225,11 @@ Still to evaluate:
 
 - whether the current TF-IDF plus thresholding combination is the right long-term Phase 1 choice or just an acceptable prototype step
 - whether a dedicated cold-start TF-IDF-aware assertion adds useful signal beyond the existing integration tests
+- whether the current TF-IDF rescue path needs tuning because the realistic note-shaped corpus is not yet clearly positive
 
 ### Checkpoint 4: Verify Phase 1 quality against explicit scenarios
 
-Status: substantially complete for baseline verification and now has an initial synthetic comparison signal.
+Status: substantially complete for baseline verification and now has both synthetic and more realistic measurement signals.
 
 Verified so far:
 
@@ -219,12 +238,13 @@ Verified so far:
 - lexical rescue still surfaces strongest late candidates after TF-IDF shortlist ranking
 - stronger non-English semantic matches are not displaced by English lexical overlap in the added cross-language guardrail test
 - the synthetic comparison harness shows a better rare-term MRR for TF-IDF rescue than for the previous bounded lexical rescue path on the current synthetic corpus
+- the more realistic note-shaped comparison harness shows a mixed outcome: no rare-term gain on that corpus and weaker broad-query ranking for TF-IDF in the observed run
 - lexical and recall-focused suites pass after the rescue-path change
 
 Still to verify explicitly:
 
 - whether a dedicated cold-start TF-IDF-aware MCP assertion adds value beyond current integration coverage
-- whether the measured performance cost is acceptable on more realistic note-growth scenarios, not just the current synthetic harness
+- whether the realistic note-shaped corpus should be refined again to better match expected note-growth pressure, or whether the current mixed result is already sufficient evidence to pause and reconsider the approach
 
 Candidate scenario-to-test mapping:
 
@@ -235,25 +255,34 @@ Candidate scenario-to-test mapping:
 - cold-start simplicity: may still need explicit targeted assertion
 - cross-language sanity: implemented
 - synthetic rescue comparison: implemented
+- realistic note-shaped rescue comparison: implemented
 
 Success condition:
 
-- the test suite and comparison harness demonstrate lexical-heavy improvement with no visible semantic-first regression and no obvious language-independence regression
+- the test suite and measurement harnesses demonstrate lexical-heavy improvement with no visible semantic-first regression and no obvious language-independence regression, and measurement evidence is strong enough to justify keeping the added cost
 
 ### Checkpoint 5: Measure Phase 1 cost before proceeding
 
-Status: started, but not complete.
+Status: materially progressed, but not conclusively favorable.
 
 What is now measured:
 
 - a synthetic comparison harness exists and demonstrates rare-term ranking improvement on the current late-target corpus
-- the same harness shows a noticeable query-time cost increase for TF-IDF versus the previous bounded lexical rescue path
+- a more realistic note-shaped comparison harness exists and demonstrates a mixed tradeoff picture
+- both harnesses show a noticeable query-time cost increase for TF-IDF versus the previous bounded lexical rescue path
+
+Current reading of the evidence:
+
+- the synthetic corpus supports rescue-only TF-IDF
+- the more realistic note-shaped corpus does not yet clearly support rescue-only TF-IDF
+- therefore Phase 1 is not ready for a keep/proceed decision yet; it either needs tuning and re-measurement or a decision to stop if the realistic corpus is judged representative enough already
 
 Still needed:
 
-- compare current rescue vs TF-IDF rescue on a more realistic synthetic or fixture corpus closer to actual note growth patterns
-- record whether the higher measurement cost remains acceptable once the corpus better matches expected use
-- include at least a small mixed-language fixture slice so English-only tuning artifacts are easier to spot in the broader comparison story
+- decide with the user whether the realistic note-shaped corpus is representative enough to treat as decisive
+- if not decisive, tune or reshape the rescue scoring and re-measure
+- if decisive, decide whether rescue-only TF-IDF should stop here instead of advancing
+- include at least a small mixed-language fixture slice in any further broader comparison story if the current evidence is expanded again
 
 Go / no-go rule:
 
@@ -308,10 +337,11 @@ Do not add any of the following during the experiment:
 
 These are the places where I would stop and confirm direction instead of silently pushing forward:
 
-1. Before expanding beyond the current synthetic comparison harness, to confirm the next corpus shape is representative enough.
-2. After Phase 1 verification and broader measurements, to decide stop vs proceed.
-3. After any Phase 2 large-corpus comparison, to decide keep current, rescue-only, or candidate-generation.
-4. Before changing the reusable dogfooding packs, to confirm whether that change is actually warranted.
+1. Decide whether the realistic note-shaped corpus is representative enough to guide the Phase 1 outcome.
+2. If not, decide whether to tune the rescue scoring and re-measure or stop the experiment.
+3. After any further Phase 1 measurement, decide stop vs proceed.
+4. After any Phase 2 large-corpus comparison, decide keep current, rescue-only, or candidate-generation.
+5. Before changing the reusable dogfooding packs, confirm whether that change is actually warranted.
 
 ## Current status
 
@@ -319,6 +349,7 @@ This note is intentionally temporary. It is execution scaffolding for the experi
 
 Current state in plain terms:
 
-- the baseline and guardrail coverage for Phase 1 is now in good shape
-- the rescue-only TF-IDF shortlist behavior is implemented and has an initial positive synthetic measurement signal
-- the next useful step is a broader, more realistic measurement pass before deciding whether Phase 1 is strong enough to keep as rescue-only or advance further
+- the baseline and guardrail coverage for Phase 1 is in good shape
+- the rescue-only TF-IDF shortlist behavior is implemented
+- the measurement story is now mixed rather than clearly positive
+- the next step should be a decision with the user about whether the realistic corpus is representative enough to treat as a stop/tune signal before going further
