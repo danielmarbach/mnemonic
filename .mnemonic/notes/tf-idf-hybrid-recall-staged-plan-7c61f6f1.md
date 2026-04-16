@@ -8,7 +8,7 @@ tags:
   - projections
 lifecycle: temporary
 createdAt: '2026-04-16T19:32:34.302Z'
-updatedAt: '2026-04-16T20:41:04.115Z'
+updatedAt: '2026-04-16T21:01:14.251Z'
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
@@ -44,7 +44,8 @@ Implemented so far:
 - the TF-IDF ranker was optimized to reuse prepared corpus tokenization and IDF data instead of rebuilding them repeatedly during ranking
 - the TF-IDF ranker now includes a small title-aware lexical boost so exact title matches can beat repeated generic design decoys in realistic note-shaped corpora
 - real-note dogfooding runs for Pack A and Pack B completed against the live project notes and did not reveal a new regression attributable to the TF-IDF experiment
-- the main dogfooding noise source remains live-vault recency pollution rather than the TF-IDF rescue behavior itself
+- the main dogfooding noise source was live-vault recency pollution rather than the TF-IDF rescue behavior itself
+- **isolated dogfood vault runner is now implemented** — `run-dogfood-packs.mjs --isolated` copies notes into a temporary workspace, runs packs there, and cleans up afterward, removing the live-vault noise problem for future dogfooding runs
 
 Implemented files:
 
@@ -53,11 +54,18 @@ Implemented files:
 - `tests/lexical.unit.test.ts`
 - `tests/lexical-rescue-comparison.unit.test.ts`
 - `tests/recall-embeddings.integration.test.ts`
+- `scripts/dogfooding-isolated-vault.mjs` (new)
+- `scripts/dogfooding-runner-helpers.mjs` (modified)
+- `scripts/run-dogfood-packs.mjs` (modified)
+- `tests/dogfooding-isolated-vault.unit.test.ts` (new)
+- `tests/dogfooding-runner.unit.test.ts` (modified)
+- `tests/dogfooding-runner.integration.test.ts` (new)
 
 Verified command and result:
 
 - `npm test -- tests/lexical.unit.test.ts tests/lexical-rescue-comparison.unit.test.ts tests/recall.unit.test.ts tests/recall-embeddings.integration.test.ts`
 - result: 4 files passed, 75 tests passed, 0 failed
+- `npm test` (full suite): 42 files passed, 622 tests passed, 0 failed
 
 ## Dogfooding snapshot
 
@@ -74,10 +82,12 @@ High-level reading:
 - Pack C was only a closest honest approximation because a truly blind second-session run was not available from the current session.
 - The main workflow noise was still live-vault contamination of recent-note navigation, matching the existing isolated-dogfood-runner checkpoint, rather than a regression caused by TF-IDF rescue.
 
+**Updated 2026-04-16:** The isolated dogfood vault runner is now available (`run-dogfood-packs.mjs --isolated`). Future dogfooding runs can use it to eliminate live-vault recency noise, which was the dominant measurement-quality problem identified in the 2026-04-16 dogfooding runs.
+
 Interpretation:
 
 - Real-note dogfooding did not produce evidence that the current rescue-only TF-IDF work regressed the user-facing recall/orientation workflow.
-- The strongest remaining measurement-quality problem is environmental: live-vault dogfooding makes recent-note and relationship-navigation judgments noisy.
+- The strongest remaining measurement-quality problem was environmental: live-vault dogfooding makes recent-note and relationship-navigation judgments noisy. This is now solvable with the `--isolated` flag.
 
 ## Measurement snapshot
 
@@ -152,4 +162,5 @@ Interpretation:
 - the earlier timing concern was mostly removed by avoiding repeated corpus preparation work
 - the realistic note-shaped ranking regression was addressed by adding a small title-aware boost
 - real-note dogfooding did not reveal a new regression attributable to the TF-IDF experiment
-- the remaining question is whether the current realistic corpus is representative enough to support a keep/proceed decision, and whether future dogfooding should move to an isolated temporary vault runner to reduce live-vault noise
+- the isolated dogfood vault runner is now implemented, removing the main measurement-quality obstacle for future dogfooding runs
+- **next action:** re-run Pack A using `run-dogfood-packs.mjs --isolated` to get clean recency/relationship-navigation measurements without live-vault noise, then decide keep/proceed
