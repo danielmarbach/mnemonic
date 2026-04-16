@@ -8,7 +8,7 @@ tags:
   - projections
 lifecycle: temporary
 createdAt: '2026-04-16T19:32:34.302Z'
-updatedAt: '2026-04-16T20:17:29.326Z'
+updatedAt: '2026-04-16T20:23:23.921Z'
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
@@ -41,7 +41,8 @@ Implemented so far:
 - late-candidate rescue coverage now verifies that a stronger lexical match can still win even when it appears after many weaker decoys
 - a synthetic comparison harness now measures the previous bounded lexical rescue path against the TF-IDF rescue path
 - a more realistic note-shaped comparison harness now measures tradeoffs on mixed design, checkpoint, temporal, dogfooding, and misc note patterns
-- targeted lexical and recall-focused verification passed after the change
+- the TF-IDF ranker was optimized to reuse prepared corpus tokenization and IDF data instead of rebuilding them repeatedly during ranking
+- targeted lexical and recall-focused verification passed after the optimization
 
 Implemented files:
 
@@ -60,6 +61,8 @@ Verified command and result:
 
 ### Synthetic late-target corpus
 
+Before the prepared-corpus optimization, the observed synthetic measurement was:
+
 - previous bounded lexical rescue rare-term MRR: `0.400`
 - TF-IDF rescue rare-term MRR: `0.607`
 - previous bounded lexical rescue broad-query MRR: `1.000`
@@ -67,15 +70,24 @@ Verified command and result:
 - previous bounded lexical rescue measurement time: about `9.5ms`
 - TF-IDF rescue measurement time: about `155.7ms`
 
+After the prepared-corpus optimization, a direct measurement run produced:
+
+- previous bounded lexical rescue rare-term MRR: `0.400`
+- TF-IDF rescue rare-term MRR: `0.607`
+- previous bounded lexical rescue broad-query MRR: `1.000`
+- TF-IDF rescue broad-query MRR: `1.000`
+- previous bounded lexical rescue measurement time: about `9.2ms`
+- TF-IDF rescue measurement time: about `5.8ms`
+
 Interpretation:
 
-- the current TF-IDF rescue path improves rare-term recovery on the synthetic late-target corpus used for Phase 1 measurement
-- the broad-query sanity slice did not regress on this synthetic corpus
-- query-time cost is noticeably higher in the synthetic harness, so performance remains an explicit go/no-go part of the Phase 1 decision rather than something already settled
+- the rare-term improvement signal on the synthetic late-target corpus remained intact after optimization
+- the large timing gap originally observed was mostly implementation overhead from repeated corpus tokenization and IDF work, not an unavoidable property of TF-IDF itself in the current in-memory harness
+- after removing the repeated work, TF-IDF rescue is no longer slower than the previous bounded lexical rescue on this synthetic harness
 
 ### More realistic note-shaped corpus
 
-Observed measurement from the initial realistic-corpus run before the harness assertions were relaxed into pure measurement mode:
+Before the prepared-corpus optimization, the observed realistic-corpus measurement was:
 
 - previous bounded lexical rescue rare-term MRR: `1.000`
 - TF-IDF rescue rare-term MRR: `1.000`
@@ -84,11 +96,20 @@ Observed measurement from the initial realistic-corpus run before the harness as
 - previous bounded lexical rescue measurement time: about `13.2ms`
 - TF-IDF rescue measurement time: about `237.1ms`
 
+After the prepared-corpus optimization, a direct measurement run produced:
+
+- previous bounded lexical rescue rare-term MRR: `1.000`
+- TF-IDF rescue rare-term MRR: `1.000`
+- previous bounded lexical rescue broad-query MRR: `1.000`
+- TF-IDF rescue broad-query MRR: `0.676`
+- previous bounded lexical rescue measurement time: about `13.5ms`
+- TF-IDF rescue measurement time: about `6.3ms`
+
 Interpretation:
 
-- on the more realistic note-shaped corpus, the current TF-IDF rescue path did not improve the measured rare-term slice over the previous bounded rescue path
-- the same corpus showed worse broad-query ranking behavior for the TF-IDF path in this harness
-- the broader measurement story is therefore mixed, not uniformly positive: the current rescue-only TF-IDF implementation helps on the synthetic late-target corpus but is not yet clearly superior on the more realistic note-shaped corpus
+- the optimization removed the timing concern in the current in-memory realistic harness as well
+- the realistic-corpus ranking result remains mixed: TF-IDF still does not improve the rare-term slice there and still underperforms on the broad-query slice in this observed run
+- the main unresolved question is now ranking quality on realistic note-shaped data, not raw algorithm cost inside the current implementation
 
 ## Language-independence reference
 
@@ -190,6 +211,7 @@ Implemented helpers:
 - `computeTermFrequency`
 - `computeInverseDocumentFrequency`
 - `computeTfIdfCosineSimilarity`
+- `prepareTfIdfCorpus`
 - `rankDocumentsByTfIdf`
 
 Implemented unit coverage:
@@ -199,6 +221,7 @@ Implemented unit coverage:
 - rare-token ranking over broader fuzzy matches
 - preservation of non-English tokens during TF-IDF preparation
 - strongest late-match selection from a larger corpus slice
+- prepared-corpus reuse without ranking drift
 
 Remaining follow-up:
 
@@ -239,7 +262,7 @@ Verified so far:
 - stronger non-English semantic matches are not displaced by English lexical overlap in the added cross-language guardrail test
 - the synthetic comparison harness shows a better rare-term MRR for TF-IDF rescue than for the previous bounded lexical rescue path on the current synthetic corpus
 - the more realistic note-shaped comparison harness shows a mixed outcome: no rare-term gain on that corpus and weaker broad-query ranking for TF-IDF in the observed run
-- lexical and recall-focused suites pass after the rescue-path change
+- lexical and recall-focused suites pass after the rescue-path change and optimization
 
 Still to verify explicitly:
 
@@ -259,23 +282,23 @@ Candidate scenario-to-test mapping:
 
 Success condition:
 
-- the test suite and measurement harnesses demonstrate lexical-heavy improvement with no visible semantic-first regression and no obvious language-independence regression, and measurement evidence is strong enough to justify keeping the added cost
+- the test suite and measurement harnesses demonstrate lexical-heavy improvement with no visible semantic-first regression and no obvious language-independence regression, and measurement evidence is strong enough to justify keeping the added cost or complexity
 
 ### Checkpoint 5: Measure Phase 1 cost before proceeding
 
-Status: materially progressed, but not conclusively favorable.
+Status: algorithm-cost question clarified; ranking-quality question remains open.
 
 What is now measured:
 
 - a synthetic comparison harness exists and demonstrates rare-term ranking improvement on the current late-target corpus
 - a more realistic note-shaped comparison harness exists and demonstrates a mixed tradeoff picture
-- both harnesses show a noticeable query-time cost increase for TF-IDF versus the previous bounded lexical rescue path
+- prepared-corpus reuse removed the large timing penalty that earlier measurements showed in the in-memory harnesses
 
 Current reading of the evidence:
 
-- the synthetic corpus supports rescue-only TF-IDF
-- the more realistic note-shaped corpus does not yet clearly support rescue-only TF-IDF
-- therefore Phase 1 is not ready for a keep/proceed decision yet; it either needs tuning and re-measurement or a decision to stop if the realistic corpus is judged representative enough already
+- the earlier large timing gap was mostly implementation overhead from repeated corpus tokenization and IDF recomputation, not just an unavoidable complexity penalty in the current in-memory ranking path
+- after optimization, the main concern is ranking quality on realistic note-shaped data rather than raw algorithm timing inside the measurement harnesses
+- therefore Phase 1 is still not ready for a keep/proceed decision, but the reason has shifted: quality is now the blocker more than cost
 
 Still needed:
 
@@ -351,5 +374,6 @@ Current state in plain terms:
 
 - the baseline and guardrail coverage for Phase 1 is in good shape
 - the rescue-only TF-IDF shortlist behavior is implemented
-- the measurement story is now mixed rather than clearly positive
+- the earlier timing concern was mostly removed by avoiding repeated corpus preparation work
+- the measurement story is still mixed because of ranking quality on realistic note-shaped data
 - the next step should be a decision with the user about whether the realistic corpus is representative enough to treat as a stop/tune signal before going further
