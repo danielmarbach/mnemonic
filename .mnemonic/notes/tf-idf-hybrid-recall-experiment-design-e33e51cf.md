@@ -7,7 +7,7 @@ tags:
   - projections
 lifecycle: permanent
 createdAt: '2026-04-16T19:32:34.301Z'
-updatedAt: '2026-04-16T19:34:48.386Z'
+updatedAt: '2026-04-16T19:47:01.144Z'
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
@@ -32,11 +32,22 @@ Treat TF-IDF as a staged experiment, not a new architectural pillar.
 - Keep the feature rebuildable, disposable, local, and optional, in the same spirit as embeddings and projections.
 - Reject any variant that introduces a database, always-on service, committed index artifacts, or lifecycle complexity beyond the current stdio MCP model.
 
+## Language-independence guardrail
+
+Mnemonic has an existing design principle that user-facing retrieval behavior should not overfit to English wording or mnemonic-specific vocabulary. That principle applies here too.
+
+For this experiment:
+
+- TF-IDF may improve exact lexical recovery, but it must remain a supplementary signal under the semantic-first path, not the backbone of recall.
+- Tuning decisions must not optimize only for mnemonic's own English-heavy vocabulary or note titles.
+- Unsupported-language and mixed-language notes should degrade gracefully rather than being systematically pushed down just because lexical overlap is weaker.
+- A wording-heavy TF-IDF win is acceptable only when it does not regress cross-language behavior or displace strong semantic matches.
+
 ## Why this fits mnemonic
 
 This preserves the architecture documented in `ARCHITECTURE.md`: notes remain the durable source of truth, embeddings and projections remain derived local artifacts, recall stays project-biased rather than project-exclusive, and local dogfooding continues to work through the normal on-demand MCP entrypoint.
 
-The current shipped hybrid recall note is the baseline, not something to replace. This experiment is only justified if TF-IDF improves lexical-heavy precision or candidate-selection cost while preserving semantic paraphrase quality and the current simple operational shape.
+The current shipped hybrid recall note is the baseline, not something to replace. This experiment is only justified if TF-IDF improves lexical-heavy precision or candidate-selection cost while preserving semantic paraphrase quality, language-independence guardrails, and the current simple operational shape.
 
 ## Constraints and invariants
 
@@ -45,11 +56,12 @@ The current shipped hybrid recall note is the baseline, not something to replace
 - No new persistent source of truth.
 - Fail-soft behavior must remain: disabling or failing TF-IDF falls back to current semantic-plus-lightweight-lexical behavior.
 - Verification must be done against realistic note growth, not only micro-benchmarks.
+- Verification must include at least a light cross-language sanity check so TF-IDF is not tuned only for English lexical wins.
 
 ## Adopt / reject criteria
 
-Keep the current design if TF-IDF does not clearly improve lexical-heavy recall, harms paraphrase quality, or adds more complexity than the benefit justifies.
+Keep the current design if TF-IDF does not clearly improve lexical-heavy recall, harms paraphrase quality, materially worsens cross-language behavior, or adds more complexity than the benefit justifies.
 
-Adopt rescue-only TF-IDF if it improves identifier-heavy and repo-jargon queries without semantic regressions, but candidate-generation gains remain unclear.
+Adopt rescue-only TF-IDF if it improves identifier-heavy and repo-jargon queries without semantic regressions or meaningful language-independence regressions, but candidate-generation gains remain unclear.
 
 Adopt TF-IDF candidate generation in hybrid mode only if rescue-only results are already positive and larger-corpus verification shows clear cost or latency wins while preserving the same explainable ranking story: semantic first, lexical assists, project bias preserved.
