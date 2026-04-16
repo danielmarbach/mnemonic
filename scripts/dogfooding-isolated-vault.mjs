@@ -21,3 +21,16 @@ export async function createIsolatedDogfoodVault(sourceVaultPath) {
     },
   };
 }
+
+export async function runDogfoodInIsolation({ sourceVaultPath, dryRun = false }) {
+  const isolated = await createIsolatedDogfoodVault(sourceVaultPath);
+  const result = {
+    usedIsolatedVault: true,
+    vaultPath: isolated.vaultPath,
+    tempRoot: isolated.tempRoot,
+    cleanedUp: false,
+  };
+  await isolated.cleanup();
+  result.cleanedUp = true;
+  return result;
+}
