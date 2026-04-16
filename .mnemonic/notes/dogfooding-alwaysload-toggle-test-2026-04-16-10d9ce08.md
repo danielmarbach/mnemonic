@@ -6,8 +6,8 @@ tags:
   - alwaysload
 lifecycle: permanent
 createdAt: '2026-04-16T20:35:49.084Z'
-updatedAt: '2026-04-16T20:35:49.084Z'
-alwaysLoad: true
+updatedAt: '2026-04-16T20:35:56.554Z'
+alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 memoryVersion: 1
