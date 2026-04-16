@@ -8,7 +8,7 @@ tags:
   - projections
 lifecycle: temporary
 createdAt: '2026-04-16T19:32:34.302Z'
-updatedAt: '2026-04-16T19:38:50.661Z'
+updatedAt: '2026-04-16T19:43:55.338Z'
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
@@ -66,43 +66,116 @@ Baseline matrix to lock down before TF-IDF changes:
 
 1. Semantic paraphrase safety
 
-- query shape: wording differs from the note but meaning matches
-- expected: semantic match remains rank 1 even when lexical overlap is weak
-- suggested home: integration coverage, because this is a retrieval-contract assertion
+- target file: `tests/recall-embeddings.integration.test.ts`
+- proposed test name: `it("keeps semantic paraphrase matches ahead when lexical overlap is weak", async () => { ... })`
+- fixture shape:
+  - note A id: `semantic-target`
+  - title: `CI learning promotion guidance`
+  - content: wording about promoting learnings from CI failures into durable memory
+  - tags: `ci`, `learning`, `design`
+  - note B id: `lexical-decoy`
+  - title: `Promotion checklist`
+  - content: repeated lexical uses of `promotion`, `guidance`, or `workflow` without the same meaning
+  - embeddings:
+    - `semantic-target` gets the same vector as the query
+    - `lexical-decoy` gets a weaker but nonzero vector
+  - query shape: `how we handle promotion of CI learnings`
+- expected assertions:
+  - result 0 id is `semantic-target`
+  - decoy does not displace the semantic note even if it has stronger exact-token overlap
+- rationale: this is the core semantic-first safety test for the experiment
 
 1. Exact lexical title match
 
-- query shape: exact note-title terms such as `hybrid recall design`
-- expected: intended note ranks above semantically tied but lexically weaker notes
-- suggested home: existing reranking integration coverage
+- target file: `tests/recall-embeddings.integration.test.ts`
+- existing nearby coverage: `reranks semantic ties using projections even when no projection cache is warm`
+- proposed companion test name if a separate one is still useful: `it("prefers the exact title match among semantically tied notes", async () => { ... })`
+- fixture shape:
+  - note A id: `hybrid-design`
+  - title: `Hybrid Recall Design`
+  - content: exact design notes for hybrid recall
+  - note B id: `retrieval-notes`
+  - title: `Retrieval Notes`
+  - content: semantically similar but less exact lexical match
+  - embeddings: identical vectors to force lexical tie-breaking
+  - query shape: `hybrid recall design`
+- expected assertions:
+  - result 0 id is `hybrid-design`
+  - lexical tie-break remains deterministic in a cold projection state
+- rationale: this is already partly covered and should remain explicitly preserved across TF-IDF changes
 
 1. Identifier and repo-jargon lookup
 
-- query shape: rare feature name, implementation term, or note id-like token
-- expected: strongest lexical match surfaces; broad fuzzy notes do not outrank it
-- suggested home: integration coverage with small fixed corpora
+- target file: `tests/recall-embeddings.integration.test.ts`
+- proposed test name: `it("rescues rare repo-jargon queries with the strongest lexical match", async () => { ... })`
+- fixture shape:
+  - note A id: `projection-doc`
+  - title: `Projection layer notes`
+  - content: mentions `projectionText`, `staleness`, and `derived retrieval text`
+  - note B id: `general-recall`
+  - title: `Recall notes`
+  - content: broad recall concepts without rare implementation terms
+  - note C id: `id-like-target`
+  - title: `Hybrid recall design`
+  - content: includes a rare term such as `projectionText` or another stable implementation token used in real code
+  - embeddings: all weak and similar so lexical rescue matters
+  - query shape: `projectionText staleness`
+- expected assertions:
+  - result set contains `projection-doc` or `id-like-target` first depending on chosen corpus wording
+  - broad recall note does not outrank the rare-token match
+- rationale: this is the primary lexical-heavy win case the TF-IDF experiment must improve
 
 1. Weak semantic rescue quality
 
-- query shape: low-similarity or noisy query where semantic scores are weak
-- expected: rescue path returns plausible lexical candidates and does not prefer first-seen weak notes
-- suggested home: existing rescue integration coverage
+- target file: `tests/recall-embeddings.integration.test.ts`
+- existing nearby coverage: `lexical rescue keeps the strongest projection matches instead of first-seen notes`
+- proposed companion test name if tightening is needed: `it("returns only plausible rescue candidates when semantic scores are weak", async () => { ... })`
+- fixture shape:
+  - preserve the existing four-note shape (`a-weak`, `b-mid`, `c-mid`, `d-strong`) or rename for clarity
+  - all embeddings remain equally weak negative vectors
+  - query shape: `hybrid recall design`
+- expected assertions:
+  - top result remains the strongest lexical note
+  - obviously weak note is excluded from rescued results
+  - result ordering is by lexical strength rather than file creation order
+- rationale: this is the direct baseline against which Phase 1 rescue-only TF-IDF should be compared
 
 1. Project-first widening invariants
 
-- query shape: both project-local and global notes are plausible matches
-- expected: project results fill first, then global results widen only as needed
-- suggested home: `tests/recall.unit.test.ts` unless real entrypoint coverage is needed
+- target file: `tests/recall.unit.test.ts`
+- existing coverage already present:
+  - `prefers current-project matches before widening to global results`
+  - `returns only project matches when they fill the limit`
+  - `keeps stronger project preference behavior intact after additive metadata boosts`
+- proposed additional test name if the experiment starts touching candidate selection too early: `it("preserves project-first widening when lexical signals exist on both project and global candidates", () => { ... })`
+- fixture shape:
+  - project candidate A: moderate semantic score, strong lexical score, `isCurrentProject: true`
+  - project candidate B: slightly lower semantic score, acceptable lexical score, `isCurrentProject: true`
+  - global candidate: best raw semantic score, strong lexical score, `isCurrentProject: false`
+- expected assertions:
+  - project candidates still fill first for `scope: "all"`
+  - global candidate only appears after project slots are exhausted
+- rationale: if TF-IDF is introduced into candidate selection later, this invariant becomes easy to accidentally weaken
 
 1. Cold-start operational simplicity
 
-- query shape: normal recall through the local MCP entrypoint in a fresh run
-- expected: no pre-warm step, no extra service, no TF-IDF-specific operator action
-- suggested home: existing MCP smoke-style integration coverage
+- target file: `tests/recall-embeddings.integration.test.ts` or MCP smoke coverage using `tests/helpers/mcp.ts`
+- proposed test name: `it("recall works through the local MCP entrypoint without TF-IDF prewarming", async () => { ... })`
+- fixture shape:
+  - use the normal temporary vault setup and fake embedding server
+  - seed one exact lexical target and one distractor
+  - do not precompute or warm any extra runtime state beyond what the current tests already do
+  - query shape: one lexical-heavy query and one semantic query if the test remains concise
+- expected assertions:
+  - recall returns valid structured content through the real entrypoint
+  - intended result ranks first
+  - no extra setup step, file artifact, or service dependency is introduced
+- rationale: this protects the MCP-first operational shape while the experiment evolves
 
 Success condition:
 
 - current behavior is locked down tightly enough that TF-IDF changes can be judged against a fixed matrix instead of memory or intuition
+- at least one explicit baseline test exists for each of the six categories above
 
 ### Checkpoint 2: Add isolated TF-IDF primitives in `src/lexical.ts`
 
@@ -127,6 +200,21 @@ Tests to add:
 - deterministic ranking for a small fixed corpus
 - empty and degenerate corpus behavior
 - rare token queries outrank broad fuzzy matches
+
+Proposed unit test names:
+
+- `it("computes normalized term frequency for repeated tokens", () => { ... })`
+- `it("assigns higher inverse-document frequency to rarer terms", () => { ... })`
+- `it("builds deterministic tf-idf rankings for a fixed corpus", () => { ... })`
+- `it("returns empty or zero scores for empty corpora and empty queries", () => { ... })`
+- `it("prefers rare-token documents over broad fuzzy matches", () => { ... })`
+
+Suggested fixture corpus for ranking tests:
+
+- doc `rare-target`: `projectiontext staleness derived retrieval text`
+- doc `broad-related`: `retrieval text retrieval notes design`
+- doc `unrelated`: `cooking recipes weekly menu`
+- query: `projectiontext staleness`
 
 Success condition:
 
@@ -154,6 +242,20 @@ Tests to add:
 - TF-IDF rescue favors exact identifier and repo-jargon matches
 - no projections or partial projection availability degrades cleanly
 
+Proposed test names:
+
+- `it("activates tf-idf rescue only when semantic confidence is weak", async () => { ... })`
+- `it("skips tf-idf rescue when semantic results are already strong", async () => { ... })`
+- `it("uses tf-idf rescue to prioritize identifier-heavy matches", async () => { ... })`
+- `it("fails soft when projection text is partially unavailable", async () => { ... })`
+
+Suggested fixture shape:
+
+- 4 to 6 notes with near-identical weak embeddings
+- one target note containing repeated rare lexical terms in projection text
+- one broad semantic decoy
+- one first-created weak note to guard against accidental first-seen ordering
+
 Success condition:
 
 - TF-IDF can replace or narrow the current rescue candidate selection without changing the non-rescue path
@@ -174,6 +276,14 @@ Scenarios to encode:
 - weak semantic queries gain plausible rescue candidates
 - cold MCP entrypoint still works with no pre-warm step
 
+Candidate scenario-to-test mapping:
+
+- paraphrase safety: `keeps semantic paraphrase matches ahead when lexical overlap is weak`
+- exact lexical tie-break: existing `reranks semantic ties using projections even when no projection cache is warm`
+- rescue quality: existing `lexical rescue keeps the strongest projection matches instead of first-seen notes`
+- repo jargon gain: `rescues rare repo-jargon queries with the strongest lexical match`
+- cold-start simplicity: `recall works through the local MCP entrypoint without TF-IDF prewarming`
+
 Success condition:
 
 - the test suite demonstrates clear improvement for lexical-heavy cases with no visible semantic-first regression
@@ -189,6 +299,16 @@ Actions:
 - compare current rescue vs TF-IDF rescue on a larger synthetic or fixture corpus
 - record build-time cost, query-time cost, and whether memory overhead is still modest
 - capture whether the result feels like a helper layer rather than an indexing subsystem
+
+Suggested benchmark fixture shape:
+
+- 50 to 200 notes
+- 20 to 40 project-local notes
+- remainder global-style notes
+- 3 query classes:
+  - semantic paraphrase
+  - exact jargon or identifier
+  - mixed project-plus-global lookup
 
 Go / no-go rule:
 
@@ -209,6 +329,10 @@ Actions:
 - use TF-IDF only to narrow or prioritize lexical candidates before final hybrid scoring
 - do not let TF-IDF become the top-level ranker for strong semantic queries
 
+Suggested unit-level guard test:
+
+- `it("does not let lexical candidate narrowing overcome a large semantic gap", () => { ... })`
+
 Success condition:
 
 - the ranking story stays explainable: semantic first, lexical assists, project bias preserved
@@ -226,6 +350,13 @@ Scenarios to encode:
 - mixed semantic and lexical query set
 - synonym-heavy queries with low exact-token overlap
 - project-plus-global blend where a useful global note should still appear after project-local hits
+
+Proposed test names or benchmark labels:
+
+- `large corpus: semantic paraphrase remains dominant`
+- `large corpus: identifier-heavy query benefits from tf-idf candidate narrowing`
+- `large corpus: project-local results still fill before global fallback`
+- `large corpus: useful global companion note still appears when project results are incomplete`
 
 Success condition:
 
