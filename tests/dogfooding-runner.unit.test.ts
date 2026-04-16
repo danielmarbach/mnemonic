@@ -5,6 +5,7 @@ import {
   getSummaryThemeEntries,
   getWorkingStateNotes,
   pickRecentNoteForRelationshipNavigation,
+  resolveDogfoodVaultPath,
 } from "../scripts/dogfooding-runner-helpers.mjs";
 
 describe("dogfooding runner helpers", () => {
@@ -65,5 +66,10 @@ describe("dogfooding runner helpers", () => {
     ]);
 
     expect(picked?.id).toBe("older");
+  });
+
+  it("prefers an explicitly provided isolated vault path over the live project vault", () => {
+    const config = resolveDogfoodVaultPath({ cwd: "/repo", isolatedVaultPath: "/tmp/run/.mnemonic" });
+    expect(config).toBe("/tmp/run/.mnemonic");
   });
 });
