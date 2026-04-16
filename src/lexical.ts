@@ -167,27 +167,54 @@ export function computeTfIdfCosineSimilarity(query: string, document: string, co
   return dotProduct / (Math.sqrt(queryMagnitude) * Math.sqrt(documentMagnitude));
 }
 
+interface PreparedTfIdfDocument {
+  id: string;
+  text: string;
+  tokens: string[];
+}
+
+export interface PreparedTfIdfCorpus {
+  documents: PreparedTfIdfDocument[];
+  idf: Map<string, number>;
+}
+
+export function prepareTfIdfCorpus(
+  documents: Array<{ id: string; text: string }>
+): PreparedTfIdfCorpus {
+  const preparedDocuments = documents.map((document) => ({
+    id: document.id,
+    text: document.text,
+    tokens: tokenize(document.text),
+  }));
+
+  return {
+    documents: preparedDocuments,
+    idf: computeInverseDocumentFrequency(preparedDocuments.map((document) => document.tokens)),
+  };
+}
+
 /**
  * Rank documents by TF-IDF cosine similarity for a query.
  */
 export function rankDocumentsByTfIdf(
   query: string,
   documents: Array<{ id: string; text: string }>,
-  limit: number
+  limit: number,
+  preparedCorpus?: PreparedTfIdfCorpus
 ): Array<{ id: string; score: number }> {
   if (limit <= 0 || documents.length === 0) {
     return [];
   }
 
-  const corpus = documents.map((document) => document.text);
-  const corpusTokens = corpus.map((entry) => tokenize(entry));
+  const prepared = preparedCorpus ?? prepareTfIdfCorpus(documents);
+  const corpus = prepared.documents.map((document) => document.text);
   const queryTokens = tokenize(query);
-  const idf = computeInverseDocumentFrequency(corpusTokens);
+  const idf = prepared.idf;
 
-  return documents
+  return prepared.documents
     .map((document) => {
-      const tfIdfScore = computeTfIdfCosineSimilarity(query, document.text, corpus);
-      const coverageScore = computeTfIdfWeightedQueryCoverage(queryTokens, tokenize(document.text), idf);
+      const tfIdfScore = computeTfIdfCosineSimilarityWithPreparedData(queryTokens, document.tokens, idf);
+      const coverageScore = computeTfIdfWeightedQueryCoverage(queryTokens, document.tokens, idf);
       return {
         id: document.id,
         score: tfIdfScore + 0.35 * coverageScore,
@@ -195,6 +222,39 @@ export function rankDocumentsByTfIdf(
     })
     .sort((a, b) => b.score - a.score)
     .slice(0, limit);
+}
+
+function computeTfIdfCosineSimilarityWithPreparedData(
+  queryTokens: string[],
+  documentTokens: string[],
+  idf: Map<string, number>
+): number {
+  if (queryTokens.length === 0 || documentTokens.length === 0) {
+    return 0;
+  }
+
+  const queryTf = computeTermFrequency(queryTokens);
+  const documentTf = computeTermFrequency(documentTokens);
+  const vocabulary = new Set([...queryTf.keys(), ...documentTf.keys()]);
+
+  let dotProduct = 0;
+  let queryMagnitude = 0;
+  let documentMagnitude = 0;
+
+  for (const token of vocabulary) {
+    const weight = idf.get(token) ?? 0;
+    const queryWeight = (queryTf.get(token) ?? 0) * weight;
+    const documentWeight = (documentTf.get(token) ?? 0) * weight;
+    dotProduct += queryWeight * documentWeight;
+    queryMagnitude += queryWeight * queryWeight;
+    documentMagnitude += documentWeight * documentWeight;
+  }
+
+  if (queryMagnitude === 0 || documentMagnitude === 0) {
+    return 0;
+  }
+
+  return dotProduct / (Math.sqrt(queryMagnitude) * Math.sqrt(documentMagnitude));
 }
 
 function computeTfIdfWeightedQueryCoverage(

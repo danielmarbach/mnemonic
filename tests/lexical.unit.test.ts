@@ -10,6 +10,7 @@ import {
   computeTermFrequency,
   computeInverseDocumentFrequency,
   computeTfIdfCosineSimilarity,
+  prepareTfIdfCorpus,
   rankDocumentsByTfIdf,
   shouldTriggerLexicalRescue,
   LEXICAL_RESCUE_CANDIDATE_LIMIT,
@@ -202,6 +203,20 @@ describe("TF-IDF primitives", () => {
 
     expect(ranked[0]?.id).toBe("late-target");
     expect(ranked.map((entry) => entry.id)).toContain("late-target");
+  });
+
+  it("reuses prepared tf-idf corpus data without changing ranking behavior", () => {
+    const documents = [
+      { id: "rare-target", text: "projectiontext staleness derived retrieval text" },
+      { id: "broad-related", text: "staleness retrieval text notes design" },
+      { id: "unrelated", text: "cooking recipes weekly menu" },
+    ];
+
+    const prepared = prepareTfIdfCorpus(documents);
+    const preparedRanked = rankDocumentsByTfIdf("projectiontext staleness", documents, documents.length, prepared);
+    const directRanked = rankDocumentsByTfIdf("projectiontext staleness", documents, documents.length);
+
+    expect(preparedRanked).toEqual(directRanked);
   });
 });
 
