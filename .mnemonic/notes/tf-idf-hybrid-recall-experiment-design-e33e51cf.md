@@ -13,8 +13,6 @@ alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
-  - id: tf-idf-hybrid-recall-staged-plan-7c61f6f1
-    type: explains
   - id: hybrid-recall-design-and-implementation-completed-0-20-0-f4159d37
     type: related-to
   - id: performance-principles-for-file-first-mcp-and-git-backed-wor-4e7d3bc8
