@@ -45,7 +45,7 @@ No code changes required — set `EMBED_MODEL=qwen3-embedding:0.6b` in your envi
 
 ## Setup
 
-### Native (Node.js 18+)
+### Native (Node.js 20+)
 
 ```bash
 npm install
