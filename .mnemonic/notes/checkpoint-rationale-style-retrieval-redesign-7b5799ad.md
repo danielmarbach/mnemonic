@@ -8,7 +8,7 @@ tags:
   - rationale
 lifecycle: temporary
 createdAt: '2026-04-05T17:41:52.918Z'
-updatedAt: '2026-04-17T04:52:02.109Z'
+updatedAt: '2026-04-17T04:55:50.889Z'
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
@@ -16,7 +16,7 @@ memoryVersion: 1
 ---
 Checkpoint for the rationale-style retrieval redesign follow-up.
 
-Current status: the broad design direction is now approved. The next step is to turn the approved design into a written implementation plan, then implement it test-first.
+Current status: the design is approved and the implementation plan is now written. The next step is to choose execution mode and implement it test-first.
 
 Approved design:
 
@@ -37,9 +37,10 @@ Why this design was chosen:
 - metadata-only or repo-specific canonical-note solutions would create authoring burden and corpus-shaped behavior
 - the real gap appears to be bounded promotion of canonical explanatory notes that are already near the correct semantic neighborhood
 
-Testing shape agreed for the next implementation plan:
+Testing shape agreed for implementation:
 
 - unit tests for the promotion scorer
+- unit guardrails for weak-wording/language-independent promotion
 - recall integration tests for canonical-answer promotion
 - guardrail tests so factual/entity queries and temporary notes do not regress
 
@@ -47,11 +48,16 @@ Written spec path:
 
 - `docs/superpowers/specs/2026-04-17-rationale-style-retrieval-design.md`
 
+Written plan path:
+
+- `docs/superpowers/plans/2026-04-17-rationale-style-retrieval-implementation.md`
+
 Constraints still in force:
 
 - remain language-independent in primary signals
 - no repo-specific title exceptions or allowlists
 - no new persistent retrieval layer
 - do not modify TF-IDF rescue as part of this work
+- do not commit `docs/superpowers/*` artifacts unless the user later asks for that explicitly
 
-Next action: have the user review the written spec, then write the implementation plan for the bounded canonical-explanation promotion design.
+Next action: execute the implementation plan using subagent-driven development or inline execution.
