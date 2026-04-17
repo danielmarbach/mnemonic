@@ -12,9 +12,6 @@ updatedAt: '2026-04-05T10:30:26.227Z'
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
-relatedTo:
-  - id: dogfooding-test-suite-results-phases-1-8-validation-2026-03--86866b21
-    type: related-to
 memoryVersion: 1
 ---
 # Dogfooding test packs: reusable prompts and scorecards
