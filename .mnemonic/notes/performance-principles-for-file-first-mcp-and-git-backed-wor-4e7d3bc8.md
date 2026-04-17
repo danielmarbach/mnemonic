@@ -17,8 +17,6 @@ relatedTo:
     type: related-to
   - id: active-session-project-cache-single-in-memory-vault-cache-pe-7463f124
     type: related-to
-  - id: tf-idf-hybrid-recall-experiment-design-e33e51cf
-    type: related-to
 memoryVersion: 1
 ---
 ## Durable Performance Principles

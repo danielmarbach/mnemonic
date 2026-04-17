@@ -13,8 +13,6 @@ projectName: mnemonic
 relatedTo:
   - id: mcp-workflow-ux-hint-prompt-tool-descriptions-and-session-st-e89a18fc
     type: related-to
-  - id: tf-idf-hybrid-recall-experiment-design-e33e51cf
-    type: related-to
 memoryVersion: 1
 ---
 Phase 7 role suggestions prioritize language-independent structural and graph signals over wording cues.

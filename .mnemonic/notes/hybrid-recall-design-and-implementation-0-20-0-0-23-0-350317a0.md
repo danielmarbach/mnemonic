@@ -1,23 +1,24 @@
 ---
-title: 'Hybrid recall design and implementation (completed 0.20.0, updated 0.23.0)'
+title: 'Hybrid recall design and implementation (0.20.0, 0.23.0)'
 tags:
   - recall
   - hybrid-search
-  - completed
   - design
-  - projections
+  - completed
 lifecycle: permanent
-createdAt: '2026-04-04T12:32:49.862Z'
-updatedAt: '2026-04-17T11:10:31.962Z'
+createdAt: '2026-04-17T13:14:34.706Z'
+updatedAt: '2026-04-17T13:14:34.706Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
+  - id: performance-principles-for-file-first-mcp-and-git-backed-wor-4e7d3bc8
+    type: related-to
   - id: mnemonic-key-design-decisions-3f2a6273
     type: example-of
-  - id: tf-idf-hybrid-recall-experiment-design-e33e51cf
-    type: related-to
 memoryVersion: 1
 ---
+TF-IDF design note is a subset of the hybrid recall note which now contains all TF-IDF outcome details. Merge into the canonical note and prune the separate TF-IDF note.
+
 Hybrid recall improves mnemonic recall quality by combining semantic retrieval with lexical reranking, lexical rescue, and canonical explanation promotion over existing projection data, while preserving mnemonic's core simplicity constraints.
 
 **Status: COMPLETED** — shipped in 0.20.0 (2026-04-04), enhanced in 0.23.0.
@@ -37,7 +38,7 @@ Hybrid recall improves mnemonic recall quality by combining semantic retrieval w
 - `src/recall.ts` — `lexicalScore` on `ScoredRecallCandidate`, `computeHybridScore`, `applyLexicalReranking`, `computeCanonicalExplanationScore`, `applyCanonicalExplanationPromotion`
 - `src/index.ts` — `collectLexicalRescueCandidates` helper, `buildRecallCandidateContext` helper, hybrid recall integration in recall handler
 
-### Key design choices
+## Key design choices
 
 - Lexical scoring uses a composite: substring match (40%), bigram Jaccard (35%), unigram Jaccard (25%)
 - Hybrid weight is 12% — enough to reorder close candidates but not overcome large semantic gaps
@@ -45,22 +46,31 @@ Hybrid recall improves mnemonic recall quality by combining semantic retrieval w
 - Rescue bounded to 3 candidates max, scanned from projections only
 - All lexical operations fail-soft to pure semantic behavior
 
-### TF-IDF rescue ranking (adopted 0.23.0)
+## TF-IDF rescue ranking (adopted 0.23.0)
 
-The TF-IDF experiment concluded with a decision to adopt rescue-only TF-IDF ranking. Key outcomes:
+TF-IDF was evaluated as a staged experiment, not a new architectural pillar. The experiment concluded with a decision to adopt rescue-only TF-IDF ranking.
 
-- TF-IDF now ranks the eligible rescue pool by TF-IDF similarity before applying the bounded rescue limit, replacing the previous sequential scan
+- TF-IDF ranks the eligible rescue pool by similarity before applying the bounded rescue limit, replacing the previous sequential scan
 - Title-aware boost ensures exact title matches can beat repeated generic decoys in realistic note-shaped corpora
 - Prepared corpus optimization avoids rebuilding tokenization and IDF data during ranking
-- Measurement results: TF-IDF rescue achieves MRR 0.607 on rare-term queries (vs 0.400 previously) and matches broad-query MRR at 1.000, with timing comparable to the previous path after optimization (~10-16ms)
-- Language-independence guardrail: TF-IDF operates only in the rescue lane, never displacing strong semantic matches
-- Isolated dogfooding confirmed no new regression in user-facing recall/orientation workflow
+- MRR on rare-term queries improved from 0.400 to 0.607; broad-query MRR stays at 1.000
+- Timing comparable to the previous path after optimization (~10-16ms vs ~9-13ms)
+- TF-IDF is built only from derived retrieval text, never raw markdown note bodies
+- No database, always-on service, committed index artifacts, or lifecycle complexity beyond the current stdio MCP model
+- Full hybrid mode (TF-IDF candidate generation alongside semantic) was not adopted because rescue-only results were already positive
 
-### Canonical explanation promotion (added 0.23.0)
+### Language-independence guardrail
+
+- TF-IDF operates only in the rescue lane, never displacing strong semantic matches
+- Tuning decisions must not optimize only for English-heavy vocabulary or mnemonic-specific note titles
+- Unsupported-language and mixed-language notes degrade gracefully rather than being systematically pushed down
+- Wording-heavy TF-IDF wins are acceptable only when they do not regress cross-language behavior
+
+## Canonical explanation promotion (added 0.23.0)
 
 Bounded promotion of notes that are strong canonical explanations for rationale-style queries:
 
-- Semantic plausibility gate: promotion only applies to candidates with score ≥ 0.5 (MIN_CANONICAL_EXPLANATION_SCORE)
+- Semantic plausibility gate: promotion only applies to candidates with score >= 0.5 (MIN_CANONICAL_EXPLANATION_SCORE)
 - Language-independent primary signals: lifecycle (permanent), role (decision/overview/context), relationship centrality, connection diversity, structure score
 - Wording is the smallest contributor (capped at 0.02), ensuring non-English notes benefit equally
 - `semanticScoreForPromotion` tracks the raw semantic score separately from the promoted score, so rescue trigger logic stays honest
@@ -86,7 +96,7 @@ Bounded promotion of notes that are strong canonical explanations for rationale-
 
 ## Why this fits mnemonic
 
-- it reinforces the existing file-first, projection-based, embedding-driven model
-- it adds precision and weak-query recovery without changing the storage model
-- it preserves the principle that post-processing layers are additive, bounded, and reversible if they underperform
+- reinforces the existing file-first, projection-based, embedding-driven model
+- adds precision and weak-query recovery without changing the storage model
+- preserves the principle that post-processing layers are additive, bounded, and reversible if they underperform
 - canonical promotion respects language independence and project bias by using graph and structural signals rather than wording heuristics
