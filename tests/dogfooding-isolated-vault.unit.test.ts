@@ -1,9 +1,13 @@
+import { execFile } from "child_process";
 import { access, mkdtemp, mkdir, readFile, writeFile } from "fs/promises";
+import { promisify } from "util";
 import { describe, expect, it } from "vitest";
 import os from "os";
 import path from "path";
 
 import { createIsolatedDogfoodVault } from "../scripts/dogfooding-isolated-vault.mjs";
+
+const execFileAsync = promisify(execFile);
 
 describe("isolated dogfood vault", () => {
   it("copies notes into a temporary isolated vault without modifying the source vault", async () => {
@@ -34,5 +38,24 @@ describe("isolated dogfood vault", () => {
 
     await expect(access(path.join(isolated.vaultPath, "embeddings"))).rejects.toThrow();
     await expect(access(path.join(isolated.vaultPath, "projections"))).rejects.toThrow();
+  });
+
+  it("preserves enough git identity for project-scoped isolated runs", async () => {
+    const sourceRoot = await mkdtemp(path.join(os.tmpdir(), "mnemonic-dogfood-source-"));
+    const sourceVault = path.join(sourceRoot, ".mnemonic");
+    await mkdir(path.join(sourceVault, "notes"), { recursive: true });
+    await writeFile(
+      path.join(sourceVault, "notes", "sample.md"),
+      "---\ntitle: Sample\nlifecycle: permanent\n---\n\nhello",
+      "utf-8"
+    );
+
+    await execFileAsync("git", ["init"], { cwd: sourceRoot });
+    await execFileAsync("git", ["remote", "add", "origin", "https://github.com/example/mnemonic.git"], { cwd: sourceRoot });
+
+    const isolated = await createIsolatedDogfoodVault(sourceVault);
+
+    const { stdout: remoteUrl } = await execFileAsync("git", ["remote", "get-url", "origin"], { cwd: isolated.tempRoot });
+    expect(remoteUrl.trim()).toBe("https://github.com/example/mnemonic.git");
   });
 });
