@@ -8,7 +8,7 @@ tags:
   - projections
 lifecycle: temporary
 createdAt: '2026-04-16T19:32:34.302Z'
-updatedAt: '2026-04-16T21:01:14.251Z'
+updatedAt: '2026-04-17T04:41:34.717Z'
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
@@ -46,6 +46,8 @@ Implemented so far:
 - real-note dogfooding runs for Pack A and Pack B completed against the live project notes and did not reveal a new regression attributable to the TF-IDF experiment
 - the main dogfooding noise source was live-vault recency pollution rather than the TF-IDF rescue behavior itself
 - **isolated dogfood vault runner is now implemented** — `run-dogfood-packs.mjs --isolated` copies notes into a temporary workspace, runs packs there, and cleans up afterward, removing the live-vault noise problem for future dogfooding runs
+- isolated-runner project-context routing is now fixed so the temporary workspace preserves enough git identity for project-scoped note operations during dogfood validation
+- isolated Pack A was re-run successfully against the current TF-IDF branch using the built local server entrypoint
 
 Implemented files:
 
@@ -66,6 +68,8 @@ Verified command and result:
 - `npm test -- tests/lexical.unit.test.ts tests/lexical-rescue-comparison.unit.test.ts tests/recall.unit.test.ts tests/recall-embeddings.integration.test.ts`
 - result: 4 files passed, 75 tests passed, 0 failed
 - `npm test` (full suite): 42 files passed, 622 tests passed, 0 failed
+- `npm test -- tests/dogfooding-isolated-vault.unit.test.ts tests/dogfooding-runner.unit.test.ts tests/dogfooding-runner.integration.test.ts`
+- result: 3 files passed, 10 tests passed, 0 failed
 
 ## Dogfooding snapshot
 
@@ -75,19 +79,26 @@ Real-note dogfooding results captured on 2026-04-16:
 - `dogfooding-results-working-state-continuity-pack-2026-04-16-9217df0e`
 - `dogfooding-results-blind-interruption-resumption-pack-2026-0-42f05f1a`
 
+Isolated-vault dogfooding results captured on 2026-04-17:
+
+- `dogfooding-results-core-enrichment-orientation-pack-2026-04--31e8f012`
+- `dogfooding-results-working-state-continuity-pack-2026-04-17--a18e7465`
+- `dogfooding-results-blind-interruption-resumption-pack-2026-0-62b38711`
+
 High-level reading:
 
-- Pack A was mostly pass with friction, not fail. Cold hybrid phrasing still worked on the real notes, temporal recall stayed bounded, and design archaeology still worked.
-- Pack B passed with friction. Temporary-note recovery remained useful and coherent.
-- Pack C was only a closest honest approximation because a truly blind second-session run was not available from the current session.
-- The main workflow noise was still live-vault contamination of recent-note navigation, matching the existing isolated-dogfood-runner checkpoint, rather than a regression caused by TF-IDF rescue.
-
-**Updated 2026-04-16:** The isolated dogfood vault runner is now available (`run-dogfood-packs.mjs --isolated`). Future dogfooding runs can use it to eliminate live-vault recency noise, which was the dominant measurement-quality problem identified in the 2026-04-16 dogfooding runs.
+- Pack A in isolated mode completed cleanly and still showed cold hybrid phrasing working: `hybrid reranking rescue projections` returned `Hybrid recall design and implementation (completed 0.20.0)` at the top.
+- Pack A in isolated mode also kept the architecture-oriented query healthy: `projections enrichment layer design` still returned the enrichment-layer design note at the top.
+- The two isolated Pack A unchecked items were `recall answers canonical design questions` and `recent-to-architecture navigation works`.
+- These two failures line up with already-known non-TF-IDF gaps: rationale-style/canonical-answer retrieval and recent-note relationship navigation.
+- Pack B remained fully clean in isolated mode.
+- The isolated run removed live-vault recency noise, so the remaining Pack A misses are better evidence of baseline retrieval/navigation limitations than of TF-IDF rescue behavior.
 
 Interpretation:
 
-- Real-note dogfooding did not produce evidence that the current rescue-only TF-IDF work regressed the user-facing recall/orientation workflow.
-- The strongest remaining measurement-quality problem was environmental: live-vault dogfooding makes recent-note and relationship-navigation judgments noisy. This is now solvable with the `--isolated` flag.
+- Real-note and isolated-vault dogfooding still do not show evidence that the current rescue-only TF-IDF work regressed the user-facing recall/orientation workflow.
+- The isolated run strengthened the confidence of that read because it eliminated the earlier environmental noise.
+- The remaining misses are not good reasons to reject rescue-only TF-IDF; they point instead at the separate rationale-style retrieval redesign and recent-note navigation quality.
 
 ## Measurement snapshot
 
@@ -153,7 +164,7 @@ Interpretation:
 
 - the title-aware tuning removed the broad-query regression on the realistic note-shaped corpus used in the current harness
 - on this realistic harness, TF-IDF is now quality-neutral relative to the previous bounded lexical rescue path while remaining in the same rough timing range
-- the current evidence is materially better than before, and the dogfooding runs did not contradict the harness story
+- the current evidence is materially better than before, and the isolated dogfooding run did not contradict the harness story
 
 ## Current state in plain terms
 
@@ -161,6 +172,8 @@ Interpretation:
 - the rescue-only TF-IDF shortlist behavior is implemented
 - the earlier timing concern was mostly removed by avoiding repeated corpus preparation work
 - the realistic note-shaped ranking regression was addressed by adding a small title-aware boost
-- real-note dogfooding did not reveal a new regression attributable to the TF-IDF experiment
-- the isolated dogfood vault runner is now implemented, removing the main measurement-quality obstacle for future dogfooding runs
-- **next action:** re-run Pack A using `run-dogfood-packs.mjs --isolated` to get clean recency/relationship-navigation measurements without live-vault noise, then decide keep/proceed
+- real-note and isolated-vault dogfooding did not reveal a new regression attributable to the TF-IDF experiment
+- the isolated dogfood runner now works for project-scoped dogfood validation rather than falling back to the main vault
+- decision: keep the rescue-only TF-IDF work
+- decision: do not treat the remaining isolated Pack A misses as blockers for the rescue-only TF-IDF experiment
+- next action: treat rationale-style canonical recall and recent-note relationship navigation as separate follow-up work, not as reasons to keep iterating locally on TF-IDF rescue tuning
