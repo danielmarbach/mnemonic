@@ -17,7 +17,7 @@ For the high-level system map, see [`ARCHITECTURE.md`](ARCHITECTURE.md). For rel
 
 ## Stability
 
-mnemonic is at the inception stage. The storage format (frontmatter schema, vault layout, config structure) is still stabilizing and **may change in breaking ways** between releases. Migrations are provided when possible, but treat your vault as something you can afford to rebuild or re-migrate during this period. Keep an eye on the changelog; mnemonic surfaces pending migrations at startup and `list_migrations` shows pending work per vault after each update.
+The storage format is stable with migration support for any future changes. Keep an eye on the changelog; `list_migrations` shows pending work per vault after each update.
 
 **Scale:** Designed for simplicity and portability — not large-scale knowledge bases.
 
