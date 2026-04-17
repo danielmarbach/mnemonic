@@ -1,5 +1,5 @@
 ---
-title: Hybrid recall design and implementation (completed 0.20.0)
+title: 'Hybrid recall design and implementation (completed 0.20.0, updated 0.23.0)'
 tags:
   - recall
   - hybrid-search
@@ -8,7 +8,7 @@ tags:
   - projections
 lifecycle: permanent
 createdAt: '2026-04-04T12:32:49.862Z'
-updatedAt: '2026-04-16T19:34:48.379Z'
+updatedAt: '2026-04-17T11:10:31.962Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
@@ -18,9 +18,9 @@ relatedTo:
     type: related-to
 memoryVersion: 1
 ---
-Hybrid recall improves mnemonic recall quality by combining semantic retrieval with lexical reranking and lexical rescue over existing projection data, while preserving mnemonic's core simplicity constraints.
+Hybrid recall improves mnemonic recall quality by combining semantic retrieval with lexical reranking, lexical rescue, and canonical explanation promotion over existing projection data, while preserving mnemonic's core simplicity constraints.
 
-**Status: COMPLETED** — shipped in 0.20.0 (2026-04-04).
+**Status: COMPLETED** — shipped in 0.20.0 (2026-04-04), enhanced in 0.23.0.
 
 ## Design principles
 
@@ -33,9 +33,9 @@ Hybrid recall improves mnemonic recall quality by combining semantic retrieval w
 
 ## Implementation
 
-- `src/lexical.ts` — normalization, tokenization, Jaccard/bigram/substring scoring, confidence gate
-- `src/recall.ts` — `lexicalScore` on `ScoredRecallCandidate`, `computeHybridScore`, `applyLexicalReranking`
-- `src/index.ts` — `collectLexicalRescueCandidates` helper, hybrid recall integration in recall handler
+- `src/lexical.ts` — normalization, tokenization, Jaccard/bigram/substring scoring, confidence gate, TF-IDF rescue ranking
+- `src/recall.ts` — `lexicalScore` on `ScoredRecallCandidate`, `computeHybridScore`, `applyLexicalReranking`, `computeCanonicalExplanationScore`, `applyCanonicalExplanationPromotion`
+- `src/index.ts` — `collectLexicalRescueCandidates` helper, `buildRecallCandidateContext` helper, hybrid recall integration in recall handler
 
 ### Key design choices
 
@@ -45,10 +45,34 @@ Hybrid recall improves mnemonic recall quality by combining semantic retrieval w
 - Rescue bounded to 3 candidates max, scanned from projections only
 - All lexical operations fail-soft to pure semantic behavior
 
-### Test results
+### TF-IDF rescue ranking (adopted 0.23.0)
 
-- 48 new tests for lexical utilities and hybrid reranking
-- Full suite: 574 tests passing, 0 failures
+The TF-IDF experiment concluded with a decision to adopt rescue-only TF-IDF ranking. Key outcomes:
+
+- TF-IDF now ranks the eligible rescue pool by TF-IDF similarity before applying the bounded rescue limit, replacing the previous sequential scan
+- Title-aware boost ensures exact title matches can beat repeated generic decoys in realistic note-shaped corpora
+- Prepared corpus optimization avoids rebuilding tokenization and IDF data during ranking
+- Measurement results: TF-IDF rescue achieves MRR 0.607 on rare-term queries (vs 0.400 previously) and matches broad-query MRR at 1.000, with timing comparable to the previous path after optimization (~10-16ms)
+- Language-independence guardrail: TF-IDF operates only in the rescue lane, never displacing strong semantic matches
+- Isolated dogfooding confirmed no new regression in user-facing recall/orientation workflow
+
+### Canonical explanation promotion (added 0.23.0)
+
+Bounded promotion of notes that are strong canonical explanations for rationale-style queries:
+
+- Semantic plausibility gate: promotion only applies to candidates with score ≥ 0.5 (MIN_CANONICAL_EXPLANATION_SCORE)
+- Language-independent primary signals: lifecycle (permanent), role (decision/overview/context), relationship centrality, connection diversity, structure score
+- Wording is the smallest contributor (capped at 0.02), ensuring non-English notes benefit equally
+- `semanticScoreForPromotion` tracks the raw semantic score separately from the promoted score, so rescue trigger logic stays honest
+- minSimilarity bypass: lexical rescue is suppressed when minSimilarity exceeds the default threshold, preventing rescue candidates from bypassing explicit user filters
+- Bug fix: `shouldTriggerLexicalRescue` corrected to return true for empty result sets
+
+## Test coverage
+
+- 48 new tests for lexical utilities and hybrid reranking (0.20.0)
+- 87 tests in recall and lexical suites at 0.23.0
+- Integration tests cover TF-IDF rescue, canonical explanation promotion, minSimilarity bypass, and rationale-query guardrails
+- Isolated dogfooding (Pack A/B/C) confirms no regression from TF-IDF or canonical promotion
 
 ## Definition of done — all met
 
@@ -57,11 +81,12 @@ Hybrid recall improves mnemonic recall quality by combining semantic retrieval w
 - no new storage layer or synced state
 - no token growth in default output
 - lexical/projection failures degrade gracefully to existing behavior
+- canonical explanation promotion uses language-independent signals
+- TF-IDF rescue improves rare-term recall without regressing broad queries
 
 ## Why this fits mnemonic
 
 - it reinforces the existing file-first, projection-based, embedding-driven model
 - it adds precision and weak-query recovery without changing the storage model
 - it preserves the principle that post-processing layers are additive, bounded, and reversible if they underperform
-
-**related (1):** mnemonic — key design decisions (`mnemonic-key-design-decisions-3f2a6273`) [example-of]
+- canonical promotion respects language independence and project bias by using graph and structural signals rather than wording heuristics
