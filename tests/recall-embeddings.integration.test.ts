@@ -702,4 +702,36 @@ This note has no embedding.`,
       await embeddingServer.close();
     }
   }, 15000);
+
+  it("includes confidence in recall text output for non-temporal queries", async () => {
+    const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-confidence-text-"));
+    tempDirs.push(vaultDir);
+    const embeddingServer = await startFakeEmbeddingServer();
+
+    try {
+      const repoDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-confidence-repo-"));
+      tempDirs.push(repoDir);
+      await initTestRepo(repoDir);
+
+      await callLocalMcp(vaultDir, "remember", {
+        title: "Confidence text output test",
+        content: "This note should show confidence in the text rendering of non-temporal recall results.",
+        tags: ["confidence", "text-rendering"],
+        lifecycle: "permanent",
+        scope: "project",
+        cwd: repoDir,
+        summary: "Seed note for confidence text rendering test",
+      }, embeddingServer.url);
+
+      const response = await callLocalMcpResponse(vaultDir, "recall", {
+        query: "confidence text output",
+        cwd: repoDir,
+      }, embeddingServer.url);
+
+      expect(response.text).toMatch(/\*\*confidence:\*\*\s*(high|medium|low)/i);
+      expect(response.text).toContain("confidence:");
+    } finally {
+      await embeddingServer.close();
+    }
+  }, 15000);
 });

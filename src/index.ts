@@ -2642,8 +2642,11 @@ server.registerTool(
         const formattedRelationships = relationships !== undefined
           ? `\n\n${formatRelationshipPreview(relationships)}`
           : "";
+        const provenanceLine = provenance || confidence
+          ? `\n**confidence:** ${confidence ?? "medium"}${provenance?.recentlyChanged ? " | **recently changed**" : ""}`
+          : "";
         // Suppress raw related IDs when enriched preview is shown to avoid duplication
-        sections.push(`${formatNote(note, score, relationships === undefined)}${formattedHistory}${formattedRelationships}`);
+        sections.push(`${formatNote(note, score, relationships === undefined)}${provenanceLine}${formattedHistory}${formattedRelationships}`);
 
         structuredResults.push({
           id,
