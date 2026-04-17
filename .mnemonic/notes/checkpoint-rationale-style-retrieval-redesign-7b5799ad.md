@@ -8,7 +8,7 @@ tags:
   - rationale
 lifecycle: temporary
 createdAt: '2026-04-05T17:41:52.918Z'
-updatedAt: '2026-04-17T04:55:50.889Z'
+updatedAt: '2026-04-17T08:43:39.216Z'
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
@@ -16,48 +16,57 @@ memoryVersion: 1
 ---
 Checkpoint for the rationale-style retrieval redesign follow-up.
 
-Current status: the design is approved and the implementation plan is now written. The next step is to choose execution mode and implement it test-first.
+## Current status: implementation complete, all tasks verified
 
-Approved design:
+All 5 implementation tasks are done. The canonical explanation promotion is wired into the recall pipeline with bounded scoring, language-independent primary signals, and minSimilarity-respecting rescue suppression.
 
-- keep the normal semantic-first retrieval path as the entry path
-- do not add a special rationale-query classifier as the main mechanism
-- add a bounded canonical-explanation promotion step after semantic retrieval and project-biased widening build the normal candidate neighborhood
-- compute a `canonicalExplanationScore` only over that bounded neighborhood
-- only let the promotion step materially affect candidates that are already semantically plausible
-- use language-independent primary signals: semantic alignment, relationship centrality, connection diversity, durable-note bias, explicit role metadata when present, and light structural support
-- allow wording cues only as weak tiebreakers, not as the backbone of success
-- cap the effect so central but off-topic notes, generic overviews, and temporary checkpoint notes cannot displace better direct answers
-- keep the change fail-soft and local to ranking logic
+## What changed
 
-Why this design was chosen:
+### Task 1 — Scoring guardrails (ScoredRecallCandidate extended)
 
-- small generic reranking tweaks were already tried and did not materially fix the real-corpus canonical-answer gap
-- a rationale-query classifier would likely overfit to English wording and violate the language-independent design intent
-- metadata-only or repo-specific canonical-note solutions would create authoring burden and corpus-shaped behavior
-- the real gap appears to be bounded promotion of canonical explanatory notes that are already near the correct semantic neighborhood
+- Added `semanticScoreForPromotion`, `lifecycle`, `relatedCount`, `connectionDiversity`, `structureScore`, `metadata`, `canonicalExplanationScore` to `ScoredRecallCandidate`
+- Added `computeCanonicalExplanationScore` with semantic plausibility gate (MIN_CANONICAL_EXPLANATION_SCORE = 0.5)
+- Added `applyCanonicalExplanationPromotion` which computes scores and re-sorts by hybrid score
+- Updated `computeHybridScore` to include `canonicalExplanationScore`
 
-Testing shape agreed for implementation:
+### Task 2 — Wiring, lifecycle filter, rescue trigger fix, semantic gate, minSimilarity bypass
 
-- unit tests for the promotion scorer
-- unit guardrails for weak-wording/language-independent promotion
-- recall integration tests for canonical-answer promotion
-- guardrail tests so factual/entity queries and temporary notes do not regress
+- `buildRecallCandidateContext` helper populates all new context fields from notes
+- Main recall loop populates `semanticScoreForPromotion: rawScore` for semantic candidates, `0` for rescue
+- `applyCanonicalExplanationPromotion` wired after `applyLexicalReranking` and after rescue
+- `collectLexicalRescueCandidates` now receives `lifecycle` filter and passes it through
+- Rescue trigger uses `strongestSemanticScore` from pre-rerank `scored[]` (not post-promotion)
+- **minSimilarity bypass fix**: lexical rescue is suppressed when `minSimilarity > DEFAULT_MIN_SIMILARITY`
+- **Bug fix discovered & resolved**: `shouldTriggerLexicalRescue` was incorrectly returning `false` for empty result sets; changed back to `return true`
 
-Written spec path:
+### Task 3 — Rationale-query integration regression test
 
-- `docs/superpowers/specs/2026-04-17-rationale-style-retrieval-design.md`
+- Added "promotes the canonical explanatory note for why-style recall queries" test
+- Verifies that "Key design decisions" ranks top-1 for "why are embeddings gitignored"
 
-Written plan path:
+### Task 4 — Direct-answer guardrail coverage
 
-- `docs/superpowers/plans/2026-04-17-rationale-style-retrieval-implementation.md`
+- Added "does not displace a direct answer with a generic overview note" test
+- Verifies that "API endpoint port" ranks top-1 for "what port does the local api use"
 
-Constraints still in force:
+### Task 5 — Full verification
 
-- remain language-independent in primary signals
-- no repo-specific title exceptions or allowlists
-- no new persistent retrieval layer
-- do not modify TF-IDF rescue as part of this work
-- do not commit `docs/superpowers/*` artifacts unless the user later asks for that explicitly
+- 635/635 tests pass, 0 failures (including 3 pre-existing rescue tests now fixed)
+- Typecheck passes
+- Build passes
 
-Next action: execute the implementation plan using subagent-driven development or inline execution.
+## Verification evidence
+
+- `vitest run tests/ — 635 passed, 0 failed`
+- `npm run typecheck — PASS`
+- `npm run build — PASS`
+
+## Relevant files
+
+- `src/recall.ts` — ScoredRecallCandidate interface, scoring, promotion
+- `src/index.ts` — buildRecallCandidateContext, candidate population, wiring
+- `src/lexical.ts` — shouldTriggerLexicalRescue (bug fix)
+- `tests/recall.unit.test.ts` — unit tests for scoring, guardrails, promotion
+- `tests/recall-embeddings.integration.test.ts` — integration tests for rescue, minSimilarity, rationale query guardrails
+- `docs/superpowers/specs/2026-04-17-rationale-style-retrieval-design.md` — design spec (uncommitted)
+- `docs/superpowers/plans/2026-04-17-rationale-style-retrieval-implementation.md` — implementation plan (uncommitted)
