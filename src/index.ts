@@ -33,7 +33,14 @@ import {
   resolveEffectiveConsolidationMode,
 } from "./consolidate.js";
 import { suggestAutoRelationships } from "./auto-relate.js";
-import { computeRecallMetadataBoost, computeHybridScore, selectRecallResults, applyLexicalReranking, type ScoredRecallCandidate } from "./recall.js";
+import {
+  computeRecallMetadataBoost,
+  computeHybridScore,
+  selectRecallResults,
+  applyLexicalReranking,
+  applyCanonicalExplanationPromotion,
+  type ScoredRecallCandidate,
+} from "./recall.js";
 import {
   shouldTriggerLexicalRescue,
   computeLexicalScore,
@@ -2235,12 +2242,33 @@ server.registerTool(
 
 // ── Lexical rescue helper ─────────────────────────────────────────────────────
 
+function buildRecallCandidateContext(note: Note) {
+  const metadata = getEffectiveMetadata(note);
+  const relatedCount = note.relatedTo?.length ?? 0;
+  return {
+    metadata,
+    metadataBoost: computeRecallMetadataBoost(metadata),
+    lifecycle: note.lifecycle,
+    relatedCount,
+    connectionDiversity: new Set((note.relatedTo ?? []).map((rel) => rel.type)).size,
+    structureScore: Math.min(
+      0.04,
+      [
+        note.content.includes("## ") ? 0.02 : 0,
+        note.content.includes("- ") || note.content.includes("1. ") ? 0.01 : 0,
+        note.content.length >= 400 ? 0.01 : 0,
+      ].reduce((sum, value) => sum + value, 0)
+    ),
+  };
+}
+
 async function collectLexicalRescueCandidates(
   vaults: Vault[],
   query: string,
   project: { id: string; name: string } | undefined,
   scope: "project" | "global" | "all",
   tags: string[] | undefined,
+  lifecycle: NoteLifecycle | undefined,
   existingIds: ScoredRecallCandidate[]
 ): Promise<ScoredRecallCandidate[]> {
   const existingIdSet = new Set(existingIds.map((c) => c.id));
@@ -2249,7 +2277,7 @@ async function collectLexicalRescueCandidates(
     vault: Vault;
     isCurrentProject: boolean;
     projectionText: string;
-    metadataBoost: number;
+    context: ReturnType<typeof buildRecallCandidateContext>;
   }> = [];
 
   for (const vault of vaults) {
@@ -2262,6 +2290,8 @@ async function collectLexicalRescueCandidates(
         if (!tags.every((t) => noteTags.has(t))) continue;
       }
 
+      if (lifecycle && note.lifecycle !== lifecycle) continue;
+
       const isProjectNote = note.project !== undefined;
       const isCurrentProject = project && note.project === project.id;
 
@@ -2271,13 +2301,12 @@ async function collectLexicalRescueCandidates(
       const projection = await getOrBuildProjection(vault.storage, note).catch(() => undefined);
       if (!projection) continue;
 
-      const metadataBoost = computeRecallMetadataBoost(getEffectiveMetadata(note));
       rescuePool.push({
         id: note.id,
         vault,
         isCurrentProject: Boolean(isCurrentProject),
         projectionText: projection.projectionText,
-        metadataBoost,
+        context: buildRecallCandidateContext(note),
       });
     }
   }
@@ -2298,14 +2327,20 @@ async function collectLexicalRescueCandidates(
     const lexicalScore = tfIdfScore;
     if (lexicalScore < LEXICAL_RESCUE_THRESHOLD) continue;
 
-    const boost = (candidate.isCurrentProject ? 0.15 : 0) + candidate.metadataBoost;
+    const boost = (candidate.isCurrentProject ? 0.15 : 0) + candidate.context.metadataBoost;
     candidates.push({
       id: candidate.id,
-      score: 0,
+      score: lexicalScore,
+      semanticScoreForPromotion: 0,
       boosted: boost,
       vault: candidate.vault,
       isCurrentProject: candidate.isCurrentProject,
       lexicalScore,
+      lifecycle: candidate.context.lifecycle,
+      relatedCount: candidate.context.relatedCount,
+      connectionDiversity: candidate.context.connectionDiversity,
+      structureScore: candidate.context.structureScore,
+      metadata: candidate.context.metadata,
     });
   }
 
@@ -2430,9 +2465,21 @@ server.registerTool(
           if (isProjectNote) continue;
         }
 
-        const metadataBoost = computeRecallMetadataBoost(getEffectiveMetadata(note));
-        const boost = (isCurrentProject ? 0.15 : 0) + metadataBoost;
-        scored.push({ id: rec.id, score: rawScore, boosted: rawScore + boost, vault, isCurrentProject: Boolean(isCurrentProject) });
+        const context = buildRecallCandidateContext(note);
+        const boost = (isCurrentProject ? 0.15 : 0) + context.metadataBoost;
+        scored.push({
+          id: rec.id,
+          score: rawScore,
+          semanticScoreForPromotion: rawScore,
+          boosted: rawScore + boost,
+          vault,
+          isCurrentProject: Boolean(isCurrentProject),
+          lifecycle: context.lifecycle,
+          relatedCount: context.relatedCount,
+          connectionDiversity: context.connectionDiversity,
+          structureScore: context.structureScore,
+          metadata: context.metadata,
+        });
       }
     }
 
@@ -2466,23 +2513,32 @@ server.registerTool(
       }
       return undefined;
     };
+    const strongestSemanticScore = scored.reduce<number | undefined>(
+      (max, candidate) => max === undefined ? candidate.score : Math.max(max, candidate.score),
+      undefined
+    );
     const reranked = applyLexicalReranking(scored, query, getProjectionText);
+    let promoted = applyCanonicalExplanationPromotion(reranked);
 
-    // Lexical rescue: when semantic results are weak, scan projections for additional candidates
-    const topScore = reranked.length > 0 ? reranked[0].score : undefined;
-    if (shouldTriggerLexicalRescue(topScore, reranked.length)) {
+    // Lexical rescue: when semantic results are weak, scan projections for additional candidates.
+    // Skip rescue when the caller set a strict minSimilarity above the default,
+    // because rescue candidates lack genuine semantic backing.
+    const rescueAllowed = minSimilarity <= DEFAULT_MIN_SIMILARITY;
+    if (rescueAllowed && shouldTriggerLexicalRescue(strongestSemanticScore, scored.length)) {
       const rescueCandidates = await collectLexicalRescueCandidates(
         vaults,
         query,
         project ?? undefined,
         scope,
         tags,
-        reranked
+        lifecycle,
+        promoted
       );
-      reranked.push(...rescueCandidates);
+      promoted.push(...rescueCandidates);
+      promoted = applyCanonicalExplanationPromotion(promoted);
     }
 
-    const top = selectRecallResults(reranked, limit, scope);
+    const top = selectRecallResults(promoted, limit, scope);
 
     if (top.length === 0) {
       const structuredContent: RecallResult = { action: "recalled", query, scope: scope || "all", results: [] };

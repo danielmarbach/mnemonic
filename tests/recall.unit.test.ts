@@ -4,6 +4,8 @@ import {
   computeRecallMetadataBoost,
   selectRecallResults,
   applyLexicalReranking,
+  applyCanonicalExplanationPromotion,
+  computeCanonicalExplanationScore,
   computeHybridScore,
   type ScoredRecallCandidate,
 } from "../src/recall.js";
@@ -133,6 +135,22 @@ describe("computeHybridScore", () => {
     const highSemantic: ScoredRecallCandidate = { id: "b", score: 0.8, boosted: 0.8, vault, isCurrentProject: false, lexicalScore: 0 };
     expect(computeHybridScore(highSemantic)).toBeGreaterThan(computeHybridScore(lowSemantic));
   });
+
+  it("includes coverage, phrase, and canonical explanation contributions", () => {
+    const candidate: ScoredRecallCandidate = {
+      id: "a",
+      score: 0.7,
+      boosted: 0.5,
+      vault,
+      isCurrentProject: true,
+      lexicalScore: 0.25,
+      coverageScore: 0.5,
+      phraseScore: 1,
+      canonicalExplanationScore: 0.07,
+    };
+
+    expect(computeHybridScore(candidate)).toBeCloseTo(0.8, 5);
+  });
 });
 
 describe("applyLexicalReranking", () => {
@@ -207,5 +225,318 @@ describe("applyLexicalReranking", () => {
     const reranked = applyLexicalReranking(candidates, "test", (id) => `text for ${id}`);
 
     expect(reranked).toHaveLength(2);
+  });
+});
+
+describe("canonical explanation promotion", () => {
+  it("promotes a central permanent decision note when semantic scores are close", () => {
+    const candidates: ScoredRecallCandidate[] = [
+      {
+        id: "canonical",
+        score: 0.56,
+        semanticScoreForPromotion: 0.56,
+        boosted: 0.56,
+        vault,
+        isCurrentProject: true,
+        lifecycle: "permanent",
+        relatedCount: 6,
+        connectionDiversity: 3,
+        structureScore: 0.03,
+        metadata: {
+          role: "decision",
+          roleSource: "explicit",
+          importance: "high",
+          importanceSource: "explicit",
+          alwaysLoadSource: "none",
+        },
+      },
+      {
+        id: "incidental",
+        score: 0.58,
+        semanticScoreForPromotion: 0.58,
+        boosted: 0.58,
+        vault,
+        isCurrentProject: true,
+        lifecycle: "permanent",
+        relatedCount: 1,
+        connectionDiversity: 1,
+        structureScore: 0.01,
+        metadata: {
+          roleSource: "none",
+          importanceSource: "none",
+          alwaysLoadSource: "none",
+        },
+      },
+    ];
+
+    const promoted = applyCanonicalExplanationPromotion(candidates);
+    expect(promoted[0].id).toBe("canonical");
+    expect(promoted[0].canonicalExplanationScore).toBeGreaterThan(promoted[1].canonicalExplanationScore ?? 0);
+  });
+
+  it("does not promote a highly central note when semantic plausibility is too low", () => {
+    const unrelated: ScoredRecallCandidate = {
+      id: "unrelated-central",
+      score: 0.34,
+      semanticScoreForPromotion: 0.34,
+      boosted: 0.34,
+      vault,
+      isCurrentProject: true,
+      lifecycle: "permanent",
+      relatedCount: 12,
+      connectionDiversity: 5,
+      structureScore: 0.04,
+      metadata: {
+        role: "decision",
+        roleSource: "explicit",
+        importance: "high",
+        importanceSource: "explicit",
+        alwaysLoadSource: "none",
+      },
+    };
+
+    expect(computeCanonicalExplanationScore(unrelated)).toBe(0);
+  });
+
+  it("does not treat lexical rescue strength as semantic plausibility for canonical promotion", () => {
+    const rescuedButUnproven = {
+      id: "rescued-but-unproven",
+      score: 0.93,
+      boosted: 0.15,
+      vault,
+      isCurrentProject: true,
+      lexicalScore: 0.93,
+      semanticScoreForPromotion: 0,
+      lifecycle: "permanent" as const,
+      relatedCount: 12,
+      connectionDiversity: 5,
+      structureScore: 0.04,
+      metadata: {
+        role: "decision" as const,
+        roleSource: "explicit" as const,
+        importance: "high" as const,
+        importanceSource: "explicit" as const,
+        alwaysLoadSource: "none" as const,
+      },
+    } satisfies ScoredRecallCandidate & { semanticScoreForPromotion?: number };
+
+    expect(computeCanonicalExplanationScore(rescuedButUnproven)).toBe(0);
+  });
+
+  it("keeps temporary notes behind durable explanation notes", () => {
+    const promoted = applyCanonicalExplanationPromotion([
+      {
+        id: "temporary",
+        score: 0.57,
+        semanticScoreForPromotion: 0.57,
+        boosted: 0.57,
+        vault,
+        isCurrentProject: true,
+        lifecycle: "temporary",
+        relatedCount: 5,
+        connectionDiversity: 3,
+        structureScore: 0.03,
+        metadata: {
+          role: "context",
+          roleSource: "suggested",
+          importanceSource: "none",
+          alwaysLoadSource: "none",
+        },
+      },
+      {
+        id: "durable",
+        score: 0.55,
+        semanticScoreForPromotion: 0.55,
+        boosted: 0.55,
+        vault,
+        isCurrentProject: true,
+        lifecycle: "permanent",
+        relatedCount: 4,
+        connectionDiversity: 2,
+        structureScore: 0.02,
+        metadata: {
+          role: "decision",
+          roleSource: "explicit",
+          importanceSource: "none",
+          alwaysLoadSource: "none",
+        },
+      },
+    ]);
+
+    expect(promoted[0].id).toBe("durable");
+  });
+
+  it("does not let a low-semantic canonical note beat a much stronger semantic match", () => {
+    const promoted = applyCanonicalExplanationPromotion([
+      {
+        id: "canonical-but-weaker",
+        score: 0.58,
+        semanticScoreForPromotion: 0.58,
+        boosted: 0.58,
+        vault,
+        isCurrentProject: true,
+        lifecycle: "permanent",
+        relatedCount: 100,
+        connectionDiversity: 10,
+        structureScore: 1,
+        metadata: {
+          role: "decision",
+          roleSource: "explicit",
+          importanceSource: "none",
+          alwaysLoadSource: "none",
+        },
+      },
+      {
+        id: "semantically-stronger",
+        score: 0.82,
+        semanticScoreForPromotion: 0.82,
+        boosted: 0.82,
+        vault,
+        isCurrentProject: true,
+        metadata: {
+          roleSource: "none",
+          importanceSource: "none",
+          alwaysLoadSource: "none",
+        },
+      },
+    ]);
+
+    expect(promoted[0].id).toBe("semantically-stronger");
+  });
+
+  it("uses wording only as a weak tiebreaker", () => {
+    const promoted = applyCanonicalExplanationPromotion([
+      {
+        id: "canonical",
+        score: 0.55,
+        semanticScoreForPromotion: 0.55,
+        boosted: 0.55,
+        vault,
+        isCurrentProject: true,
+        lexicalScore: 0.1,
+        lifecycle: "permanent",
+        relatedCount: 6,
+        connectionDiversity: 3,
+        structureScore: 0.03,
+        metadata: {
+          role: "decision",
+          roleSource: "explicit",
+          importanceSource: "none",
+          alwaysLoadSource: "none",
+        },
+      },
+      {
+        id: "wording-heavy",
+        score: 0.56,
+        semanticScoreForPromotion: 0.56,
+        boosted: 0.56,
+        vault,
+        isCurrentProject: true,
+        lexicalScore: 1,
+        lifecycle: "permanent",
+        relatedCount: 1,
+        connectionDiversity: 1,
+        structureScore: 0,
+        metadata: {
+          roleSource: "none",
+          importanceSource: "none",
+          alwaysLoadSource: "none",
+        },
+      },
+    ]);
+
+    expect(promoted[0].id).toBe("canonical");
+  });
+
+  it("can promote a wording-light explanatory note from graph and role evidence", () => {
+    const promoted = applyCanonicalExplanationPromotion([
+      {
+        id: "canonical-structural",
+        score: 0.55,
+        semanticScoreForPromotion: 0.55,
+        boosted: 0.55,
+        vault,
+        isCurrentProject: true,
+        lexicalScore: 0,
+        lifecycle: "permanent",
+        relatedCount: 7,
+        connectionDiversity: 3,
+        structureScore: 0.04,
+        metadata: {
+          role: "decision",
+          roleSource: "explicit",
+          importanceSource: "none",
+          alwaysLoadSource: "none",
+        },
+      },
+      {
+        id: "lexical-but-thin",
+        score: 0.56,
+        semanticScoreForPromotion: 0.56,
+        boosted: 0.56,
+        vault,
+        isCurrentProject: true,
+        lexicalScore: 0.9,
+        lifecycle: "permanent",
+        relatedCount: 1,
+        connectionDiversity: 1,
+        structureScore: 0,
+        metadata: {
+          roleSource: "none",
+          importanceSource: "none",
+          alwaysLoadSource: "none",
+        },
+      },
+    ]);
+
+    expect(promoted[0].id).toBe("canonical-structural");
+  });
+});
+
+describe("selectRecallResults keeps all candidates (rescue filtering is at the caller)", () => {
+  it("includes rescue candidates alongside semantic matches", () => {
+    const candidates: ScoredRecallCandidate[] = [
+      {
+        id: "semantic-match",
+        score: 0.85,
+        semanticScoreForPromotion: 0.85,
+        boosted: 0.85,
+        vault,
+        isCurrentProject: true,
+      },
+      {
+        id: "rescue-pure-lexical",
+        score: 0.93,
+        semanticScoreForPromotion: 0,
+        boosted: 0.15,
+        vault,
+        isCurrentProject: true,
+        lexicalScore: 0.93,
+      },
+    ];
+
+    const results = selectRecallResults(candidates, 5, "all");
+
+    expect(results).toHaveLength(2);
+  });
+
+  it("includes rescue candidates when they are the only matches", () => {
+    const candidates: ScoredRecallCandidate[] = [
+      {
+        id: "rescue-strong-lexical",
+        score: 0.93,
+        semanticScoreForPromotion: 0,
+        boosted: 0.15,
+        vault,
+        isCurrentProject: true,
+        lexicalScore: 0.8,
+        coverageScore: 0.5,
+        phraseScore: 1,
+      },
+    ];
+
+    const results = selectRecallResults(candidates, 5, "all");
+
+    expect(results.map((r) => r.id)).toEqual(["rescue-strong-lexical"]);
   });
 });

@@ -620,4 +620,86 @@ This note has no embedding.`,
       await embeddingServer.close();
     }
   }, 15000);
+
+  it("promotes the canonical explanatory note for why-style recall queries", async () => {
+    const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-vault-"));
+    const repoDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-project-"));
+    tempDirs.push(vaultDir, repoDir);
+
+    await initTestRepo(repoDir);
+    const embeddingServer = await startFakeEmbeddingServer();
+
+    try {
+      await callLocalMcp(vaultDir, "remember", {
+        title: "Key design decisions",
+        content: "Embeddings are gitignored because they are derived data and can be rebuilt.\n\n## Decision\nKeep derived artifacts out of git.\n\n## Rationale\nGit should track durable source-of-truth notes, not rebuildable machine output.",
+        tags: ["design"],
+        cwd: repoDir,
+        scope: "project",
+        summary: "Add canonical design explanation note",
+      }, embeddingServer.url);
+
+      await callLocalMcp(vaultDir, "remember", {
+        title: "Sync redesign",
+        content: "Embeddings sync redesign and reindex behavior. This note discusses when embeddings are regenerated during sync.",
+        tags: ["sync"],
+        cwd: repoDir,
+        scope: "project",
+        summary: "Add incidental embeddings note",
+      }, embeddingServer.url);
+
+      const response = await callLocalMcpResponse(vaultDir, "recall", {
+        query: "why are embeddings gitignored",
+        cwd: repoDir,
+        scope: "all",
+        limit: 3,
+      }, embeddingServer.url);
+
+      const parsed = RecallResultSchema.parse(response.structuredContent);
+      expect(parsed.results[0]?.title).toBe("Key design decisions");
+    } finally {
+      await embeddingServer.close();
+    }
+  }, 15000);
+
+  it("does not displace a direct answer with a generic overview note", async () => {
+    const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-vault-"));
+    const repoDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-project-"));
+    tempDirs.push(vaultDir, repoDir);
+
+    await initTestRepo(repoDir);
+    const embeddingServer = await startFakeEmbeddingServer();
+
+    try {
+      await callLocalMcp(vaultDir, "remember", {
+        title: "API endpoint port",
+        content: "The local API listens on port 4317.",
+        tags: ["fact"],
+        cwd: repoDir,
+        scope: "project",
+        summary: "Add direct answer note",
+      }, embeddingServer.url);
+
+      await callLocalMcp(vaultDir, "remember", {
+        title: "System overview",
+        content: "## Overview\nThis note explains architecture, decisions, and system context in a broad durable form.",
+        tags: ["overview"],
+        cwd: repoDir,
+        scope: "project",
+        summary: "Add overview note",
+      }, embeddingServer.url);
+
+      const response = await callLocalMcpResponse(vaultDir, "recall", {
+        query: "what port does the local api use",
+        cwd: repoDir,
+        scope: "all",
+        limit: 3,
+      }, embeddingServer.url);
+
+      const parsed = RecallResultSchema.parse(response.structuredContent);
+      expect(parsed.results[0]?.title).toBe("API endpoint port");
+    } finally {
+      await embeddingServer.close();
+    }
+  }, 15000);
 });
