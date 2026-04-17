@@ -574,6 +574,14 @@ This keeps early ideation reusable as personal/global knowledge while moving con
 
 mnemonic and Beads address complementary concerns. mnemonic is a **knowledge graph**: it stores notes, relationships between them, and lets agents retrieve relevant context through semantic search. [Beads](https://github.com/steveyegge/beads) is a **task and dependency tracker**: it models work items and their dependencies so agents can determine what is ready to execute next. Both tools can coexist in the same workflow — mnemonic stores knowledge and reasoning while Beads manages execution.
 
+**How does mnemonic differ from Memory Bank MCP?**
+
+mnemonic and Memory Bank MCP both provide persistent memory for agents, but differ in hosting and scope. Memory Bank MCP is a **centralized service** — your memory lives in a remote MCP service and is accessed across projects through that single endpoint. mnemonic is **local-first** — your memories live as plain markdown files on your machine: project-scoped notes in `.mnemonic/` within each repo, and personal notes in a global vault under your home directory. There is no always-on server to configure or depend on; the MCP server spawns on demand per session.
+
+**How does mnemonic differ from Basic Memory?**
+
+Both tools are local-first and use markdown, but with different scoping models. [Basic Memory](https://github.com/basicmachines/basicmemory) maintains a **knowledge base per project** that agents can search and update, with optional cloud sync. mnemonic splits memory into **two distinct vaults**: a global personal vault (`~/mnemonic-vault/`) for cross-project knowledge, and a project-scoped vault (`.mnemonic/`) that travels with the repo and is shared via git. This lets you capture early ideas globally before a repo exists, then migrate only project-relevant notes into the shared vault once collaboration begins.
+
 **What are temporary notes?**
 
 mnemonic distinguishes between two lifecycle states. `temporary` notes capture evolving working-state: hypotheses, in-progress plans, experiment results, draft reasoning. `permanent` notes capture durable knowledge: decisions, root cause explanations, architectural guidance, lessons learned. As an investigation progresses, a cluster of temporary notes is typically `consolidate`d into one or more permanent notes, and the scaffolding is discarded. This two-phase lifecycle keeps exploratory thinking from polluting long-term memory while still giving agents a place to reason incrementally before committing to a conclusion.

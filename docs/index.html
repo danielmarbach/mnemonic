@@ -1049,6 +1049,73 @@
       border-radius: 3px;
     }
 
+    /* ── Comparison table ── */
+    .compare-table-wrap {
+      margin-top: 48px;
+      overflow-x: auto;
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+    }
+
+    .compare-table {
+      width: 100%;
+      min-width: 580px;
+      border-collapse: collapse;
+    }
+
+    .compare-table th {
+      padding: 12px 20px;
+      text-align: left;
+      font-size: 0.72rem;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      background: rgba(255,255,255,0.02);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .compare-table td {
+      padding: 14px 20px;
+      font-size: 0.82rem;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+      vertical-align: top;
+      line-height: 1.55;
+    }
+
+    .compare-table tr:last-child td { border-bottom: none; }
+
+    .compare-table tr:hover td { background: rgba(255,255,255,0.02); }
+
+    .compare-table .tool-name {
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 500;
+      color: var(--primary-lt);
+      white-space: nowrap;
+    }
+
+    .compare-table code {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.78rem;
+      color: var(--cyan-lt);
+      background: rgba(6,182,212,0.08);
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+
+    .compare-footnote {
+      margin-top: 16px;
+      font-size: 0.78rem;
+      color: var(--text-muted);
+    }
+
+    .compare-footnote a {
+      color: var(--cyan-lt);
+      text-decoration: none;
+    }
+
+    .compare-footnote a:hover { text-decoration: underline; }
+
     /* ── Scrollbar ── */
     ::-webkit-scrollbar { width: 6px; height: 6px; }
     ::-webkit-scrollbar-track { background: var(--bg); }
@@ -1262,6 +1329,80 @@
         <p>Opt-in temporal mode adds compact git-backed history to <code style="font-family:JetBrains Mono,monospace;font-size:0.8em;color:var(--primary-lt)">recall</code> results. Each change is described in plain language — "Expanded the note with additional detail", "Connected this note to related work" — and the overall arc is summarised: "The core decision remained stable while rationale expanded." See how a decision formed without wading through raw diffs.</p>
       </div>
     </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- ── How mnemonic is different ── -->
+<section>
+  <svg class="section-art" width="480" height="480" viewBox="0 0 480 480" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <!-- Left-side branching diagram: center node branches to three downstream nodes -->
+    <circle cx="80" cy="240" r="8" stroke="#4ade80" stroke-width="1.5"/>
+    <line x1="88" y1="240" x2="160" y2="200" stroke="#4ade80" stroke-width="1.2"/>
+    <line x1="88" y1="240" x2="160" y2="240" stroke="#4ade80" stroke-width="1.2"/>
+    <line x1="88" y1="240" x2="160" y2="280" stroke="#06b6d4" stroke-width="1.2"/>
+    <circle cx="170" cy="200" r="5" stroke="#4ade80" stroke-width="1"/>
+    <circle cx="170" cy="240" r="5" stroke="#4ade80" stroke-width="1"/>
+    <circle cx="170" cy="280" r="5" stroke="#06b6d4" stroke-width="1"/>
+    <!-- Upstream gathering nodes converge to center -->
+    <line x1="300" y1="140" x2="220" y2="200" stroke="#4ade80" stroke-width="0.8" stroke-dasharray="4 3"/>
+    <line x1="360" y1="180" x2="280" y2="220" stroke="#4ade80" stroke-width="0.8" stroke-dasharray="4 3"/>
+    <line x1="380" y1="240" x2="200" y2="240" stroke="#4ade80" stroke-width="0.8" stroke-dasharray="4 3"/>
+    <line x1="360" y1="300" x2="280" y2="260" stroke="#06b6d4" stroke-width="0.8" stroke-dasharray="4 3"/>
+    <line x1="300" y1="340" x2="220" y2="280" stroke="#06b6d4" stroke-width="0.8" stroke-dasharray="4 3"/>
+    <circle cx="310" cy="140" r="4" stroke="#4ade80" stroke-width="1"/>
+    <circle cx="370" cy="180" r="4" stroke="#4ade80" stroke-width="1"/>
+    <circle cx="390" cy="240" r="5" stroke="#4ade80" stroke-width="1"/>
+    <circle cx="370" cy="300" r="4" stroke="#06b6d4" stroke-width="1"/>
+    <circle cx="310" cy="340" r="4" stroke="#06b6d4" stroke-width="1"/>
+    <!-- Right-side continuation from center -->
+    <line x1="160" y1="240" x2="420" y2="240" stroke="#4ade80" stroke-width="0.8" stroke-dasharray="6 4"/>
+    <circle cx="430" cy="240" r="6" stroke="#4ade80" stroke-width="1.2"/>
+  </svg>
+  <div class="container">
+    <div class="section-label">Comparison</div>
+    <h2 class="section-title">How mnemonic is different.</h2>
+    <p class="section-desc">mnemonic combines repo-scoped shared memory with a personal global vault. The main differences from similar tools are where memory lives, how it is shared, and whether it depends on a hosted service.</p>
+
+    <div class="compare-table-wrap fade-up">
+      <table class="compare-table">
+        <thead>
+          <tr>
+            <th>Tool</th>
+            <th>Primary model</th>
+            <th>Storage model</th>
+            <th>Sharing model</th>
+            <th>Hosting model</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="tool-name">mnemonic</td>
+            <td>Shared project memory + personal global memory for coding agents</td>
+            <td>Project memory in <code>.mnemonic/</code> as plain markdown; personal memory in a global user vault</td>
+            <td>Team-shared via git commits in the repo; personal memory across projects</td>
+            <td>Local MCP server, on demand</td>
+          </tr>
+          <tr>
+            <td class="tool-name">Memory Bank MCP</td>
+            <td>Structured memory bank service for agents</td>
+            <td>Memory bank files managed through a central MCP service</td>
+            <td>Centralized across projects</td>
+            <td>Remote / centralized service</td>
+          </tr>
+          <tr>
+            <td class="tool-name">Basic Memory</td>
+            <td>Local-first knowledge base for agents</td>
+            <td>Markdown knowledge base with semantic search</td>
+            <td>Shareable knowledge base, not primarily repo-scoped</td>
+            <td>Local-first, optional cloud</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p class="compare-footnote">For deeper comparison notes and FAQs, see the <a href="https://github.com/danielmarbach/mnemonic/blob/main/README.md#faq" target="_blank" rel="noopener">README FAQ</a>.</p>
   </div>
 </section>
 
