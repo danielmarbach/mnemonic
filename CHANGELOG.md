@@ -4,6 +4,20 @@ All notable changes to `mnemonic` will be documented in this file.
 
 The format is loosely based on Keep a Changelog and uses semver-style version headings.
 
+## [0.23.0] - 2026-04-17
+
+### Added
+
+- Lexical rescue now ranks candidates by TF-IDF similarity, improving recall for identifier-heavy and jargon queries without affecting semantic ranking.
+- Recall now boosts notes that explain key decisions and concepts when you ask "why"-style questions, using structural signals like role, connections, and format rather than keyword matching.
+- `run-dogfood-packs.mjs --isolated` copies notes into a temporary workspace for reproducible validation runs without polluting the live vault.
+- Rescue candidates no longer appear when `minSimilarity` is set above the default, so explicit quality filters are respected.
+
+### Changed
+
+- Decision and overview notes now surface more reliably for questions like "why are embeddings gitignored" instead of being outranked by incidental mentions.
+- Lexical rescue now correctly activates when no semantic results are found at all.
+
 ## [0.22.0] - 2026-04-13
 
 ### Added

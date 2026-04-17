@@ -1345,7 +1345,7 @@
 
     <div class="recall-flow fade-up">
       <h3>Recall flow &mdash; hybrid semantic + lexical search</h3>
-      <p class="section-desc" style="margin-bottom:16px;font-size:0.875rem;">Before embedding, notes are projected into clean structured text: title, lifecycle, tags, summary, and h1–h3 headings — no prose noise. Semantic search finds the right note even when you don't remember exact words. When results are weak, lexical matching rescues by scanning projections for keyword overlap. Inferred role and importance further boost scores so summary and decision notes surface naturally.</p>
+      <p class="section-desc" style="margin-bottom:16px;font-size:0.875rem;">Semantic search finds the right note even when you don't remember exact words. When results are weak, keyword matching rescues relevant candidates. Notes that explain key decisions and concepts then get a boost so "why"-style questions surface the right answer.</p>
       <div class="flow-steps">
         <div class="flow-step">
           <div class="flow-step-box" style="border-color:rgba(74,222,128,0.25);color:var(--primary-lt)">recall query</div>
@@ -1364,7 +1364,12 @@
         <div class="flow-arrow">+</div>
         <div class="flow-step">
           <div class="flow-step-box">lexical rescue</div>
-          <div class="flow-step-label">weak results</div>
+          <div class="flow-step-label">TF-IDF ranked</div>
+        </div>
+        <div class="flow-arrow">&#x2192;</div>
+        <div class="flow-step">
+          <div class="flow-step-box">canonical promotion</div>
+          <div class="flow-step-label"><span class="boost-badge">explanations</span></div>
         </div>
         <div class="flow-arrow">&#x2192;</div>
         <div class="flow-step">

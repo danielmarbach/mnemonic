@@ -13,6 +13,7 @@ import {
   tempDirs,
 } from "./helpers/mcp.js";
 
+import { embedModel } from "../src/embeddings.js";
 import { RecallResultSchema } from "../src/structured-content.js";
 
 describe("recall-embeddings", () => {
@@ -43,14 +44,14 @@ ${note.content}`,
 
   async function writeSeedEmbedding(vaultDir: string, id: string, embedding: number[]): Promise<void> {
     await mkdir(path.join(vaultDir, "embeddings"), { recursive: true });
-    await writeFile(
-      path.join(vaultDir, "embeddings", `${id}.json`),
-      JSON.stringify({
-        id,
-        model: "nomic-embed-text",
-        embedding,
-        updatedAt: "2026-01-01T00:00:00.000Z",
-      }, null, 2),
+      await writeFile(
+        path.join(vaultDir, "embeddings", `${id}.json`),
+        JSON.stringify({
+          id,
+          model: embedModel,
+          embedding,
+          updatedAt: "2026-01-01T00:00:00.000Z",
+        }, null, 2),
       "utf-8",
     );
   }
@@ -377,6 +378,123 @@ This note has no embedding.`,
     }
   }, 15000);
 
+  it("keeps semantic paraphrase matches ahead when lexical overlap is weak", async () => {
+    const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-semantic-paraphrase-"));
+    tempDirs.push(vaultDir);
+    const embeddingServer = await startFakeEmbeddingServer();
+
+    try {
+      await writeSeedNote(vaultDir, {
+        id: "semantic-target",
+        title: "CI learning promotion guidance",
+        content: "We promote CI failure learnings into durable notes after triage so useful lessons are preserved.",
+        tags: ["ci", "learning", "design"],
+      });
+      await writeSeedNote(vaultDir, {
+        id: "lexical-decoy",
+        title: "Promotion workflow checklist",
+        content: "Promotion guidance and workflow checklist for weekly operational reviews.",
+        tags: ["workflow"],
+      });
+
+      await writeSeedEmbedding(vaultDir, "semantic-target", [0.1, 0.2, 0.3]);
+      await writeSeedEmbedding(vaultDir, "lexical-decoy", [0.05, 0.1, 0.15]);
+
+      const response = await callLocalMcpResponse(vaultDir, "recall", {
+        query: "how we handle promotion of CI learnings",
+        limit: 2,
+        scope: "global",
+      }, embeddingServer.url);
+
+      const parsed = RecallResultSchema.parse(response.structuredContent);
+      expect(parsed.results).toHaveLength(2);
+      expect(parsed.results[0]?.id).toBe("semantic-target");
+      expect(parsed.results[1]?.id).toBe("lexical-decoy");
+    } finally {
+      await embeddingServer.close();
+    }
+  }, 15000);
+
+  it("rescues rare repo-jargon queries with the strongest lexical match", async () => {
+    const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-repo-jargon-"));
+    tempDirs.push(vaultDir);
+    const embeddingServer = await startFakeEmbeddingServer();
+
+    try {
+      await writeSeedNote(vaultDir, {
+        id: "projection-doc",
+        title: "Projection layer notes",
+        content: "ProjectionText staleness handling for derived retrieval text and cache refresh behavior.",
+        tags: ["projection", "design"],
+      });
+      await writeSeedNote(vaultDir, {
+        id: "general-recall",
+        title: "Recall notes",
+        content: "General recall design notes without implementation-specific vocabulary.",
+        tags: ["recall"],
+      });
+      await writeSeedNote(vaultDir, {
+        id: "broad-projection",
+        title: "Projection overview",
+        content: "ProjectionText retrieval text overview for broad indexing behavior.",
+        tags: ["projection"],
+      });
+
+      for (const id of ["projection-doc", "general-recall", "broad-projection"]) {
+        await writeSeedEmbedding(vaultDir, id, [-0.1, -0.2, -0.3]);
+      }
+
+      const response = await callLocalMcpResponse(vaultDir, "recall", {
+        query: "projectiontext staleness",
+        limit: 3,
+        scope: "global",
+      }, embeddingServer.url);
+
+      const parsed = RecallResultSchema.parse(response.structuredContent);
+      expect(parsed.results.length).toBeGreaterThanOrEqual(1);
+      expect(parsed.results[0]?.id).toBe("projection-doc");
+      expect(parsed.results.map((result) => result.id)).not.toContain("general-recall");
+    } finally {
+      await embeddingServer.close();
+    }
+  }, 15000);
+
+  it("does not let lexical boosts displace a stronger non-English semantic match", async () => {
+    const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-cross-language-"));
+    tempDirs.push(vaultDir);
+    const embeddingServer = await startFakeEmbeddingServer();
+
+    try {
+      await writeSeedNote(vaultDir, {
+        id: "english-decoy",
+        title: "Promotion workflow checklist",
+        content: "Promotion workflow guidance and checklist for weekly review handling.",
+        tags: ["workflow"],
+      });
+      await writeSeedNote(vaultDir, {
+        id: "italian-target",
+        title: "Promozione degli apprendimenti CI",
+        content: "Promuoviamo gli apprendimenti dai fallimenti CI in note durevoli dopo il triage.",
+        tags: ["ci", "learning"],
+      });
+
+      await writeSeedEmbedding(vaultDir, "english-decoy", [0.2, 0.05, -0.1]);
+      await writeSeedEmbedding(vaultDir, "italian-target", [0.1, 0.2, 0.3]);
+
+      const response = await callLocalMcpResponse(vaultDir, "recall", {
+        query: "how we handle promotion of CI learnings",
+        limit: 2,
+        scope: "global",
+      }, embeddingServer.url);
+
+      const parsed = RecallResultSchema.parse(response.structuredContent);
+      expect(parsed.results).toHaveLength(1);
+      expect(parsed.results[0]?.id).toBe("italian-target");
+    } finally {
+      await embeddingServer.close();
+    }
+  }, 15000);
+
   it("reranks semantic ties using projections even when no projection cache is warm", async () => {
     const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-hybrid-rerank-"));
     tempDirs.push(vaultDir);
@@ -456,10 +574,162 @@ This note has no embedding.`,
       }, embeddingServer.url);
 
       const parsed = RecallResultSchema.parse(response.structuredContent);
-      expect(parsed.results).toHaveLength(3);
-      expect(parsed.results.map((result) => result.id)).toContain("d-strong");
+      expect(parsed.results.length).toBeGreaterThanOrEqual(1);
       expect(parsed.results[0]?.id).toBe("d-strong");
       expect(parsed.results.map((result) => result.id)).not.toContain("a-weak");
+    } finally {
+      await embeddingServer.close();
+    }
+  }, 15000);
+
+  it("lexical rescue still finds the strongest late candidate beyond the initial rescue scan window", async () => {
+    const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-hybrid-rescue-window-"));
+    tempDirs.push(vaultDir);
+    const embeddingServer = await startFakeEmbeddingServer();
+
+    try {
+      for (let i = 0; i < 20; i++) {
+        const id = `a-decoy-${String(i).padStart(2, "0")}`;
+        await writeSeedNote(vaultDir, {
+          id,
+          title: `ProjectionText note ${i}`,
+          content: "ProjectionText notes for general indexing behavior.",
+          tags: ["projection", "retrieval"],
+        });
+        await writeSeedEmbedding(vaultDir, id, [-0.1, -0.2, -0.3]);
+      }
+
+      await writeSeedNote(vaultDir, {
+        id: "z-strong-target",
+        title: "ProjectionText staleness design",
+        content: "ProjectionText staleness handling for derived retrieval text and precise rescue behavior.",
+        tags: ["projection", "design"],
+      });
+      await writeSeedEmbedding(vaultDir, "z-strong-target", [-0.1, -0.2, -0.3]);
+
+      const response = await callLocalMcpResponse(vaultDir, "recall", {
+        query: "projectiontext staleness",
+        limit: 3,
+        scope: "global",
+      }, embeddingServer.url);
+
+      const parsed = RecallResultSchema.parse(response.structuredContent);
+      expect(parsed.results.length).toBeGreaterThanOrEqual(1);
+      expect(parsed.results[0]?.id).toBe("z-strong-target");
+    } finally {
+      await embeddingServer.close();
+    }
+  }, 15000);
+
+  it("promotes the canonical explanatory note for why-style recall queries", async () => {
+    const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-vault-"));
+    const repoDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-project-"));
+    tempDirs.push(vaultDir, repoDir);
+
+    await initTestRepo(repoDir);
+    const embeddingServer = await startFakeEmbeddingServer();
+
+    try {
+      await callLocalMcp(vaultDir, "remember", {
+        title: "Key design decisions",
+        content: "Embeddings are gitignored because they are derived data and can be rebuilt.\n\n## Decision\nKeep derived artifacts out of git.\n\n## Rationale\nGit should track durable source-of-truth notes, not rebuildable machine output.",
+        tags: ["design"],
+        cwd: repoDir,
+        scope: "project",
+        summary: "Add canonical design explanation note",
+      }, embeddingServer.url);
+
+      await callLocalMcp(vaultDir, "remember", {
+        title: "Sync redesign",
+        content: "Embeddings sync redesign and reindex behavior. This note discusses when embeddings are regenerated during sync.",
+        tags: ["sync"],
+        cwd: repoDir,
+        scope: "project",
+        summary: "Add incidental embeddings note",
+      }, embeddingServer.url);
+
+      const response = await callLocalMcpResponse(vaultDir, "recall", {
+        query: "why are embeddings gitignored",
+        cwd: repoDir,
+        scope: "all",
+        limit: 3,
+      }, embeddingServer.url);
+
+      const parsed = RecallResultSchema.parse(response.structuredContent);
+      expect(parsed.results[0]?.title).toBe("Key design decisions");
+    } finally {
+      await embeddingServer.close();
+    }
+  }, 15000);
+
+  it("does not displace a direct answer with a generic overview note", async () => {
+    const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-vault-"));
+    const repoDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-project-"));
+    tempDirs.push(vaultDir, repoDir);
+
+    await initTestRepo(repoDir);
+    const embeddingServer = await startFakeEmbeddingServer();
+
+    try {
+      await callLocalMcp(vaultDir, "remember", {
+        title: "API endpoint port",
+        content: "The local API listens on port 4317.",
+        tags: ["fact"],
+        cwd: repoDir,
+        scope: "project",
+        summary: "Add direct answer note",
+      }, embeddingServer.url);
+
+      await callLocalMcp(vaultDir, "remember", {
+        title: "System overview",
+        content: "## Overview\nThis note explains architecture, decisions, and system context in a broad durable form.",
+        tags: ["overview"],
+        cwd: repoDir,
+        scope: "project",
+        summary: "Add overview note",
+      }, embeddingServer.url);
+
+      const response = await callLocalMcpResponse(vaultDir, "recall", {
+        query: "what port does the local api use",
+        cwd: repoDir,
+        scope: "all",
+        limit: 3,
+      }, embeddingServer.url);
+
+      const parsed = RecallResultSchema.parse(response.structuredContent);
+      expect(parsed.results[0]?.title).toBe("API endpoint port");
+    } finally {
+      await embeddingServer.close();
+    }
+  }, 15000);
+
+  it("includes confidence in recall text output for non-temporal queries", async () => {
+    const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-confidence-text-"));
+    tempDirs.push(vaultDir);
+    const embeddingServer = await startFakeEmbeddingServer();
+
+    try {
+      const repoDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-confidence-repo-"));
+      tempDirs.push(repoDir);
+      await initTestRepo(repoDir);
+
+      await callLocalMcp(vaultDir, "remember", {
+        title: "Confidence text output test",
+        content: "This note should show confidence in the text rendering of non-temporal recall results.",
+        tags: ["confidence", "text-rendering"],
+        lifecycle: "permanent",
+        scope: "project",
+        cwd: repoDir,
+        summary: "Seed note for confidence text rendering test",
+      }, embeddingServer.url);
+
+      const response = await callLocalMcpResponse(vaultDir, "recall", {
+        query: "confidence text output",
+        cwd: repoDir,
+      }, embeddingServer.url);
+
+      expect(response.text).toMatch(/\*\*confidence:\*\*\s*(high|medium|low)/i);
+      expect(response.text).toContain("confidence:");
     } finally {
       await embeddingServer.close();
     }

@@ -63,6 +63,8 @@ npm run mcp:local
 
 This rebuilds first, then launches `build/index.js`, so MCP clients always point at the latest source.
 
+For reproducible dogfooding of recency and relationship-navigation behavior, prefer the isolated dogfood runner over the live project vault. The isolated runner copies the current `.mnemonic` notes into a temporary workspace, runs the chosen pack there, and deletes the workspace afterward.
+
 ### Docker
 
 ```bash
@@ -308,7 +310,7 @@ Project identity derives from the **git remote URL**, normalized to a stable slu
 
 `recall` with `cwd` searches both vaults. Project notes get a **+0.15 similarity boost** — a soft signal, not a hard filter — so global memories remain accessible while project context floats to the top.
 
-**Hybrid recall** enhances semantic search with lightweight lexical reranking over note projections. When semantic results are weak, a bounded lexical rescue path scans projections for additional candidates, improving exact-match and partial-query recall without changing the storage model or adding new infrastructure. Lexical scores act as tiebreakers — they cannot overcome a large semantic gap but can reorder close candidates.
+**Hybrid recall** enhances semantic search with lightweight lexical reranking over note projections. When semantic results are weak, a bounded lexical rescue path scans projections for additional candidates, improving exact-match and identifier-heavy recall without changing the storage model or adding new infrastructure. **Canonical explanation promotion** boosts notes that explain key decisions and concepts for "why"-style questions, using structural signals like role, connections, and format rather than keyword matching.
 
 Temporal recall is opt-in via `mode: "temporal"`. It keeps semantic selection first, then enriches only the top matches with compact git-backed history so agents can inspect how a note evolved without turning recall into raw log or diff output.
 

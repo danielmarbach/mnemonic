@@ -60,6 +60,8 @@ Mnemonic is built to be used while being developed. Every non-trivial change to 
 3. **Use project-scoped memory operations:** pass `cwd` to every `remember`, `recall`, `update`, and `get` call so notes are associated with this repository.
 4. **Capture decisions through MCP:** when you make a design decision, discover a bug cause, or land on a non-obvious workaround, call `remember` (or `update` if a related note already exists).
 
+For reproducible dogfooding of recency and relationship-navigation behavior, prefer the isolated dogfood runner over the live project vault. The isolated runner copies the current `.mnemonic` notes into a temporary workspace, runs the chosen pack there, and deletes the workspace afterward. Use `npm run mcp:local` or `scripts/mcp-local.sh` for local dogfooding against the current source tree.
+
 ### What to capture
 
 Default to capturing context without waiting for a reminder. In particular, capture when:

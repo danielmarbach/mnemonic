@@ -1,3 +1,5 @@
+import path from "path";
+
 export function getSummaryThemeEntries(summary) {
   return Object.entries(summary?.themes ?? {});
 }
@@ -16,4 +18,8 @@ export function allTemporarySourcesAutoDelete(sourceNotes) {
 
 export function pickRecentNoteForRelationshipNavigation(notes) {
   return notes.find((note) => (note.relationships?.shown?.length ?? 0) > 0) ?? notes[0] ?? null;
+}
+
+export function resolveDogfoodVaultPath({ cwd, isolatedVaultPath }) {
+  return isolatedVaultPath ?? path.join(cwd, ".mnemonic");
 }

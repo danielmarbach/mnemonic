@@ -11,10 +11,13 @@ const RECALL_HIGH_IMPORTANCE_BOOST = 0.006;
 const LEXICAL_HYBRID_WEIGHT = 0.12;
 const COVERAGE_HYBRID_WEIGHT = 0.08;
 const PHRASE_HYBRID_WEIGHT = 0.16;
+const MIN_CANONICAL_EXPLANATION_SCORE = 0.5;
 
 export interface ScoredRecallCandidate {
   id: string;
   score: number;
+  /** Semantic plausibility used to gate canonical explanation promotion. */
+  semanticScoreForPromotion?: number;
   boosted: number;
   vault: Vault;
   isCurrentProject: boolean;
@@ -24,6 +27,12 @@ export interface ScoredRecallCandidate {
   coverageScore?: number;
   /** Exact contiguous phrase coverage across significant query tokens. */
   phraseScore?: number;
+  lifecycle?: "temporary" | "permanent";
+  relatedCount?: number;
+  connectionDiversity?: number;
+  structureScore?: number;
+  metadata?: EffectiveNoteMetadata;
+  canonicalExplanationScore?: number;
 }
 
 export function computeRecallMetadataBoost(metadata?: EffectiveNoteMetadata): number {
@@ -51,18 +60,54 @@ export function computeRecallMetadataBoost(metadata?: EffectiveNoteMetadata): nu
 }
 
 /**
- * Compute a hybrid score that combines semantic similarity with lexical overlap.
+ * Compute a hybrid score that combines semantic similarity with additive
+ * lexical, coverage, phrase, and canonical explanation signals.
  *
- * The formula is: boosted + LEXICAL_HYBRID_WEIGHT * lexicalScore
+ * The formula is:
+ * boosted
+ *   + LEXICAL_HYBRID_WEIGHT * lexical
+ *   + COVERAGE_HYBRID_WEIGHT * coverage
+ *   + PHRASE_HYBRID_WEIGHT * phrase
+ *   + canonicalExplanation
  *
- * Lexical score acts as a tiebreaker and small reranking signal — it cannot
- * overcome a large semantic gap but can reorder close candidates.
+ * These additive signals act as tiebreakers and small reranking signals. They
+ * cannot overcome a large semantic gap but can reorder close candidates.
  */
 export function computeHybridScore(candidate: ScoredRecallCandidate): number {
   const lexical = candidate.lexicalScore ?? 0;
   const coverage = candidate.coverageScore ?? 0;
   const phrase = candidate.phraseScore ?? 0;
-  return candidate.boosted + LEXICAL_HYBRID_WEIGHT * lexical + COVERAGE_HYBRID_WEIGHT * coverage + PHRASE_HYBRID_WEIGHT * phrase;
+  const canonical = candidate.canonicalExplanationScore ?? 0;
+  return candidate.boosted + LEXICAL_HYBRID_WEIGHT * lexical + COVERAGE_HYBRID_WEIGHT * coverage + PHRASE_HYBRID_WEIGHT * phrase + canonical;
+}
+
+export function computeCanonicalExplanationScore(candidate: ScoredRecallCandidate): number {
+  if ((candidate.semanticScoreForPromotion ?? 0) < MIN_CANONICAL_EXPLANATION_SCORE) {
+    return 0;
+  }
+
+  const permanence = candidate.lifecycle === "permanent" ? 0.05 : 0;
+  const role = candidate.metadata?.role === "decision"
+    ? 0.05
+    : candidate.metadata?.role === "context"
+      ? 0.04
+      : candidate.metadata?.role === "summary"
+        ? 0.02
+        : 0;
+  const centrality = Math.min(0.05, Math.log((candidate.relatedCount ?? 0) + 1) * 0.02);
+  const diversity = Math.min(0.04, (candidate.connectionDiversity ?? 0) * 0.015);
+  const structure = Math.min(0.03, candidate.structureScore ?? 0);
+  const wording = Math.min(0.01, candidate.lexicalScore ?? 0);
+
+  return permanence + role + centrality + diversity + structure + wording;
+}
+
+export function applyCanonicalExplanationPromotion(candidates: ScoredRecallCandidate[]): ScoredRecallCandidate[] {
+  for (const candidate of candidates) {
+    candidate.canonicalExplanationScore = computeCanonicalExplanationScore(candidate);
+  }
+
+  return [...candidates].sort((a, b) => computeHybridScore(b) - computeHybridScore(a));
 }
 
 function computeSignificantPhraseScore(query: string, candidateText: string): number {

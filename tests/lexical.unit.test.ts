@@ -7,6 +7,11 @@ import {
   bigramJaccardSimilarity,
   containsSubstring,
   computeLexicalScore,
+  computeTermFrequency,
+  computeInverseDocumentFrequency,
+  computeTfIdfCosineSimilarity,
+  prepareTfIdfCorpus,
+  rankDocumentsByTfIdf,
   shouldTriggerLexicalRescue,
   LEXICAL_RESCUE_CANDIDATE_LIMIT,
   LEXICAL_RESCUE_THRESHOLD,
@@ -139,6 +144,113 @@ describe("computeLexicalScore", () => {
     const score1 = computeLexicalScore("Hello World", "hello world");
     const score2 = computeLexicalScore("hello world", "hello world");
     expect(score1).toBe(score2);
+  });
+});
+
+describe("TF-IDF primitives", () => {
+  it("computes normalized term frequency for repeated tokens", () => {
+    const frequencies = computeTermFrequency(["alpha", "beta", "alpha"]);
+
+    expect(frequencies.get("alpha")).toBeCloseTo(2 / 3, 5);
+    expect(frequencies.get("beta")).toBeCloseTo(1 / 3, 5);
+  });
+
+  it("assigns higher inverse-document frequency to rarer terms", () => {
+    const idf = computeInverseDocumentFrequency([
+      ["projectiontext", "staleness", "retrieval"],
+      ["retrieval", "design"],
+      ["retrieval", "notes"],
+    ]);
+
+    expect(idf.get("projectiontext")!).toBeGreaterThan(idf.get("retrieval")!);
+    expect(idf.get("staleness")!).toBeGreaterThan(idf.get("retrieval")!);
+  });
+
+  it("prefers rare-token documents over broad fuzzy matches", () => {
+    const corpus = [
+      "projectiontext staleness derived retrieval text",
+      "staleness retrieval text notes design",
+      "cooking recipes weekly menu",
+    ];
+
+    const rareTargetScore = computeTfIdfCosineSimilarity("projectiontext staleness", corpus[0]!, corpus);
+    const broadRelatedScore = computeTfIdfCosineSimilarity("projectiontext staleness", corpus[1]!, corpus);
+    const unrelatedScore = computeTfIdfCosineSimilarity("projectiontext staleness", corpus[2]!, corpus);
+
+    expect(rareTargetScore).toBeGreaterThan(broadRelatedScore);
+    expect(broadRelatedScore).toBeGreaterThan(unrelatedScore);
+  });
+
+  it("preserves non-English tokens during tf-idf preparation", () => {
+    const frequencies = computeTermFrequency(tokenize("promozione apprendimento café"));
+
+    expect(frequencies.has("promozione")).toBe(true);
+    expect(frequencies.has("apprendimento")).toBe(true);
+    expect(frequencies.has("café")).toBe(true);
+  });
+
+  it("selects the strongest tf-idf matches even when they appear late in the corpus", () => {
+    const documents = Array.from({ length: 20 }, (_, index) => ({
+      id: `decoy-${index}`,
+      text: "projectiontext derived retrieval text broad notes",
+    }));
+    documents.push({
+      id: "late-target",
+      text: "projectiontext staleness derived retrieval text precise design",
+    });
+
+    const ranked = rankDocumentsByTfIdf("projectiontext staleness derived retrieval text", documents, 3);
+
+    expect(ranked[0]?.id).toBe("late-target");
+    expect(ranked.map((entry) => entry.id)).toContain("late-target");
+  });
+
+  it("reuses prepared tf-idf corpus data without changing ranking behavior", () => {
+    const documents = [
+      { id: "rare-target", text: "projectiontext staleness derived retrieval text" },
+      { id: "broad-related", text: "staleness retrieval text notes design" },
+      { id: "unrelated", text: "cooking recipes weekly menu" },
+    ];
+
+    const prepared = prepareTfIdfCorpus(documents);
+    const preparedRanked = rankDocumentsByTfIdf("projectiontext staleness", documents, documents.length, prepared);
+    const directRanked = rankDocumentsByTfIdf("projectiontext staleness", documents, documents.length);
+
+    expect(preparedRanked).toEqual(directRanked);
+  });
+
+  it("prefers an exact title match over repeated generic design decoys", () => {
+    const documents = Array.from({ length: 20 }, (_, index) => ({
+      id: `design-decoy-${index}`,
+      text: [
+        `Title: Design note ${index}`,
+        "Lifecycle: permanent",
+        "Tags: design, recall",
+        "Summary: General recall design notes for hybrid retrieval, ranking behavior, and projection usage.",
+        "Headings: Overview | Constraints | Tradeoffs",
+      ].join("\n"),
+    }));
+
+    documents.push(
+      {
+        id: "hybrid-design-target",
+        text: [
+          "Title: Hybrid recall design and implementation",
+          "Lifecycle: permanent",
+          "Tags: recall, hybrid-search, design",
+          "Summary: Hybrid recall design with reranking rescue and projections.",
+          "Headings: Design Principles | Implementation | Tests",
+        ].join("\n"),
+      },
+      {
+        id: "unrelated",
+        text: "Title: Cooking notes\nSummary: Weekly menu planning and recipes.",
+      }
+    );
+
+    const ranked = rankDocumentsByTfIdf("hybrid recall design", documents, documents.length);
+
+    expect(ranked[0]?.id).toBe("hybrid-design-target");
   });
 });
 

@@ -12,6 +12,7 @@ When working on mnemonic itself:
 - Use project-scoped `mnemonic` MCP for memory operations
 - Exercise features through MCP tools (`remember`, `update`, `get`, `relate`, `recall`)
 - Mnemoize decisions and findings through MCP (never write `.mnemonic/` files directly)
+- For reproducible dogfooding, prefer the isolated dogfood runner (`scripts/dogfooding-isolated-vault.mjs`) over the live project vault — it copies notes into a temporary workspace and cleans up afterward
 
 ### Session start
 
