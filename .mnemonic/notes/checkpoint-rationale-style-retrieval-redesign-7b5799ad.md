@@ -8,41 +8,50 @@ tags:
   - rationale
 lifecycle: temporary
 createdAt: '2026-04-05T17:41:52.918Z'
-updatedAt: '2026-04-05T17:41:52.918Z'
+updatedAt: '2026-04-17T04:52:02.109Z'
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 memoryVersion: 1
 ---
-Checkpoint for a larger generic retrieval change aimed at rationale-style queries.
+Checkpoint for the rationale-style retrieval redesign follow-up.
 
-Current status: small generic hybrid reranking improvements were implemented and verified, but they did not materially improve the real-corpus result for rationale-style queries such as asking why a design decision exists. The likely next step is a broader retrieval design rather than another local scoring tweak.
+Current status: the broad design direction is now approved. The next step is to turn the approved design into a written implementation plan, then implement it test-first.
 
-What was attempted:
+Approved design:
 
-- Added rare-token coverage to hybrid recall reranking.
-- Added contiguous significant-token phrase coverage to hybrid recall reranking.
-- Verified these changes with targeted unit tests.
-- Rechecked the real mnemonic corpus and confirmed the canonical rationale note still ranked too low for the motivating query.
+- keep the normal semantic-first retrieval path as the entry path
+- do not add a special rationale-query classifier as the main mechanism
+- add a bounded canonical-explanation promotion step after semantic retrieval and project-biased widening build the normal candidate neighborhood
+- compute a `canonicalExplanationScore` only over that bounded neighborhood
+- only let the promotion step materially affect candidates that are already semantically plausible
+- use language-independent primary signals: semantic alignment, relationship centrality, connection diversity, durable-note bias, explicit role metadata when present, and light structural support
+- allow wording cues only as weak tiebreakers, not as the backbone of success
+- cap the effect so central but off-topic notes, generic overviews, and temporary checkpoint notes cannot displace better direct answers
+- keep the change fail-soft and local to ranking logic
 
-What worked:
+Why this design was chosen:
 
-- The changes were generic and language-independent.
-- They improved the retrieval machinery in a principled way without repo-specific heuristics.
-- They established that the remaining gap is not likely solvable with one more small additive boost.
+- small generic reranking tweaks were already tried and did not materially fix the real-corpus canonical-answer gap
+- a rationale-query classifier would likely overfit to English wording and violate the language-independent design intent
+- metadata-only or repo-specific canonical-note solutions would create authoring burden and corpus-shaped behavior
+- the real gap appears to be bounded promotion of canonical explanatory notes that are already near the correct semantic neighborhood
 
-Blockers and constraints:
+Testing shape agreed for the next implementation plan:
 
-- Further small tweaks risk overfitting to this repo's note corpus.
-- Any next design must remain language-independent and avoid repo-specific boosts, note-id exceptions, or English-only rationale keywords.
-- A stronger solution likely needs a more explicit retrieval path for explanatory or canonical notes.
+- unit tests for the promotion scorer
+- recall integration tests for canonical-answer promotion
+- guardrail tests so factual/entity queries and temporary notes do not regress
 
-Alternatives considered:
+Written spec path:
 
-- Keep adding more reranking boosts: rejected because it trends toward corpus-specific tuning.
-- Stop entirely: rejected because the gap is still real for end users.
-- Design a larger two-stage retrieval or rationale-aware selection model: most promising direction.
+- `docs/superpowers/specs/2026-04-17-rationale-style-retrieval-design.md`
 
-Next action: design a larger still-generic retrieval approach for rationale-style queries, likely as a two-stage retrieval/scoring change with tests based on abstract rationale-note behavior rather than mnemonic-specific note titles.
+Constraints still in force:
 
-Confidence: medium.
+- remain language-independent in primary signals
+- no repo-specific title exceptions or allowlists
+- no new persistent retrieval layer
+- do not modify TF-IDF rescue as part of this work
+
+Next action: have the user review the written spec, then write the implementation plan for the bounded canonical-explanation promotion design.
