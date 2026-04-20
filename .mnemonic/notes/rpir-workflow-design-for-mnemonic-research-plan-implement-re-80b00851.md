@@ -8,7 +8,7 @@ tags:
   - decision
 lifecycle: permanent
 createdAt: '2026-04-20T21:36:57.480Z'
-updatedAt: '2026-04-20T21:37:11.693Z'
+updatedAt: '2026-04-20T21:47:16.005Z'
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
@@ -19,6 +19,8 @@ relatedTo:
     type: related-to
   - id: phase-2-design-workflow-hint-first-working-state-continuity-07153fcb
     type: related-to
+  - id: rpir-workflow-phase-1-implementation-plan-f10a7f81
+    type: example-of
 memoryVersion: 1
 ---
 Approved design for evolving mnemonic into a canonical workflow artifact store with first-class research/plan/review support. Full spec at `docs/superpowers/specs/2026-04-20-rpir-workflow-design.md`.
