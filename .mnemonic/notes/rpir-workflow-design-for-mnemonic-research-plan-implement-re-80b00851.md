@@ -8,7 +8,7 @@ tags:
   - decision
 lifecycle: permanent
 createdAt: '2026-04-20T21:36:57.480Z'
-updatedAt: '2026-04-20T21:47:16.005Z'
+updatedAt: '2026-04-20T21:52:39.546Z'
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
@@ -23,21 +23,43 @@ relatedTo:
     type: example-of
 memoryVersion: 1
 ---
-Approved design for evolving mnemonic into a canonical workflow artifact store with first-class research/plan/review support. Full spec at `docs/superpowers/specs/2026-04-20-rpir-workflow-design.md`.
+Approved design for evolving mnemonic into a canonical workflow artifact store with first-class research/plan/review support. Also stored at `docs/superpowers/specs/2026-04-20-rpir-workflow-design.md`.
 
 ## Core principle
 
 mnemonic is the canonical store for workflow artifacts, not the workflow runtime.
 
+## Design choices locked in
+
+- **New roles:** Add `research` and `review` — makes workflow artifacts first-class without tag overload
+- **Apply/task role:** No new role — use existing roles + tags — avoids role explosion
+- **Apply/task role split:** `role: plan` for intended executable work; `role: context` for execution observations/checkpoints — prevents drift without adding an apply role
+- **Role inference:** Inference stays on 5 existing roles; skill drives explicit typing of research/review — avoids overlap/drift in inference signals
+- **Role persistence:** Explicit roles are persisted (existing contract); research/review are set by skill, not inference — no contract change needed
+- **Lifecycle defaults:** Role-based soft defaults in `remember()` at creation time only — common workflow artifacts get the right lifecycle most of the time; updates do not implicitly rewrite lifecycle
+- **Request root note:** Convention only: `role: context`, `lifecycle: temporary`, tagged as workflow request root — avoids adding a request role while keeping workflow roots consistent
+- **Plan currency:** Prefer one current plan note per request — simplifies retrieval, handoff, and review
+- **Relationship types:** Existing 4 types + skill conventions for Phase 1-2 — strengthen guidance, not complexity
+- **Relationship density:** Use minimal relationship set; link to immediate upstream artifacts only — keeps the graph sparse and readable
+- **Directional types:** Deferred to Phase 3 gate — only if chain reconstruction proves unreliable
+- **Skill delivery:** Single RPIR skill in `skills/` directory, same repo — lowest friction, same release
+- **MCP prompt:** Separate `mnemonic-rpir-workflow` prompt — memory protocol and task workflow are different concerns
+- **Ergonomic helper:** `recall(mode: "workflow")` variant, Phase 3 gated — computed on demand, minimal tool surface expansion
+- **Orchestration:** Explicitly out of scope — mnemonic is artifact store, not runtime
+
 ## Core changes (Phase 1)
 
 ### Role enum expansion
 
-Add `research` and `review` to `NoteRole`. Inference stays on the 5 existing roles; skill drives explicit typing of research/review.
+Add `research` and `review` to `NoteRole` in `src/storage.ts`. Inference stays on the 5 existing roles; skill drives explicit typing of research/review.
 
 ### Role-based lifecycle defaults
 
 Soft defaults in `remember()` at creation time only: research/plan/review → temporary, decision/summary/reference → permanent. Updates do not implicitly rewrite lifecycle.
+
+### No migration needed
+
+Role is already an optional field. The change is purely additive: existing notes with no role or existing valid roles are unaffected. `isNoteRole()` uses `NOTE_ROLES.includes()`, so the new values become valid where they were previously ignored. No schema version bump required.
 
 ### Request root note convention
 
@@ -60,7 +82,13 @@ request root (role: context, temporary)
 
 ## Relationship conventions
 
-Use minimal relationship set; link to immediate upstream artifacts only. No dense cross-linking.
+Use minimal relationship set; link to immediate upstream artifacts only. No dense cross-linking. Specific edges:
+
+- research `related-to` request
+- plan `related-to` request + the key research notes
+- apply/task `related-to` plan
+- review `related-to` apply or plan
+- outcome `related-to` plan and optionally request
 
 ## Plan currency
 
@@ -74,6 +102,19 @@ A plan change is material if it changes: architecture/design direction, file/mod
 
 At workflow end: decision note for resolved approaches, summary note for outcome recaps. Promote reusable facts/patterns into permanent reference notes. Let pure scaffolding and redundant checkpoints expire.
 
+## Stage protocol
+
+1. Research -- create/update request root note, create research notes, distill into a short research summary when needed
+2. Plan -- create/update plan note linked to research/request, keep concise and executable
+3. Implement -- create temporary apply/task notes, hand narrow context to subagent if non-trivial
+4. Review -- create review notes, fix directly or mark blockers, update plan if review changes it materially
+5. Iterate -- only when review/checks warrant it (optional, not default)
+
+## Subagent handoff contract
+
+A subagent receives: request note, current plan note or relevant slice, relevant research note(s), a few durable recalled notes, narrow file/task scope.
+A subagent returns: updated temporary apply note, optional review note, recommendation: continue / block / update plan.
+
 ## Convention delivery (Phase 2)
 
 - Separate MCP prompt `mnemonic-rpir-workflow` (memory protocol and task workflow are different concerns)
@@ -81,12 +122,37 @@ At workflow end: decision note for resolved approaches, summary note for outcome
 
 ## Commit discipline
 
-Three classes: memory (research/plan/review artifacts), work (code/test/docs), memory (consolidation/promotion). Plan changes materially → update notes → memory commit → then continue.
+Three classes: memory (research/plan/review artifacts), work (code/test/docs), memory (consolidation/promotion). Plan changes materially -- update notes, memory commit, then continue.
 
 ## Phase 3 helpers (gated)
 
-1. `recall(mode: "workflow")` — chain reconstruction via role + relationship traversal
-2. Directional types `derives-from`/`follows` — only if chain reconstruction is unreliable with `related-to`
+1. `recall(mode: "workflow")` -- chain reconstruction via role + relationship traversal
+2. Directional types `derives-from`/`follows` -- only if chain reconstruction is unreliable with `related-to`
+
+## Phase 4 validation
+
+Run RPIR on 3-5 real tasks: research-heavy, plan-heavy refactor, multi-step implementation, review/fix cycle. Measure token cost, plan drift, temporary-note cleanup burden, retrieval quality, graph readability.
+
+## Phase 5 orchestrator decision
+
+Build a separate orchestration layer only if real usage consistently wants automated subagent dispatch, reviewer fanout, loop scheduling. mnemonic stays the artifact backbone; the orchestrator stays thin.
+
+## Non-goals
+
+- No orchestration runtime in core
+- No full task engine in core
+- No mandatory loop model
+- No rich task-state schema in core
+- No full autonomous loop-first workflow
+- No many helper tools up front
+
+## Alternatives considered
+
+- **Minimal Core, Maximal Skill:** Only enum + defaults in core. Rejected because convention only reaches skill-aware agents; the MCP prompt is a natural delivery channel.
+- **Core + Schema:** Add validation for workflow graph shape. Rejected because it contradicts the no-heavy-schema principle.
+- **Mix RPIR into existing mnemonic-workflow-hint:** Rejected because memory protocol and task workflow are different concerns.
+- **Full inference for research/review:** Rejected because research overlaps with context signals and review overlaps with plan signals.
+- **Adding a request role:** Rejected because `role: context` + tag convention is sufficient and avoids role proliferation.
 
 ## Open questions
 
