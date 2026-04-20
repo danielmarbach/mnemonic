@@ -7,7 +7,7 @@ tags:
   - decision
 lifecycle: permanent
 createdAt: '2026-04-04T22:09:20.109Z'
-updatedAt: '2026-04-04T22:09:20.109Z'
+updatedAt: '2026-04-20T21:11:00.514Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
@@ -17,9 +17,32 @@ relatedTo:
     type: related-to
 memoryVersion: 1
 ---
-Consolidated two notes covering the same topic: roles are read-only hints, not a schema or persisted mutation.
-
 Roles and importance suggestions in mnemonic are **read-only runtime hints**, not a required schema, and must never mutate notes.
+
+## Current role/lifecycle model (concrete)
+
+**NoteRole** (`src/storage.ts` line 9): `"summary" | "decision" | "plan" | "context" | "reference"`
+**NoteLifecycle** (`src/storage.ts` line 8): `"temporary" | "permanent"`
+**NoteImportance** (`src/storage.ts` line 10): `"high" | "normal" | "low"`
+**RelationshipType** (`src/storage.ts` line 7): `"related-to" | "explains" | "example-of" | "supersedes"`
+
+**Lifecycle default** (`src/index.ts` line 1924): `lifecycle ?? "permanent"` — new notes default permanent unless explicitly temporary.
+**alwaysLoad default** (`src/index.ts` line 1925): `alwaysLoad ?? false`
+**Scope default**: `"project"` when cwd + vault exist, `"ask"` when vault doesn't exist, `"global"` when no cwd (`src/project-memory-policy.ts`).
+**Consolidation default**: `"supersedes"` unless all sources are temporary (then `"delete"`).
+
+**Role inference signals** (`src/role-suggestions.ts`):
+
+- summary: inboundReferences >= 4, linkedByPermanentNotes >= 2, headingCount >= 2, bulletCount >= 4
+- decision: explanatoryRelations >= 2, headingCount >= 2, bulletCount >= 2, paragraphCount >= 2
+- plan: numberedCount >= 2, checklistCount >= 2, totalListItems >= 4
+- reference: colonPairCount >= 4, tableRowCount >= 3, shortLineCount >= 4
+- context: permanent lifecycle, headingCount >= 2, paragraphCount >= 2, inbound >= 1 or totalRelations >= 1
+- Threshold: ROLE_THRESHOLD = 5, ROLE_MARGIN = 2 (score >= 5 and exceeds second-best by >= 2)
+
+**Inferred roles are never persisted**: `role-suggestions.ts` only returns suggestions at runtime; only explicit user/agent-provided values get written to frontmatter. Source can be `"explicit"`, `"suggested"`, or `"none"`.
+
+**README discrepancy**: README lists roles as `summary, decision, plan, log, reference` — code has `"context"` not `"log"`. README says importance is `high` and `normal` only — code includes `"low"`. Code is authoritative.
 
 ## Core principle
 
@@ -54,3 +77,4 @@ Roles and importance suggestions in mnemonic are **read-only runtime hints**, no
 - Debug output may eventually expose suggested metadata for inspection
 - If users want persistence, that should happen through explicit editing rather than heuristic write-back
 - Custom roles should remain ignored unless there is a clear compatibility story that preserves the hint-only model
+- Proposed additions: `research` and `review` roles for first-class workflow artifact typing
