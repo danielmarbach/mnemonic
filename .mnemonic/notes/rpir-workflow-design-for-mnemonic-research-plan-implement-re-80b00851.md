@@ -8,7 +8,7 @@ tags:
   - decision
 lifecycle: permanent
 createdAt: '2026-04-20T21:36:57.480Z'
-updatedAt: '2026-04-23T19:16:32.125Z'
+updatedAt: '2026-04-23T21:23:19.225Z'
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
@@ -144,6 +144,14 @@ A subagent returns: updated temporary apply note, optional review note, recommen
 
 - Separate MCP prompt `mnemonic-rpir-workflow` (memory protocol and task workflow are different concerns)
 - Skill `skills/mnemonic-rpir-workflow/SKILL.md` with stage checklists, subagent handoff template, commit discipline rules, consolidation guidance, examples
+
+## Skill packaging decision essentials
+
+- Skills are part of the product experience and must ship with mnemonic releases.
+- MCP prompts and skills are complementary: prompts bootstrap discovery, skills carry detailed execution guidance.
+- Packaging must support updates: users need a repeatable way to refresh installed local skill copies after upgrading mnemonic.
+- Distribution targets include Claude and OpenCode directories, plus custom paths for other clients.
+- Backward compatibility is required: existing prompt names and workflows remain valid while packaging and delivery improve.
 
 ## Commit discipline
 
