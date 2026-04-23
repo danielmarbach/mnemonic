@@ -8,7 +8,7 @@ tags:
   - decision
 lifecycle: permanent
 createdAt: '2026-04-20T21:36:57.480Z'
-updatedAt: '2026-04-20T21:52:39.546Z'
+updatedAt: '2026-04-23T18:15:53.736Z'
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
@@ -23,7 +23,15 @@ relatedTo:
     type: example-of
 memoryVersion: 1
 ---
-Approved design for evolving mnemonic into a canonical workflow artifact store with first-class research/plan/review support. Also stored at `docs/superpowers/specs/2026-04-20-rpir-workflow-design.md`.
+Approved design for evolving mnemonic into a canonical workflow artifact store with first-class research/plan/review support.
+
+## Phase status (as of 2026-04-23)
+
+- **Phase 1 — complete:** roles (`research`, `review`), role parameter support, role-based lifecycle defaults, tests, and workflow-hint alignment shipped.
+- **Phase 2 — complete:** `mnemonic-rpir-workflow` MCP prompt added, `skills/mnemonic-rpir-workflow/SKILL.md` added, prompt coverage tests added, `AGENT.md` and `README.md` updated with RPIR conventions.
+- **Phase 3 — pending:** workflow recall helper and directional relationships remain gated.
+- **Phase 4 — pending:** real-task validation cycle not run yet.
+- **Phase 5 — pending:** orchestrator decision deferred until validation evidence exists.
 
 ## Core principle
 
