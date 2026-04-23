@@ -94,6 +94,38 @@ npm install @danielmarbach/mnemonic-mcp
 npm install @danielmarbach/mnemonic-mcp@0.2.0
 ```
 
+### Install bundled skills (Claude/OpenCode)
+
+The npm package now includes `skills/**` plus a helper binary to install them into local skill directories.
+
+```bash
+# If mnemonic is installed in this project:
+npx mnemonic-install-skills --target all --mode copy
+
+# One-off install without adding dependency:
+npx -y -p @danielmarbach/mnemonic-mcp mnemonic-install-skills --target all --mode copy
+```
+
+Supported targets:
+
+- `--target claude` -> `~/.claude/skills`
+- `--target opencode` -> `~/.config/opencode/skills`
+- `--target all` -> both (default)
+- `--target custom` -> only use `--target-dir` destinations
+- `--target-dir <path>` -> add any custom client skill directory
+
+Update flow after upgrading `@danielmarbach/mnemonic-mcp`:
+
+```bash
+npx mnemonic-install-skills --target all --mode copy --update
+```
+
+If you prefer automatic propagation without copy refreshes, use symlink mode:
+
+```bash
+npx mnemonic-install-skills --target all --mode symlink --update
+```
+
 ### Homebrew
 
 The formula lives in this repository. Tap it with an explicit URL so no separate repository is needed:
