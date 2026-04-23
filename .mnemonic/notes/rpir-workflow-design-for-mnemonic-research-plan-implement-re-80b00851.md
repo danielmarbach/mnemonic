@@ -8,7 +8,7 @@ tags:
   - decision
 lifecycle: permanent
 createdAt: '2026-04-20T21:36:57.480Z'
-updatedAt: '2026-04-23T19:16:23.605Z'
+updatedAt: '2026-04-23T19:16:32.125Z'
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
@@ -20,6 +20,8 @@ relatedTo:
   - id: phase-2-design-workflow-hint-first-working-state-continuity-07153fcb
     type: related-to
   - id: rpir-workflow-phase-1-implementation-plan-f10a7f81
+    type: example-of
+  - id: rpir-workflow-phase-3-implementation-plan-22ac514b
     type: example-of
 memoryVersion: 1
 ---
