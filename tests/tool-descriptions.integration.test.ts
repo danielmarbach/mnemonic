@@ -29,7 +29,8 @@ describe("tool-descriptions", () => {
     expect(promptText).toContain("Bad: call `remember` immediately because the user said 'remember'.");
     expect(promptText).toContain("Roles are optional prioritization hints, not schema.");
     expect(promptText).toContain("Lifecycle still governs durability.");
-    expect(promptText).toContain("`role: plan` does not imply `temporary`.");
+    expect(promptText).toContain("When `lifecycle` is omitted, `remember` applies soft defaults based on role");
+    expect(promptText).toContain("`research`, `plan`, and `review` default to `temporary`");
     expect(promptText).toContain("Inferred roles are internal hints only.");
     expect(promptText).toContain("Prioritization is language-independent by default.");
     expect(promptText).toContain("Call `project_memory_summary` first for orientation");

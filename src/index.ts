@@ -6,7 +6,7 @@ import { randomUUID } from "crypto";
 import path from "path";
 import { promises as fs } from "fs";
 
-import { NOTE_LIFECYCLES, Storage, type Note, type NoteLifecycle, type Relationship, type RelationshipType } from "./storage.js";
+import { NOTE_LIFECYCLES, NOTE_ROLES, Storage, type Note, type NoteLifecycle, type NoteRole, type Relationship, type RelationshipType } from "./storage.js";
 import { embed, cosineSimilarity, embedModel } from "./embeddings.js";
 import { type CommitResult, type PushResult, type SyncResult } from "./git.js";
 import { buildTemporalHistoryEntry, computeConfidence, getNoteProvenance } from "./provenance.js";
@@ -1383,6 +1383,15 @@ function addVaultChange(vaultChanges: Map<Vault, string[]>, vault: Vault, file: 
   }
 }
 
+const ROLE_LIFECYCLE_DEFAULTS: Record<string, NoteLifecycle> = {
+  research: "temporary",
+  plan: "temporary",
+  review: "temporary",
+  decision: "permanent",
+  summary: "permanent",
+  reference: "permanent",
+};
+
 // ── MCP Server ────────────────────────────────────────────────────────────────
 
 const server = new McpServer({
@@ -1846,7 +1855,15 @@ server.registerTool(
         .optional()
         .describe(
           "Memory lifetime. Use `temporary` for short-lived working context such as active investigations or transient status. " +
-          "Use `permanent` for durable knowledge such as decisions, fixes, patterns, and preferences."
+          "Use `permanent` for durable knowledge such as decisions, fixes, patterns, and preferences. " +
+          "When omitted, defaults based on role: research/plan/review → temporary, decision/summary/reference → permanent."
+        ),
+      role: z
+        .enum(NOTE_ROLES)
+        .optional()
+        .describe(
+          "Optional prioritization hint for the note. Inferred automatically when omitted. " +
+          "Set explicitly for workflow artifacts like research or review notes."
         ),
       summary: z.string().optional().describe(
         "Git commit summary only. Imperative mood, concise, and focused on why the change matters."
@@ -1888,7 +1905,7 @@ server.registerTool(
     }),
     outputSchema: RememberResultSchema,
   },
-  async ({ title, content, tags, lifecycle, summary, alwaysLoad, cwd, scope, allowProtectedBranch = false }) => {
+  async ({ title, content, tags, lifecycle, role, summary, alwaysLoad, cwd, scope, allowProtectedBranch = false }) => {
     await ensureBranchSynced(cwd);
 
     const project = await resolveProject(cwd);
@@ -1922,7 +1939,8 @@ server.registerTool(
 
     const note: Note = {
       id, title, content: cleanedContent, tags,
-      lifecycle: lifecycle ?? "permanent",
+      lifecycle: lifecycle ?? (role ? ROLE_LIFECYCLE_DEFAULTS[role] : undefined) ?? "permanent",
+      ...(role ? { role } : {}),
       alwaysLoad: alwaysLoad ?? false,
       project: project?.id,
       projectName: project?.name,
@@ -2760,6 +2778,10 @@ server.registerTool(
         .enum(NOTE_LIFECYCLES)
         .optional()
         .describe("Change lifecycle. Preserve the existing value unless you're intentionally switching it."),
+      role: z
+        .enum(NOTE_ROLES)
+        .optional()
+        .describe("Change role. Preserve the existing value unless you're intentionally switching it."),
       summary: z.string().optional().describe("Git commit summary only. Imperative mood, concise, and focused on why the change matters."),
       alwaysLoad: z
         .boolean()
@@ -2779,7 +2801,7 @@ server.registerTool(
     }),
     outputSchema: UpdateResultSchema,
   },
-  async ({ id, content, semanticPatch, title, tags, lifecycle, summary, alwaysLoad, cwd, allowProtectedBranch = false }) => {
+  async ({ id, content, semanticPatch, title, tags, lifecycle, role, summary, alwaysLoad, cwd, allowProtectedBranch = false }) => {
     await ensureBranchSynced(cwd);
 
     const found = await vaultManager.findNote(id, cwd);
@@ -2837,6 +2859,7 @@ server.registerTool(
       content: patchedContent ?? cleanedContent ?? note.content,
       tags: tags ?? note.tags,
       lifecycle: lifecycle ?? note.lifecycle,
+      ...(role !== undefined ? { role } : (note.role ? { role: note.role } : {})),
       alwaysLoad: alwaysLoad !== undefined ? alwaysLoad : note.alwaysLoad,
       updatedAt: now,
     };
@@ -6049,7 +6072,7 @@ server.registerPrompt(
             "- When unsure, prefer `recall` over `remember`.\n" +
             "- For repo-related tasks, pass `cwd` so mnemonic can route project memories correctly.\n\n" +
             "Workflow: `recall`/`list` -> `get` -> `update` or `remember` -> `relate`/`consolidate`/`move_memory`. Use `discover_tags` only when tag choice is ambiguous.\n\n" +
-            "Roles are optional prioritization hints, not schema. Lifecycle still governs durability. `role: plan` does not imply `temporary`. Inferred roles are internal hints only. Prioritization is language-independent by default.\n\n" +
+            "Roles are optional prioritization hints, not schema. Lifecycle still governs durability. When `lifecycle` is omitted, `remember` applies soft defaults based on role: `research`, `plan`, and `review` default to `temporary`; `decision`, `summary`, and `reference` default to `permanent`. Explicit `lifecycle` always overrides the role-based default. Inferred roles are internal hints only. Prioritization is language-independent by default.\n\n" +
             "### Working-state continuity\n\n" +
             "Preserve in-progress work as temporary notes when continuation value is high. Recovery happens after project orientation.\n\n" +
             "**Checkpoint note structure (temporary notes):**\n" +

@@ -6,10 +6,10 @@ import type { NoteProjection } from "./structured-content.js";
 
 export type RelationshipType = "related-to" | "explains" | "example-of" | "supersedes";
 export type NoteLifecycle = "temporary" | "permanent";
-export type NoteRole = "summary" | "decision" | "plan" | "context" | "reference";
+export type NoteRole = "summary" | "decision" | "plan" | "context" | "reference" | "research" | "review";
 export type NoteImportance = "high" | "normal" | "low";
 export const NOTE_LIFECYCLES = ["temporary", "permanent"] as const satisfies readonly NoteLifecycle[];
-export const NOTE_ROLES = ["summary", "decision", "plan", "context", "reference"] as const satisfies readonly NoteRole[];
+export const NOTE_ROLES = ["summary", "decision", "plan", "context", "reference", "research", "review"] as const satisfies readonly NoteRole[];
 export const NOTE_IMPORTANCE_LEVELS = ["high", "normal", "low"] as const satisfies readonly NoteImportance[];
 
 export interface Relationship {
