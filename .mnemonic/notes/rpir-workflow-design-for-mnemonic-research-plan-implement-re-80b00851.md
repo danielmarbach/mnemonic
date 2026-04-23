@@ -8,7 +8,7 @@ tags:
   - decision
 lifecycle: permanent
 createdAt: '2026-04-20T21:36:57.480Z'
-updatedAt: '2026-04-23T18:15:53.736Z'
+updatedAt: '2026-04-23T19:16:23.605Z'
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
@@ -29,13 +29,21 @@ Approved design for evolving mnemonic into a canonical workflow artifact store w
 
 - **Phase 1 — complete:** roles (`research`, `review`), role parameter support, role-based lifecycle defaults, tests, and workflow-hint alignment shipped.
 - **Phase 2 — complete:** `mnemonic-rpir-workflow` MCP prompt added, `skills/mnemonic-rpir-workflow/SKILL.md` added, prompt coverage tests added, `AGENT.md` and `README.md` updated with RPIR conventions.
-- **Phase 3 — pending:** workflow recall helper and directional relationships remain gated.
+- **Phase 3 — planned (combined):** `recall(mode: "workflow")` + directional relationship types in one always-on release.
 - **Phase 4 — pending:** real-task validation cycle not run yet.
 - **Phase 5 — pending:** orchestrator decision deferred until validation evidence exists.
 
 ## Core principle
 
 mnemonic is the canonical store for workflow artifacts, not the workflow runtime.
+
+## Important Phase 3 revelations
+
+- **Always-on rollout (no flags):** Phase 3 ships directly without feature flags.
+- **No migration:** relationship changes are additive only; no bulk rewriting of existing notes.
+- **Indefinite compatibility fallback:** workflow reconstruction keeps `related-to` fallback indefinitely.
+- **External-user posture:** compatibility is treated as a long-term public contract, not a short-lived internal bridge.
+- **Precision path:** `derives-from` and `follows` improve chain quality but are optional; mixed graphs are first-class.
 
 ## Design choices locked in
 
@@ -47,12 +55,12 @@ mnemonic is the canonical store for workflow artifacts, not the workflow runtime
 - **Lifecycle defaults:** Role-based soft defaults in `remember()` at creation time only — common workflow artifacts get the right lifecycle most of the time; updates do not implicitly rewrite lifecycle
 - **Request root note:** Convention only: `role: context`, `lifecycle: temporary`, tagged as workflow request root — avoids adding a request role while keeping workflow roots consistent
 - **Plan currency:** Prefer one current plan note per request — simplifies retrieval, handoff, and review
-- **Relationship types:** Existing 4 types + skill conventions for Phase 1-2 — strengthen guidance, not complexity
+- **Relationship types:** Existing 4 types + workflow conventions; Phase 3 adds `derives-from` and `follows` additively
 - **Relationship density:** Use minimal relationship set; link to immediate upstream artifacts only — keeps the graph sparse and readable
-- **Directional types:** Deferred to Phase 3 gate — only if chain reconstruction proves unreliable
+- **Directional types:** Enabled in Phase 3 as precision edges, with indefinite fallback to `related-to`
 - **Skill delivery:** Single RPIR skill in `skills/` directory, same repo — lowest friction, same release
 - **MCP prompt:** Separate `mnemonic-rpir-workflow` prompt — memory protocol and task workflow are different concerns
-- **Ergonomic helper:** `recall(mode: "workflow")` variant, Phase 3 gated — computed on demand, minimal tool surface expansion
+- **Ergonomic helper:** `recall(mode: "workflow")` in Phase 3 with bounded chain-oriented retrieval
 - **Orchestration:** Explicitly out of scope — mnemonic is artifact store, not runtime
 
 ## Core changes (Phase 1)
@@ -98,6 +106,13 @@ Use minimal relationship set; link to immediate upstream artifacts only. No dens
 - review `related-to` apply or plan
 - outcome `related-to` plan and optionally request
 
+Phase 3 adds optional directional equivalents where explicit sequencing/derivation is known:
+
+- `derives-from`
+- `follows`
+
+Workflow recall must continue supporting mixed legacy and directional graphs.
+
 ## Plan currency
 
 Prefer one current plan note per request. Update or supersede when plan evolves. Avoid concurrent "current" plans unless exploring alternatives (tag: `alternative/a`, `alternative/b`).
@@ -132,10 +147,10 @@ A subagent returns: updated temporary apply note, optional review note, recommen
 
 Three classes: memory (research/plan/review artifacts), work (code/test/docs), memory (consolidation/promotion). Plan changes materially -- update notes, memory commit, then continue.
 
-## Phase 3 helpers (gated)
+## Phase 3 helpers (planned combined)
 
-1. `recall(mode: "workflow")` -- chain reconstruction via role + relationship traversal
-2. Directional types `derives-from`/`follows` -- only if chain reconstruction is unreliable with `related-to`
+1. `recall(mode: "workflow")` -- chain reconstruction via role + relationship traversal, bounded and chain-oriented
+2. Directional types `derives-from`/`follows` -- additive precision layer with indefinite fallback to `related-to`
 
 ## Phase 4 validation
 
@@ -165,6 +180,5 @@ Build a separate orchestration layer only if real usage consistently wants autom
 ## Open questions
 
 - One plan note vs. plan revisions in practice
-- Whether `related-to` is sufficient for chain recovery
-- Whether `recall(mode: "workflow")` is enough without a dedicated helper
+- Whether `recall(mode: "workflow")` output shape is sufficient without extra helper tools
 - Whether memory commits become too noisy
