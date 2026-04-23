@@ -38,6 +38,27 @@ describe("tool-descriptions", () => {
     expect(promptText).not.toContain("strategy `supersedes`");
   }, 15000);
 
+  it("exposes rpir-workflow prompt with stage protocol conventions", async () => {
+    const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-vault-"));
+    tempDirs.push(vaultDir);
+
+    const promptText = await callLocalMcpPrompt(vaultDir, "mnemonic-rpir-workflow");
+
+    expect(promptText).toContain("## RPIR workflow: research → plan → implement → review");
+    expect(promptText).toContain("mnemonic is the artifact store, not the runtime");
+    expect(promptText).toContain("`role: context`");
+    expect(promptText).toContain("`lifecycle: temporary`");
+    expect(promptText).toContain("`tags: [\"workflow\", \"request\"]`");
+    expect(promptText).toContain("### Stage 1 — Research");
+    expect(promptText).toContain("### Stage 2 — Plan");
+    expect(promptText).toContain("### Stage 3 — Implement");
+    expect(promptText).toContain("### Stage 4 — Review");
+    expect(promptText).toContain("### Stage 5 — Consolidate");
+    expect(promptText).toContain("One current plan per request");
+    expect(promptText).toContain("Subagent returns: updated apply note");
+    expect(promptText).toContain("Three classes: memory (research/plan/review artifacts), work (code/test/docs), memory (consolidation/promotion)");
+  }, 15000);
+
   it("surfaces prerequisite-first workflow wording in phase-aware tool descriptions", async () => {
     const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-vault-"));
     tempDirs.push(vaultDir);

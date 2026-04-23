@@ -347,6 +347,16 @@ Set `alwaysLoad: true` in a note's frontmatter to mark it as an explicit session
 
 mnemonic works without roles. Inferred roles stay internal-only, prioritization is language-independent by default, and lifecycle remains the separate durability axis. When `lifecycle` is omitted, `remember` applies soft defaults based on role: `research`, `plan`, and `review` default to `temporary`; `decision`, `summary`, and `reference` default to `permanent`. Explicit `lifecycle` always overrides the role-based default.
 
+### RPIR workflow conventions
+
+For structured workflows, use the RPIR stages: research -> plan -> implement -> review (iterate only when needed).
+
+- Create one request root note per workflow: `role: context`, `lifecycle: temporary`, `tags: ["workflow", "request"]`.
+- Keep one current plan note per request (`role: plan`) and update or supersede as the plan evolves.
+- For apply/task notes, do not add a new role: use `role: plan` for executable steps and `role: context` for execution observations; tag both with `apply`.
+- Keep relationships sparse and immediate-upstream only: research -> request, plan -> request/research, apply -> plan, review -> apply/plan, outcome -> plan (optionally request).
+- Consolidate at workflow end: promote durable outcomes into permanent decision/summary/reference notes; let temporary scaffolding expire.
+
 ### Note format
 
 Notes are standard markdown with YAML frontmatter:
@@ -444,6 +454,7 @@ Imported notes are written to the main vault with `lifecycle: permanent` and `sc
 
 | Prompt | Description |
 |--------|-------------|
+| `mnemonic-rpir-workflow` | Optional. Returns RPIR stage protocol and conventions: request root note pattern, stage checklists, apply/task split, sparse relationships, subagent handoff contract, and commit discipline. |
 | `mnemonic-workflow-hint` | Optional. Returns a compact decision protocol: use `recall` or `list` first, inspect with `get`, update existing memories, remember only when nothing matches, then organize with `relate`, `consolidate`, or `move_memory`. It also reinforces summary-first orientation via `project_memory_summary`, temporary-note recovery only after orientation, and that roles are optional prioritization hints while lifecycle stays separate. |
 
 ## Tools
