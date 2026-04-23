@@ -8,7 +8,7 @@ tags:
   - plan
 lifecycle: temporary
 createdAt: '2026-04-20T21:46:51.934Z'
-updatedAt: '2026-04-20T21:53:00.821Z'
+updatedAt: '2026-04-23T16:08:06.365Z'
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
@@ -18,6 +18,15 @@ relatedTo:
 memoryVersion: 1
 ---
 Phase 1 implementation plan for the RPIR workflow design. Also stored at `docs/superpowers/specs/2026-04-20-rpir-workflow-phase1-plan.md`.
+
+## Implementation progress
+
+- [x] Task 1: Add research and review to NoteRole enum
+- [x] Task 2: Add role input parameter to remember and update
+- [x] Task 3: Add role-based lifecycle defaults in remember()
+- [ ] Task 4: Add tests
+- [x] Task 5: Fix README discrepancies
+- [x] Task 6: Update mnemonic-workflow-hint prompt
 
 ## Key discovery
 
@@ -29,36 +38,36 @@ Role is already an optional field in the Note interface. The change is purely ad
 
 ## 6 tasks
 
-### Task 1: Add research and review to NoteRole enum
+### Task 1: Add research and review to NoteRole enum ✓
 
-- `src/storage.ts` line 9: expand type union with `"research" | "review"`
-- `src/storage.ts` line 12: expand NOTE_ROLES array with `"research"` and `"review"`
+- `src/storage.ts` line 9: expanded type union with `"research" | "review"`
+- `src/storage.ts` line 12: expanded NOTE_ROLES array with `"research"` and `"review"`
 - No changes to role-suggestions.ts (inference stays 5-role only)
 - isNoteRole() (line 400-402) works automatically (uses NOTE_ROLES.includes)
 
-### Task 2: Add role input parameter to remember and update
+### Task 2: Add role input parameter to remember and update ✓
 
-- Add `role: z.enum(NOTE_ROLES).optional()` to remember input schema (after lifecycle param, around line 1849)
-- Describe as: "Optional prioritization hint for the note. Inferred automatically when omitted. Set explicitly for workflow artifacts like research or review notes."
-- Add `role` to remember handler destructured params (line 1890)
-- Persist `role` in Note object only when explicitly provided: `role: role ?? undefined` (around line 1922-1931)
-- Add same `role` param to update input schema (around line 2727)
-- Describe as: "Change role. Preserve the existing value unless you're intentionally switching it."
-- Add `role` to update handler destructured params (line 2751)
+- Added `role: z.enum(NOTE_ROLES).optional()` to remember input schema (after lifecycle param)
+- Described as: "Optional prioritization hint for the note. Inferred automatically when omitted. Set explicitly for workflow artifacts like research or review notes."
+- Added `role` to remember handler destructured params
+- Persist `role` in Note object only when explicitly provided: `...(role ? { role } : {})`
+- Added same `role` param to update input schema
+- Described as: "Change role. Preserve the existing value unless you're intentionally switching it."
+- Added `role` to update handler destructured params
 - Apply `role` change in update logic only when explicitly provided
 
-### Task 3: Add role-based lifecycle defaults in remember()
+### Task 3: Add role-based lifecycle defaults in remember() ✓
 
-- Define `ROLE_LIFECYCLE_DEFAULTS` constant near remember handler in `src/index.ts`:
+- Defined `ROLE_LIFECYCLE_DEFAULTS` constant before server creation in `src/index.ts`:
   - research: temporary, plan: temporary, review: temporary
   - decision: permanent, summary: permanent, reference: permanent
   - context: no default (falls through to "permanent")
-- Change line 1924 from `lifecycle: lifecycle ?? "permanent"` to `lifecycle: lifecycle ?? (role ? ROLE_LIFECYCLE_DEFAULTS[role] : undefined) ?? "permanent"`
+- Changed lifecycle assignment: `lifecycle: lifecycle ?? (role ? ROLE_LIFECYCLE_DEFAULTS[role] : undefined) ?? "permanent"`
 - Precedence: explicit lifecycle > role-based default > "permanent" fallback
 - update() does NOT get role-based defaults (creation-time only per design)
-- Update lifecycle parameter description to note the role-based defaulting
+- Updated lifecycle parameter description to note the role-based defaulting
 
-### Task 4: Add tests
+### Task 4: Add tests (IN PROGRESS)
 
 - Integration test: `remember` with `role: "research"` creates note with `role: research` in frontmatter
 - Integration test: `remember` with `role: "review"` creates note with `role: review` in frontmatter
@@ -71,16 +80,18 @@ Role is already an optional field in the Note interface. The change is purely ad
 - Integration test: `remember` without `role` does NOT write `role` to frontmatter (inference is runtime-only)
 - Unit test: `suggestRole` never returns `"research"` or `"review"` (inference is 5-role only)
 
-### Task 5: Fix README discrepancies
+### Task 5: Fix README discrepancies ✓
 
-- Line 344: Change `log` to `context` in the valid roles list
-- Line 344: Add `low` to the valid importance values (`high`, `normal`, `low`)
+- Changed `log` to `context` in the valid roles list
+- Added `low` to the valid importance values
+- Added `research` and `review` to valid roles
+- Updated lifecycle sentence to describe role-based defaults
 
-### Task 6: Update mnemonic-workflow-hint prompt
+### Task 6: Update mnemonic-workflow-hint prompt ✓
 
-- Update the prompt text at line 6003 to reflect role-based lifecycle defaulting behavior
-- Change "role: plan does not imply temporary" to reflect that plan now defaults to temporary when lifecycle is omitted
-- Preserve all other prompt content (working-state continuity, anti-patterns, etc.)
+- Updated the prompt text to reflect role-based lifecycle defaulting behavior
+- Changed "role: plan does not imply temporary" to reflect that plan now defaults to temporary when lifecycle is omitted
+- Preserved all other prompt content (working-state continuity, anti-patterns, etc.)
 
 ## Out of scope for Phase 1
 
