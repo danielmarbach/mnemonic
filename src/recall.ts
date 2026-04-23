@@ -12,6 +12,14 @@ const LEXICAL_HYBRID_WEIGHT = 0.12;
 const COVERAGE_HYBRID_WEIGHT = 0.08;
 const PHRASE_HYBRID_WEIGHT = 0.16;
 const MIN_CANONICAL_EXPLANATION_SCORE = 0.5;
+const WORKFLOW_ROLE_BOOSTS: Partial<Record<NonNullable<EffectiveNoteMetadata["role"]>, number>> = {
+  plan: 0.03,
+  review: 0.025,
+  research: 0.02,
+  context: 0.015,
+  decision: 0.012,
+  summary: 0.008,
+};
 
 export interface ScoredRecallCandidate {
   id: string;
@@ -179,6 +187,39 @@ export function selectRecallResults(
   scope: "project" | "global" | "all"
 ): ScoredRecallCandidate[] {
   const sorted = [...scored].sort((a, b) => computeHybridScore(b) - computeHybridScore(a));
+
+  if (scope !== "all") {
+    return sorted.slice(0, limit);
+  }
+
+  const projectMatches = sorted.filter((candidate) => candidate.isCurrentProject);
+  if (projectMatches.length === 0) {
+    return sorted.slice(0, limit);
+  }
+
+  const topProject = projectMatches.slice(0, limit);
+  if (topProject.length >= limit) {
+    return topProject;
+  }
+
+  const selectedIds = new Set(topProject.map((candidate) => candidate.id));
+  const fallback = sorted.filter((candidate) => !selectedIds.has(candidate.id));
+  return [...topProject, ...fallback].slice(0, limit);
+}
+
+function computeWorkflowScore(candidate: ScoredRecallCandidate): number {
+  const roleBoost = candidate.metadata?.role ? (WORKFLOW_ROLE_BOOSTS[candidate.metadata.role] ?? 0) : 0;
+  const temporaryBoost = candidate.lifecycle === "temporary" ? 0.01 : 0;
+  const centralityBoost = Math.min(0.015, Math.log((candidate.relatedCount ?? 0) + 1) * 0.006);
+  return computeHybridScore(candidate) + roleBoost + temporaryBoost + centralityBoost;
+}
+
+export function selectWorkflowResults(
+  scored: ScoredRecallCandidate[],
+  limit: number,
+  scope: "project" | "global" | "all"
+): ScoredRecallCandidate[] {
+  const sorted = [...scored].sort((a, b) => computeWorkflowScore(b) - computeWorkflowScore(a));
 
   if (scope !== "all") {
     return sorted.slice(0, limit);

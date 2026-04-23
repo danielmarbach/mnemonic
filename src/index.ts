@@ -37,6 +37,7 @@ import {
   computeRecallMetadataBoost,
   computeHybridScore,
   selectRecallResults,
+  selectWorkflowResults,
   applyLexicalReranking,
   applyCanonicalExplanationPromotion,
   type ScoredRecallCandidate,
@@ -2376,6 +2377,7 @@ server.registerTool(
     description:
       "Semantic search over stored memories using embeddings.\n\n" +
       "Supports opt-in temporal mode (`mode: \"temporal\"`) to enrich top semantic matches with compact git-backed history.\n\n" +
+      "Supports workflow mode (`mode: \"workflow\"`) to prioritize RPIR-style chain reconstruction while retaining compatibility with legacy relationships.\n\n" +
       "Use this when:\n" +
       "- You know the topic but not the exact memory id\n" +
       "- You are starting a session and want relevant prior context\n" +
@@ -2402,7 +2404,7 @@ server.registerTool(
       cwd: projectParam,
       limit: z.number().int().min(1).max(20).optional().default(DEFAULT_RECALL_LIMIT),
       minSimilarity: z.number().min(0).max(1).optional().default(DEFAULT_MIN_SIMILARITY),
-      mode: z.enum(["default", "temporal"]).optional().default("default").describe("Temporal history is opt-in. Use `temporal` to enrich top semantic matches with compact git-backed history."),
+      mode: z.enum(["default", "temporal", "workflow"]).optional().default("default").describe("Use `temporal` for compact git-backed history, or `workflow` for RPIR-oriented chain reconstruction."),
       verbose: z.boolean().optional().default(false).describe("Only meaningful with `mode: \"temporal\"`. Adds richer stats-based history context without returning raw diffs."),
       tags: z.array(z.string()).optional().describe("Filter results to notes with all of these tags."),
       scope: z
@@ -2557,7 +2559,9 @@ server.registerTool(
       promoted = applyCanonicalExplanationPromotion(promoted);
     }
 
-    const top = selectRecallResults(promoted, limit, scope);
+    const top = mode === "workflow"
+      ? selectWorkflowResults(promoted, limit, scope)
+      : selectRecallResults(promoted, limit, scope);
 
     if (top.length === 0) {
       const structuredContent: RecallResult = { action: "recalled", query, scope: scope || "all", results: [] };
@@ -4663,6 +4667,8 @@ const RELATIONSHIP_TYPES: [RelationshipType, ...RelationshipType[]] = [
   "explains",
   "example-of",
   "supersedes",
+  "derives-from",
+  "follows",
 ];
 
 server.registerTool(
@@ -4693,7 +4699,7 @@ server.registerTool(
       fromId: z.string().describe("Source memory id"),
       toId: z.string().describe("Target memory id"),
       type: z.enum(RELATIONSHIP_TYPES).default("related-to").describe(
-        "Relationship type: 'related-to' (same topic), 'explains' (clarifies why), 'example-of' (instance of pattern), 'supersedes' (replaces)"
+        "Relationship type: 'related-to' (same topic), 'explains' (clarifies why), 'example-of' (instance of pattern), 'supersedes' (replaces), 'derives-from' (derived artifact), 'follows' (sequence order)"
       ),
       bidirectional: z.boolean().optional().default(true).describe("Add relationship in both directions (default: true)"),
       cwd: projectParam,

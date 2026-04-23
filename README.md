@@ -312,7 +312,11 @@ Project identity derives from the **git remote URL**, normalized to a stable slu
 
 **Hybrid recall** enhances semantic search with lightweight lexical reranking over note projections. When semantic results are weak, a bounded lexical rescue path scans projections for additional candidates, improving exact-match and identifier-heavy recall without changing the storage model or adding new infrastructure. **Canonical explanation promotion** boosts notes that explain key decisions and concepts for "why"-style questions, using structural signals like role, connections, and format rather than keyword matching.
 
-Temporal recall is opt-in via `mode: "temporal"`. It keeps semantic selection first, then enriches only the top matches with compact git-backed history so agents can inspect how a note evolved without turning recall into raw log or diff output.
+Recall modes:
+
+- `mode: "default"` (default): semantic recall with optional lexical reranking and bounded relationship previews.
+- `mode: "temporal"`: enrich top matches with compact git-backed history (no raw diffs by default).
+- `mode: "workflow"`: prioritize RPIR-style chain reconstruction while remaining compatible with legacy `related-to` links.
 
 **What temporal mode shows:**
 
@@ -474,7 +478,7 @@ Imported notes are written to the main vault with `lifecycle: permanent` and `sc
 | `memory_graph`              | Show compact adjacency list of relationships                             |
 | `move_memory`               | Move note between vaults without changing id                             |
 | `project_memory_summary`    | Session-start entrypoint: themed notes, anchors, and orientation for fast project orientation |
-| `recall`                    | Semantic search with optional project boost and opt-in temporal history  |
+| `recall`                    | Semantic search with optional project boost, temporal history mode, and workflow chain mode |
 | `recent_memories`           | Show most recently updated notes for scope                               |
 | `remember`                  | Write note + embedding; `cwd` sets context, `scope` picks storage, `lifecycle` picks temporary vs permanent |
 | `relate`                    | Create typed relationship between notes (bidirectional)                  |
@@ -515,6 +519,10 @@ relatedTo:
 | `explains`   | `fromId` explains `toId`                 |
 | `example-of` | `fromId` is a concrete example of `toId` |
 | `supersedes` | `fromId` is the newer version of `toId`  |
+| `derives-from` | `fromId` is derived from `toId`        |
+| `follows` | `fromId` follows `toId` in sequence         |
+
+`workflow` recall mode prefers directional and typed relationships first, then falls back to `related-to` for long-term compatibility with older vaults.
 
 `relate` is bidirectional by default. `forget` automatically removes any edges pointing at the deleted note.
 

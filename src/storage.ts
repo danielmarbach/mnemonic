@@ -4,7 +4,7 @@ import { randomUUID } from "crypto";
 import matter from "gray-matter";
 import type { NoteProjection } from "./structured-content.js";
 
-export type RelationshipType = "related-to" | "explains" | "example-of" | "supersedes";
+export type RelationshipType = "related-to" | "explains" | "example-of" | "supersedes" | "derives-from" | "follows";
 export type NoteLifecycle = "temporary" | "permanent";
 export type NoteRole = "summary" | "decision" | "plan" | "context" | "reference" | "research" | "review";
 export type NoteImportance = "high" | "normal" | "low";

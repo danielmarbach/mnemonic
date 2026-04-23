@@ -442,7 +442,7 @@ export interface ProjectSummaryResult extends Record<string, unknown> {
 // ── Zod output schemas ────────────────────────────────────────────────────────
 
 const _NoteLifecycle = z.enum(["temporary", "permanent"]);
-const _RelationshipType = z.enum(["related-to", "explains", "example-of", "supersedes"]);
+const _RelationshipType = z.enum(["related-to", "explains", "example-of", "supersedes", "derives-from", "follows"]);
 /**
  * Vault label used in structured output.
  * - "main-vault" for the main (global) vault.

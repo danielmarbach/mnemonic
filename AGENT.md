@@ -300,7 +300,7 @@ Keep these high-level anchors in mind:
 | `memory_graph` | Show compact adjacency list of relationships |
 | `move_memory` | Move note between vaults without changing id |
 | `project_memory_summary` | Session-start entrypoint: themed notes, anchors, and orientation for fast project orientation |
-| `recall` | Semantic search with optional project boost and opt-in temporal history |
+| `recall` | Semantic search with optional project boost plus `temporal` and `workflow` modes |
 | `recent_memories` | Show most recently updated notes for scope |
 | `remember` | Write note + embedding; `cwd` sets context, `scope` picks storage, `lifecycle` picks temporary vs permanent |
 | `relate` | Create typed relationship between notes (bidirectional) |
