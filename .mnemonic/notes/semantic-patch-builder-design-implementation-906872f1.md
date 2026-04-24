@@ -10,7 +10,7 @@ tags:
   - implementation
 lifecycle: permanent
 createdAt: '2026-04-24T11:09:39.750Z'
-updatedAt: '2026-04-24T19:12:40.313Z'
+updatedAt: '2026-04-24T21:11:17.596Z'
 role: reference
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
@@ -125,6 +125,39 @@ Checking fieldsModified.
 Total: 682 tests pass, typecheck clean.
 
 ## Backward Compatibility
+
+## LLM Usability Improvements
+
+Empirical observation: LLMs (including strong models) fail to construct correct `semanticPatch` JSON in two ways:
+
+1. **Nesting error** — flatten `{selector, operation}` into `{op, value}` at the top level, losing the required two-key structure
+2. **String wrapping** — pass the entire array as a JSON string literal instead of a JSON array
+
+Both are LLM construction problems, not transport bugs. MCP JSON-RPC serializes arrays correctly.
+
+### Design decisions
+
+**Keep the current schema.** The nested `{selector, operation}` shape is structurally sound. The problem is insufficient format guidance, not a bad API shape.
+
+**Expanded parameter description with explicit type union and complete example.** The `semanticPatch` description now includes:
+
+- The full selector type union written out: `{ heading: "..." } | { headingStartsWith: "..." } | { lastChild: true } | { nthChild: 0-based-index }`
+- The full operation type union written out: `{ op: "appendChild", value: "..." } | ... | { op: "remove" }`
+- A 3-patch working example showing `appendChild`, `replaceChildren`, and `remove`
+- Heading values shown without `##` prefix (matches AST comparison)
+
+**Workflow hint section added.** `mnemonic-workflow-hint` now includes a `### semanticPatch format` section with:
+
+- Explicit correct nesting example
+- "Common mistake" callout showing the flattening error
+- "JSON array, NOT a string" reminder
+- Instruction to `get` first to read exact heading text
+
+**Selector error messages include format reminder.** When a selector is not found, the error now appends a corrected example using the first available heading.
+
+### Token economics
+
+The expanded description adds ~7 lines to the tool schema (sent once per session, not per call). Each failed semanticPatch attempt costs far more tokens than the extra description. An LLM that constructs the patch correctly on the first try is a net token savings.
 
 - `content` parameter untouched (except both-provided validation)
 - `semanticPatch` is purely additive
