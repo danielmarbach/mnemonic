@@ -10,7 +10,7 @@ tags:
   - implementation
 lifecycle: permanent
 createdAt: '2026-04-24T11:09:39.750Z'
-updatedAt: '2026-04-24T11:09:39.750Z'
+updatedAt: '2026-04-24T11:29:37.329Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 memoryVersion: 1
@@ -48,6 +48,18 @@ Zod schema uses `z.discriminatedUnion` for operations (`remove` has no `value`; 
 - Patch produces invalid markdown → lint rejection; no mutation
 - Any patch failure → no mutation; no commit; no fallback
 
+## Empirical Token Savings
+
+Measured against the actual design note (3291 bytes / approx. 823 tokens on disk). Wire payload includes id, cwd, allowProtectedBranch, plus the patch array.
+
+| Scenario | Size | Savings |
+| --- | --- | --- |
+| Full note body | 3291 B | baseline |
+| Small patch (1 line) | 232 B | 93% (14x) |
+| Larger patch (2 sections) | 564 B | 83% (5.8x) |
+
+For a 2000-token production note the ratio widens further since patch overhead stays constant. Verified via tests/dogfood-semantic-patch.mjs against build/index.js (7/7 checks passed).
+
 ## Implementation Details
 
 - `replaceChildren` on a heading node replaces the heading *text*, not body content below it. Use `insertAfter` to add block content under a heading.
@@ -57,6 +69,7 @@ Zod schema uses `z.discriminatedUnion` for operations (`remove` has no `value`; 
 ## Dogfooding
 
 `run-dogfood-packs.mjs` validates three scenarios:
+
 - Multi-patch `insertAfter` under different headings
 - Lint rejection on invalid markdown (`[broken](<>)`)
 - Retry with valid patch succeeds after lint rejection (no mutation from the bad patch)
