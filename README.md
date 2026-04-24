@@ -129,6 +129,13 @@ If you prefer automatic propagation without copy refreshes, use symlink mode:
 npx mnemonic-install-skills --target all --mode symlink --update
 ```
 
+After install, load and use the skill by name:
+
+- Skill name: `mnemonic-rpi-workflow`
+- Prompt counterpart: `mnemonic-rpi-workflow`
+
+In clients that support explicit skill loading (for example Claude Code or OpenCode), load `mnemonic-rpi-workflow` before running multi-step RPIR workflows.
+
 ### Homebrew
 
 The formula lives in this repository. Tap it with an explicit URL so no separate repository is needed:
