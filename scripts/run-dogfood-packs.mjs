@@ -23,7 +23,10 @@ const pendingResponses = new Map();
 
 function spawnMnemonic() {
   if (mnemonicEntrypoint) {
-    return spawn("node", [path.resolve(cwd, mnemonicEntrypoint)], { cwd, env: process.env, stdio: ["pipe", "pipe", "pipe"] });
+    const entryPath = path.isAbsolute(mnemonicEntrypoint)
+      ? mnemonicEntrypoint
+      : path.resolve(process.cwd(), mnemonicEntrypoint);
+    return spawn("node", [entryPath], { cwd, env: process.env, stdio: ["pipe", "pipe", "pipe"] });
   }
 
   return spawn("mnemonic", [], { cwd, env: process.env, stdio: ["pipe", "pipe", "pipe"] });
@@ -168,6 +171,61 @@ async function main() {
   const summary2 = await callTool("project_memory_summary", { cwd });
   const promptText = await getPrompt("mnemonic-workflow-hint");
 
+  // Semantic-patch dogfood: create a structured note, patch it, then clean up
+  const semPatchTestTitle = `Dogfood semanticPatch ${today} ${Date.now()}`;
+  const semPatchId = await createTemporaryNote({
+    title: semPatchTestTitle,
+    content: `# ${semPatchTestTitle}\n\n## Section A\n\nOriginal content in A.\n\n## Section B\n\nOriginal content in B.\n`,
+    tags: ["dogfooding", "testing", "semantic-patch"],
+  });
+  const semPatchAppend = await callTool("update", {
+    id: semPatchId,
+    semanticPatch: [
+      { selector: { heading: "Section A" }, operation: { op: "insertAfter", value: "Patched: inserted after Section A." } },
+      { selector: { heading: "Section B" }, operation: { op: "insertAfter", value: "Patched: replaced B's content." } },
+    ],
+    summary: "Dogfood semanticPatch append and replaceChildren",
+    cwd,
+    allowProtectedBranch: true,
+  });
+  const semPatchGet = await callTool("get", { ids: [semPatchId], cwd, includeRelationships: false });
+  const semPatchOk = semPatchGet.text.includes("Patched: inserted after Section A.")
+    && semPatchGet.text.includes("Patched: replaced B's content.")
+    && semPatchGet.text.includes("Original content in B.");
+
+  // Lint-rejection and retry: apply a bad patch (broken link), expect failure, then retry with a valid patch
+  const semPatchLintTitle = `Dogfood semanticPatch lint-reject ${today} ${Date.now()}`;
+  const semPatchLintId = await createTemporaryNote({
+    title: semPatchLintTitle,
+    content: `# ${semPatchLintTitle}\n\n## Section X\n\nClean content.\n`,
+    tags: ["dogfooding", "testing", "semantic-patch"],
+  });
+  const badPatch = await callTool("update", {
+    id: semPatchLintId,
+    semanticPatch: [
+      { selector: { heading: "Section X" }, operation: { op: "insertAfter", value: "[broken](<>)" } },
+    ],
+    summary: "Dogfood semanticPatch lint rejection",
+    cwd,
+    allowProtectedBranch: true,
+  });
+  const lintRejected = badPatch.text.includes("Semantic patch failed");
+  // Retry with valid content
+  const retryPatch = await callTool("update", {
+    id: semPatchLintId,
+    semanticPatch: [
+      { selector: { heading: "Section X" }, operation: { op: "insertAfter", value: "Retry succeeded." } },
+    ],
+    summary: "Dogfood semanticPatch retry after lint rejection",
+    cwd,
+    allowProtectedBranch: true,
+  });
+  const retryOk = retryPatch.text.includes("Updated memory");
+  const retryGet = await callTool("get", { ids: [semPatchLintId], cwd, includeRelationships: false });
+  const retryContentOk = retryGet.text.includes("Retry succeeded.");
+  await forgetIfPresent(semPatchLintId);
+  await forgetIfPresent(semPatchId);
+
   const themeEntries = getSummaryThemeEntries(summary1.structured);
   const workingStateNotes = getWorkingStateNotes(summary1.structured);
   const recent = summary1.structured?.recent ?? [];
@@ -290,7 +348,15 @@ async function main() {
   };
 
   const packC = {
-    unchecked: [],
+    unchecked: [
+      !semPatchOk && "`semanticPatch` multi-patch insertAfter works",
+      !lintRejected && "semantic patch with broken link is rejected on lint error",
+      (!retryOk || !retryContentOk) && "retry with valid patch succeeds after lint rejection",
+    ].filter(Boolean),
+    semPatchOk,
+    lintRejected,
+    retryOk,
+    retryContentOk,
   };
 
   report.packA = packA;
@@ -303,7 +369,7 @@ async function main() {
 
   const packBContent = `Dogfooding results for the working-state continuity pack on ${today} using the ${vaultLabel}.\n\nUnchecked items:\n${packB.unchecked.length === 0 ? "- none" : packB.unchecked.map((item) => `- ${item}`).join("\n")}\n\nObservations:\n- Temporary recent titles: ${packB.recentTemporaryTitles.map((title) => `\`${title}\``).join(", ") || "none"}\n- Temporary recall titles: ${packB.recalledTemporaryTitles.map((title) => `\`${title}\``).join(", ") || "none"}\n- All-temporary merges auto-delete by default: ${packB.allTemporarySourcesAutoDelete}`;
 
-  const packCContent = `Dogfooding results for the blind interruption/resumption pack on ${today} using the ${vaultLabel}.\n\nUnchecked items:\n- none`;
+  const packCContent = `Dogfooding results for the blind interruption/resumption pack on ${today} using the ${vaultLabel}.\n\nUnchecked items:\n- none\n\nSemantic patch checks:\n- Multi-patch append + replaceChildren: ${semPatchOk}\n- Lint rejection on invalid markdown: ${lintRejected}\n- Retry after lint rejection: retryOk=${retryOk}, retryContentOk=${retryContentOk}`;
 
   const packTitleSuffix = useIsolated ? ` (${today}) (isolated vault)` : ` (${today})`;
 
