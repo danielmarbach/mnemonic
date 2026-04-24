@@ -56,6 +56,8 @@ npm test
 npm run verify:release
 ```
 
+The gate fails on required dogfood checks and reports advisory findings separately in the dogfood output.
+
 `npm run build` already runs `typecheck`, but running it explicitly first gives a faster failure loop when iterating on the codebase.
 
 For local dogfooding, start the built MCP server with:
