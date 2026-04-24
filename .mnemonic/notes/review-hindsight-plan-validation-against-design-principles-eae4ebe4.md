@@ -8,7 +8,7 @@ tags:
   - plan-validation
 lifecycle: temporary
 createdAt: '2026-04-24T18:30:35.753Z'
-updatedAt: '2026-04-24T18:31:02.115Z'
+updatedAt: '2026-04-24T18:37:23.661Z'
 role: review
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -18,6 +18,8 @@ relatedTo:
     type: derives-from
   - id: hybrid-recall-design-and-implementation-0-20-0-0-23-0-350317a0
     type: related-to
+  - id: performance-principles-for-file-first-mcp-and-git-backed-wor-4e7d3bc8
+    type: explains
 memoryVersion: 1
 ---
 # Review: Hindsight Plan Validation Against Design Principles
