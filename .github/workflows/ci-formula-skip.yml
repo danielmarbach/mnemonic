@@ -1,0 +1,12 @@
+name: CI (Formula skip)
+
+on:
+  pull_request:
+    paths:
+      - "Formula/**"
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Formula-only change — skipping build and tests"
