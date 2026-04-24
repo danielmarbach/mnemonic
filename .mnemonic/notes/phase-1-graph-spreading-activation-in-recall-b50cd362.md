@@ -5,7 +5,7 @@ tags:
   - request
 lifecycle: temporary
 createdAt: '2026-04-24T20:13:47.389Z'
-updatedAt: '2026-04-24T22:37:58.171Z'
+updatedAt: '2026-04-24T22:38:12.418Z'
 role: context
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -35,7 +35,14 @@ Improve mnemonic's recall quality by adding graph spreading activation — trave
 ## Success criteria
 
 - Graph-discovered candidates flow through full pipeline: lexical reranking → canonical promotion → rescue → re-promotion → selection
+- Existing candidates are boosted (not skipped) when related to entry points (Finding 1 fixed)
+- Score accumulation works across multiple entry points
 - Dogfooding: "broker simulation design" surfaces `InMemory transport simulation design`
 - No regression on existing recall benchmarks
 - Tests verify spreading activation discovers related note that pure semantic misses
-- Post-implementation review surfaced two gaps: (1) current implementation is discovery-only — it skips candidates already in the set instead of boosting them, and (2) discovered notes carry no lexical/metadata scores so they rank below original candidates of equal semantic strength. Both are earmarked for Phase 2.
+- Post-implementation review surfaced three findings:
+  - Finding 1 (discovery-only behavior) ✅ FIXED — existing candidates now receive score accumulation
+  - Finding 2 (metadata-starved discovered notes) 🔮 earmarked for Phase 2
+  - Finding 3 (cross-vault `isCurrentProject` heuristic) 🔮 earmarked for Phase 2
+- 703 tests pass (up from 692 before graph spreading), typecheck passes
+- Date completed: 2026-04-25
