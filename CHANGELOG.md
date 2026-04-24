@@ -6,6 +6,13 @@ The format is loosely based on Keep a Changelog and uses semver-style version he
 
 ## [Unreleased]
 
+## [0.25.1] - 2026-04-24
+
+### Changed
+
+- `semanticPatch` no longer rejects content with markdown lint issues — the patch succeeds and warnings are surfaced in the response instead, so the LLM can continue without retrying from scratch. Previously any lint issue forced a hard failure.
+- Structural errors (bad selector, invalid operation) and content lint errors are now distinguished from patch lint warnings with separate guidance, so the LLM gets the right fix direction for each failure mode.
+
 ## [0.25.0] - 2026-04-24
 
 ### Added

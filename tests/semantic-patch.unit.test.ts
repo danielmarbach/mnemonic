@@ -21,7 +21,8 @@ describe("semantic-patch", () => {
       },
     ];
     const result = await applySemanticPatches(note, patches);
-    expect(result).toContain("Appended after Details.");
+    expect(result.content).toContain("Appended after Details.");
+    expect(result.lintWarnings).toEqual([]);
   });
 
   it("replaces a paragraph's content using replaceChildren", async () => {
@@ -33,8 +34,9 @@ describe("semantic-patch", () => {
       },
     ];
     const result = await applySemanticPatches(note, patches);
-    expect(result).toContain("Completely replaced content.");
-    expect(result).not.toContain("Some content here.");
+    expect(result.content).toContain("Completely replaced content.");
+    expect(result.content).not.toContain("Some content here.");
+    expect(result.lintWarnings).toEqual([]);
   });
 
   it("throws a diagnostic error when heading is not found", async () => {
@@ -69,7 +71,8 @@ describe("semantic-patch", () => {
       },
     ];
     const result = await applySemanticPatches(sampleNote, patches);
-    expect(result).not.toContain("Related");
+    expect(result.content).not.toContain("Related");
+    expect(result.lintWarnings).toEqual([]);
   });
 
   it("inserts content after a heading", async () => {
@@ -80,7 +83,8 @@ describe("semantic-patch", () => {
       },
     ];
     const result = await applySemanticPatches(sampleNote, patches);
-    expect(result).toContain("Paragraph inserted after the title.");
+    expect(result.content).toContain("Paragraph inserted after the title.");
+    expect(result.lintWarnings).toEqual([]);
   });
 
   it("matches heading by prefix with headingStartsWith and inserts after", async () => {
@@ -91,7 +95,8 @@ describe("semantic-patch", () => {
       },
     ];
     const result = await applySemanticPatches(sampleNote, patches);
-    expect(result).toContain("Appended via prefix match.");
+    expect(result.content).toContain("Appended via prefix match.");
+    expect(result.lintWarnings).toEqual([]);
   });
 
   it("selects by nthChild", async () => {
@@ -103,7 +108,8 @@ describe("semantic-patch", () => {
       },
     ];
     const result = await applySemanticPatches(note, patches);
-    expect(result).toContain("replaced");
+    expect(result.content).toContain("replaced");
+    expect(result.lintWarnings).toEqual([]);
   });
 
   it("selects by lastChild", async () => {
@@ -114,8 +120,9 @@ describe("semantic-patch", () => {
       },
     ];
     const result = await applySemanticPatches(sampleNote, patches);
-    expect(result).toContain("replaced");
-    expect(result).not.toContain("Item two");
+    expect(result.content).toContain("replaced");
+    expect(result.content).not.toContain("Item two");
+    expect(result.lintWarnings).toEqual([]);
   });
 
   it("prepends content under a heading", async () => {
@@ -126,11 +133,12 @@ describe("semantic-patch", () => {
       },
     ];
     const result = await applySemanticPatches(sampleNote, patches);
-    const detailsIndex = result.indexOf("## Details");
-    const prependIndex = result.indexOf("Prepended content.");
-    const oldIndex = result.indexOf("Some detailed content here.");
+    const detailsIndex = result.content.indexOf("## Details");
+    const prependIndex = result.content.indexOf("Prepended content.");
+    const oldIndex = result.content.indexOf("Some detailed content here.");
     expect(prependIndex).toBeGreaterThan(detailsIndex);
     expect(oldIndex).toBeGreaterThan(prependIndex);
+    expect(result.lintWarnings).toEqual([]);
   });
 
   it("inserts content before a heading", async () => {
@@ -141,9 +149,10 @@ describe("semantic-patch", () => {
       },
     ];
     const result = await applySemanticPatches(sampleNote, patches);
-    expect(result.indexOf("Inserted before Details.")).toBeLessThan(
-      result.indexOf("## Details")
+    expect(result.content.indexOf("Inserted before Details.")).toBeLessThan(
+      result.content.indexOf("## Details")
     );
+    expect(result.lintWarnings).toEqual([]);
   });
 
   // ── Multi-scenario tests ──────────────────────────────────────────────
@@ -154,9 +163,10 @@ describe("semantic-patch", () => {
       { selector: { heading: "Details" }, operation: { op: "insertAfter", value: "After Details." } },
     ];
     const result = await applySemanticPatches(sampleNote, patches);
-    expect(result.indexOf("After title.")).toBeLessThan(result.indexOf("## Details"));
+    expect(result.content.indexOf("After title.")).toBeLessThan(result.content.indexOf("## Details"));
     // insertAfter on a heading inserts as a sibling after the heading, before existing child content
-    expect(result.indexOf("After Details.")).toBeLessThan(result.indexOf("Some detailed content here."));
+    expect(result.content.indexOf("After Details.")).toBeLessThan(result.content.indexOf("Some detailed content here."));
+    expect(result.lintWarnings).toEqual([]);
   });
 
   it("appends new list items under a list heading via replaceChildren", async () => {
@@ -165,8 +175,9 @@ describe("semantic-patch", () => {
       { selector: { nthChild: 1 }, operation: { op: "replaceChildren", value: "- Milk\n- Eggs\n- Bread" } },
     ];
     const result = await applySemanticPatches(note, patches);
-    expect(result).toContain("Bread");
-    expect(result).toContain("Milk");
+    expect(result.content).toContain("Bread");
+    expect(result.content).toContain("Milk");
+    expect(result.lintWarnings).toEqual([]);
   });
 
   it("inserts multi-paragraph value after a heading", async () => {
@@ -174,16 +185,21 @@ describe("semantic-patch", () => {
       { selector: { heading: "Details" }, operation: { op: "insertAfter", value: "First paragraph.\n\nSecond paragraph." } },
     ];
     const result = await applySemanticPatches(sampleNote, patches);
-    expect(result).toContain("First paragraph.");
-    expect(result).toContain("Second paragraph.");
+    expect(result.content).toContain("First paragraph.");
+    expect(result.content).toContain("Second paragraph.");
+    expect(result.lintWarnings).toEqual([]);
   });
 
-  it("rejects patches that produce markdown lint errors", async () => {
-    // Producing a broken link which markdownlint should reject
+  it("returns lint warnings for patches that produce markdown lint issues instead of rejecting", async () => {
+    // Producing a broken link which markdownlint should flag
     const patches: SemanticPatch[] = [
       { selector: { heading: "Details" }, operation: { op: "insertAfter", value: "[broken](<>)" } },
     ];
-    await expect(applySemanticPatches(sampleNote, patches)).rejects.toThrow();
+    const result = await applySemanticPatches(sampleNote, patches);
+    expect(result.lintWarnings.length).toBeGreaterThanOrEqual(1);
+    expect(result.lintWarnings[0]).toContain("MD042");
+    // Content still contains the text
+    expect(result.content).toContain("broken");
   });
 
   it("replaces a blockquote's content", async () => {
@@ -192,8 +208,9 @@ describe("semantic-patch", () => {
       { selector: { nthChild: 1 }, operation: { op: "replaceChildren", value: "New quote text" } },
     ];
     const result = await applySemanticPatches(note, patches);
-    expect(result).toContain("New quote text");
-    expect(result).not.toContain("Old quote text");
+    expect(result.content).toContain("New quote text");
+    expect(result.content).not.toContain("Old quote text");
+    expect(result.lintWarnings).toEqual([]);
   });
 
   it("removes a paragraph and verifies the surrounding structure is intact", async () => {
@@ -202,9 +219,10 @@ describe("semantic-patch", () => {
       { selector: { nthChild: 1 }, operation: { op: "remove" } },
     ];
     const result = await applySemanticPatches(note, patches);
-    expect(result).not.toContain("First para.");
-    expect(result).toContain("## Mid");
-    expect(result).toContain("Last para.");
+    expect(result.content).not.toContain("First para.");
+    expect(result.content).toContain("## Mid");
+    expect(result.content).toContain("Last para.");
+    expect(result.lintWarnings).toEqual([]);
   });
 
   it("handles a note with no headings at root level", async () => {
@@ -213,7 +231,8 @@ describe("semantic-patch", () => {
       { selector: { lastChild: true }, operation: { op: "replace", value: "Replaced." } },
     ];
     const result = await applySemanticPatches(note, patches);
-    expect(result).toContain("Replaced.");
+    expect(result.content).toContain("Replaced.");
+    expect(result.lintWarnings).toEqual([]);
   });
 
   it("gives clear diagnostic for headings when no headings exist", async () => {
@@ -229,7 +248,8 @@ describe("semantic-patch", () => {
       { selector: { heading: "Details" }, operation: { op: "replace", value: "Replaced heading content." } },
     ];
     const result = await applySemanticPatches(sampleNote, patches);
-    expect(result).toContain("Replaced heading content.");
+    expect(result.content).toContain("Replaced heading content.");
+    expect(result.lintWarnings).toEqual([]);
   });
 
   it("fails on ambiguous headingStartsWith match (returns first match)", async () => {
@@ -239,7 +259,8 @@ describe("semantic-patch", () => {
     ];
     // Should match the first heading (Alpha), not Alphabeta
     const result = await applySemanticPatches(note, patches);
-    expect(result.indexOf("X")).toBeLessThan(result.indexOf("Alphabeta"));
+    expect(result.content.indexOf("X")).toBeLessThan(result.content.indexOf("Alphabeta"));
+    expect(result.lintWarnings).toEqual([]);
   });
 
   it("preserves code blocks through round-trip after patch", async () => {
@@ -248,9 +269,10 @@ describe("semantic-patch", () => {
       { selector: { nthChild: 0 }, operation: { op: "insertAfter", value: "Inserted after heading." } },
     ];
     const result = await applySemanticPatches(note, patches);
-    expect(result).toContain("```ts");
-    expect(result).toContain("const x = 1;");
-    expect(result).toContain("Inserted after heading.");
+    expect(result.content).toContain("```ts");
+    expect(result.content).toContain("const x = 1;");
+    expect(result.content).toContain("Inserted after heading.");
+    expect(result.lintWarnings).toEqual([]);
   });
 
   it("throws error when trying to appendChild on a leaf node like code", async () => {

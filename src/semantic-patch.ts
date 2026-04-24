@@ -1,6 +1,6 @@
 import type { Root, Content, Heading, Paragraph, Blockquote, List } from "mdast";
 import { parseBody, serializeBody } from "./markdown-ast.js";
-import { cleanMarkdown } from "./markdown.js";
+import { attemptCleanMarkdown } from "./markdown.js";
 
 export type SemanticSelector =
   | { heading: string }
@@ -97,7 +97,7 @@ function collectAvailableHeadings(tree: Root): string[] {
   return headings;
 }
 
-export async function applySemanticPatches(body: string, patches: SemanticPatch[]): Promise<string> {
+export async function applySemanticPatches(body: string, patches: SemanticPatch[]): Promise<{ content: string; lintWarnings: string[] }> {
   const tree = parseBody(body);
 
   for (const patch of patches) {
@@ -172,5 +172,6 @@ export async function applySemanticPatches(body: string, patches: SemanticPatch[
   }
 
   const serialized = serializeBody(tree);
-  return cleanMarkdown(serialized);
+  const { cleaned, warnings } = await attemptCleanMarkdown(serialized);
+  return { content: cleaned, lintWarnings: warnings };
 }
