@@ -12,7 +12,10 @@ When working on mnemonic itself:
 - Use project-scoped `mnemonic` MCP for memory operations
 - Exercise features through MCP tools (`remember`, `update`, `get`, `relate`, `recall`)
 - Mnemoize decisions and findings through MCP (never write `.mnemonic/` files directly)
-- For reproducible dogfooding, prefer the isolated dogfood runner (`scripts/dogfooding-isolated-vault.mjs`) over the live project vault — it copies notes into a temporary workspace and cleans up afterward
+- For reproducible dogfooding, prefer the isolated dogfood runner (`scripts/run-dogfood-packs.mjs --isolated`) over the live project vault — it copies notes into a temporary workspace and cleans up afterward
+- To dogfood packs against an uninstalled build, set `MNEMONIC_ENTRYPOINT=build/index.js` (the spawn function resolves it relative to `process.cwd()`). Without it, the runner spawns the globally installed `mnemonic` binary.
+- Standalone dogfood scripts at `tests/dogfood-semantic-patch.mjs` exercise specific features directly against `build/index.js`.
+- When spawning the local build directly via stdio, do NOT set `DISABLE_GIT` if working with a project vault — git is required for project identity resolution. Pass `VAULT_PATH=<cwd>` or omit it to auto-discover.
 
 ### Session start
 
