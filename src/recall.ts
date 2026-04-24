@@ -2,10 +2,18 @@ import type { Vault } from "./vault.js";
 import type { EffectiveNoteMetadata } from "./role-suggestions.js";
 import { computeLexicalScore, tokenize } from "./lexical.js";
 
+import type { RelationshipType } from "./storage.js";
+
 const RECALL_ALWAYS_LOAD_BOOST = 0.01;
 const RECALL_SUMMARY_BOOST = 0.012;
 const RECALL_DECISION_BOOST = 0.009;
 const RECALL_HIGH_IMPORTANCE_BOOST = 0.006;
+
+const SPREADING_ENTRY_POINT_LIMIT = 5;
+const SPREADING_HOP_DECAY = 0.5;
+const SPREADING_ACTIVATION_GATE = 0.5;
+const SPREADING_RELATED_TO_MULTIPLIER = 0.8;
+const SPREADING_EXPLAINS_DERIVES_MULTIPLIER = 1.0;
 
 /** Weight applied to lexical score when computing hybrid boosted score. */
 const LEXICAL_HYBRID_WEIGHT = 0.12;
@@ -238,4 +246,73 @@ export function selectWorkflowResults(
   const selectedIds = new Set(topProject.map((candidate) => candidate.id));
   const fallback = sorted.filter((candidate) => !selectedIds.has(candidate.id));
   return [...topProject, ...fallback].slice(0, limit);
+}
+
+function getRelationshipMultiplier(type: RelationshipType): number {
+  switch (type) {
+    case "explains":
+    case "derives-from":
+      return SPREADING_EXPLAINS_DERIVES_MULTIPLIER;
+    case "related-to":
+    case "example-of":
+    case "supersedes":
+    case "follows":
+      return SPREADING_RELATED_TO_MULTIPLIER;
+  }
+}
+
+export function applyGraphSpreadingActivation(
+  candidates: ScoredRecallCandidate[],
+  getNoteRelationships: (id: string) => Array<{ id: string; type: RelationshipType }> | undefined
+): ScoredRecallCandidate[] {
+  if (candidates.length === 0) {
+    return candidates;
+  }
+
+  const sortedByScore = [...candidates].sort((a, b) => b.score - a.score);
+  const entryPoints = sortedByScore.slice(0, SPREADING_ENTRY_POINT_LIMIT);
+
+  const eligibleEntries = entryPoints.filter((e) => e.score >= SPREADING_ACTIVATION_GATE);
+  if (eligibleEntries.length === 0) {
+    return candidates;
+  }
+
+  const existingIds = new Set(candidates.map((c) => c.id));
+  const discovered = new Map<string, ScoredRecallCandidate>();
+
+  for (const entry of eligibleEntries) {
+    const relationships = getNoteRelationships(entry.id);
+    if (!relationships) continue;
+
+    for (const rel of relationships) {
+      if (existingIds.has(rel.id) && !discovered.has(rel.id)) continue;
+
+      const multiplier = getRelationshipMultiplier(rel.type);
+      const propagatedScore = entry.score * SPREADING_HOP_DECAY * multiplier;
+
+      if (!discovered.has(rel.id)) {
+        discovered.set(rel.id, {
+          id: rel.id,
+          score: propagatedScore,
+          semanticScoreForPromotion: propagatedScore,
+          boosted: propagatedScore,
+          vault: entry.vault,
+          isCurrentProject: entry.isCurrentProject,
+        });
+      } else {
+        const existing = discovered.get(rel.id)!;
+        existing.score += propagatedScore;
+        existing.boosted += propagatedScore;
+        if (existing.semanticScoreForPromotion !== undefined) {
+          existing.semanticScoreForPromotion += propagatedScore;
+        }
+      }
+    }
+  }
+
+  if (discovered.size === 0) {
+    return candidates;
+  }
+
+  return [...candidates, ...discovered.values()];
 }

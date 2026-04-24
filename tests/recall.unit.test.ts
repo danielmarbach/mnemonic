@@ -7,6 +7,7 @@ import {
   applyCanonicalExplanationPromotion,
   computeCanonicalExplanationScore,
   computeHybridScore,
+  applyGraphSpreadingActivation,
   type ScoredRecallCandidate,
 } from "../src/recall.js";
 import type { EffectiveNoteMetadata } from "../src/role-suggestions.js";
@@ -538,5 +539,182 @@ describe("selectRecallResults keeps all candidates (rescue filtering is at the c
     const results = selectRecallResults(candidates, 5, "all");
 
     expect(results.map((r) => r.id)).toEqual(["rescue-strong-lexical"]);
+  });
+});
+
+describe("applyGraphSpreadingActivation", () => {
+  it("discovers a related note not in the semantic candidate set", () => {
+    const candidates: ScoredRecallCandidate[] = [
+      { id: "entry", score: 0.6, boosted: 0.6, vault, isCurrentProject: true },
+    ];
+
+    const getNoteRelationships = (id: string) => {
+      if (id === "entry") {
+        return [{ id: "related-note", type: "related-to" as const }];
+      }
+      return undefined;
+    };
+
+    const result = applyGraphSpreadingActivation(candidates, getNoteRelationships);
+
+    expect(result).toHaveLength(2);
+    const discovered = result.find((c) => c.id === "related-note");
+    expect(discovered).toBeDefined();
+    expect(discovered!.score).toBeCloseTo(0.6 * 0.5 * 0.8, 5);
+  });
+
+  it("does not duplicate a note already in the candidate set", () => {
+    const candidates: ScoredRecallCandidate[] = [
+      { id: "entry", score: 0.6, boosted: 0.6, vault, isCurrentProject: true },
+      { id: "already-there", score: 0.5, boosted: 0.5, vault, isCurrentProject: true },
+    ];
+
+    const getNoteRelationships = (id: string) => {
+      if (id === "entry") {
+        return [{ id: "already-there", type: "related-to" as const }];
+      }
+      return undefined;
+    };
+
+    const result = applyGraphSpreadingActivation(candidates, getNoteRelationships);
+
+    expect(result).toHaveLength(2);
+    expect(result.find((c) => c.id === "already-there")).toBeDefined();
+  });
+
+  it("applies explains/derives-from multiplier of 1.0", () => {
+    const candidates: ScoredRecallCandidate[] = [
+      { id: "entry", score: 0.7, boosted: 0.7, vault, isCurrentProject: true },
+    ];
+
+    const getNoteRelationships = (id: string) => {
+      if (id === "entry") {
+        return [{ id: "explains-note", type: "explains" as const }];
+      }
+      return undefined;
+    };
+
+    const result = applyGraphSpreadingActivation(candidates, getNoteRelationships);
+
+    const discovered = result.find((c) => c.id === "explains-note");
+    expect(discovered!.score).toBeCloseTo(0.7 * 0.5 * 1.0, 5);
+  });
+
+  it("only uses top 5 entry points", () => {
+    const candidates: ScoredRecallCandidate[] = Array.from({ length: 10 }, (_, i) => ({
+      id: `entry-${i}`,
+      score: 0.5 + i * 0.05,
+      boosted: 0.5 + i * 0.05,
+      vault,
+      isCurrentProject: true,
+    }));
+
+    const getNoteRelationships = (id: string) => {
+      if (id === "entry-0") {
+        return [{ id: "deeply-related", type: "related-to" as const }];
+      }
+      return undefined;
+    };
+
+    const result = applyGraphSpreadingActivation(candidates, getNoteRelationships);
+
+    expect(result.find((c) => c.id === "deeply-related")).toBeUndefined();
+  });
+
+  it("skips propagation when no entry point meets activation gate (0.5)", () => {
+    const candidates: ScoredRecallCandidate[] = [
+      { id: "weak", score: 0.3, boosted: 0.3, vault, isCurrentProject: true },
+    ];
+
+    const getNoteRelationships = (id: string) => {
+      if (id === "weak") {
+        return [{ id: "related", type: "related-to" as const }];
+      }
+      return undefined;
+    };
+
+    const result = applyGraphSpreadingActivation(candidates, getNoteRelationships);
+
+    expect(result).toHaveLength(1);
+  });
+
+  it("propagates from entry points with score >= 0.5", () => {
+    const candidates: ScoredRecallCandidate[] = [
+      { id: "weak", score: 0.3, boosted: 0.3, vault, isCurrentProject: true },
+      { id: "strong", score: 0.55, boosted: 0.55, vault, isCurrentProject: true },
+    ];
+
+    const getNoteRelationships = (id: string) => {
+      if (id === "strong") {
+        return [{ id: "graph-discovered", type: "related-to" as const }];
+      }
+      return undefined;
+    };
+
+    const result = applyGraphSpreadingActivation(candidates, getNoteRelationships);
+
+    const discovered = result.find((c) => c.id === "graph-discovered");
+    expect(discovered).toBeDefined();
+  });
+
+  it("accumulates propagated scores when same note is reachable via multiple entry points", () => {
+    const candidates: ScoredRecallCandidate[] = [
+      { id: "entry-a", score: 0.6, boosted: 0.6, vault, isCurrentProject: true },
+      { id: "entry-b", score: 0.55, boosted: 0.55, vault, isCurrentProject: true },
+    ];
+
+    const getNoteRelationships = (id: string) => {
+      if (id === "entry-a") {
+        return [{ id: "shared", type: "related-to" as const }];
+      }
+      if (id === "entry-b") {
+        return [{ id: "shared", type: "related-to" as const }];
+      }
+      return undefined;
+    };
+
+    const result = applyGraphSpreadingActivation(candidates, getNoteRelationships);
+
+    const discovered = result.find((c) => c.id === "shared");
+    const expectedScore = (0.6 * 0.5 * 0.8) + (0.55 * 0.5 * 0.8);
+    expect(discovered!.score).toBeCloseTo(expectedScore, 5);
+  });
+
+  it("returns original candidates unchanged when no relationships exist", () => {
+    const candidates: ScoredRecallCandidate[] = [
+      { id: "entry", score: 0.6, boosted: 0.6, vault, isCurrentProject: true },
+    ];
+
+    const getNoteRelationships = () => undefined;
+
+    const result = applyGraphSpreadingActivation(candidates, getNoteRelationships);
+
+    expect(result).toEqual(candidates);
+  });
+
+  it("returns original candidates when empty candidate set", () => {
+    const getNoteRelationships = () => [{ id: "should-not-appear", type: "related-to" as const }];
+
+    const result = applyGraphSpreadingActivation([], getNoteRelationships);
+
+    expect(result).toHaveLength(0);
+  });
+
+  it("sets semanticScoreForPromotion on discovered candidates", () => {
+    const candidates: ScoredRecallCandidate[] = [
+      { id: "entry", score: 0.7, boosted: 0.7, vault, isCurrentProject: true },
+    ];
+
+    const getNoteRelationships = (id: string) => {
+      if (id === "entry") {
+        return [{ id: "discovered", type: "explains" as const }];
+      }
+      return undefined;
+    };
+
+    const result = applyGraphSpreadingActivation(candidates, getNoteRelationships);
+
+    const discovered = result.find((c) => c.id === "discovered");
+    expect(discovered!.semanticScoreForPromotion).toBeCloseTo(0.7 * 0.5 * 1.0, 5);
   });
 });

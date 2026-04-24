@@ -40,6 +40,7 @@ import {
   selectWorkflowResults,
   applyLexicalReranking,
   applyCanonicalExplanationPromotion,
+  applyGraphSpreadingActivation,
   type ScoredRecallCandidate,
 } from "./recall.js";
 import {
@@ -2507,10 +2508,15 @@ server.registerTool(
     }
 
     const projectionTexts = new Map<string, string>();
+    const noteRelationships = new Map<string, Array<{ id: string; type: RelationshipType }>>();
     for (const candidate of scored) {
       const note = await readCachedNote(candidate.vault, candidate.id).catch(() => null);
       if (!note) {
         continue;
+      }
+
+      if (note.relatedTo && note.relatedTo.length > 0) {
+        noteRelationships.set(candidate.id, note.relatedTo.map((r) => ({ id: r.id, type: r.type })));
       }
 
       const projection = await getOrBuildProjection(candidate.vault.storage, note).catch(() => undefined);
@@ -2541,7 +2547,13 @@ server.registerTool(
       undefined
     );
     const reranked = applyLexicalReranking(scored, query, getProjectionText);
-    let promoted = applyCanonicalExplanationPromotion(reranked);
+
+    // Apply graph spreading activation: traverse related notes and boost their scores
+    const getNoteRelationships = (id: string): Array<{ id: string; type: RelationshipType }> | undefined => {
+      return noteRelationships.get(id);
+    };
+    const withGraphSpread = applyGraphSpreadingActivation(reranked, getNoteRelationships);
+    let promoted = applyCanonicalExplanationPromotion(withGraphSpread);
 
     // Lexical rescue: when semantic results are weak, scan projections for additional candidates.
     // Skip rescue when the caller set a strict minSimilarity above the default,
