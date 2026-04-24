@@ -107,6 +107,7 @@ export async function applySemanticPatches(body: string, patches: SemanticPatch[
       let diagnostic = `Selector not found: ${JSON.stringify(patch.selector)}`;
       if (headings.length > 0) {
         diagnostic += `\nAvailable headings:\n${headings.map((h) => `  - ${h}`).join("\n")}`;
+        diagnostic += `\nUse exact heading text (without ## prefix), e.g.: { \"selector\": { \"heading\": \"${headings[0]}\" } }`;
       } else {
         diagnostic += "\nNo headings in document.";
       }
