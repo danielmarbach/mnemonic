@@ -4,6 +4,12 @@ All notable changes to `mnemonic` will be documented in this file.
 
 The format is loosely based on Keep a Changelog and uses semver-style version headings.
 
+## [0.24.0] - 2026-04-24
+
+### Added
+
+- `update` now supports `semanticPatch` for token-efficient targeted edits (insert, replace, append, remove content under specific headings) without round-tripping the full note body.
+
 ## [0.23.0] - 2026-04-17
 
 ### Added

@@ -51,6 +51,7 @@ import {
 } from "./lexical.js";
 import { getRelationshipPreview } from "./relationships.js";
 import { cleanMarkdown } from "./markdown.js";
+import { applySemanticPatches, type SemanticPatch } from "./semantic-patch.js";
 import { MnemonicConfigStore, readVaultSchemaVersion, type MutationPushMode } from "./config.js";
 import {
   CONSOLIDATION_MODES,
@@ -2713,7 +2714,8 @@ server.registerTool(
       "- The updated memory id, changed fields, and persistence status\n\n" +
       "Side effects: rewrites the note, refreshes embeddings, git commits, and may push.\n\n" +
       "Typical next step:\n" +
-      "- Use `relate` or `consolidate` if the update changes how this note connects to others.",
+      "- Use `relate` or `consolidate` if the update changes how this note connects to others.\n\n" +
+      "Use `semanticPatch` for targeted edits (more token-efficient). Use `content` only for complete rewrites.",
     annotations: {
       readOnlyHint: false,
       destructiveHint: false,
@@ -2722,7 +2724,36 @@ server.registerTool(
     },
     inputSchema: z.object({
       id: z.string().describe("Exact memory id. Use an id returned by `recall`, `list`, `recent_memories`, or `where_is`."),
-      content: z.string().optional().describe("Markdown note body. Put the key fact, decision, or outcome in the opening lines, then supporting detail."),
+      semanticPatch: z
+        .array(z.object({
+          selector: z.object({
+            heading: z.string().optional(),
+            headingStartsWith: z.string().optional(),
+            nthChild: z.number().int().optional(),
+            lastChild: z.literal(true).optional(),
+          }).refine(
+            (sel) => {
+              const keys = [sel.heading, sel.headingStartsWith, sel.nthChild, sel.lastChild].filter((v) => v !== undefined);
+              return keys.length === 1;
+            },
+            { message: "Selector must have exactly one of: heading, headingStartsWith, nthChild, lastChild" }
+          ),
+          operation: z.discriminatedUnion("op", [
+            z.object({ op: z.literal("appendChild"), value: z.string() }),
+            z.object({ op: z.literal("prependChild"), value: z.string() }),
+            z.object({ op: z.literal("replace"), value: z.string() }),
+            z.object({ op: z.literal("replaceChildren"), value: z.string() }),
+            z.object({ op: z.literal("insertAfter"), value: z.string() }),
+            z.object({ op: z.literal("insertBefore"), value: z.string() }),
+            z.object({ op: z.literal("remove") }),
+          ]),
+        }))
+        .optional()
+        .describe(
+          "Use for targeted edits when you know the structure. More token-efficient than passing full content. " +
+          "Mutually exclusive with content."
+        ),
+      content: z.string().optional().describe("Full note body replacement. Use only for complete rewrites or when the note is small. Mutually exclusive with semanticPatch."),
       title: z.string().optional().describe("Specific, retrieval-friendly title. Prefer the concrete topic or decision, not a vague label."),
       tags: z.array(z.string()).optional().describe("Optional tags for later filtering. Use a small number of stable, meaningful tags."),
       lifecycle: z
@@ -2748,12 +2779,19 @@ server.registerTool(
     }),
     outputSchema: UpdateResultSchema,
   },
-  async ({ id, content, title, tags, lifecycle, summary, alwaysLoad, cwd, allowProtectedBranch = false }) => {
+  async ({ id, content, semanticPatch, title, tags, lifecycle, summary, alwaysLoad, cwd, allowProtectedBranch = false }) => {
     await ensureBranchSynced(cwd);
 
     const found = await vaultManager.findNote(id, cwd);
     if (!found) {
       return { content: [{ type: "text", text: `No memory found with id '${id}'` }], isError: true };
+    }
+
+    // Validate: content and semanticPatch are mutually exclusive
+    const hasContent = content !== undefined;
+    const hasSemanticPatch = semanticPatch !== undefined && semanticPatch.length > 0;
+    if (hasContent && hasSemanticPatch) {
+      return { content: [{ type: "text", text: "Exactly one of content or semanticPatch must be provided, not both." }], isError: true };
     }
 
     const { note, vault } = found;
@@ -2781,12 +2819,22 @@ server.registerTool(
     }
 
     const now = new Date().toISOString();
+
+    let patchedContent: string | undefined;
+    if (semanticPatch && semanticPatch.length > 0) {
+      try {
+        patchedContent = await applySemanticPatches(note.content, semanticPatch as SemanticPatch[]);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        return { content: [{ type: "text", text: `Semantic patch failed: ${message}` }], isError: true };
+      }
+    }
     const cleanedContent = content === undefined ? undefined : await cleanMarkdown(content);
 
     const updated: Note = {
       ...note,
       title: title ?? note.title,
-      content: cleanedContent ?? note.content,
+      content: patchedContent ?? cleanedContent ?? note.content,
       tags: tags ?? note.tags,
       lifecycle: lifecycle ?? note.lifecycle,
       alwaysLoad: alwaysLoad !== undefined ? alwaysLoad : note.alwaysLoad,
@@ -2832,6 +2880,7 @@ server.registerTool(
     const changes: string[] = [];
     if (title !== undefined && title !== note.title) changes.push("title");
     if (content !== undefined) changes.push("content");
+    if (semanticPatch !== undefined) changes.push("semanticPatch");
     if (tags !== undefined) changes.push("tags");
     if (lifecycle !== undefined && lifecycle !== note.lifecycle) changes.push("lifecycle");
     if (alwaysLoad !== undefined && alwaysLoad !== note.alwaysLoad) changes.push("alwaysLoad");

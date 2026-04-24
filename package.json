@@ -35,7 +35,10 @@
     "@modelcontextprotocol/sdk": "^1.10.1",
     "gray-matter": "^4.0.3",
     "markdownlint": "^0.40.0",
+    "remark-parse": "^11.0.0",
+    "remark-stringify": "^11.0.0",
     "simple-git": "^3.27.0",
+    "unified": "^11.0.0",
     "zod": "^4.3.6"
   },
   "devDependencies": {
