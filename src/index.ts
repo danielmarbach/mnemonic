@@ -2785,7 +2785,8 @@ server.registerTool(
           "  { \"selector\": { \"heading\": \"Findings\" }, \"operation\": { \"op\": \"appendChild\", \"value\": \"A new paragraph.\" } },\n" +
           "  { \"selector\": { \"heading\": \"Recommendation\" }, \"operation\": { \"op\": \"replaceChildren\", \"value\": \"Updated recommendation.\" } },\n" +
           "  { \"selector\": { \"heading\": \"Old Section\" }, \"operation\": { \"op\": \"remove\" } }\n" +
-          "]"
+          "]\n\n" +
+          "`replaceChildren` on a `heading` selector targets the heading itself, not the body below it. Use `appendChild` or `replace` instead."
         ),
       content: z.string().optional().describe("Full note body replacement. Use only for complete rewrites or when the note is small. Mutually exclusive with semanticPatch."),
       title: z.string().optional().describe("Specific, retrieval-friendly title. Prefer the concrete topic or decision, not a vague label."),
@@ -6155,7 +6156,8 @@ server.registerPrompt(
             "- `operation` has an `op` key plus `value` (except `remove` which has no value).\n" +
             "- The parameter must be a JSON array, NOT a string.\n" +
             "- Use `get` first to read exact heading text, then use those headings (without `##` prefix) as selector values.\n" +
-            "- Common mistake: writing `{ \"op\": \"appendChild\", \"value\": \"...\" }` at the top level instead of nesting inside `operation`. Correct shape: `{ \"selector\": { \"heading\": \"Findings\" }, \"operation\": { \"op\": \"appendChild\", \"value\": \"text\" } }`",
+            "- Common mistake: writing `{ \"op\": \"appendChild\", \"value\": \"...\" }` at the top level instead of nesting inside `operation`. Correct shape: `{ \"selector\": { \"heading\": \"Findings\" }, \"operation\": { \"op\": \"appendChild\", \"value\": \"text\" } }`\n" +
+            "- `replaceChildren` on a `heading` selector targets the heading itself, not the body below it. Use `appendChild` or `replace` instead.",
         },
       },
     ],
