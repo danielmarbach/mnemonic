@@ -2976,7 +2976,7 @@ server.registerTool(
     invalidateActiveProjectCache();
     const fieldText = changes.length > 0 ? `\nfields modified: ${changes.join(", ")}` : "";
     const warningsText = lintWarnings && lintWarnings.length > 0
-      ? `\nmarkdown lint warnings (auto-fixed):\n- ${lintWarnings.join("\n- ")}`
+      ? `\nmarkdown lint warnings (not auto-fixable):\n- ${lintWarnings.join("\n- ")}`
       : "";
     return { content: [{ type: "text", text: `Updated memory '${id}'${fieldText}${warningsText}\n${formatPersistenceSummary(persistence)}` }], structuredContent };
   }
