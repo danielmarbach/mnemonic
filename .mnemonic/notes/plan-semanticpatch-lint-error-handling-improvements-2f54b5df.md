@@ -5,11 +5,14 @@ tags:
   - plan
 lifecycle: temporary
 createdAt: '2026-04-24T18:49:06.872Z'
-updatedAt: '2026-04-24T18:49:06.872Z'
+updatedAt: '2026-04-24T19:12:40.313Z'
 role: plan
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: semantic-patch-builder-design-implementation-906872f1
+    type: derives-from
 memoryVersion: 1
 ---
 # Plan: semanticPatch lint error handling improvements
