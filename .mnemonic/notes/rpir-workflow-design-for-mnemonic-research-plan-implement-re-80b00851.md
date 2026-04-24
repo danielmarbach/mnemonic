@@ -8,7 +8,7 @@ tags:
   - decision
 lifecycle: permanent
 createdAt: '2026-04-20T21:36:57.480Z'
-updatedAt: '2026-04-23T21:23:19.225Z'
+updatedAt: '2026-04-24T11:59:43.410Z'
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
@@ -27,11 +27,11 @@ memoryVersion: 1
 ---
 Approved design for evolving mnemonic into a canonical workflow artifact store with first-class research/plan/review support.
 
-## Phase status (as of 2026-04-23)
+## Phase status (as of 2026-04-24)
 
 - **Phase 1 — complete:** roles (`research`, `review`), role parameter support, role-based lifecycle defaults, tests, and workflow-hint alignment shipped.
-- **Phase 2 — complete:** `mnemonic-rpir-workflow` MCP prompt added, `skills/mnemonic-rpir-workflow/SKILL.md` added, prompt coverage tests added, `AGENT.md` and `README.md` updated with RPIR conventions.
-- **Phase 3 — planned (combined):** `recall(mode: "workflow")` + directional relationship types in one always-on release.
+- **Phase 2 — complete:** workflow prompt + skill delivery conventions shipped with docs and prompt coverage tests.
+- **Phase 3 — complete (branch):** `recall(mode: "workflow")` plus directional relationship types shipped with additive compatibility behavior.
 - **Phase 4 — pending:** real-task validation cycle not run yet.
 - **Phase 5 — pending:** orchestrator decision deferred until validation evidence exists.
 
@@ -49,43 +49,16 @@ mnemonic is the canonical store for workflow artifacts, not the workflow runtime
 
 ## Design choices locked in
 
-- **New roles:** Add `research` and `review` — makes workflow artifacts first-class without tag overload
-- **Apply/task role:** No new role — use existing roles + tags — avoids role explosion
-- **Apply/task role split:** `role: plan` for intended executable work; `role: context` for execution observations/checkpoints — prevents drift without adding an apply role
-- **Role inference:** Inference stays on 5 existing roles; skill drives explicit typing of research/review — avoids overlap/drift in inference signals
-- **Role persistence:** Explicit roles are persisted (existing contract); research/review are set by skill, not inference — no contract change needed
-- **Lifecycle defaults:** Role-based soft defaults in `remember()` at creation time only — common workflow artifacts get the right lifecycle most of the time; updates do not implicitly rewrite lifecycle
-- **Request root note:** Convention only: `role: context`, `lifecycle: temporary`, tagged as workflow request root — avoids adding a request role while keeping workflow roots consistent
-- **Plan currency:** Prefer one current plan note per request — simplifies retrieval, handoff, and review
-- **Relationship types:** Existing 4 types + workflow conventions; Phase 3 adds `derives-from` and `follows` additively
-- **Relationship density:** Use minimal relationship set; link to immediate upstream artifacts only — keeps the graph sparse and readable
-- **Directional types:** Enabled in Phase 3 as precision edges, with indefinite fallback to `related-to`
-- **Skill delivery:** Single RPIR skill in `skills/` directory, same repo — lowest friction, same release
-- **MCP prompt:** Separate `mnemonic-rpir-workflow` prompt — memory protocol and task workflow are different concerns
-- **Ergonomic helper:** `recall(mode: "workflow")` in Phase 3 with bounded chain-oriented retrieval
-- **Orchestration:** Explicitly out of scope — mnemonic is artifact store, not runtime
-
-## Core changes (Phase 1)
-
-### Role enum expansion
-
-Add `research` and `review` to `NoteRole` in `src/storage.ts`. Inference stays on the 5 existing roles; skill drives explicit typing of research/review.
-
-### Role-based lifecycle defaults
-
-Soft defaults in `remember()` at creation time only: research/plan/review → temporary, decision/summary/reference → permanent. Updates do not implicitly rewrite lifecycle.
-
-### No migration needed
-
-Role is already an optional field. The change is purely additive: existing notes with no role or existing valid roles are unaffected. `isNoteRole()` uses `NOTE_ROLES.includes()`, so the new values become valid where they were previously ignored. No schema version bump required.
-
-### Request root note convention
-
-`role: context`, `lifecycle: temporary`, `tags: ["workflow", "request"]`. One per RPIR workflow. All artifacts relate to it.
-
-## Apply/task note split
-
-No new role. Use `role: plan` for intended executable work, `role: context` for execution observations/checkpoints. Both tagged with `apply` tag.
+- Add `research` and `review` roles for workflow artifacts.
+- Keep apply/task notes on existing roles (`plan` for intended steps, `context` for execution observations) with `apply` tag.
+- Keep role inference conservative (existing roles only); skill/prompt drives explicit workflow role usage.
+- Use role-based lifecycle soft defaults at creation time only.
+- Keep one request-root convention (`role: context`, temporary, workflow/request tags).
+- Keep one current plan note per request as the default operating model.
+- Keep relationship graph sparse, immediate-upstream focused.
+- Use directional types as additive precision, never as mandatory requirement.
+- Keep prompts and skills complementary.
+- Keep orchestration runtime out of mnemonic core.
 
 ## Canonical note graph
 
@@ -100,75 +73,52 @@ request root (role: context, temporary)
 
 ## Relationship conventions
 
-Use minimal relationship set; link to immediate upstream artifacts only. No dense cross-linking. Specific edges:
+Minimal set, immediate upstream links only:
 
 - research `related-to` request
-- plan `related-to` request + the key research notes
+- plan `related-to` request + key research notes
 - apply/task `related-to` plan
 - review `related-to` apply or plan
-- outcome `related-to` plan and optionally request
+- outcome `related-to` plan (optionally request)
 
-Phase 3 adds optional directional equivalents where explicit sequencing/derivation is known:
+Directional additions for explicit derivation/ordering:
 
 - `derives-from`
 - `follows`
 
-Workflow recall must continue supporting mixed legacy and directional graphs.
-
-## Plan currency
-
-Prefer one current plan note per request. Update or supersede when plan evolves. Avoid concurrent "current" plans unless exploring alternatives (tag: `alternative/a`, `alternative/b`).
-
-## Material plan change definition
-
-A plan change is material if it changes: architecture/design direction, file/module scope, task ordering/dependencies, validation strategy, key assumptions/constraints. Non-material: wording cleanup, clearer phrasing, adding detail that does not change execution.
-
-## Consolidation output distinction
-
-At workflow end: decision note for resolved approaches, summary note for outcome recaps. Promote reusable facts/patterns into permanent reference notes. Let pure scaffolding and redundant checkpoints expire.
+Workflow recall supports mixed legacy and directional graphs.
 
 ## Stage protocol
 
-1. Research -- create/update request root note, create research notes, distill into a short research summary when needed
-2. Plan -- create/update plan note linked to research/request, keep concise and executable
-3. Implement -- create temporary apply/task notes, hand narrow context to subagent if non-trivial
-4. Review -- create review notes, fix directly or mark blockers, update plan if review changes it materially
-5. Iterate -- only when review/checks warrant it (optional, not default)
+1. Research — create/update request root note, create research notes, distill when needed.
+2. Plan — create/update plan note linked to request/research, keep concise and executable.
+3. Implement — create temporary apply/task notes, hand narrow context to subagent if non-trivial.
+4. Review — create review notes, fix or mark blockers, update plan first if review changes execution materially.
+5. Iterate — only when checks/review warrant it.
 
-## Subagent handoff contract
+## Convention delivery decisions
 
-A subagent receives: request note, current plan note or relevant slice, relevant research note(s), a few durable recalled notes, narrow file/task scope.
-A subagent returns: updated temporary apply note, optional review note, recommendation: continue / block / update plan.
-
-## Convention delivery (Phase 2)
-
-- Separate MCP prompt `mnemonic-rpir-workflow` (memory protocol and task workflow are different concerns)
-- Skill `skills/mnemonic-rpir-workflow/SKILL.md` with stage checklists, subagent handoff template, commit discipline rules, consolidation guidance, examples
+- Workflow prompt name: `mnemonic-rpi-workflow`.
+- Workflow skill location/name: `skills/mnemonic-rpi-workflow/SKILL.md`.
+- Memory protocol prompt remains separate: `mnemonic-workflow-hint`.
 
 ## Skill packaging decision essentials
 
-- Skills are part of the product experience and must ship with mnemonic releases.
-- MCP prompts and skills are complementary: prompts bootstrap discovery, skills carry detailed execution guidance.
-- Packaging must support updates: users need a repeatable way to refresh installed local skill copies after upgrading mnemonic.
-- Distribution targets include Claude and OpenCode directories, plus custom paths for other clients.
-- Backward compatibility is required: existing prompt names and workflows remain valid while packaging and delivery improve.
+- Skills are part of the product experience and ship with mnemonic releases.
+- Packaging includes a repeatable install/update flow for local client skill directories.
+- Target distribution includes Claude, OpenCode, and custom client paths.
 
 ## Commit discipline
 
-Three classes: memory (research/plan/review artifacts), work (code/test/docs), memory (consolidation/promotion). Plan changes materially -- update notes, memory commit, then continue.
-
-## Phase 3 helpers (planned combined)
-
-1. `recall(mode: "workflow")` -- chain reconstruction via role + relationship traversal, bounded and chain-oriented
-2. Directional types `derives-from`/`follows` -- additive precision layer with indefinite fallback to `related-to`
+Three classes: memory (research/plan/review artifacts), work (code/test/docs), memory (consolidation/promotion).
 
 ## Phase 4 validation
 
-Run RPIR on 3-5 real tasks: research-heavy, plan-heavy refactor, multi-step implementation, review/fix cycle. Measure token cost, plan drift, temporary-note cleanup burden, retrieval quality, graph readability.
+Run RPIR on 3-5 real tasks: research-heavy, plan-heavy refactor, multi-step implementation, review/fix cycle. Measure token cost, plan drift, temporary-note cleanup burden, retrieval quality, and graph readability.
 
 ## Phase 5 orchestrator decision
 
-Build a separate orchestration layer only if real usage consistently wants automated subagent dispatch, reviewer fanout, loop scheduling. mnemonic stays the artifact backbone; the orchestrator stays thin.
+Build a separate orchestration layer only if real usage consistently wants automated subagent dispatch/review looping. mnemonic remains artifact backbone; orchestrator remains thin.
 
 ## Non-goals
 
@@ -176,19 +126,8 @@ Build a separate orchestration layer only if real usage consistently wants autom
 - No full task engine in core
 - No mandatory loop model
 - No rich task-state schema in core
-- No full autonomous loop-first workflow
-- No many helper tools up front
-
-## Alternatives considered
-
-- **Minimal Core, Maximal Skill:** Only enum + defaults in core. Rejected because convention only reaches skill-aware agents; the MCP prompt is a natural delivery channel.
-- **Core + Schema:** Add validation for workflow graph shape. Rejected because it contradicts the no-heavy-schema principle.
-- **Mix RPIR into existing mnemonic-workflow-hint:** Rejected because memory protocol and task workflow are different concerns.
-- **Full inference for research/review:** Rejected because research overlaps with context signals and review overlaps with plan signals.
-- **Adding a request role:** Rejected because `role: context` + tag convention is sufficient and avoids role proliferation.
 
 ## Open questions
 
-- One plan note vs. plan revisions in practice
-- Whether `recall(mode: "workflow")` output shape is sufficient without extra helper tools
+- One plan note vs. plan revisions in long-running work
 - Whether memory commits become too noisy
