@@ -6125,69 +6125,81 @@ server.registerPrompt(
   })
 );
 
-// ── mnemonic-rpir-workflow prompt ──────────────────────────────────────────────
+// ── mnemonic-rpi-workflow prompt ───────────────────────────────────────────────
+const rpiWorkflowPrompt = async () => ({
+  messages: [
+    {
+      role: "user" as const,
+      content: {
+        type: "text" as const,
+        text:
+          "## RPIR workflow: research → plan → implement → review\n\n" +
+          "mnemonic is the artifact store, not the runtime. Store workflow artifacts with correct roles and lifecycle; do not build orchestration in core.\n\n" +
+          "### Request root note\n\n" +
+          "For each RPIR workflow, create one request root note: `role: context`, `lifecycle: temporary`, `tags: [\"workflow\", \"request\"]`. All artifacts relate to it.\n\n" +
+          "### Stage 1 — Research\n\n" +
+          "- Create or update request root note.\n" +
+          "- Create research notes: `role: research`, `lifecycle: temporary`.\n" +
+          "- Distill a short research summary when findings are scattered.\n" +
+          "- Link research `related-to` request root.\n" +
+          "- Before creating research notes, call `recall` to check whether existing notes already cover the topic.\n\n" +
+          "### Stage 2 — Plan\n\n" +
+          "- Create or update one plan note: `role: plan`, `lifecycle: temporary`.\n" +
+          "- Link plan `related-to` request root + key research notes.\n" +
+          "- Keep plan concise and executable.\n" +
+          "- REQUIRES: One current plan per request. Update or supersede when plan evolves.\n" +
+          "- Material changes (architecture, scope, ordering, validation, assumptions): update plan note first, then continue.\n" +
+          "- Non-material changes (wording, phrasing, detail): update inline without branching.\n\n" +
+          "### Stage 3 — Implement\n\n" +
+          "- Create temporary apply/task notes, tagged with `apply`.\n" +
+          "- Use `role: plan` for executable steps. Use `role: context` for observations and checkpoints.\n" +
+          "- Link apply notes `related-to` plan.\n" +
+          "- For non-trivial work, hand narrow context to subagent: request note, current plan or relevant slice, key research notes, narrow file/task scope.\n" +
+          "- Subagent returns: updated apply note, optional review note, recommendation (continue / block / update plan).\n\n" +
+          "### Stage 4 — Review\n\n" +
+          "- Create review notes: `role: review`, `lifecycle: temporary`.\n" +
+          "- Link review `related-to` apply or plan.\n" +
+          "- Fix directly or mark blockers.\n" +
+          "- If review changes the plan materially, update plan note first.\n\n" +
+          "### Stage 5 — Consolidate\n\n" +
+          "At workflow end:\n" +
+          "- Create decision note for resolved approaches (`lifecycle: permanent`).\n" +
+          "- Create summary note for outcome recaps (`lifecycle: permanent`).\n" +
+          "- Promote reusable facts and patterns into permanent reference notes.\n" +
+          "- Let pure scaffolding and redundant checkpoints expire as temporary notes.\n\n" +
+          "### Relationship conventions\n\n" +
+          "Minimal set. Link to immediate upstream artifacts only. No dense cross-linking.\n" +
+          "- research → request root\n" +
+          "- plan → request root + key research notes\n" +
+          "- apply/task → plan\n" +
+          "- review → apply or plan\n" +
+          "- outcome → plan (optionally request root)\n\n" +
+          "### Commit discipline\n\n" +
+          "Three classes: memory (research/plan/review artifacts), work (code/test/docs), memory (consolidation/promotion). When plan changes materially: update notes, commit memory, then continue work.\n\n" +
+          "### Iterate?\n\n" +
+          "Only when review or checks warrant it. Not the default.",
+      },
+    },
+  ],
+});
+
+server.registerPrompt(
+  "mnemonic-rpi-workflow",
+  {
+    title: "RPI Workflow: Research → Plan → Implement → Review",
+    description: "Stage protocol and conventions for structured task workflows using mnemonic as artifact store.",
+  },
+  rpiWorkflowPrompt
+);
+
+// Backward-compatible alias
 server.registerPrompt(
   "mnemonic-rpir-workflow",
   {
-    title: "RPIR Workflow: Research → Plan → Implement → Review",
-    description: "Stage protocol and conventions for structured task workflows using mnemonic as artifact store.",
+    title: "RPIR Workflow (alias): Research → Plan → Implement → Review",
+    description: "Backward-compatible alias for `mnemonic-rpi-workflow`.",
   },
-  async () => ({
-    messages: [
-      {
-        role: "user",
-        content: {
-          type: "text",
-          text:
-            "## RPIR workflow: research → plan → implement → review\n\n" +
-            "mnemonic is the artifact store, not the runtime. Store workflow artifacts with correct roles and lifecycle; do not build orchestration in core.\n\n" +
-            "### Request root note\n\n" +
-            "For each RPIR workflow, create one request root note: `role: context`, `lifecycle: temporary`, `tags: [\"workflow\", \"request\"]`. All artifacts relate to it.\n\n" +
-            "### Stage 1 — Research\n\n" +
-            "- Create or update request root note.\n" +
-            "- Create research notes: `role: research`, `lifecycle: temporary`.\n" +
-            "- Distill a short research summary when findings are scattered.\n" +
-            "- Link research `related-to` request root.\n" +
-            "- Before creating research notes, call `recall` to check whether existing notes already cover the topic.\n\n" +
-            "### Stage 2 — Plan\n\n" +
-            "- Create or update one plan note: `role: plan`, `lifecycle: temporary`.\n" +
-            "- Link plan `related-to` request root + key research notes.\n" +
-            "- Keep plan concise and executable.\n" +
-            "- REQUIRES: One current plan per request. Update or supersede when plan evolves.\n" +
-            "- Material changes (architecture, scope, ordering, validation, assumptions): update plan note first, then continue.\n" +
-            "- Non-material changes (wording, phrasing, detail): update inline without branching.\n\n" +
-            "### Stage 3 — Implement\n\n" +
-            "- Create temporary apply/task notes, tagged with `apply`.\n" +
-            "- Use `role: plan` for executable steps. Use `role: context` for observations and checkpoints.\n" +
-            "- Link apply notes `related-to` plan.\n" +
-            "- For non-trivial work, hand narrow context to subagent: request note, current plan or relevant slice, key research notes, narrow file/task scope.\n" +
-            "- Subagent returns: updated apply note, optional review note, recommendation (continue / block / update plan).\n\n" +
-            "### Stage 4 — Review\n\n" +
-            "- Create review notes: `role: review`, `lifecycle: temporary`.\n" +
-            "- Link review `related-to` apply or plan.\n" +
-            "- Fix directly or mark blockers.\n" +
-            "- If review changes the plan materially, update plan note first.\n\n" +
-            "### Stage 5 — Consolidate\n\n" +
-            "At workflow end:\n" +
-            "- Create decision note for resolved approaches (`lifecycle: permanent`).\n" +
-            "- Create summary note for outcome recaps (`lifecycle: permanent`).\n" +
-            "- Promote reusable facts and patterns into permanent reference notes.\n" +
-            "- Let pure scaffolding and redundant checkpoints expire as temporary notes.\n\n" +
-            "### Relationship conventions\n\n" +
-            "Minimal set. Link to immediate upstream artifacts only. No dense cross-linking.\n" +
-            "- research → request root\n" +
-            "- plan → request root + key research notes\n" +
-            "- apply/task → plan\n" +
-            "- review → apply or plan\n" +
-            "- outcome → plan (optionally request root)\n\n" +
-            "### Commit discipline\n\n" +
-            "Three classes: memory (research/plan/review artifacts), work (code/test/docs), memory (consolidation/promotion). When plan changes materially: update notes, commit memory, then continue work.\n\n" +
-            "### Iterate?\n\n" +
-            "Only when review or checks warrant it. Not the default.",
-        },
-      },
-    ],
-  })
+  rpiWorkflowPrompt
 );
 
 // ── start ─────────────────────────────────────────────────────────────────────

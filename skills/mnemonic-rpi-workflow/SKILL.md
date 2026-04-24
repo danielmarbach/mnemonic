@@ -1,4 +1,4 @@
-# Skill: mnemonic-rpir-workflow
+# Skill: mnemonic-rpi-workflow
 
 # RPIR Workflow: Research -> Plan -> Implement -> Review
 

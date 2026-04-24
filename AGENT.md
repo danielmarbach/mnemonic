@@ -63,7 +63,7 @@ When running Research -> Plan -> Implement -> Review workflows:
 - Keep one current plan note per request using `role: plan` and update or supersede it as work evolves.
 - For apply/task notes, do not add new roles: use `role: plan` for executable steps and `role: context` for observations/checkpoints; tag both with `apply`.
 - Keep relationships sparse and immediate-upstream only: research -> request, plan -> request/research, apply -> plan, review -> apply/plan, outcome -> plan.
-- Use `mnemonic-rpir-workflow` prompt for stage protocol and handoff conventions; use `mnemonic-workflow-hint` for memory-tool usage protocol.
+- Use `mnemonic-rpi-workflow` prompt for stage protocol and handoff conventions; use `mnemonic-workflow-hint` for memory-tool usage protocol.
 
 ### Capture triggers
 
@@ -278,7 +278,8 @@ Keep these high-level anchors in mind:
 
 | Prompt | Description |
 |--------|-------------|
-| `mnemonic-rpir-workflow` | Optional. Returns the RPIR stage protocol and conventions: request root note pattern, stage checklists, apply/task split, sparse relationship conventions, subagent handoff contract, and commit discipline. |
+| `mnemonic-rpi-workflow` | Optional. Returns the RPIR stage protocol and conventions: request root note pattern, stage checklists, apply/task split, sparse relationship conventions, subagent handoff contract, and commit discipline. |
+| `mnemonic-rpir-workflow` | Optional alias for `mnemonic-rpi-workflow` kept for backward compatibility. |
 | `mnemonic-workflow-hint` | Optional. Returns a compact decision protocol: use `recall` or `list` first, inspect with `get`, update existing memories, remember only when nothing matches, then organize with `relate`, `consolidate`, or `move_memory`. It also reinforces summary-first orientation via `project_memory_summary`, recovery of temporary working state only after orientation, and that roles are optional hints while lifecycle remains separate. |
 
 ## Tools
