@@ -73,7 +73,7 @@ function resolveSelector(tree: Root, selector: SemanticSelector): { parent: Root
   return undefined;
 }
 
-const CONTAINER_TYPES = new Set(["heading", "blockquote", "list", "paragraph"]);
+const CONTAINER_TYPES = new Set(["blockquote", "list", "paragraph"]);
 
 function getTargetChildren(target: Content): Content[] | undefined {
   if (CONTAINER_TYPES.has(target.type)) {

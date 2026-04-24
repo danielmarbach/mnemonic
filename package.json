@@ -1,6 +1,6 @@
 {
   "name": "@danielmarbach/mnemonic-mcp",
-  "version": "0.25.2",
+  "version": "0.25.3",
   "description": "A local MCP memory server backed by markdown + JSON files, synced via git",
   "type": "module",
   "repository": {
