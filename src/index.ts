@@ -6192,16 +6192,6 @@ server.registerPrompt(
   rpiWorkflowPrompt
 );
 
-// Backward-compatible alias
-server.registerPrompt(
-  "mnemonic-rpir-workflow",
-  {
-    title: "RPIR Workflow (alias): Research → Plan → Implement → Review",
-    description: "Backward-compatible alias for `mnemonic-rpi-workflow`.",
-  },
-  rpiWorkflowPrompt
-);
-
 // ── start ─────────────────────────────────────────────────────────────────────
 await warnAboutPendingMigrationsOnStartup();
 const transport = new StdioServerTransport();

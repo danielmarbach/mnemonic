@@ -491,7 +491,6 @@ Imported notes are written to the main vault with `lifecycle: permanent` and `sc
 | Prompt | Description |
 |--------|-------------|
 | `mnemonic-rpi-workflow` | Optional. Returns RPIR stage protocol and conventions: request root note pattern, stage checklists, apply/task split, sparse relationships, subagent handoff contract, and commit discipline. |
-| `mnemonic-rpir-workflow` | Optional alias for `mnemonic-rpi-workflow` kept for backward compatibility. |
 | `mnemonic-workflow-hint` | Optional. Returns a compact decision protocol: use `recall` or `list` first, inspect with `get`, update existing memories, remember only when nothing matches, then organize with `relate`, `consolidate`, or `move_memory`. It also reinforces summary-first orientation via `project_memory_summary`, temporary-note recovery only after orientation, and that roles are optional prioritization hints while lifecycle stays separate. |
 
 ## Tools

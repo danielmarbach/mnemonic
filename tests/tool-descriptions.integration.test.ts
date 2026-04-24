@@ -59,17 +59,6 @@ describe("tool-descriptions", () => {
     expect(promptText).toContain("Three classes: memory (research/plan/review artifacts), work (code/test/docs), memory (consolidation/promotion)");
   }, 15000);
 
-  it("keeps mnemonic-rpir-workflow as a compatibility alias", async () => {
-    const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-vault-"));
-    tempDirs.push(vaultDir);
-
-    const promptText = await callLocalMcpPrompt(vaultDir, "mnemonic-rpir-workflow");
-
-    expect(promptText).toContain("## RPIR workflow: research → plan → implement → review");
-    expect(promptText).toContain("### Stage 1 — Research");
-    expect(promptText).toContain("### Stage 5 — Consolidate");
-  }, 15000);
-
   it("surfaces prerequisite-first workflow wording in phase-aware tool descriptions", async () => {
     const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-vault-"));
     tempDirs.push(vaultDir);

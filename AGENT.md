@@ -279,7 +279,6 @@ Keep these high-level anchors in mind:
 | Prompt | Description |
 |--------|-------------|
 | `mnemonic-rpi-workflow` | Optional. Returns the RPIR stage protocol and conventions: request root note pattern, stage checklists, apply/task split, sparse relationship conventions, subagent handoff contract, and commit discipline. |
-| `mnemonic-rpir-workflow` | Optional alias for `mnemonic-rpi-workflow` kept for backward compatibility. |
 | `mnemonic-workflow-hint` | Optional. Returns a compact decision protocol: use `recall` or `list` first, inspect with `get`, update existing memories, remember only when nothing matches, then organize with `relate`, `consolidate`, or `move_memory`. It also reinforces summary-first orientation via `project_memory_summary`, recovery of temporary working state only after orientation, and that roles are optional hints while lifecycle remains separate. |
 
 ## Tools
