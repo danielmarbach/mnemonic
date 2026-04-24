@@ -6,9 +6,10 @@ tags:
   - semantic-patch
   - update
   - markdown
+  - approved
 lifecycle: permanent
 createdAt: '2026-04-23T20:44:16.146Z'
-updatedAt: '2026-04-24T05:19:02.650Z'
+updatedAt: '2026-04-24T05:20:24.718Z'
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
@@ -103,4 +104,4 @@ AST round-trip via `remark` may change whitespace or formatting on notes that cu
 
 ## Status
 
-Design stage. Not yet approved for implementation.
+Design approved for implementation.
