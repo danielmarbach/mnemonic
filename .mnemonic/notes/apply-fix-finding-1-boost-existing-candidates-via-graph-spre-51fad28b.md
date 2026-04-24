@@ -6,11 +6,14 @@ tags:
   - recall
 lifecycle: temporary
 createdAt: '2026-04-24T22:35:11.748Z'
-updatedAt: '2026-04-24T22:35:11.748Z'
+updatedAt: '2026-04-24T22:37:58.170Z'
 role: plan
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: review-phase-1-graph-spreading-finding-1-fix-5053b069
+    type: derives-from
 memoryVersion: 1
 ---
 # Apply: Fix Finding 1 — boost existing candidates via graph spreading
