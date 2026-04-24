@@ -51,7 +51,7 @@ import {
   LEXICAL_RESCUE_RESULT_LIMIT,
 } from "./lexical.js";
 import { getRelationshipPreview } from "./relationships.js";
-import { cleanMarkdown } from "./markdown.js";
+import { MarkdownLintError, cleanMarkdown } from "./markdown.js";
 import { applySemanticPatches, type SemanticPatch } from "./semantic-patch.js";
 import { MnemonicConfigStore, readVaultSchemaVersion, type MutationPushMode } from "./config.js";
 import {
@@ -2777,7 +2777,8 @@ server.registerTool(
         .optional()
         .describe(
           "Use for targeted edits when you know the structure. More token-efficient than passing full content. " +
-          "Mutually exclusive with content."
+          "Mutually exclusive with content. " +
+          "If this fails, fix the issue in your patch values and retry — do NOT fall back to full content rewrite."
         ),
       content: z.string().optional().describe("Full note body replacement. Use only for complete rewrites or when the note is small. Mutually exclusive with semanticPatch."),
       title: z.string().optional().describe("Specific, retrieval-friendly title. Prefer the concrete topic or decision, not a vague label."),
@@ -2851,10 +2852,17 @@ server.registerTool(
     const now = new Date().toISOString();
 
     let patchedContent: string | undefined;
+    let lintWarnings: string[] | undefined;
     if (semanticPatch && semanticPatch.length > 0) {
       try {
-        patchedContent = await applySemanticPatches(note.content, semanticPatch as SemanticPatch[]);
+        const result = await applySemanticPatches(note.content, semanticPatch as SemanticPatch[]);
+        patchedContent = result.content;
+        lintWarnings = result.lintWarnings;
       } catch (err) {
+        if (err instanceof MarkdownLintError) {
+          const message = `Semantic patch produced content with markdown lint issues. Fix the lint issues in your patch values and retry — do NOT fall back to full content rewrite.\n\n${err.message}`;
+          return { content: [{ type: "text", text: message }], isError: true };
+        }
         const message = err instanceof Error ? err.message : String(err);
         return { content: [{ type: "text", text: `Semantic patch failed: ${message}` }], isError: true };
       }
@@ -2961,12 +2969,16 @@ server.registerTool(
       project: noteProjectRef(updated),
       lifecycle: updated.lifecycle,
       role: updated.role,
+      lintWarnings: lintWarnings && lintWarnings.length > 0 ? lintWarnings : undefined,
       persistence,
     };
     
     invalidateActiveProjectCache();
     const fieldText = changes.length > 0 ? `\nfields modified: ${changes.join(", ")}` : "";
-    return { content: [{ type: "text", text: `Updated memory '${id}'${fieldText}\n${formatPersistenceSummary(persistence)}` }], structuredContent };
+    const warningsText = lintWarnings && lintWarnings.length > 0
+      ? `\nmarkdown lint warnings (auto-fixed):\n- ${lintWarnings.join("\n- ")}`
+      : "";
+    return { content: [{ type: "text", text: `Updated memory '${id}'${fieldText}${warningsText}\n${formatPersistenceSummary(persistence)}` }], structuredContent };
   }
 );
 

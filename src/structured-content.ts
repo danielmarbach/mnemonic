@@ -198,6 +198,7 @@ export interface UpdateResult extends Record<string, unknown> {
   project?: ProjectRef;
   lifecycle: NoteLifecycle;
   role?: NoteRole;
+  lintWarnings?: string[];
   persistence: PersistenceStatus;
 }
 
@@ -614,6 +615,7 @@ export const UpdateResultSchema = z.object({
   project: ProjectRefSchema.optional(),
   lifecycle: _NoteLifecycle,
   role: _NoteRole.optional(),
+  lintWarnings: z.array(z.string()).optional(),
   persistence: PersistenceStatusSchema,
 });
 
