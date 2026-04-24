@@ -8,7 +8,7 @@ tags:
   - hindsight
 lifecycle: temporary
 createdAt: '2026-04-24T18:10:35.779Z'
-updatedAt: '2026-04-24T20:23:16.495Z'
+updatedAt: '2026-04-24T20:44:11.295Z'
 role: plan
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -36,7 +36,9 @@ Focus on the TEMPR recall layer (retain/recall), not CARA (opinion/reflect), bec
 
 ***
 
-## Phase 1: Graph Spreading Activation in Recall (COMPLETED — v0.26.0)
+Phase 1: Graph Spreading Activation in Recall (REVIEW PENDING — v0.26.0)
+
+Independent review found implementation is discovery-only, not true spreading activation. Existing candidates are never score-boosted by relationships. Fix before marking complete.
 
 When semantic recall produces candidate notes, traverse their related notes and boost scores via spreading activation over existing relationship graph.
 
