@@ -10,7 +10,7 @@ tags:
   - implementation
 lifecycle: permanent
 createdAt: '2026-04-24T11:09:39.750Z'
-updatedAt: '2026-04-24T21:11:17.596Z'
+updatedAt: '2026-04-24T21:56:22.627Z'
 role: reference
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
@@ -91,7 +91,8 @@ Measured against the actual design note (3291 bytes / approx. 823 tokens on disk
 
 For a 2000-token production note the ratio widens further since patch overhead stays constant. Verified via tests/dogfood-semantic-patch.mjs against build/index.js (7/7 checks passed).
 
-## Implementation Details
+- `appendChild`, `prependChild`, and `replaceChildren` on a heading are rejected with a clear error. Use `insertAfter` to add block content under a heading.
+- `fieldsModified` reports `"semanticPatch"` as a separate entry.
 
 - `replaceChildren` on a heading node replaces the heading *text*, not body content below it. Use `insertAfter` to add block content under a heading.
 - `fieldsModified` reports `"semanticPatch"` as a separate entry.
