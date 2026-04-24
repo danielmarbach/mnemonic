@@ -8,7 +8,8 @@ tags:
   - decision
 lifecycle: permanent
 createdAt: '2026-04-20T21:36:57.480Z'
-updatedAt: '2026-04-24T12:22:30.089Z'
+updatedAt: '2026-04-24T15:35:56.372Z'
+role: decision
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
