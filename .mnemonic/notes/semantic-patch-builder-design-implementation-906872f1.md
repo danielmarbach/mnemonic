@@ -10,10 +10,13 @@ tags:
   - implementation
 lifecycle: permanent
 createdAt: '2026-04-24T11:09:39.750Z'
-updatedAt: '2026-04-24T19:05:37.959Z'
+updatedAt: '2026-04-24T19:12:40.313Z'
 role: reference
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: plan-semanticpatch-lint-error-handling-improvements-2f54b5df
+    type: derives-from
 memoryVersion: 1
 ---
 # Semantic Patch Builder: Design & Implementation

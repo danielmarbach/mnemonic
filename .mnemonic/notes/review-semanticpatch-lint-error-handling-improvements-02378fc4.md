@@ -5,11 +5,14 @@ tags:
   - review
 lifecycle: temporary
 createdAt: '2026-04-24T19:05:03.894Z'
-updatedAt: '2026-04-24T19:05:03.894Z'
+updatedAt: '2026-04-24T19:12:40.306Z'
 role: review
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: semantic-patch-builder-design-implementation-906872f1
+    type: derives-from
 memoryVersion: 1
 ---
 # Review: semanticPatch lint error handling improvements
