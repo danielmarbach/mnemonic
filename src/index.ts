@@ -588,13 +588,14 @@ function describeLifecycle(lifecycle: NoteLifecycle): string {
 function formatNote(note: Note, score?: number, showRawRelated = true): string {
   const scoreStr = score !== undefined ? ` | similarity: ${score.toFixed(3)}` : "";
   const projectStr = note.project ? ` | project: ${note.projectName ?? note.project}` : " | global";
+  const roleStr = note.role ? ` | **role: ${note.role}**` : "";
   const relStr = showRawRelated && note.relatedTo && note.relatedTo.length > 0
     ? `\n**related:** ${note.relatedTo.map((r) => `\`${r.id}\` (${r.type})`).join(", ")}`
     : "";
   return (
     `## ${note.title}\n` +
     `**id:** \`${note.id}\`${projectStr}${scoreStr}\n` +
-    `**tags:** ${note.tags.join(", ") || "none"} | **${describeLifecycle(note.lifecycle)}** | **updated:** ${note.updatedAt}${relStr}\n\n` +
+    `**tags:** ${note.tags.join(", ") || "none"} | **${describeLifecycle(note.lifecycle)}**${roleStr} | **updated:** ${note.updatedAt}${relStr}\n\n` +
     note.content
   );
 }
@@ -1262,9 +1263,10 @@ function formatListEntry(
   const proj = note.project ? `[${note.projectName ?? note.project}]` : "[global]";
   const extras: string[] = [];
   if (note.tags.length > 0) extras.push(note.tags.join(", "));
-  extras.push(`lifecycle=${note.lifecycle}`);
-  if (options.includeStorage) extras.push(`stored=${storageLabel(vault)}`);
-  if (options.includeUpdated) extras.push(`updated=${note.updatedAt}`);
+  extras.push(`lifecycle: ${note.lifecycle}`);
+  if (note.role) extras.push(`role: ${note.role}`);
+  if (options.includeStorage) extras.push(`stored: ${storageLabel(vault)}`);
+  if (options.includeUpdated) extras.push(`updated: ${note.updatedAt}`);
   const lines = [`- **${note.title}** \`${note.id}\` ${proj}${extras.length > 0 ? ` — ${extras.join(" | ")}` : ""}`];
   if (options.includeRelations && note.relatedTo && note.relatedTo.length > 0) {
     lines.push(`  related: ${note.relatedTo.map((rel) => `${rel.id} (${rel.type})`).join(", ")}`);
@@ -2963,7 +2965,8 @@ server.registerTool(
     };
     
     invalidateActiveProjectCache();
-    return { content: [{ type: "text", text: `Updated memory '${id}'\n${formatPersistenceSummary(persistence)}` }], structuredContent };
+    const fieldText = changes.length > 0 ? `\nfields modified: ${changes.join(", ")}` : "";
+    return { content: [{ type: "text", text: `Updated memory '${id}'${fieldText}\n${formatPersistenceSummary(persistence)}` }], structuredContent };
   }
 );
 
@@ -3191,7 +3194,7 @@ server.registerTool(
     const lines: string[] = [];
     for (const note of found) {
       lines.push(`## ${note.title} (${note.id})`);
-      lines.push(`project: ${note.project?.name ?? "global"} | stored: ${note.vault} | lifecycle: ${note.lifecycle}`);
+      lines.push(`project: ${note.project?.name ?? "global"} | stored: ${note.vault} | lifecycle: ${note.lifecycle}${note.role ? ` | role: ${note.role}` : ""}`);
       if (note.tags.length > 0) lines.push(`tags: ${note.tags.join(", ")}`);
       lines.push("");
       lines.push(note.content);

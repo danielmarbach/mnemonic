@@ -214,6 +214,7 @@ describe("role parameter and role-based lifecycle defaults", () => {
       expect(updateResponse.text).toContain("Updated");
       expect(updateResponse.structuredContent?.fieldsModified).toContain("role");
       expect(updateResponse.structuredContent?.role).toBe("decision");
+      expect(updateResponse.text).toContain("fields modified: role");
 
       const getResponse = await callLocalMcpResponse(vaultDir, "get", {
         ids: [noteId],
@@ -222,6 +223,7 @@ describe("role parameter and role-based lifecycle defaults", () => {
 
       const getNotes = (getResponse.structuredContent?.notes as Array<Record<string, unknown>> | undefined) ?? [];
       expect(getNotes[0]?.role).toBe("decision");
+      expect(getResponse.text).toContain("role: decision");
 
       const listResponse = await callLocalMcpResponse(vaultDir, "list", {
         scope: "global",
@@ -231,6 +233,7 @@ describe("role parameter and role-based lifecycle defaults", () => {
       const listNotes = (listResponse.structuredContent?.notes as Array<Record<string, unknown>> | undefined) ?? [];
       const listed = listNotes.find((n) => n.id === noteId);
       expect(listed?.role).toBe("decision");
+      expect(listResponse.text).toContain("role: decision");
 
       const recallResponse = await callLocalMcpResponse(vaultDir, "recall", {
         query: "Role visibility across structured outputs",
@@ -241,6 +244,7 @@ describe("role parameter and role-based lifecycle defaults", () => {
       const recallResults = (recallResponse.structuredContent?.results as Array<Record<string, unknown>> | undefined) ?? [];
       const recalled = recallResults.find((r) => r.id === noteId);
       expect(recalled?.role).toBe("decision");
+      expect(recallResponse.text).toContain("**role: decision**");
     } finally {
       await embeddingServer.close();
     }

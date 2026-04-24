@@ -208,7 +208,7 @@ describe("vault-routing", () => {
       }, embeddingServer.url);
 
       expect(listed.text).toContain("Round trip move test");
-      expect(listed.text).toContain("stored=main-vault");
+      expect(listed.text).toContain("stored: main-vault");
       expect(listed.structuredContent?.["count"]).toBe(1);
       const notes = listed.structuredContent?.["notes"] as Array<Record<string, unknown>>;
       expect(notes[0]?.["id"]).toBe(noteId);

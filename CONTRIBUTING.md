@@ -174,6 +174,8 @@ If you add MCP integration tests, follow the same hermetic pattern unless you ex
 
 When changing a tool's `structuredContent` shape or zod `outputSchema`, add or update a schema-audit test that parses the real MCP response with the exported schema. Treat handler/schema drift as a regression class to guard explicitly.
 
+When changing structured output fields, also keep human-readable text output in sync. Add or update at least one integration assertion that checks both `structuredContent` and text for the same user-visible field so text/schema parity does not drift.
+
 ### Release confidence gate
 
 Before releasing, run the full release verification gate:
