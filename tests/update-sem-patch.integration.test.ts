@@ -75,6 +75,32 @@ describe("update with semanticPatch", () => {
     await session.close();
   }, 15000);
 
+  it("rejects heading-specific appends (bug regression)", async () => {
+    const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-update-test-"));
+    tempDirs.push(vaultDir);
+    await initTestRepo(vaultDir, "main");
+
+    const session = await createPersistentMcpSession(vaultDir, { disableGit: true });
+
+    const rememberResult = await session.callTool("remember", {
+      title: "Heading Bug Test",
+      content: "# Heading Bug Test\n\n## Scope\n\n- item a\n- item b\n",
+      lifecycle: "temporary",
+    });
+    const idMatch = rememberResult.text.match(/`([^`]+)`/);
+    expect(idMatch).not.toBeNull();
+    const noteId = idMatch![1];
+
+    const updateResult = await session.callTool("update", {
+      id: noteId,
+      semanticPatch: [{ selector: { heading: "Scope" }, operation: { op: "appendChild", value: "new item" } }],
+    });
+
+    expect(updateResult.text).toContain("Cannot appendChild to node of type 'heading'");
+
+    await session.close();
+  }, 15000);
+
   it("rejects semanticPatch with missing selector", async () => {
     const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-update-test-"));
     tempDirs.push(vaultDir);

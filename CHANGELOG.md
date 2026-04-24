@@ -6,6 +6,12 @@ The format is loosely based on Keep a Changelog and uses semver-style version he
 
 ## [Unreleased]
 
+## [0.25.3] - 2026-04-25
+
+### Fixed
+
+- `appendChild`, `prependChild`, and `replaceChildren` on heading selectors now reject with a clear error instead of corrupting note structure. Previously headings were incorrectly treated as container nodes, causing malformed output.
+
 ## [0.25.2] - 2026-04-24
 
 ### Changed
