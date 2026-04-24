@@ -8,7 +8,7 @@ tags:
   - decision
 lifecycle: permanent
 createdAt: '2026-04-20T21:36:57.480Z'
-updatedAt: '2026-04-24T12:09:46.731Z'
+updatedAt: '2026-04-24T12:22:30.089Z'
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
@@ -47,7 +47,7 @@ mnemonic is the canonical store for workflow artifacts, not the workflow runtime
 - **External-user posture:** compatibility is treated as a long-term public contract, not a short-lived internal bridge.
 - **Precision path:** `derives-from` and `follows` improve chain quality but are optional; mixed graphs are first-class.
 
-## Design choices locked in
+## Design choices locked in- **Post-hoc classification:** explicit role assignment after note creation is a first-class workflow requirement; `update` must support it directly and expose role changes in structured output for verification and retrieval confidence
 
 - Add `research` and `review` roles for workflow artifacts.
 - Keep apply/task notes on existing roles (`plan` for intended steps, `context` for execution observations) with `apply` tag.
