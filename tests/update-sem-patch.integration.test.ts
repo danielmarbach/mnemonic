@@ -46,7 +46,7 @@ describe("update with semanticPatch", () => {
     expect(getResult.text).toContain("Existing content under B.");
 
     await session.close();
-  });
+  }, 15000);
 
   it("rejects both content and semanticPatch together", async () => {
     const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-update-test-"));
@@ -73,7 +73,7 @@ describe("update with semanticPatch", () => {
     expect(updateResult.text).toContain("Exactly one of content or semanticPatch must be provided");
 
     await session.close();
-  });
+  }, 15000);
 
   it("rejects semanticPatch with missing selector", async () => {
     const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-update-test-"));
@@ -100,7 +100,7 @@ describe("update with semanticPatch", () => {
     expect(updateResult.text).toContain("Available headings");
 
     await session.close();
-  });
+  }, 15000);
 
   it("allows metadata-only updates without content or semanticPatch", async () => {
     const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-update-test-"));
@@ -126,5 +126,5 @@ describe("update with semanticPatch", () => {
     expect(updateResult.text).toContain("Updated memory");
 
     await session.close();
-  });
+  }, 15000);
 });

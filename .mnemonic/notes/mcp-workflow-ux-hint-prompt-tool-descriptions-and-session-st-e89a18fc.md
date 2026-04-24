@@ -7,7 +7,7 @@ tags:
   - decision
 lifecycle: permanent
 createdAt: '2026-03-24T10:55:20.655Z'
-updatedAt: '2026-04-05T09:27:09.797Z'
+updatedAt: '2026-04-20T21:37:09.165Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
@@ -20,6 +20,8 @@ relatedTo:
   - id: mnemonic-language-independent-role-heuristics-f66619c1
     type: related-to
   - id: phase-2-design-workflow-hint-first-working-state-continuity-07153fcb
+    type: related-to
+  - id: rpir-workflow-design-for-mnemonic-research-plan-implement-re-80b00851
     type: related-to
 memoryVersion: 1
 ---

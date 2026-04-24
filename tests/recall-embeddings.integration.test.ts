@@ -284,6 +284,50 @@ This note has no embedding.`,
     }
   }, 15000);
 
+  it("workflow recall mode supports legacy related-to chains", async () => {
+    const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-vault-"));
+    tempDirs.push(vaultDir);
+    const embeddingServer = await startFakeEmbeddingServer();
+
+    try {
+      const parent = await callLocalMcpResponse(vaultDir, "remember", {
+        title: "Workflow parent note",
+        content: "Root context for workflow chain.",
+        tags: ["workflow"],
+        lifecycle: "temporary",
+        scope: "global",
+        summary: "Create workflow parent",
+      }, embeddingServer.url);
+
+      const child = await callLocalMcpResponse(vaultDir, "remember", {
+        title: "Workflow child note",
+        content: "Plan step connected by legacy related-to.",
+        tags: ["workflow"],
+        lifecycle: "temporary",
+        scope: "global",
+        summary: "Create workflow child",
+      }, embeddingServer.url);
+
+      await callLocalMcpResponse(vaultDir, "relate", {
+        fromId: child.structuredContent?.id,
+        toId: parent.structuredContent?.id,
+        type: "related-to",
+      }, embeddingServer.url);
+
+      const response = await callLocalMcpResponse(vaultDir, "recall", {
+        query: "workflow child plan step",
+        mode: "workflow",
+        limit: 3,
+      }, embeddingServer.url);
+
+      const parsed = RecallResultSchema.parse(response.structuredContent);
+      expect(parsed.results.length).toBeGreaterThan(0);
+      expect(parsed.results.map((result) => result.title)).toContain("Workflow child note");
+    } finally {
+      await embeddingServer.close();
+    }
+  }, 15000);
+
   it("temporal recall mode omits history beyond the enrichment cap instead of claiming no history", async () => {
     const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-vault-"));
     tempDirs.push(vaultDir);

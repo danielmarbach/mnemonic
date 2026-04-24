@@ -4,6 +4,21 @@ All notable changes to `mnemonic` will be documented in this file.
 
 The format is loosely based on Keep a Changelog and uses semver-style version headings.
 
+## [Unreleased]
+
+## [0.25.0] - 2026-04-24
+
+### Added
+
+- `recall` now supports `mode: "workflow"` for RPIR-oriented chain retrieval while keeping compatibility with existing note graphs.
+- Relationship types now include `derives-from` and `follows` so workflows can express directional sequencing and derivation explicitly.
+- The npm package now ships bundled skills and includes a `mnemonic-install-skills` command to install or update local skill directories for Claude, OpenCode, and custom targets.
+
+### Changed
+
+- RPIR workflow guidance now uses `mnemonic-rpi-workflow` as the prompt name.
+- The RPIR skill is now published under `skills/mnemonic-rpi-workflow`.
+
 ## [0.24.0] - 2026-04-24
 
 ### Added

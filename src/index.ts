@@ -6,7 +6,7 @@ import { randomUUID } from "crypto";
 import path from "path";
 import { promises as fs } from "fs";
 
-import { NOTE_LIFECYCLES, Storage, type Note, type NoteLifecycle, type Relationship, type RelationshipType } from "./storage.js";
+import { NOTE_LIFECYCLES, NOTE_ROLES, Storage, type Note, type NoteLifecycle, type NoteRole, type Relationship, type RelationshipType } from "./storage.js";
 import { embed, cosineSimilarity, embedModel } from "./embeddings.js";
 import { type CommitResult, type PushResult, type SyncResult } from "./git.js";
 import { buildTemporalHistoryEntry, computeConfidence, getNoteProvenance } from "./provenance.js";
@@ -37,6 +37,7 @@ import {
   computeRecallMetadataBoost,
   computeHybridScore,
   selectRecallResults,
+  selectWorkflowResults,
   applyLexicalReranking,
   applyCanonicalExplanationPromotion,
   type ScoredRecallCandidate,
@@ -587,13 +588,14 @@ function describeLifecycle(lifecycle: NoteLifecycle): string {
 function formatNote(note: Note, score?: number, showRawRelated = true): string {
   const scoreStr = score !== undefined ? ` | similarity: ${score.toFixed(3)}` : "";
   const projectStr = note.project ? ` | project: ${note.projectName ?? note.project}` : " | global";
+  const roleStr = note.role ? ` | **role: ${note.role}**` : "";
   const relStr = showRawRelated && note.relatedTo && note.relatedTo.length > 0
     ? `\n**related:** ${note.relatedTo.map((r) => `\`${r.id}\` (${r.type})`).join(", ")}`
     : "";
   return (
     `## ${note.title}\n` +
     `**id:** \`${note.id}\`${projectStr}${scoreStr}\n` +
-    `**tags:** ${note.tags.join(", ") || "none"} | **${describeLifecycle(note.lifecycle)}** | **updated:** ${note.updatedAt}${relStr}\n\n` +
+    `**tags:** ${note.tags.join(", ") || "none"} | **${describeLifecycle(note.lifecycle)}**${roleStr} | **updated:** ${note.updatedAt}${relStr}\n\n` +
     note.content
   );
 }
@@ -1261,9 +1263,10 @@ function formatListEntry(
   const proj = note.project ? `[${note.projectName ?? note.project}]` : "[global]";
   const extras: string[] = [];
   if (note.tags.length > 0) extras.push(note.tags.join(", "));
-  extras.push(`lifecycle=${note.lifecycle}`);
-  if (options.includeStorage) extras.push(`stored=${storageLabel(vault)}`);
-  if (options.includeUpdated) extras.push(`updated=${note.updatedAt}`);
+  extras.push(`lifecycle: ${note.lifecycle}`);
+  if (note.role) extras.push(`role: ${note.role}`);
+  if (options.includeStorage) extras.push(`stored: ${storageLabel(vault)}`);
+  if (options.includeUpdated) extras.push(`updated: ${note.updatedAt}`);
   const lines = [`- **${note.title}** \`${note.id}\` ${proj}${extras.length > 0 ? ` — ${extras.join(" | ")}` : ""}`];
   if (options.includeRelations && note.relatedTo && note.relatedTo.length > 0) {
     lines.push(`  related: ${note.relatedTo.map((rel) => `${rel.id} (${rel.type})`).join(", ")}`);
@@ -1382,6 +1385,15 @@ function addVaultChange(vaultChanges: Map<Vault, string[]>, vault: Vault, file: 
     vaultChanges.set(vault, files);
   }
 }
+
+const ROLE_LIFECYCLE_DEFAULTS: Record<string, NoteLifecycle> = {
+  research: "temporary",
+  plan: "temporary",
+  review: "temporary",
+  decision: "permanent",
+  summary: "permanent",
+  reference: "permanent",
+};
 
 // ── MCP Server ────────────────────────────────────────────────────────────────
 
@@ -1846,7 +1858,15 @@ server.registerTool(
         .optional()
         .describe(
           "Memory lifetime. Use `temporary` for short-lived working context such as active investigations or transient status. " +
-          "Use `permanent` for durable knowledge such as decisions, fixes, patterns, and preferences."
+          "Use `permanent` for durable knowledge such as decisions, fixes, patterns, and preferences. " +
+          "When omitted, defaults based on role: research/plan/review → temporary, decision/summary/reference → permanent."
+        ),
+      role: z
+        .enum(NOTE_ROLES)
+        .optional()
+        .describe(
+          "Optional prioritization hint for the note. Inferred automatically when omitted. " +
+          "Set explicitly for workflow artifacts like research or review notes."
         ),
       summary: z.string().optional().describe(
         "Git commit summary only. Imperative mood, concise, and focused on why the change matters."
@@ -1888,7 +1908,7 @@ server.registerTool(
     }),
     outputSchema: RememberResultSchema,
   },
-  async ({ title, content, tags, lifecycle, summary, alwaysLoad, cwd, scope, allowProtectedBranch = false }) => {
+  async ({ title, content, tags, lifecycle, role, summary, alwaysLoad, cwd, scope, allowProtectedBranch = false }) => {
     await ensureBranchSynced(cwd);
 
     const project = await resolveProject(cwd);
@@ -1922,7 +1942,8 @@ server.registerTool(
 
     const note: Note = {
       id, title, content: cleanedContent, tags,
-      lifecycle: lifecycle ?? "permanent",
+      lifecycle: lifecycle ?? (role ? ROLE_LIFECYCLE_DEFAULTS[role] : undefined) ?? "permanent",
+      ...(role ? { role } : {}),
       alwaysLoad: alwaysLoad ?? false,
       project: project?.id,
       projectName: project?.name,
@@ -2358,6 +2379,7 @@ server.registerTool(
     description:
       "Semantic search over stored memories using embeddings.\n\n" +
       "Supports opt-in temporal mode (`mode: \"temporal\"`) to enrich top semantic matches with compact git-backed history.\n\n" +
+      "Supports workflow mode (`mode: \"workflow\"`) to prioritize RPIR-style chain reconstruction while retaining compatibility with legacy relationships.\n\n" +
       "Use this when:\n" +
       "- You know the topic but not the exact memory id\n" +
       "- You are starting a session and want relevant prior context\n" +
@@ -2384,7 +2406,7 @@ server.registerTool(
       cwd: projectParam,
       limit: z.number().int().min(1).max(20).optional().default(DEFAULT_RECALL_LIMIT),
       minSimilarity: z.number().min(0).max(1).optional().default(DEFAULT_MIN_SIMILARITY),
-      mode: z.enum(["default", "temporal"]).optional().default("default").describe("Temporal history is opt-in. Use `temporal` to enrich top semantic matches with compact git-backed history."),
+      mode: z.enum(["default", "temporal", "workflow"]).optional().default("default").describe("Use `temporal` for compact git-backed history, or `workflow` for RPIR-oriented chain reconstruction."),
       verbose: z.boolean().optional().default(false).describe("Only meaningful with `mode: \"temporal\"`. Adds richer stats-based history context without returning raw diffs."),
       tags: z.array(z.string()).optional().describe("Filter results to notes with all of these tags."),
       scope: z
@@ -2539,7 +2561,9 @@ server.registerTool(
       promoted = applyCanonicalExplanationPromotion(promoted);
     }
 
-    const top = selectRecallResults(promoted, limit, scope);
+    const top = mode === "workflow"
+      ? selectWorkflowResults(promoted, limit, scope)
+      : selectRecallResults(promoted, limit, scope);
 
     if (top.length === 0) {
       const structuredContent: RecallResult = { action: "recalled", query, scope: scope || "all", results: [] };
@@ -2560,6 +2584,7 @@ server.registerTool(
       vault: string;
       tags: string[];
       lifecycle: NoteLifecycle;
+      role?: Note["role"];
       updatedAt: string;
       provenance?: {
         lastUpdatedAt: string;
@@ -2658,6 +2683,7 @@ server.registerTool(
           vault: storageLabel(vault),
           tags: note.tags,
           lifecycle: note.lifecycle,
+          role: note.role,
           updatedAt: note.updatedAt,
           provenance,
           confidence,
@@ -2760,6 +2786,10 @@ server.registerTool(
         .enum(NOTE_LIFECYCLES)
         .optional()
         .describe("Change lifecycle. Preserve the existing value unless you're intentionally switching it."),
+      role: z
+        .enum(NOTE_ROLES)
+        .optional()
+        .describe("Change role. Preserve the existing value unless you're intentionally switching it."),
       summary: z.string().optional().describe("Git commit summary only. Imperative mood, concise, and focused on why the change matters."),
       alwaysLoad: z
         .boolean()
@@ -2779,7 +2809,7 @@ server.registerTool(
     }),
     outputSchema: UpdateResultSchema,
   },
-  async ({ id, content, semanticPatch, title, tags, lifecycle, summary, alwaysLoad, cwd, allowProtectedBranch = false }) => {
+  async ({ id, content, semanticPatch, title, tags, lifecycle, role, summary, alwaysLoad, cwd, allowProtectedBranch = false }) => {
     await ensureBranchSynced(cwd);
 
     const found = await vaultManager.findNote(id, cwd);
@@ -2837,6 +2867,7 @@ server.registerTool(
       content: patchedContent ?? cleanedContent ?? note.content,
       tags: tags ?? note.tags,
       lifecycle: lifecycle ?? note.lifecycle,
+      ...(role !== undefined ? { role } : (note.role ? { role: note.role } : {})),
       alwaysLoad: alwaysLoad !== undefined ? alwaysLoad : note.alwaysLoad,
       updatedAt: now,
     };
@@ -2883,6 +2914,7 @@ server.registerTool(
     if (semanticPatch !== undefined) changes.push("semanticPatch");
     if (tags !== undefined) changes.push("tags");
     if (lifecycle !== undefined && lifecycle !== note.lifecycle) changes.push("lifecycle");
+    if (role !== undefined && role !== note.role) changes.push("role");
     if (alwaysLoad !== undefined && alwaysLoad !== note.alwaysLoad) changes.push("alwaysLoad");
     const changeDesc = changes.length > 0 ? `Updated ${changes.join(", ")}` : "No changes";
     const commitSummary = summary ?? changeDesc;
@@ -2928,11 +2960,13 @@ server.registerTool(
       timestamp: now,
       project: noteProjectRef(updated),
       lifecycle: updated.lifecycle,
+      role: updated.role,
       persistence,
     };
     
     invalidateActiveProjectCache();
-    return { content: [{ type: "text", text: `Updated memory '${id}'\n${formatPersistenceSummary(persistence)}` }], structuredContent };
+    const fieldText = changes.length > 0 ? `\nfields modified: ${changes.join(", ")}` : "";
+    return { content: [{ type: "text", text: `Updated memory '${id}'${fieldText}\n${formatPersistenceSummary(persistence)}` }], structuredContent };
   }
 );
 
@@ -3142,6 +3176,7 @@ server.registerTool(
         project: noteProjectRef(note),
         tags: note.tags,
         lifecycle: note.lifecycle,
+        role: note.role,
         alwaysLoad: note.alwaysLoad,
         relatedTo: note.relatedTo,
         createdAt: note.createdAt,
@@ -3159,7 +3194,7 @@ server.registerTool(
     const lines: string[] = [];
     for (const note of found) {
       lines.push(`## ${note.title} (${note.id})`);
-      lines.push(`project: ${note.project?.name ?? "global"} | stored: ${note.vault} | lifecycle: ${note.lifecycle}`);
+      lines.push(`project: ${note.project?.name ?? "global"} | stored: ${note.vault} | lifecycle: ${note.lifecycle}${note.role ? ` | role: ${note.role}` : ""}`);
       if (note.tags.length > 0) lines.push(`tags: ${note.tags.join(", ")}`);
       lines.push("");
       lines.push(note.content);
@@ -3332,6 +3367,7 @@ server.registerTool(
       project?: ProjectRef;
       tags: string[];
       lifecycle: NoteLifecycle;
+      role?: Note["role"];
       vault: string;
       updatedAt: string;
       hasRelated?: boolean;
@@ -3341,6 +3377,7 @@ server.registerTool(
       project: noteProjectRef(note),
       tags: note.tags,
       lifecycle: note.lifecycle,
+      role: note.role,
       vault: storageLabel(vault),
       updatedAt: note.updatedAt,
       hasRelated: note.relatedTo && note.relatedTo.length > 0,
@@ -4640,6 +4677,8 @@ const RELATIONSHIP_TYPES: [RelationshipType, ...RelationshipType[]] = [
   "explains",
   "example-of",
   "supersedes",
+  "derives-from",
+  "follows",
 ];
 
 server.registerTool(
@@ -4670,7 +4709,7 @@ server.registerTool(
       fromId: z.string().describe("Source memory id"),
       toId: z.string().describe("Target memory id"),
       type: z.enum(RELATIONSHIP_TYPES).default("related-to").describe(
-        "Relationship type: 'related-to' (same topic), 'explains' (clarifies why), 'example-of' (instance of pattern), 'supersedes' (replaces)"
+        "Relationship type: 'related-to' (same topic), 'explains' (clarifies why), 'example-of' (instance of pattern), 'supersedes' (replaces), 'derives-from' (derived artifact), 'follows' (sequence order)"
       ),
       bidirectional: z.boolean().optional().default(true).describe("Add relationship in both directions (default: true)"),
       cwd: projectParam,
@@ -6049,7 +6088,7 @@ server.registerPrompt(
             "- When unsure, prefer `recall` over `remember`.\n" +
             "- For repo-related tasks, pass `cwd` so mnemonic can route project memories correctly.\n\n" +
             "Workflow: `recall`/`list` -> `get` -> `update` or `remember` -> `relate`/`consolidate`/`move_memory`. Use `discover_tags` only when tag choice is ambiguous.\n\n" +
-            "Roles are optional prioritization hints, not schema. Lifecycle still governs durability. `role: plan` does not imply `temporary`. Inferred roles are internal hints only. Prioritization is language-independent by default.\n\n" +
+            "Roles are optional prioritization hints, not schema. Lifecycle still governs durability. When `lifecycle` is omitted, `remember` applies soft defaults based on role: `research`, `plan`, and `review` default to `temporary`; `decision`, `summary`, and `reference` default to `permanent`. Explicit `lifecycle` always overrides the role-based default. Inferred roles are internal hints only. Prioritization is language-independent by default.\n\n" +
             "### Working-state continuity\n\n" +
             "Preserve in-progress work as temporary notes when continuation value is high. Recovery happens after project orientation.\n\n" +
             "**Checkpoint note structure (temporary notes):**\n" +
@@ -6094,6 +6133,73 @@ server.registerPrompt(
       },
     ],
   })
+);
+
+// ── mnemonic-rpi-workflow prompt ───────────────────────────────────────────────
+const rpiWorkflowPrompt = async () => ({
+  messages: [
+    {
+      role: "user" as const,
+      content: {
+        type: "text" as const,
+        text:
+          "## RPIR workflow: research → plan → implement → review\n\n" +
+          "mnemonic is the artifact store, not the runtime. Store workflow artifacts with correct roles and lifecycle; do not build orchestration in core.\n\n" +
+          "### Request root note\n\n" +
+          "For each RPIR workflow, create one request root note: `role: context`, `lifecycle: temporary`, `tags: [\"workflow\", \"request\"]`. All artifacts relate to it.\n\n" +
+          "### Stage 1 — Research\n\n" +
+          "- Create or update request root note.\n" +
+          "- Create research notes: `role: research`, `lifecycle: temporary`.\n" +
+          "- Distill a short research summary when findings are scattered.\n" +
+          "- Link research `related-to` request root.\n" +
+          "- Before creating research notes, call `recall` to check whether existing notes already cover the topic.\n\n" +
+          "### Stage 2 — Plan\n\n" +
+          "- Create or update one plan note: `role: plan`, `lifecycle: temporary`.\n" +
+          "- Link plan `related-to` request root + key research notes.\n" +
+          "- Keep plan concise and executable.\n" +
+          "- REQUIRES: One current plan per request. Update or supersede when plan evolves.\n" +
+          "- Material changes (architecture, scope, ordering, validation, assumptions): update plan note first, then continue.\n" +
+          "- Non-material changes (wording, phrasing, detail): update inline without branching.\n\n" +
+          "### Stage 3 — Implement\n\n" +
+          "- Create temporary apply/task notes, tagged with `apply`.\n" +
+          "- Use `role: plan` for executable steps. Use `role: context` for observations and checkpoints.\n" +
+          "- Link apply notes `related-to` plan.\n" +
+          "- For non-trivial work, hand narrow context to subagent: request note, current plan or relevant slice, key research notes, narrow file/task scope.\n" +
+          "- Subagent returns: updated apply note, optional review note, recommendation (continue / block / update plan).\n\n" +
+          "### Stage 4 — Review\n\n" +
+          "- Create review notes: `role: review`, `lifecycle: temporary`.\n" +
+          "- Link review `related-to` apply or plan.\n" +
+          "- Fix directly or mark blockers.\n" +
+          "- If review changes the plan materially, update plan note first.\n\n" +
+          "### Stage 5 — Consolidate\n\n" +
+          "At workflow end:\n" +
+          "- Create decision note for resolved approaches (`lifecycle: permanent`).\n" +
+          "- Create summary note for outcome recaps (`lifecycle: permanent`).\n" +
+          "- Promote reusable facts and patterns into permanent reference notes.\n" +
+          "- Let pure scaffolding and redundant checkpoints expire as temporary notes.\n\n" +
+          "### Relationship conventions\n\n" +
+          "Minimal set. Link to immediate upstream artifacts only. No dense cross-linking.\n" +
+          "- research → request root\n" +
+          "- plan → request root + key research notes\n" +
+          "- apply/task → plan\n" +
+          "- review → apply or plan\n" +
+          "- outcome → plan (optionally request root)\n\n" +
+          "### Commit discipline\n\n" +
+          "Three classes: memory (research/plan/review artifacts), work (code/test/docs), memory (consolidation/promotion). When plan changes materially: update notes, commit memory, then continue work.\n\n" +
+          "### Iterate?\n\n" +
+          "Only when review or checks warrant it. Not the default.",
+      },
+    },
+  ],
+});
+
+server.registerPrompt(
+  "mnemonic-rpi-workflow",
+  {
+    title: "RPI Workflow: Research → Plan → Implement → Review",
+    description: "Stage protocol and conventions for structured task workflows using mnemonic as artifact store.",
+  },
+  rpiWorkflowPrompt
 );
 
 // ── start ─────────────────────────────────────────────────────────────────────

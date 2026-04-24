@@ -501,6 +501,8 @@ Body`;
           { id: "rel-2", type: "explains" },
           { id: "rel-3", type: "example-of" },
           { id: "rel-4", type: "supersedes" },
+          { id: "rel-5", type: "derives-from" },
+          { id: "rel-6", type: "follows" },
         ],
         createdAt: now,
         updatedAt: now,
@@ -509,7 +511,7 @@ Body`;
       await storage.writeNote(note);
       const read = await storage.readNote(note.id);
 
-      expect(read!.relatedTo).toHaveLength(4);
+      expect(read!.relatedTo).toHaveLength(6);
       expect(read!.relatedTo).toEqual(note.relatedTo);
     });
 

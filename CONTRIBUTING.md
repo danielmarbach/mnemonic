@@ -174,6 +174,25 @@ If you add MCP integration tests, follow the same hermetic pattern unless you ex
 
 When changing a tool's `structuredContent` shape or zod `outputSchema`, add or update a schema-audit test that parses the real MCP response with the exported schema. Treat handler/schema drift as a regression class to guard explicitly.
 
+When changing structured output fields, also keep human-readable text output in sync. Add or update at least one integration assertion that checks both `structuredContent` and text for the same user-visible field so text/schema parity does not drift.
+
+### Release confidence gate
+
+Before releasing, run the full release verification gate:
+
+```bash
+npm run verify:release
+```
+
+This runs build + full tests + isolated dogfood packs in one command. The isolated dogfood step uses a temporary copied vault and cleans up automatically, so it is safe to run repeatedly.
+
+`verify:release` treats dogfood checks in two tiers:
+
+- **Required (blocking):** orientation stability, alwaysLoad frontmatter toggle persistence, temporary-note merge cleanup default, workflow-hint orientation wording, semantic patch success, semantic patch lint rejection, semantic patch retry success.
+- **Advisory (non-blocking):** retrieval quality and navigation heuristics that can vary with current vault contents.
+
+Release rule: if required checks pass and tests are green, ship is allowed. If advisory findings appear, review them and either accept with rationale or open follow-up work; do not ignore them silently.
+
 ---
 
 ## Data format and migration changes

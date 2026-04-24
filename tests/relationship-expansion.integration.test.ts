@@ -91,6 +91,43 @@ describe("Phase 4 relationship expansion", () => {
       const parsed = GetResultSchema.parse(result.structuredContent);
       expect(parsed.notes[0].relationships).toBeUndefined();
     }, 30000);
+
+    it("accepts directional relationship types in relate", async () => {
+      const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-phase4-get-"));
+      tempDirs.push(vaultDir);
+
+      const from = await callLocalMcpTool(vaultDir, "remember", {
+        title: "From Note",
+        content: "From content",
+        cwd: vaultDir,
+        scope: "project",
+        lifecycle: "permanent",
+      });
+
+      const to = await callLocalMcpTool(vaultDir, "remember", {
+        title: "To Note",
+        content: "To content",
+        cwd: vaultDir,
+        scope: "project",
+        lifecycle: "permanent",
+      });
+
+      await callLocalMcpTool(vaultDir, "relate", {
+        fromId: from.structuredContent?.id,
+        toId: to.structuredContent?.id,
+        type: "follows",
+        cwd: vaultDir,
+      });
+
+      const result = await callLocalMcpTool(vaultDir, "get", {
+        ids: [from.structuredContent?.id],
+        cwd: vaultDir,
+        includeRelationships: true,
+      });
+
+      const parsed = GetResultSchema.parse(result.structuredContent);
+      expect(parsed.notes[0].relationships?.shown[0]?.relationType).toBe("follows");
+    }, 30000);
   });
 
   describe("recall relationship expansion", () => {

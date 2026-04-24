@@ -54,6 +54,17 @@ When storing a memory, choose the lifecycle intentionally:
 - `role: plan` does not imply `temporary`.
 - Tags like `plan`, `wip`, and `completed` are descriptive only. They do not control cleanup behavior.
 
+### RPIR workflow roles
+
+When running Research -> Plan -> Implement -> Review workflows:
+
+- Create one request root note with `role: context`, `lifecycle: temporary`, `tags: ["workflow", "request"]`.
+- Use `role: research` for research artifacts and `role: review` for review artifacts.
+- Keep one current plan note per request using `role: plan` and update or supersede it as work evolves.
+- For apply/task notes, do not add new roles: use `role: plan` for executable steps and `role: context` for observations/checkpoints; tag both with `apply`.
+- Keep relationships sparse and immediate-upstream only: research -> request, plan -> request/research, apply -> plan, review -> apply/plan, outcome -> plan.
+- Use `mnemonic-rpi-workflow` prompt for stage protocol and handoff conventions; use `mnemonic-workflow-hint` for memory-tool usage protocol.
+
 ### Capture triggers
 
 Default to capturing important context through MCP without waiting to be reminded. In particular, capture when any of the following happens:
@@ -267,6 +278,7 @@ Keep these high-level anchors in mind:
 
 | Prompt | Description |
 |--------|-------------|
+| `mnemonic-rpi-workflow` | Optional. Returns the RPIR stage protocol and conventions: request root note pattern, stage checklists, apply/task split, sparse relationship conventions, subagent handoff contract, and commit discipline. |
 | `mnemonic-workflow-hint` | Optional. Returns a compact decision protocol: use `recall` or `list` first, inspect with `get`, update existing memories, remember only when nothing matches, then organize with `relate`, `consolidate`, or `move_memory`. It also reinforces summary-first orientation via `project_memory_summary`, recovery of temporary working state only after orientation, and that roles are optional hints while lifecycle remains separate. |
 
 ## Tools
@@ -288,7 +300,7 @@ Keep these high-level anchors in mind:
 | `memory_graph` | Show compact adjacency list of relationships |
 | `move_memory` | Move note between vaults without changing id |
 | `project_memory_summary` | Session-start entrypoint: themed notes, anchors, and orientation for fast project orientation |
-| `recall` | Semantic search with optional project boost and opt-in temporal history |
+| `recall` | Semantic search with optional project boost plus `temporal` and `workflow` modes |
 | `recent_memories` | Show most recently updated notes for scope |
 | `remember` | Write note + embedding; `cwd` sets context, `scope` picks storage, `lifecycle` picks temporary vs permanent |
 | `relate` | Create typed relationship between notes (bidirectional) |

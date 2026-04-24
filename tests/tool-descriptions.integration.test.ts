@@ -29,12 +29,34 @@ describe("tool-descriptions", () => {
     expect(promptText).toContain("Bad: call `remember` immediately because the user said 'remember'.");
     expect(promptText).toContain("Roles are optional prioritization hints, not schema.");
     expect(promptText).toContain("Lifecycle still governs durability.");
-    expect(promptText).toContain("`role: plan` does not imply `temporary`.");
+    expect(promptText).toContain("When `lifecycle` is omitted, `remember` applies soft defaults based on role");
+    expect(promptText).toContain("`research`, `plan`, and `review` default to `temporary`");
     expect(promptText).toContain("Inferred roles are internal hints only.");
     expect(promptText).toContain("Prioritization is language-independent by default.");
     expect(promptText).toContain("Call `project_memory_summary` first for orientation");
     expect(promptText).toContain("Recovery is a follow-on step, not a replacement for orientation");
     expect(promptText).not.toContain("strategy `supersedes`");
+  }, 15000);
+
+  it("exposes rpi-workflow prompt with stage protocol conventions", async () => {
+    const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-vault-"));
+    tempDirs.push(vaultDir);
+
+    const promptText = await callLocalMcpPrompt(vaultDir, "mnemonic-rpi-workflow");
+
+    expect(promptText).toContain("## RPIR workflow: research → plan → implement → review");
+    expect(promptText).toContain("mnemonic is the artifact store, not the runtime");
+    expect(promptText).toContain("`role: context`");
+    expect(promptText).toContain("`lifecycle: temporary`");
+    expect(promptText).toContain("`tags: [\"workflow\", \"request\"]`");
+    expect(promptText).toContain("### Stage 1 — Research");
+    expect(promptText).toContain("### Stage 2 — Plan");
+    expect(promptText).toContain("### Stage 3 — Implement");
+    expect(promptText).toContain("### Stage 4 — Review");
+    expect(promptText).toContain("### Stage 5 — Consolidate");
+    expect(promptText).toContain("One current plan per request");
+    expect(promptText).toContain("Subagent returns: updated apply note");
+    expect(promptText).toContain("Three classes: memory (research/plan/review artifacts), work (code/test/docs), memory (consolidation/promotion)");
   }, 15000);
 
   it("surfaces prerequisite-first workflow wording in phase-aware tool descriptions", async () => {

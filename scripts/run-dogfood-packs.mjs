@@ -363,6 +363,28 @@ async function main() {
   report.packB = packB;
   report.packC = packC;
 
+  const requiredChecks = [
+    { name: "packA.warmOrientationStable", ok: packA.warmOrientationStable },
+    { name: "packA.alwaysLoadFlipped", ok: packA.alwaysLoadFlipped },
+    { name: "packB.allTemporarySourcesAutoDelete", ok: packB.allTemporarySourcesAutoDelete },
+    { name: "packB.promptHasOrientationFirst", ok: packB.promptHasOrientationFirst },
+    { name: "packC.semPatchOk", ok: packC.semPatchOk },
+    { name: "packC.lintRejected", ok: packC.lintRejected },
+    { name: "packC.retryOk", ok: packC.retryOk },
+    { name: "packC.retryContentOk", ok: packC.retryContentOk },
+  ];
+  const requiredFailures = requiredChecks.filter((check) => !check.ok).map((check) => check.name);
+  const advisoryFindings = [
+    ...packA.unchecked.map((item) => `packA: ${item}`),
+    ...packB.unchecked.map((item) => `packB: ${item}`),
+    ...packC.unchecked.map((item) => `packC: ${item}`),
+  ];
+
+  report.releaseGate = {
+    requiredFailures,
+    advisoryFindings,
+  };
+
   const vaultLabel = useIsolated ? "isolated vault" : "installed mnemonic server";
 
   const packAContent = `Dogfooding results for the core enrichment/orientation pack on ${today} using the ${vaultLabel}.\n\nUnchecked items:\n${packA.unchecked.length === 0 ? "- none" : packA.unchecked.map((item) => `- ${item}`).join("\n")}\n\nObservations:\n- Theme count: ${packA.themeCount}\n- Top embeddings recall hit: ${packA.topEmbeddingResult}\n- Recent navigation note: ${packA.recentNavigationNote}\n- Recent navigation reaches architecture/decision notes within three steps: ${packA.reachesArchitectureWithinThreeSteps}\n- Working-state note count: ${packA.workingStateCount}`;
@@ -380,6 +402,10 @@ async function main() {
   };
 
   console.log(JSON.stringify(report, null, 2));
+
+  if (requiredFailures.length > 0) {
+    throw new Error(`Dogfood required checks failed: ${requiredFailures.join(", ")}`);
+  }
 }
 
 main().catch((error) => {

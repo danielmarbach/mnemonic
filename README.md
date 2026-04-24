@@ -51,7 +51,12 @@ No code changes required — set `EMBED_MODEL=qwen3-embedding:0.6b` in your envi
 npm install
 npm run build
 npm test
+
+# release-confidence gate (build + full tests + isolated dogfooding)
+npm run verify:release
 ```
+
+The gate fails on required dogfood checks and reports advisory findings separately in the dogfood output.
 
 `npm run build` already runs `typecheck`, but running it explicitly first gives a faster failure loop when iterating on the codebase.
 
@@ -93,6 +98,45 @@ npm install @danielmarbach/mnemonic-mcp
 # Specific release
 npm install @danielmarbach/mnemonic-mcp@0.2.0
 ```
+
+### Install bundled skills (Claude/OpenCode)
+
+The npm package now includes `skills/**` plus a helper binary to install them into local skill directories.
+
+```bash
+# If mnemonic is installed in this project:
+npx mnemonic-install-skills --target all --mode copy
+
+# One-off install without adding dependency:
+npx -y -p @danielmarbach/mnemonic-mcp mnemonic-install-skills --target all --mode copy
+```
+
+Supported targets:
+
+- `--target claude` -> `~/.claude/skills`
+- `--target opencode` -> `~/.config/opencode/skills`
+- `--target all` -> both (default)
+- `--target custom` -> only use `--target-dir` destinations
+- `--target-dir <path>` -> add any custom client skill directory
+
+Update flow after upgrading `@danielmarbach/mnemonic-mcp`:
+
+```bash
+npx mnemonic-install-skills --target all --mode copy --update
+```
+
+If you prefer automatic propagation without copy refreshes, use symlink mode:
+
+```bash
+npx mnemonic-install-skills --target all --mode symlink --update
+```
+
+After install, load and use the skill by name:
+
+- Skill name: `mnemonic-rpi-workflow`
+- Prompt counterpart: `mnemonic-rpi-workflow`
+
+In clients that support explicit skill loading (for example Claude Code or OpenCode), load `mnemonic-rpi-workflow` before running multi-step RPIR workflows.
 
 ### Homebrew
 
@@ -312,7 +356,11 @@ Project identity derives from the **git remote URL**, normalized to a stable slu
 
 **Hybrid recall** enhances semantic search with lightweight lexical reranking over note projections. When semantic results are weak, a bounded lexical rescue path scans projections for additional candidates, improving exact-match and identifier-heavy recall without changing the storage model or adding new infrastructure. **Canonical explanation promotion** boosts notes that explain key decisions and concepts for "why"-style questions, using structural signals like role, connections, and format rather than keyword matching.
 
-Temporal recall is opt-in via `mode: "temporal"`. It keeps semantic selection first, then enriches only the top matches with compact git-backed history so agents can inspect how a note evolved without turning recall into raw log or diff output.
+Recall modes:
+
+- `mode: "default"` (default): semantic recall with optional lexical reranking and bounded relationship previews.
+- `mode: "temporal"`: enrich top matches with compact git-backed history (no raw diffs by default).
+- `mode: "workflow"`: prioritize RPIR-style chain reconstruction while remaining compatible with legacy `related-to` links.
 
 **What temporal mode shows:**
 
@@ -341,11 +389,21 @@ Each note carries a `lifecycle`:
 
 ### Roles and lifecycle
 
-Roles are optional prioritization hints, not required schema. mnemonic infers a `role` and `importance` from structural signals (heading count, bullet density, inbound references, relationship types) — inference is language-independent and never overwrites explicit frontmatter. Valid roles: `summary`, `decision`, `plan`, `log`, `reference`. Valid importance values: `high`, `normal`.
+Roles are optional prioritization hints, not required schema. mnemonic infers a `role` and `importance` from structural signals (heading count, bullet density, inbound references, relationship types) — inference is language-independent and never overwrites explicit frontmatter. Valid roles: `summary`, `decision`, `plan`, `context`, `reference`, `research`, `review`. Valid importance values: `high`, `normal`, `low`.
 
 Set `alwaysLoad: true` in a note's frontmatter to mark it as an explicit session anchor; it receives the highest recall and relationship-expansion priority regardless of inferred role.
 
-mnemonic works without roles. Inferred roles stay internal-only, prioritization is language-independent by default, and lifecycle remains the separate durability axis. A note with `role: plan` can still be either `temporary` or `permanent`.
+mnemonic works without roles. Inferred roles stay internal-only, prioritization is language-independent by default, and lifecycle remains the separate durability axis. When `lifecycle` is omitted, `remember` applies soft defaults based on role: `research`, `plan`, and `review` default to `temporary`; `decision`, `summary`, and `reference` default to `permanent`. Explicit `lifecycle` always overrides the role-based default.
+
+### RPIR workflow conventions
+
+For structured workflows, use the RPIR stages: research -> plan -> implement -> review (iterate only when needed).
+
+- Create one request root note per workflow: `role: context`, `lifecycle: temporary`, `tags: ["workflow", "request"]`.
+- Keep one current plan note per request (`role: plan`) and update or supersede as the plan evolves.
+- For apply/task notes, do not add a new role: use `role: plan` for executable steps and `role: context` for execution observations; tag both with `apply`.
+- Keep relationships sparse and immediate-upstream only: research -> request, plan -> request/research, apply -> plan, review -> apply/plan, outcome -> plan (optionally request).
+- Consolidate at workflow end: promote durable outcomes into permanent decision/summary/reference notes; let temporary scaffolding expire.
 
 ### Note format
 
@@ -444,6 +502,7 @@ Imported notes are written to the main vault with `lifecycle: permanent` and `sc
 
 | Prompt | Description |
 |--------|-------------|
+| `mnemonic-rpi-workflow` | Optional. Returns RPIR stage protocol and conventions: request root note pattern, stage checklists, apply/task split, sparse relationships, subagent handoff contract, and commit discipline. |
 | `mnemonic-workflow-hint` | Optional. Returns a compact decision protocol: use `recall` or `list` first, inspect with `get`, update existing memories, remember only when nothing matches, then organize with `relate`, `consolidate`, or `move_memory`. It also reinforces summary-first orientation via `project_memory_summary`, temporary-note recovery only after orientation, and that roles are optional prioritization hints while lifecycle stays separate. |
 
 ## Tools
@@ -463,7 +522,7 @@ Imported notes are written to the main vault with `lifecycle: permanent` and `sc
 | `memory_graph`              | Show compact adjacency list of relationships                             |
 | `move_memory`               | Move note between vaults without changing id                             |
 | `project_memory_summary`    | Session-start entrypoint: themed notes, anchors, and orientation for fast project orientation |
-| `recall`                    | Semantic search with optional project boost and opt-in temporal history  |
+| `recall`                    | Semantic search with optional project boost, temporal history mode, and workflow chain mode |
 | `recent_memories`           | Show most recently updated notes for scope                               |
 | `remember`                  | Write note + embedding; `cwd` sets context, `scope` picks storage, `lifecycle` picks temporary vs permanent |
 | `relate`                    | Create typed relationship between notes (bidirectional)                  |
@@ -504,6 +563,10 @@ relatedTo:
 | `explains`   | `fromId` explains `toId`                 |
 | `example-of` | `fromId` is a concrete example of `toId` |
 | `supersedes` | `fromId` is the newer version of `toId`  |
+| `derives-from` | `fromId` is derived from `toId`        |
+| `follows` | `fromId` follows `toId` in sequence         |
+
+`workflow` recall mode prefers directional and typed relationships first, then falls back to `related-to` for long-term compatibility with older vaults.
 
 `relate` is bidirectional by default. `forget` automatically removes any edges pointing at the deleted note.
 

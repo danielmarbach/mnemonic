@@ -90,8 +90,8 @@ describe("project-memory-summary", () => {
       expect(listed.structuredContent?.["count"]).toBe(3);
       const listedNotes = listed.structuredContent?.["notes"] as Array<Record<string, unknown>>;
       expect(listedNotes.map((note) => note["id"])).toEqual([privateProjectId, sharedProjectId, globalId]);
-      expect(listed.text).toContain("stored=project-vault");
-      expect(listed.text).toContain("stored=main-vault");
+      expect(listed.text).toContain("stored: project-vault");
+      expect(listed.text).toContain("stored: main-vault");
 
       const recent = await callLocalMcpResponse(vaultDir, "recent_memories", {
         cwd: repoDir,

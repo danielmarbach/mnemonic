@@ -271,4 +271,22 @@ describe("role suggestions", () => {
 
     expect(suggestRole(note)).toBeUndefined();
   });
+
+  it("never returns research or review from inference", () => {
+    const researchNote = makeNote({
+      title: "Research findings on API design",
+      content: "## Findings\n\n- Investigated three approaches\n- Approach A had best latency\n- Approach B had best throughput\n\n## Conclusion\n\nApproach A is preferred for low-latency use cases.",
+      lifecycle: "temporary",
+    });
+    const reviewNote = makeNote({
+      title: "Code review for PR 42",
+      content: "## Issues found\n\n1. Missing error handling in handler\n2. N+1 query in list endpoint\n[x] Check auth middleware\n\n## Verdict\n\nNeeds changes before merge.",
+      lifecycle: "temporary",
+    });
+
+    expect(suggestRole(researchNote)).not.toBe("research");
+    expect(suggestRole(researchNote)).not.toBe("review");
+    expect(suggestRole(reviewNote)).not.toBe("research");
+    expect(suggestRole(reviewNote)).not.toBe("review");
+  });
 });
