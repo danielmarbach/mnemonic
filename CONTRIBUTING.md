@@ -174,6 +174,16 @@ If you add MCP integration tests, follow the same hermetic pattern unless you ex
 
 When changing a tool's `structuredContent` shape or zod `outputSchema`, add or update a schema-audit test that parses the real MCP response with the exported schema. Treat handler/schema drift as a regression class to guard explicitly.
 
+### Release confidence gate
+
+Before releasing, run the full release verification gate:
+
+```bash
+npm run verify:release
+```
+
+This runs build + full tests + isolated dogfood packs in one command. The isolated dogfood step uses a temporary copied vault and cleans up automatically, so it is safe to run repeatedly.
+
 ---
 
 ## Data format and migration changes

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { Vault } from "./vault.js";
-import type { Note, NoteLifecycle, RelationshipType } from "./storage.js";
+import { NOTE_ROLES } from "./storage.js";
+import type { Note, NoteLifecycle, NoteRole, RelationshipType } from "./storage.js";
 
 export interface PersistenceStatus {
   notePath: string;
@@ -98,6 +99,7 @@ export interface RecallResult extends Record<string, unknown> {
     vault: string;
     tags: string[];
     lifecycle: NoteLifecycle;
+    role?: NoteRole;
     updatedAt: string;
     provenance?: Provenance;
     confidence?: Confidence;
@@ -132,6 +134,7 @@ export interface ListResult extends Record<string, unknown> {
     project?: ProjectRef;
     tags: string[];
     lifecycle: NoteLifecycle;
+    role?: NoteRole;
     vault: string;
     updatedAt: string;
     hasRelated?: boolean;
@@ -154,6 +157,7 @@ export interface GetResult extends Record<string, unknown> {
     project?: ProjectRef;
     tags: string[];
     lifecycle: NoteLifecycle;
+    role?: NoteRole;
     alwaysLoad?: boolean;
     relatedTo?: Array<{ id: string; type: RelationshipType }>;
     createdAt: string;
@@ -193,6 +197,7 @@ export interface UpdateResult extends Record<string, unknown> {
   timestamp: string;
   project?: ProjectRef;
   lifecycle: NoteLifecycle;
+  role?: NoteRole;
   persistence: PersistenceStatus;
 }
 
@@ -442,6 +447,7 @@ export interface ProjectSummaryResult extends Record<string, unknown> {
 // ── Zod output schemas ────────────────────────────────────────────────────────
 
 const _NoteLifecycle = z.enum(["temporary", "permanent"]);
+const _NoteRole = z.enum(NOTE_ROLES);
 const _RelationshipType = z.enum(["related-to", "explains", "example-of", "supersedes", "derives-from", "follows"]);
 /**
  * Vault label used in structured output.
@@ -546,6 +552,7 @@ export const RecallResultSchema = z.object({
     vault: _VaultLabel,
     tags: z.array(z.string()),
     lifecycle: _NoteLifecycle,
+    role: _NoteRole.optional(),
     updatedAt: z.string(),
     provenance: z.object({
       lastUpdatedAt: z.string(),
@@ -585,6 +592,7 @@ export const ListResultSchema = z.object({
     project: ProjectRefSchema.optional(),
     tags: z.array(z.string()),
     lifecycle: _NoteLifecycle,
+    role: _NoteRole.optional(),
     vault: _VaultLabel,
     updatedAt: z.string(),
     hasRelated: z.boolean().optional(),
@@ -605,6 +613,7 @@ export const UpdateResultSchema = z.object({
   timestamp: z.string(),
   project: ProjectRefSchema.optional(),
   lifecycle: _NoteLifecycle,
+  role: _NoteRole.optional(),
   persistence: PersistenceStatusSchema,
 });
 
@@ -794,6 +803,7 @@ export const GetResultSchema = z.object({
     project: ProjectRefSchema.optional(),
     tags: z.array(z.string()),
     lifecycle: _NoteLifecycle,
+    role: _NoteRole.optional(),
     alwaysLoad: z.boolean().optional(),
     relatedTo: z.array(z.object({ id: z.string(), type: _RelationshipType })).optional(),
     createdAt: z.string(),

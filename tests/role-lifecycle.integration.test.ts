@@ -192,6 +192,60 @@ describe("role parameter and role-based lifecycle defaults", () => {
     }
   }, 15000);
 
+  it("update role is reflected in structured update/get/list/recall outputs", async () => {
+    const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-role-"));
+    tempDirs.push(vaultDir);
+    const embeddingServer = await startFakeEmbeddingServer();
+
+    try {
+      const rememberText = await callLocalMcp(vaultDir, "remember", {
+        title: "Role visibility across structured outputs",
+        content: "Starts unclassified and is classified later.",
+        scope: "global",
+      }, embeddingServer.url);
+
+      const noteId = extractRememberedId(rememberText);
+
+      const updateResponse = await callLocalMcpResponse(vaultDir, "update", {
+        id: noteId,
+        role: "decision",
+      }, embeddingServer.url);
+
+      expect(updateResponse.text).toContain("Updated");
+      expect(updateResponse.structuredContent?.fieldsModified).toContain("role");
+      expect(updateResponse.structuredContent?.role).toBe("decision");
+
+      const getResponse = await callLocalMcpResponse(vaultDir, "get", {
+        ids: [noteId],
+        scope: "global",
+      }, embeddingServer.url);
+
+      const getNotes = (getResponse.structuredContent?.notes as Array<Record<string, unknown>> | undefined) ?? [];
+      expect(getNotes[0]?.role).toBe("decision");
+
+      const listResponse = await callLocalMcpResponse(vaultDir, "list", {
+        scope: "global",
+        storedIn: "any",
+      }, embeddingServer.url);
+
+      const listNotes = (listResponse.structuredContent?.notes as Array<Record<string, unknown>> | undefined) ?? [];
+      const listed = listNotes.find((n) => n.id === noteId);
+      expect(listed?.role).toBe("decision");
+
+      const recallResponse = await callLocalMcpResponse(vaultDir, "recall", {
+        query: "Role visibility across structured outputs",
+        scope: "global",
+        limit: 5,
+      }, embeddingServer.url);
+
+      const recallResults = (recallResponse.structuredContent?.results as Array<Record<string, unknown>> | undefined) ?? [];
+      const recalled = recallResults.find((r) => r.id === noteId);
+      expect(recalled?.role).toBe("decision");
+    } finally {
+      await embeddingServer.close();
+    }
+  }, 15000);
+
   it("update with role change does not implicitly change lifecycle", async () => {
     const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-role-"));
     tempDirs.push(vaultDir);

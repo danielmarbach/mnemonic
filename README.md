@@ -51,6 +51,9 @@ No code changes required — set `EMBED_MODEL=qwen3-embedding:0.6b` in your envi
 npm install
 npm run build
 npm test
+
+# release-confidence gate (build + full tests + isolated dogfooding)
+npm run verify:release
 ```
 
 `npm run build` already runs `typecheck`, but running it explicitly first gives a faster failure loop when iterating on the codebase.

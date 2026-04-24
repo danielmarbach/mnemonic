@@ -30,6 +30,8 @@
     "mcp:local": "./scripts/mcp-local.sh",
     "prepack": "npm run build",
     "start": "node build/index.js",
+    "dogfood:isolated": "MNEMONIC_ENTRYPOINT=build/index.js node scripts/run-dogfood-packs.mjs --isolated",
+    "verify:release": "npm run build && npm test && npm run dogfood:isolated",
     "skills:install": "node scripts/install-skills.mjs --target all --mode copy",
     "skills:update": "node scripts/install-skills.mjs --target all --mode copy --update",
     "test": "vitest run",

@@ -2582,6 +2582,7 @@ server.registerTool(
       vault: string;
       tags: string[];
       lifecycle: NoteLifecycle;
+      role?: Note["role"];
       updatedAt: string;
       provenance?: {
         lastUpdatedAt: string;
@@ -2680,6 +2681,7 @@ server.registerTool(
           vault: storageLabel(vault),
           tags: note.tags,
           lifecycle: note.lifecycle,
+          role: note.role,
           updatedAt: note.updatedAt,
           provenance,
           confidence,
@@ -2910,6 +2912,7 @@ server.registerTool(
     if (semanticPatch !== undefined) changes.push("semanticPatch");
     if (tags !== undefined) changes.push("tags");
     if (lifecycle !== undefined && lifecycle !== note.lifecycle) changes.push("lifecycle");
+    if (role !== undefined && role !== note.role) changes.push("role");
     if (alwaysLoad !== undefined && alwaysLoad !== note.alwaysLoad) changes.push("alwaysLoad");
     const changeDesc = changes.length > 0 ? `Updated ${changes.join(", ")}` : "No changes";
     const commitSummary = summary ?? changeDesc;
@@ -2955,6 +2958,7 @@ server.registerTool(
       timestamp: now,
       project: noteProjectRef(updated),
       lifecycle: updated.lifecycle,
+      role: updated.role,
       persistence,
     };
     
@@ -3169,6 +3173,7 @@ server.registerTool(
         project: noteProjectRef(note),
         tags: note.tags,
         lifecycle: note.lifecycle,
+        role: note.role,
         alwaysLoad: note.alwaysLoad,
         relatedTo: note.relatedTo,
         createdAt: note.createdAt,
@@ -3359,6 +3364,7 @@ server.registerTool(
       project?: ProjectRef;
       tags: string[];
       lifecycle: NoteLifecycle;
+      role?: Note["role"];
       vault: string;
       updatedAt: string;
       hasRelated?: boolean;
@@ -3368,6 +3374,7 @@ server.registerTool(
       project: noteProjectRef(note),
       tags: note.tags,
       lifecycle: note.lifecycle,
+      role: note.role,
       vault: storageLabel(vault),
       updatedAt: note.updatedAt,
       hasRelated: note.relatedTo && note.relatedTo.length > 0,
