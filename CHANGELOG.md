@@ -6,6 +6,12 @@ The format is loosely based on Keep a Changelog and uses semver-style version he
 
 ## [Unreleased]
 
+## [0.25.4] - 2026-04-25
+
+### Changed
+
+- `semanticPatch` parameter description and `mnemonic-workflow-hint` prompt now include a concise callout that `replaceChildren` on a `heading` selector targets the heading itself, not the body below it, with guidance to use `appendChild` or `replace` instead. This addresses a common structural misunderstanding when patching note sections via heading selectors.
+
 ## [0.25.3] - 2026-04-25
 
 ### Fixed
