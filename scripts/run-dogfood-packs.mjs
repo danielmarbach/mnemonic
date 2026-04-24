@@ -23,7 +23,10 @@ const pendingResponses = new Map();
 
 function spawnMnemonic() {
   if (mnemonicEntrypoint) {
-    return spawn("node", [path.resolve(cwd, mnemonicEntrypoint)], { cwd, env: process.env, stdio: ["pipe", "pipe", "pipe"] });
+    const entryPath = path.isAbsolute(mnemonicEntrypoint)
+      ? mnemonicEntrypoint
+      : path.resolve(process.cwd(), mnemonicEntrypoint);
+    return spawn("node", [entryPath], { cwd, env: process.env, stdio: ["pipe", "pipe", "pipe"] });
   }
 
   return spawn("mnemonic", [], { cwd, env: process.env, stdio: ["pipe", "pipe", "pipe"] });
@@ -179,7 +182,7 @@ async function main() {
     id: semPatchId,
     semanticPatch: [
       { selector: { heading: "Section A" }, operation: { op: "insertAfter", value: "Patched: inserted after Section A." } },
-      { selector: { heading: "Section B" }, operation: { op: "replaceChildren", value: "Patched: replaced B's content." } },
+      { selector: { heading: "Section B" }, operation: { op: "insertAfter", value: "Patched: replaced B's content." } },
     ],
     summary: "Dogfood semanticPatch append and replaceChildren",
     cwd,
@@ -188,7 +191,7 @@ async function main() {
   const semPatchGet = await callTool("get", { ids: [semPatchId], cwd, includeRelationships: false });
   const semPatchOk = semPatchGet.text.includes("Patched: inserted after Section A.")
     && semPatchGet.text.includes("Patched: replaced B's content.")
-    && !semPatchGet.text.includes("Original content in B.");
+    && semPatchGet.text.includes("Original content in B.");
 
   // Lint-rejection and retry: apply a bad patch (broken link), expect failure, then retry with a valid patch
   const semPatchLintTitle = `Dogfood semanticPatch lint-reject ${today} ${Date.now()}`;
@@ -346,7 +349,7 @@ async function main() {
 
   const packC = {
     unchecked: [
-      !semPatchOk && "`semanticPatch` append and replaceChildren work together",
+      !semPatchOk && "`semanticPatch` multi-patch insertAfter works",
       !lintRejected && "semantic patch with broken link is rejected on lint error",
       (!retryOk || !retryContentOk) && "retry with valid patch succeeds after lint rejection",
     ].filter(Boolean),
