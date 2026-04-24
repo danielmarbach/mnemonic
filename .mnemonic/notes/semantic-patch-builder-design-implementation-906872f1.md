@@ -10,7 +10,7 @@ tags:
   - implementation
 lifecycle: permanent
 createdAt: '2026-04-24T11:09:39.750Z'
-updatedAt: '2026-04-24T11:29:37.329Z'
+updatedAt: '2026-04-24T11:32:28.640Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 memoryVersion: 1
@@ -73,6 +73,10 @@ For a 2000-token production note the ratio widens further since patch overhead s
 - Multi-patch `insertAfter` under different headings
 - Lint rejection on invalid markdown (`[broken](<>)`)
 - Retry with valid patch succeeds after lint rejection (no mutation from the bad patch)
+
+## Test Field
+
+Checking fieldsModified.
 
 ## Files
 
