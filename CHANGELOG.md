@@ -6,6 +6,14 @@ The format is loosely based on Keep a Changelog and uses semver-style version he
 
 ## [Unreleased]
 
+## [0.25.2] - 2026-04-24
+
+### Changed
+
+- `semanticPatch` parameter description now includes the full selector/operation type union and a 3-patch working example, so LLMs can construct correct JSON shapes without guessing at the nesting structure.
+- `mnemonic-workflow-hint` prompt now includes a `semanticPatch format` section with explicit nesting examples and a callout for the common `{op, value}` flattening mistake.
+- Selector-not-found errors now include a format reminder showing the correct selector shape using the first available heading.
+
 ## [0.25.1] - 2026-04-24
 
 ### Changed

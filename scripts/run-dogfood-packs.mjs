@@ -193,8 +193,8 @@ async function main() {
     && semPatchGet.text.includes("Patched: replaced B's content.")
     && semPatchGet.text.includes("Original content in B.");
 
-  // Lint-rejection and retry: apply a bad patch (broken link), expect failure, then retry with a valid patch
-  const semPatchLintTitle = `Dogfood semanticPatch lint-reject ${today} ${Date.now()}`;
+  // Lint-warning for patch values: apply a patch with a lint issue, expect success with warning, then retry with clean content
+  const semPatchLintTitle = `Dogfood semanticPatch lint-warning ${today} ${Date.now()}`;
   const semPatchLintId = await createTemporaryNote({
     title: semPatchLintTitle,
     content: `# ${semPatchLintTitle}\n\n## Section X\n\nClean content.\n`,
@@ -205,18 +205,18 @@ async function main() {
     semanticPatch: [
       { selector: { heading: "Section X" }, operation: { op: "insertAfter", value: "[broken](<>)" } },
     ],
-    summary: "Dogfood semanticPatch lint rejection",
+    summary: "Dogfood semanticPatch lint warning",
     cwd,
     allowProtectedBranch: true,
   });
-  const lintRejected = badPatch.text.includes("Semantic patch failed");
-  // Retry with valid content
+  const lintWarnedButSucceeded = badPatch.text.includes("Updated memory") && (badPatch.text.includes("lint warning") || badPatch.text.includes("Lint warning"));
+  // Retry with valid content to confirm the note is still usable after a lint-warning patch
   const retryPatch = await callTool("update", {
     id: semPatchLintId,
     semanticPatch: [
       { selector: { heading: "Section X" }, operation: { op: "insertAfter", value: "Retry succeeded." } },
     ],
-    summary: "Dogfood semanticPatch retry after lint rejection",
+    summary: "Dogfood semanticPatch retry after lint warning",
     cwd,
     allowProtectedBranch: true,
   });
@@ -350,11 +350,11 @@ async function main() {
   const packC = {
     unchecked: [
       !semPatchOk && "`semanticPatch` multi-patch insertAfter works",
-      !lintRejected && "semantic patch with broken link is rejected on lint error",
-      (!retryOk || !retryContentOk) && "retry with valid patch succeeds after lint rejection",
+      !lintWarnedButSucceeded && "semantic patch with broken link succeeds with lint warning",
+      (!retryOk || !retryContentOk) && "retry with valid patch succeeds after lint warning",
     ].filter(Boolean),
     semPatchOk,
-    lintRejected,
+    lintWarnedButSucceeded,
     retryOk,
     retryContentOk,
   };
@@ -369,7 +369,7 @@ async function main() {
     { name: "packB.allTemporarySourcesAutoDelete", ok: packB.allTemporarySourcesAutoDelete },
     { name: "packB.promptHasOrientationFirst", ok: packB.promptHasOrientationFirst },
     { name: "packC.semPatchOk", ok: packC.semPatchOk },
-    { name: "packC.lintRejected", ok: packC.lintRejected },
+    { name: "packC.lintWarnedButSucceeded", ok: packC.lintWarnedButSucceeded },
     { name: "packC.retryOk", ok: packC.retryOk },
     { name: "packC.retryContentOk", ok: packC.retryContentOk },
   ];
@@ -391,7 +391,7 @@ async function main() {
 
   const packBContent = `Dogfooding results for the working-state continuity pack on ${today} using the ${vaultLabel}.\n\nUnchecked items:\n${packB.unchecked.length === 0 ? "- none" : packB.unchecked.map((item) => `- ${item}`).join("\n")}\n\nObservations:\n- Temporary recent titles: ${packB.recentTemporaryTitles.map((title) => `\`${title}\``).join(", ") || "none"}\n- Temporary recall titles: ${packB.recalledTemporaryTitles.map((title) => `\`${title}\``).join(", ") || "none"}\n- All-temporary merges auto-delete by default: ${packB.allTemporarySourcesAutoDelete}`;
 
-  const packCContent = `Dogfooding results for the blind interruption/resumption pack on ${today} using the ${vaultLabel}.\n\nUnchecked items:\n- none\n\nSemantic patch checks:\n- Multi-patch append + replaceChildren: ${semPatchOk}\n- Lint rejection on invalid markdown: ${lintRejected}\n- Retry after lint rejection: retryOk=${retryOk}, retryContentOk=${retryContentOk}`;
+  const packCContent = `Dogfooding results for the blind interruption/resumption pack on ${today} using the ${vaultLabel}.\n\nUnchecked items:\n- none\n\nSemantic patch checks:\n- Multi-patch append + replaceChildren: ${semPatchOk}\n- Lint warning on invalid markdown (patch still succeeds): ${lintWarnedButSucceeded}\n- Retry after lint warning: retryOk=${retryOk}, retryContentOk=${retryContentOk}`;
 
   const packTitleSuffix = useIsolated ? ` (${today}) (isolated vault)` : ` (${today})`;
 

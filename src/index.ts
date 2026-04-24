@@ -2776,9 +2776,16 @@ server.registerTool(
         }))
         .optional()
         .describe(
-          "Use for targeted edits when you know the structure. More token-efficient than passing full content. " +
-          "Mutually exclusive with content. " +
-          "If this fails, fix the issue in your patch values and retry — do NOT fall back to full content rewrite."
+          "Targeted edits to note sections. Array of {selector, operation} objects. Mutually exclusive with content. " +
+          "If this fails, fix the issue in your patch values and retry — do NOT fall back to full content rewrite.\n\n" +
+          "selector: exactly one of { heading: \"exact heading text\" } | { headingStartsWith: \"prefix\" } | { lastChild: true } | { nthChild: 0-based-index }\n" +
+          "operation: { op: \"appendChild\", value: \"content\" } | { op: \"prependChild\", value: \"content\" } | { op: \"replace\", value: \"new content\" } | { op: \"replaceChildren\", value: \"new children\" } | { op: \"insertAfter\", value: \"content\" } | { op: \"insertBefore\", value: \"content\" } | { op: \"remove\" }\n\n" +
+          "Example — append a paragraph under ## Findings, replace ## Recommendation body, remove ## Old Section:\n" +
+          "[\n" +
+          "  { \"selector\": { \"heading\": \"Findings\" }, \"operation\": { \"op\": \"appendChild\", \"value\": \"A new paragraph.\" } },\n" +
+          "  { \"selector\": { \"heading\": \"Recommendation\" }, \"operation\": { \"op\": \"replaceChildren\", \"value\": \"Updated recommendation.\" } },\n" +
+          "  { \"selector\": { \"heading\": \"Old Section\" }, \"operation\": { \"op\": \"remove\" } }\n" +
+          "]"
         ),
       content: z.string().optional().describe("Full note body replacement. Use only for complete rewrites or when the note is small. Mutually exclusive with semanticPatch."),
       title: z.string().optional().describe("Specific, retrieval-friendly title. Prefer the concrete topic or decision, not a vague label."),
@@ -6140,7 +6147,15 @@ server.registerPrompt(
             "- Existing bug note found by `recall` -> inspect with `get` -> refine with `update`.\n" +
             "- No matching note found by `recall` -> optional `discover_tags` with note context -> create with `remember`.\n" +
             "- Two notes overlap heavily -> inspect -> clean up with `consolidate`.\n" +
-            "- Resume work: `project_memory_summary` -> `recall` (lifecycle: temporary) -> continue from temporary notes.",
+            "- Resume work: `project_memory_summary` -> `recall` (lifecycle: temporary) -> continue from temporary notes.\n\n" +
+            "### semanticPatch format\n\n" +
+            "When using `update` with `semanticPatch`:\n" +
+            "- Each patch is an object with two keys: `selector` and `operation` (not flat `{op, value}` at top level).\n" +
+            "- `selector` has exactly one key: `heading`, `headingStartsWith`, `nthChild`, or `lastChild`.\n" +
+            "- `operation` has an `op` key plus `value` (except `remove` which has no value).\n" +
+            "- The parameter must be a JSON array, NOT a string.\n" +
+            "- Use `get` first to read exact heading text, then use those headings (without `##` prefix) as selector values.\n" +
+            "- Common mistake: writing `{ \"op\": \"appendChild\", \"value\": \"...\" }` at the top level instead of nesting inside `operation`. Correct shape: `{ \"selector\": { \"heading\": \"Findings\" }, \"operation\": { \"op\": \"appendChild\", \"value\": \"text\" } }`",
         },
       },
     ],
