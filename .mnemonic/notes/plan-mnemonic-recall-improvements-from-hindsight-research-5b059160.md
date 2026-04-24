@@ -8,7 +8,7 @@ tags:
   - hindsight
 lifecycle: temporary
 createdAt: '2026-04-24T18:10:35.779Z'
-updatedAt: '2026-04-24T18:10:41.367Z'
+updatedAt: '2026-04-24T18:17:04.692Z'
 role: plan
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -34,7 +34,7 @@ Focus on the TEMPR recall layer (retain/recall), not CARA (opinion/reflect), bec
 
 ---
 
-## Phase 1: Graph Spreading Activation in Recall (Target: v0.24.0)
+## Phase 1: Graph Spreading Activation in Recall (Target: v0.26.0)
 
 **Phase-1 What:** When semantic recall produces candidate notes, traverse their related notes and boost scores via spreading activation over existing relationship graph.
 
@@ -68,7 +68,7 @@ Focus on the TEMPR recall layer (retain/recall), not CARA (opinion/reflect), bec
 
 ---
 
-## Phase 2: Reciprocal Rank Fusion (Target: v0.24.0 or v0.25.0)
+## Phase 2: Reciprocal Rank Fusion (Target: v0.26.0 or v0.27.0)
 
 **Phase-2 What:** Replace additive hybrid scoring (`boosted + 0.12*lexical + 0.08*coverage + 0.16*phrase`) with RRF across semantic and lexical channels.
 
@@ -95,7 +95,7 @@ Focus on the TEMPR recall layer (retain/recall), not CARA (opinion/reflect), bec
 
 ---
 
-## Phase 3: Pre-computed BM25/IDF Cache (Target: v0.25.0)
+## Phase 3: Pre-computed BM25/IDF Cache (Target: v0.27.0)
 
 **Phase-3 What:** Avoid re-tokenizing all notes on every TF-IDF rescue call by building a persistent per-vault term-frequency cache.
 
@@ -120,7 +120,7 @@ Focus on the TEMPR recall layer (retain/recall), not CARA (opinion/reflect), bec
 
 ---
 
-## Phase 4: Temporal Retrieval Boost (Target: v0.25.0 or v0.26.0)
+## Phase 4: Temporal Retrieval Boost (Target: v0.27.0 or v0.28.0)
 
 **Phase-4 What:** Detect temporal cues in queries and boost/filter notes by `updatedAt`.
 
@@ -133,7 +133,7 @@ Focus on the TEMPR recall layer (retain/recall), not CARA (opinion/reflect), bec
 **Phase-4 How:**
 
 1. Detect temporal keywords: "recent", "last", "this week", "yesterday", "2025", "March"
-2. Parse into approximate date range (e.g., "recent" → last 30 days)
+2. Parse into approximate date range (e.g., "recent" -> last 30 days)
 3. Compute temporal boost: `exp(-|note.updatedAt - rangeCenter| / σ)` where σ is range/2
 4. Apply as additive boost alongside semantic score (smaller weight, e.g., +0.05 max)
 5. Fail-soft: if temporal parsing is uncertain, skip boost entirely
