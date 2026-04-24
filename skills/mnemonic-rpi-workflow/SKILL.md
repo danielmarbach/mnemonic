@@ -1,8 +1,13 @@
+---
+name: mnemonic-rpi-workflow
+description: Use when executing multi-step research-plan-implement-review workflows, especially when you need explicit handoffs, one current plan note, and consistent role/relationship conventions.
+---
+
 # Skill: mnemonic-rpi-workflow
 
 # RPIR Workflow: Research -> Plan -> Implement -> Review
 
-Use this skill when work needs structured workflow artifacts in mnemonic.
+Use this skill when work needs structured workflow artifacts.
 
 ## When to Use
 
@@ -22,12 +27,12 @@ mnemonic is the canonical store for workflow artifacts, not the workflow runtime
 - Before creating new notes, call `recall` for related prior work.
 - Create research notes with `role: research`, `lifecycle: temporary`.
 - Distill a short research summary when findings are scattered.
-- Link research notes `related-to` request root.
+- Link research notes to request root. Prefer `derives-from` when lineage is explicit; otherwise use `related-to`.
 
 ### 2. Plan
 
 - Create or update one current plan note with `role: plan`, `lifecycle: temporary`.
-- Link plan note `related-to` request root and key research notes.
+- Link plan note to request root and key research notes. Prefer `derives-from` for lineage and `follows` for sequence; fallback to `related-to` when direction is unclear.
 - Keep the plan concise, executable, and scoped to the current request.
 - Prefer one current plan per request; update or supersede as needed.
 - If the plan changes materially, update the plan note before continuing implementation.
@@ -39,13 +44,13 @@ Material plan changes include architecture direction, file/module scope, orderin
 - Create apply/task notes as `lifecycle: temporary`, tagged with `apply`.
 - Use `role: plan` for intended executable steps.
 - Use `role: context` for observations, checkpoints, and execution notes.
-- Link apply/task notes `related-to` the plan note.
+- Link apply/task notes to the plan note. Prefer `follows` for ordered execution steps.
 - For non-trivial work, dispatch a subagent with narrow scope and explicit handoff context.
 
 ### 4. Review
 
 - Create review notes with `role: review`, `lifecycle: temporary`.
-- Link review notes `related-to` apply/task notes or plan.
+- Link review notes to apply/task notes or plan. Use `derives-from` when review conclusions derive from specific artifacts.
 - Record outcomes: continue, block, or update plan.
 - If review causes a material plan change, update plan note first.
 
@@ -92,6 +97,12 @@ Subagent must return:
 - Apply/task split: no new role; use existing `plan` and `context` roles plus `apply` tag.
 - Relationship density: keep sparse; link only to immediate upstream artifacts.
 - Plan currency: one current plan note per request.
+
+Relationship preference order:
+
+1. `derives-from` for explicit lineage.
+2. `follows` for explicit sequence.
+3. `related-to` only when direction is unknown or intentionally generic.
 
 Canonical graph:
 
