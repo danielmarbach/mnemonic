@@ -8,11 +8,14 @@ tags:
   - hindsight
 lifecycle: temporary
 createdAt: '2026-04-24T18:10:35.779Z'
-updatedAt: '2026-04-24T18:10:35.779Z'
+updatedAt: '2026-04-24T18:10:41.367Z'
 role: plan
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: research-hindsight-paper-analysis-for-mnemonic-recall-improv-2d9317b3
+    type: follows
 memoryVersion: 1
 ---
 # Plan: mnemonic Recall Improvements from Hindsight Research
