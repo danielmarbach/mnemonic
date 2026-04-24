@@ -6,7 +6,7 @@ tags:
   - bugfix
 lifecycle: temporary
 createdAt: '2026-04-24T21:56:52.621Z'
-updatedAt: '2026-04-24T21:56:52.621Z'
+updatedAt: '2026-04-24T22:21:33.797Z'
 role: review
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -45,6 +45,6 @@ Against the design note (`semantic-patch-builder-design-implementation-906872f1`
 - Regression integration test added to `tests/update-sem-patch.integration.test.ts` — end-to-end MCP call confirming `appendChild` on a heading returns a clean error with no mutation.
 - Full suite: 683 tests pass, typecheck clean.
 
-## Outcome
+## **Resolved** — fix committed in v0.25.3 (semantic-patch-placement branch). Single-line change: removed `"heading"` from `CONTAINER_TYPES`. 32 unit tests + 5 integration tests pass. Design note updated. Changelog and version bumped
 
 continue — fix is minimal, well-tested, and design-aligned. Ready to merge.
