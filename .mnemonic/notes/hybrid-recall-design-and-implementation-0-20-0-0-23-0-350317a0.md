@@ -7,7 +7,7 @@ tags:
   - completed
 lifecycle: permanent
 createdAt: '2026-04-17T13:14:34.706Z'
-updatedAt: '2026-04-17T13:15:15.322Z'
+updatedAt: '2026-04-24T18:31:02.115Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
@@ -15,6 +15,8 @@ relatedTo:
     type: related-to
   - id: mnemonic-key-design-decisions-3f2a6273
     type: example-of
+  - id: review-hindsight-plan-validation-against-design-principles-eae4ebe4
+    type: related-to
 memoryVersion: 1
 ---
 Hybrid recall improves mnemonic recall quality by combining semantic retrieval with lexical reranking, lexical rescue, and canonical explanation promotion over existing projection data, while preserving mnemonic's core simplicity constraints.

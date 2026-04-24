@@ -8,7 +8,7 @@ tags:
   - plan-validation
 lifecycle: temporary
 createdAt: '2026-04-24T18:30:35.753Z'
-updatedAt: '2026-04-24T18:31:00.841Z'
+updatedAt: '2026-04-24T18:31:02.115Z'
 role: review
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -16,6 +16,8 @@ projectName: mnemonic
 relatedTo:
   - id: plan-mnemonic-recall-improvements-from-hindsight-research-5b059160
     type: derives-from
+  - id: hybrid-recall-design-and-implementation-0-20-0-0-23-0-350317a0
+    type: related-to
 memoryVersion: 1
 ---
 # Review: Hindsight Plan Validation Against Design Principles
