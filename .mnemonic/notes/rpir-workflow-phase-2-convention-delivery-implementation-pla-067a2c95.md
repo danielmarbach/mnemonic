@@ -8,10 +8,13 @@ tags:
   - plan
 lifecycle: temporary
 createdAt: '2026-04-23T17:59:43.951Z'
-updatedAt: '2026-04-23T18:11:43.075Z'
+updatedAt: '2026-04-24T15:55:30.469Z'
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: phase-2-working-state-and-rpir-convention-delivery-implement-89bf62b7
+    type: supersedes
 memoryVersion: 1
 ---
 Phase 2 convention delivery implementation status for RPIR workflow design.
