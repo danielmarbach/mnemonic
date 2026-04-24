@@ -563,7 +563,7 @@ describe("applyGraphSpreadingActivation", () => {
     expect(discovered!.score).toBeCloseTo(0.6 * 0.5 * 0.8, 5);
   });
 
-  it("does not duplicate a note already in the candidate set", () => {
+  it("boosts an existing candidate instead of skipping it", () => {
     const candidates: ScoredRecallCandidate[] = [
       { id: "entry", score: 0.6, boosted: 0.6, vault, isCurrentProject: true },
       { id: "already-there", score: 0.5, boosted: 0.5, vault, isCurrentProject: true },
@@ -579,7 +579,35 @@ describe("applyGraphSpreadingActivation", () => {
     const result = applyGraphSpreadingActivation(candidates, getNoteRelationships);
 
     expect(result).toHaveLength(2);
-    expect(result.find((c) => c.id === "already-there")).toBeDefined();
+    const boosted = result.find((c) => c.id === "already-there")!;
+    expect(boosted.score).toBeCloseTo(0.5 + 0.6 * 0.5 * 0.8, 5);
+    expect(boosted.boosted).toBeCloseTo(0.5 + 0.6 * 0.5 * 0.8, 5);
+  });
+
+  it("accumulates propagated scores onto an existing candidate from multiple entry points", () => {
+    const candidates: ScoredRecallCandidate[] = [
+      { id: "entry-a", score: 0.6, boosted: 0.6, vault, isCurrentProject: true },
+      { id: "entry-b", score: 0.55, boosted: 0.55, vault, isCurrentProject: true },
+      { id: "shared", score: 0.5, boosted: 0.5, vault, isCurrentProject: true, semanticScoreForPromotion: 0.5 },
+    ];
+
+    const getNoteRelationships = (id: string) => {
+      if (id === "entry-a") {
+        return [{ id: "shared", type: "related-to" as const }];
+      }
+      if (id === "entry-b") {
+        return [{ id: "shared", type: "explains" as const }];
+      }
+      return undefined;
+    };
+
+    const result = applyGraphSpreadingActivation(candidates, getNoteRelationships);
+
+    const shared = result.find((c) => c.id === "shared")!;
+    const expectedBoost = 0.6 * 0.5 * 0.8 + 0.55 * 0.5 * 1.0;
+    expect(shared.score).toBeCloseTo(0.5 + expectedBoost, 5);
+    expect(shared.boosted).toBeCloseTo(0.5 + expectedBoost, 5);
+    expect(shared.semanticScoreForPromotion).toBeCloseTo(0.5 + expectedBoost, 5);
   });
 
   it("applies explains/derives-from multiplier of 1.0", () => {

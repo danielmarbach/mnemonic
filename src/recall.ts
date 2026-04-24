@@ -277,7 +277,7 @@ export function applyGraphSpreadingActivation(
     return candidates;
   }
 
-  const existingIds = new Set(candidates.map((c) => c.id));
+  const candidateMap = new Map(candidates.map((c) => [c.id, c]));
   const discovered = new Map<string, ScoredRecallCandidate>();
 
   for (const entry of eligibleEntries) {
@@ -285,12 +285,17 @@ export function applyGraphSpreadingActivation(
     if (!relationships) continue;
 
     for (const rel of relationships) {
-      if (existingIds.has(rel.id) && !discovered.has(rel.id)) continue;
-
       const multiplier = getRelationshipMultiplier(rel.type);
       const propagatedScore = entry.score * SPREADING_HOP_DECAY * multiplier;
 
-      if (!discovered.has(rel.id)) {
+      const existingCandidate = candidateMap.get(rel.id);
+      if (existingCandidate) {
+        existingCandidate.score += propagatedScore;
+        existingCandidate.boosted += propagatedScore;
+        if (existingCandidate.semanticScoreForPromotion !== undefined) {
+          existingCandidate.semanticScoreForPromotion += propagatedScore;
+        }
+      } else if (!discovered.has(rel.id)) {
         discovered.set(rel.id, {
           id: rel.id,
           score: propagatedScore,
