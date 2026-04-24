@@ -4,7 +4,7 @@ tags:
   - review
 lifecycle: temporary
 createdAt: '2026-04-24T20:16:41.169Z'
-updatedAt: '2026-04-24T20:16:41.169Z'
+updatedAt: '2026-04-24T20:23:04.220Z'
 role: review
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -26,6 +26,14 @@ memoryVersion: 1
 - 692 tests pass (no regression)
 - Typecheck passes
 - 10 new unit tests cover: basic discovery, no duplication, multiplier differences, entry point limit, activation gate, score accumulation, empty/edge cases
+- Dogfooding ran against local build: hybrid recall and architecture notes surface correctly, graph-spreading-enabled notes appear in temporary recall
+
+**Dogfood results:**
+
+- hybridTop: "Hybrid recall design and implementation (0.20.0, 0.23.0)" — correct
+- architectureTop: "Enrichment layer design..." — correct
+- recalledTemporaryTitles includes "Phase 1: Graph Spreading Activation in Recall" — graph notes recalled correctly
+- Note: unrelated packC lint-rejection failure exists (semantic-patch broken link not rejected) — not part of this phase
 
 **Plan alignment:**
 
@@ -38,4 +46,4 @@ memoryVersion: 1
 - Fail-soft if no graph data — Returns candidates unchanged ✓
 - Flow through full pipeline — After lexical, before canonical promotion ✓
 
-**Recommendation:** Continue. Implementation complete and verified. Dogfooding validation pending.
+**Recommendation:** Continue to Phase 2 (RRF). Phase 1 complete and verified.
