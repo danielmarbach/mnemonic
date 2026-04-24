@@ -8,7 +8,8 @@ tags:
   - plan
 lifecycle: permanent
 createdAt: '2026-04-23T19:14:07.158Z'
-updatedAt: '2026-04-24T12:09:46.746Z'
+updatedAt: '2026-04-24T15:35:59.606Z'
+role: plan
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
