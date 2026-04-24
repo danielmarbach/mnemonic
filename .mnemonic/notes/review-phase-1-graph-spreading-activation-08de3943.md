@@ -4,7 +4,7 @@ tags:
   - review
 lifecycle: temporary
 createdAt: '2026-04-24T20:16:41.169Z'
-updatedAt: '2026-04-24T20:43:30.006Z'
+updatedAt: '2026-04-24T20:44:32.978Z'
 role: review
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -12,6 +12,8 @@ projectName: mnemonic
 relatedTo:
   - id: hybrid-recall-design-and-implementation-0-20-0-0-23-0-350317a0
     type: related-to
+  - id: apply-phase-1-graph-spreading-activation-5c5779af
+    type: derives-from
 memoryVersion: 1
 ---
 # Review: Phase 1 Graph Spreading Activation
