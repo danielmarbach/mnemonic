@@ -10,7 +10,7 @@ tags:
   - implementation
 lifecycle: permanent
 createdAt: '2026-04-24T11:09:39.750Z'
-updatedAt: '2026-04-24T19:00:22.062Z'
+updatedAt: '2026-04-24T19:05:37.959Z'
 role: reference
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
@@ -41,6 +41,10 @@ This leniency is unique to the patch path for two reasons:
 
 `remember` and `update` with full `content` still use strict lint validation — if the body has unfixable lint, it is rejected. The auto-fix loop in `cleanMarkdown` handles fixable issues for those paths.
 
+## Decision: Guidance at the Schema Level, Not Just Error Messages
+
+The "do NOT fall back to full content rewrite" guidance must be in the `semanticPatch` **parameter description**, not just in the `MarkdownLintError` message. Schema-level validation errors (malformed patches, wrong types) fire before the handler runs — the error message never reaches the LLM if it falls back before retrying. The parameter description is the only reliable channel.
+
 ## Architecture (5 Layers)
 
 1. **Parser** (`src/markdown-ast.ts`): `remark` + `unified` → `mdast`. `remark-stringify` configured with `bullet: "-"`.
@@ -70,6 +74,7 @@ Zod schema uses `z.discriminatedUnion` for operations (`remove` has no `value`; 
 - Structural errors (selector, operation) → "Semantic patch failed:" hard fail; no mutation; no commit
 - Patch produces markdown with lint issues → success with advisory `lintWarnings` in response; content persisted
 - `remember` and `update(content)` still hard-fail on unfixable lint
+- Schema validation errors (malformed patch) → MCP validation error; guidance at schema level prevents fallback
 
 ## Empirical Token Savings
 
