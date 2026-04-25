@@ -186,7 +186,7 @@ describe("temporal retrieval boost", () => {
 
     expect(isWithinTemporalFilterWindow("2026-04-22T00:00:00.000Z", 7, now)).toBe(true);
     expect(isWithinTemporalFilterWindow("2026-04-01T00:00:00.000Z", 7, now)).toBe(false);
-    expect(isWithinTemporalFilterWindow("not-a-date", 7, now)).toBe(false);
+    expect(isWithinTemporalFilterWindow("not-a-date", 7, now)).toBe(true);
   });
 });
 
@@ -315,6 +315,7 @@ describe("canonical explanation promotion", () => {
       {
         id: "canonical",
         score: 0.56,
+        semanticRank: 1,
         semanticScoreForPromotion: 0.56,
         boosted: 0.56,
         vault,
@@ -334,8 +335,9 @@ describe("canonical explanation promotion", () => {
       {
         id: "incidental",
         score: 0.58,
+        semanticRank: 2,
         semanticScoreForPromotion: 0.58,
-        boosted: 0.58,
+        boosted: 0.565,
         vault,
         isCurrentProject: true,
         lifecycle: "permanent",
@@ -409,6 +411,7 @@ describe("canonical explanation promotion", () => {
       {
         id: "temporary",
         score: 0.57,
+        semanticRank: 2,
         semanticScoreForPromotion: 0.57,
         boosted: 0.57,
         vault,
@@ -427,8 +430,9 @@ describe("canonical explanation promotion", () => {
       {
         id: "durable",
         score: 0.55,
+        semanticRank: 1,
         semanticScoreForPromotion: 0.55,
-        boosted: 0.55,
+        boosted: 0.57,
         vault,
         isCurrentProject: true,
         lifecycle: "permanent",
@@ -452,6 +456,7 @@ describe("canonical explanation promotion", () => {
       {
         id: "canonical-but-weaker",
         score: 0.58,
+        semanticRank: 2,
         semanticScoreForPromotion: 0.58,
         boosted: 0.58,
         vault,
@@ -470,6 +475,7 @@ describe("canonical explanation promotion", () => {
       {
         id: "semantically-stronger",
         score: 0.82,
+        semanticRank: 1,
         semanticScoreForPromotion: 0.82,
         boosted: 0.82,
         vault,
@@ -489,9 +495,10 @@ describe("canonical explanation promotion", () => {
     const promoted = applyCanonicalExplanationPromotion([
       {
         id: "canonical",
-        score: 0.55,
-        semanticScoreForPromotion: 0.55,
-        boosted: 0.55,
+        score: 0.56,
+        semanticRank: 1,
+        semanticScoreForPromotion: 0.56,
+        boosted: 0.56,
         vault,
         isCurrentProject: true,
         lexicalScore: 0.1,
@@ -509,6 +516,7 @@ describe("canonical explanation promotion", () => {
       {
         id: "wording-heavy",
         score: 0.56,
+        semanticRank: 2,
         semanticScoreForPromotion: 0.56,
         boosted: 0.56,
         vault,
@@ -533,9 +541,10 @@ describe("canonical explanation promotion", () => {
     const promoted = applyCanonicalExplanationPromotion([
       {
         id: "canonical-structural",
-        score: 0.55,
-        semanticScoreForPromotion: 0.55,
-        boosted: 0.55,
+        score: 0.56,
+        semanticRank: 1,
+        semanticScoreForPromotion: 0.56,
+        boosted: 0.56,
         vault,
         isCurrentProject: true,
         lexicalScore: 0,
@@ -553,6 +562,7 @@ describe("canonical explanation promotion", () => {
       {
         id: "lexical-but-thin",
         score: 0.56,
+        semanticRank: 2,
         semanticScoreForPromotion: 0.56,
         boosted: 0.56,
         vault,

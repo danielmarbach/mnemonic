@@ -5,7 +5,7 @@ import { computeLexicalScore, tokenize } from "./lexical.js";
 import type { RelationshipType } from "./storage.js";
 
 const RRF_K = 60;
-const CANONICAL_HYBRID_WEIGHT = 0.005;
+const CANONICAL_HYBRID_WEIGHT = 0.05;
 
 const RECALL_ALWAYS_LOAD_BOOST = 0.01;
 const RECALL_SUMMARY_BOOST = 0.012;
@@ -86,13 +86,15 @@ export function computeRecallMetadataBoost(metadata?: EffectiveNoteMetadata): nu
 }
 
 const TEMPORAL_QUERY_HINTS: Array<{ pattern: RegExp; hint: TemporalQueryHint }> = [
-  { pattern: /\b(today|latest)\b/i, hint: { windowDays: 2, maxBoost: 0.08, confidence: "medium" } },
-  { pattern: /\b(yesterday)\b/i, hint: { windowDays: 3, maxBoost: 0.08, confidence: "medium" } },
-  { pattern: /\b(this\s+week)\b/i, hint: { windowDays: 7, maxBoost: 0.06, confidence: "medium" } },
-  { pattern: /\b(last\s+week)\b/i, hint: { windowDays: 14, maxBoost: 0.06, confidence: "medium" } },
-  { pattern: /\b(this\s+month)\b/i, hint: { windowDays: 31, maxBoost: 0.05, confidence: "medium" } },
-  { pattern: /\b(last\s+month)\b/i, hint: { windowDays: 62, maxBoost: 0.05, confidence: "medium" } },
+  // Ordered by specificity (longer/more specific patterns first) to avoid first-match-wins issues.
+  { pattern: /\b(in\s+the\s+past)\b/i, hint: { windowDays: 365, maxBoost: 0.03, confidence: "low" } },
   { pattern: /\b(this\s+year|last\s+year)\b/i, hint: { windowDays: 366, maxBoost: 0.03, confidence: "medium" } },
+  { pattern: /\b(last\s+month)\b/i, hint: { windowDays: 62, maxBoost: 0.05, confidence: "medium" } },
+  { pattern: /\b(this\s+month)\b/i, hint: { windowDays: 31, maxBoost: 0.05, confidence: "medium" } },
+  { pattern: /\b(last\s+week)\b/i, hint: { windowDays: 14, maxBoost: 0.06, confidence: "medium" } },
+  { pattern: /\b(this\s+week)\b/i, hint: { windowDays: 7, maxBoost: 0.06, confidence: "medium" } },
+  { pattern: /\b(yesterday)\b/i, hint: { windowDays: 3, maxBoost: 0.08, confidence: "medium" } },
+  { pattern: /\b(today|latest)\b/i, hint: { windowDays: 2, maxBoost: 0.08, confidence: "medium" } },
   { pattern: /\b(recent|recently|newest)\b/i, hint: { windowDays: 30, maxBoost: 0.05, confidence: "low" } },
 ];
 
@@ -162,7 +164,7 @@ export function isWithinTemporalFilterWindow(
 ): boolean {
   const updated = new Date(updatedAt);
   if (Number.isNaN(updated.getTime())) {
-    return false;
+    return true;
   }
 
   const ageDays = Math.max(0, (now.getTime() - updated.getTime()) / (1000 * 60 * 60 * 24));
@@ -177,19 +179,20 @@ export function isWithinTemporalFilterWindow(
  *
  * where RRF = 1/(K + semanticRank) + 1/(K + lexicalRank)
  *
- * When lexicalRank is missing (e.g. before lexical reranking or for graph-
- * discovered notes without projections) only the semantic channel contributes.
- * When semanticRank is also missing the function falls back to pure boosted
- * (pre-RRF or rescue candidates) so it remains safe to call from anywhere.
+ * When semanticRank is missing but lexicalRank is available (rescue candidates)
+ * only the lexical channel contributes. When both are missing the function
+ * falls back to pure boosted (pre-RRF scoring stage).
  */
 export function computeHybridScore(candidate: ScoredRecallCandidate): number {
   const canonical = candidate.canonicalExplanationScore ?? 0;
 
-  if (candidate.semanticRank === undefined) {
+  if (candidate.semanticRank === undefined && candidate.lexicalRank === undefined) {
     return candidate.boosted + canonical;
   }
 
-  const semanticContribution = 1 / (RRF_K + candidate.semanticRank);
+  const semanticContribution = candidate.semanticRank !== undefined
+    ? 1 / (RRF_K + candidate.semanticRank)
+    : 0;
   const lexicalContribution = candidate.lexicalRank !== undefined
     ? 1 / (RRF_K + candidate.lexicalRank)
     : 0;
@@ -212,7 +215,7 @@ function computeLexicalRankSignal(candidate: ScoredRecallCandidate): number {
 
 const RANK_EPSILON = 1e-9;
 
-function assignDenseRanks<T>(items: T[], scoreOf: (item: T) => number, setRank: (item: T, rank: number) => void): void {
+export function assignDenseRanks<T>(items: T[], scoreOf: (item: T) => number, setRank: (item: T, rank: number) => void): void {
   let currentRank = 0;
   let previousScore: number | undefined;
   for (let i = 0; i < items.length; i++) {

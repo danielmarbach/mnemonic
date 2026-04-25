@@ -43,6 +43,7 @@ import {
   applyLexicalReranking,
   applyCanonicalExplanationPromotion,
   applyGraphSpreadingActivation,
+  assignDenseRanks,
   detectTemporalQueryHint,
   computeTemporalRecencyBoost,
   shouldApplyTemporalFiltering,
@@ -446,6 +447,7 @@ const VAULT_PATH = process.env["VAULT_PATH"]
 
 const DEFAULT_RECALL_LIMIT = 5;
 const DEFAULT_MIN_SIMILARITY = 0.3;
+const PROJECT_SCOPE_BOOST = 0.03;
 const TEMPORAL_HISTORY_NOTE_LIMIT = 5;
 const TEMPORAL_HISTORY_COMMIT_LIMIT = 5;
 
@@ -2408,7 +2410,7 @@ async function collectLexicalRescueCandidates(
     const temporalBoost = temporalQueryHint
       ? computeTemporalRecencyBoost(candidate.updatedAt, temporalQueryHint)
       : 0;
-    const boost = (candidate.isCurrentProject ? 0.15 : 0) + candidate.context.metadataBoost + temporalBoost;
+    const boost = (candidate.isCurrentProject ? PROJECT_SCOPE_BOOST : 0) + candidate.context.metadataBoost + temporalBoost;
     candidates.push({
       id: candidate.id,
       score: lexicalScore,
@@ -2625,6 +2627,14 @@ server.registerTool(
       return noteRelationships.get(id);
     };
     const withGraphSpread = applyGraphSpreadingActivation(reranked, getNoteRelationships);
+
+    // Re-assign semanticRank after graph spreading since scores are now modified
+    // and graph-discovered candidates have no semanticRank.
+    const sortedByScore = [...withGraphSpread].sort((a, b) => b.score - a.score || b.boosted - a.boosted);
+    assignDenseRanks(sortedByScore, (candidate) => candidate.score, (candidate, rank) => {
+      candidate.semanticRank = rank;
+    });
+
     let promoted = applyCanonicalExplanationPromotion(withGraphSpread);
 
     // Lexical rescue: when semantic results are weak, scan projections for additional candidates.

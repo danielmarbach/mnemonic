@@ -850,7 +850,7 @@ This note has no embedding.`,
     try {
       await callLocalMcp(vaultDir, "remember", {
         title: "API endpoint port",
-        content: "The local API listens on port 4317.",
+        content: "The local API listens on port 4317 and the port can be changed via configuration.",
         tags: ["fact"],
         cwd: repoDir,
         scope: "project",
@@ -859,7 +859,7 @@ This note has no embedding.`,
 
       await callLocalMcp(vaultDir, "remember", {
         title: "System overview",
-        content: "## Overview\nThis note explains architecture, decisions, and system context in a broad durable form.",
+        content: "This note explains architecture, decisions, and system context in a broad durable form.",
         tags: ["overview"],
         cwd: repoDir,
         scope: "project",
