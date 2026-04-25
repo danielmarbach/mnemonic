@@ -2368,7 +2368,7 @@ async function collectLexicalRescueCandidates(
   }
 
   return candidates
-    .sort((a, b) => computeHybridScore(b) - computeHybridScore(a))
+    .sort((a, b) => (b.lexicalScore ?? 0) - (a.lexicalScore ?? 0))
     .slice(0, LEXICAL_RESCUE_RESULT_LIMIT);
 }
 
