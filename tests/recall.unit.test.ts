@@ -79,8 +79,8 @@ describe("selectRecallResults", () => {
 
   it("uses hybrid score for ordering when lexical scores are present", () => {
     const candidates: ScoredRecallCandidate[] = [
-      { id: "a", score: 0.5, boosted: 0.5, vault, isCurrentProject: true, lexicalScore: 0.9 },
-      { id: "b", score: 0.52, boosted: 0.52, vault, isCurrentProject: true, lexicalScore: 0.1 },
+      { id: "a", score: 0.5, boosted: 0.5, vault, isCurrentProject: true, semanticRank: 1, lexicalRank: 1 },
+      { id: "b", score: 0.52, boosted: 0.52, vault, isCurrentProject: true, semanticRank: 2, lexicalRank: 50 },
     ];
 
     const results = selectRecallResults(candidates, 2, "all");
@@ -126,7 +126,15 @@ describe("computeHybridScore", () => {
   });
 
   it("adds lexical contribution when present", () => {
-    const candidate: ScoredRecallCandidate = { id: "a", score: 0.7, boosted: 0.8, vault, isCurrentProject: true, lexicalScore: 1.0 };
+    const candidate: ScoredRecallCandidate = {
+      id: "a",
+      score: 0.7,
+      boosted: 0.8,
+      vault,
+      isCurrentProject: true,
+      semanticRank: 1,
+      lexicalRank: 1,
+    };
     const hybrid = computeHybridScore(candidate);
     expect(hybrid).toBeGreaterThan(0.8);
   });
@@ -137,20 +145,21 @@ describe("computeHybridScore", () => {
     expect(computeHybridScore(highSemantic)).toBeGreaterThan(computeHybridScore(lowSemantic));
   });
 
-  it("includes coverage, phrase, and canonical explanation contributions", () => {
+  it("adds a small canonical contribution in RRF mode", () => {
     const candidate: ScoredRecallCandidate = {
       id: "a",
       score: 0.7,
       boosted: 0.5,
       vault,
       isCurrentProject: true,
-      lexicalScore: 0.25,
-      coverageScore: 0.5,
-      phraseScore: 1,
+      semanticRank: 1,
+      lexicalRank: 2,
       canonicalExplanationScore: 0.07,
     };
 
-    expect(computeHybridScore(candidate)).toBeCloseTo(0.8, 5);
+    const withCanonical = computeHybridScore(candidate);
+    const withoutCanonical = computeHybridScore({ ...candidate, canonicalExplanationScore: 0 });
+    expect(withCanonical).toBeGreaterThan(withoutCanonical);
   });
 });
 

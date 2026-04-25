@@ -4,6 +4,9 @@ import { computeLexicalScore, tokenize } from "./lexical.js";
 
 import type { RelationshipType } from "./storage.js";
 
+const RRF_K = 60;
+const CANONICAL_HYBRID_WEIGHT = 0.005;
+
 const RECALL_ALWAYS_LOAD_BOOST = 0.01;
 const RECALL_SUMMARY_BOOST = 0.012;
 const RECALL_DECISION_BOOST = 0.009;
@@ -15,10 +18,6 @@ const SPREADING_ACTIVATION_GATE = 0.5;
 const SPREADING_RELATED_TO_MULTIPLIER = 0.8;
 const SPREADING_EXPLAINS_DERIVES_MULTIPLIER = 1.0;
 
-/** Weight applied to lexical score when computing hybrid boosted score. */
-const LEXICAL_HYBRID_WEIGHT = 0.12;
-const COVERAGE_HYBRID_WEIGHT = 0.08;
-const PHRASE_HYBRID_WEIGHT = 0.16;
 const MIN_CANONICAL_EXPLANATION_SCORE = 0.5;
 const WORKFLOW_ROLE_BOOSTS: Partial<Record<NonNullable<EffectiveNoteMetadata["role"]>, number>> = {
   plan: 0.03,
@@ -34,6 +33,10 @@ export interface ScoredRecallCandidate {
   score: number;
   /** Semantic plausibility used to gate canonical explanation promotion. */
   semanticScoreForPromotion?: number;
+  /** Rank from the initial semantic retrieval ordering (1-based). */
+  semanticRank?: number;
+  /** Rank from the lexical reranking step (1-based). */
+  lexicalRank?: number;
   boosted: number;
   vault: Vault;
   isCurrentProject: boolean;
@@ -76,25 +79,78 @@ export function computeRecallMetadataBoost(metadata?: EffectiveNoteMetadata): nu
 }
 
 /**
- * Compute a hybrid score that combines semantic similarity with additive
- * lexical, coverage, phrase, and canonical explanation signals.
+ * Compute RRF-based hybrid score.
  *
- * The formula is:
- * boosted
- *   + LEXICAL_HYBRID_WEIGHT * lexical
- *   + COVERAGE_HYBRID_WEIGHT * coverage
- *   + PHRASE_HYBRID_WEIGHT * phrase
- *   + canonicalExplanation
+ * Formula:
+ *   boosted + RRF + canonicalExplanationScore * CANONICAL_HYBRID_WEIGHT
  *
- * These additive signals act as tiebreakers and small reranking signals. They
- * cannot overcome a large semantic gap but can reorder close candidates.
+ * where RRF = 1/(K + semanticRank) + 1/(K + lexicalRank)
+ *
+ * When lexicalRank is missing (e.g. before lexical reranking or for graph-
+ * discovered notes without projections) only the semantic channel contributes.
+ * When semanticRank is also missing the function falls back to pure boosted
+ * (pre-RRF or rescue candidates) so it remains safe to call from anywhere.
  */
 export function computeHybridScore(candidate: ScoredRecallCandidate): number {
+  const canonical = candidate.canonicalExplanationScore ?? 0;
+
+  if (candidate.semanticRank === undefined) {
+    return candidate.boosted + canonical;
+  }
+
+  const semanticContribution = 1 / (RRF_K + candidate.semanticRank);
+  const lexicalContribution = candidate.lexicalRank !== undefined
+    ? 1 / (RRF_K + candidate.lexicalRank)
+    : 0;
+
+  // Scale RRF so its maximum influence is comparable to the old additive
+  // lexical weight (~0.12). With K = 60 and two channels the max RRF is
+  // roughly 2/60 ≈ 0.033. Multiplied by 3.5 this hits ~0.115, matching the
+  // old order-of-magnitude while remaining calibration-free.
+  const rrf = semanticContribution + lexicalContribution;
+
+  return candidate.boosted + rrf * 3.5 + canonical * CANONICAL_HYBRID_WEIGHT;
+}
+
+function computeLexicalRankSignal(candidate: ScoredRecallCandidate): number {
   const lexical = candidate.lexicalScore ?? 0;
   const coverage = candidate.coverageScore ?? 0;
   const phrase = candidate.phraseScore ?? 0;
-  const canonical = candidate.canonicalExplanationScore ?? 0;
-  return candidate.boosted + LEXICAL_HYBRID_WEIGHT * lexical + COVERAGE_HYBRID_WEIGHT * coverage + PHRASE_HYBRID_WEIGHT * phrase + canonical;
+  return lexical + coverage * 0.3 + phrase * 0.5;
+}
+
+const RANK_EPSILON = 1e-9;
+
+function assignDenseRanks<T>(items: T[], scoreOf: (item: T) => number, setRank: (item: T, rank: number) => void): void {
+  let currentRank = 0;
+  let previousScore: number | undefined;
+  for (let i = 0; i < items.length; i++) {
+    const score = scoreOf(items[i]);
+    if (previousScore === undefined || Math.abs(score - previousScore) > RANK_EPSILON) {
+      currentRank = i + 1;
+      previousScore = score;
+    }
+    setRank(items[i], currentRank);
+  }
+}
+
+function compareByHybridScore(a: ScoredRecallCandidate, b: ScoredRecallCandidate): number {
+  const hybridDelta = computeHybridScore(b) - computeHybridScore(a);
+  if (hybridDelta !== 0) {
+    return hybridDelta;
+  }
+
+  const boostedDelta = b.boosted - a.boosted;
+  if (boostedDelta !== 0) {
+    return boostedDelta;
+  }
+
+  const lexicalDelta = computeLexicalRankSignal(b) - computeLexicalRankSignal(a);
+  if (lexicalDelta !== 0) {
+    return lexicalDelta;
+  }
+
+  return b.score - a.score;
 }
 
 export function computeCanonicalExplanationScore(candidate: ScoredRecallCandidate): number {
@@ -123,7 +179,14 @@ export function applyCanonicalExplanationPromotion(candidates: ScoredRecallCandi
     candidate.canonicalExplanationScore = computeCanonicalExplanationScore(candidate);
   }
 
-  return [...candidates].sort((a, b) => computeHybridScore(b) - computeHybridScore(a));
+  // Assign lexicalRank based on lexicalScore (undefined scores rank last).
+  const sortedByLexical = [...candidates]
+    .sort((a, b) => computeLexicalRankSignal(b) - computeLexicalRankSignal(a) || b.score - a.score);
+  assignDenseRanks(sortedByLexical, computeLexicalRankSignal, (candidate, rank) => {
+    candidate.lexicalRank = rank;
+  });
+
+  return [...candidates].sort(compareByHybridScore);
 }
 
 function computeSignificantPhraseScore(query: string, candidateText: string): number {
@@ -160,13 +223,14 @@ function computeWeightedQueryCoverage(query: string, candidateText: string, corp
 }
 
 /**
- * Apply lexical reranking to a set of semantic candidates.
+ * Apply lexical scoring to semantic candidates. Returns the same array.
  *
- * For each candidate, compute lexical overlap against the query using the
- * provided projection text, then re-sort by hybrid score.
+ * Computes lexical overlap, coverage, and phrase scores using projection
+ * text.  When projection text is unavailable, lexicalScore stays undefined.
  *
- * When projection text is unavailable for a candidate, lexicalScore stays
- * undefined and contributes 0 to the hybrid score.
+ * Also assigns semanticRank (1-based) based on the current boosted ordering.
+ * Sorting by RRF + canonical is deferred until applyCanonicalExplanationPromotion
+ * so that lexicalRank can be assigned after all scores are known.
  */
 export function applyLexicalReranking(
   candidates: ScoredRecallCandidate[],
@@ -186,7 +250,14 @@ export function applyLexicalReranking(
     }
   }
 
-  return [...candidates].sort((a, b) => computeHybridScore(b) - computeHybridScore(a));
+  // Assign semanticRank using dense semantic score ordering.
+  // Tied semantic scores share the same rank so lexical rank can break ties.
+  const sortedBySemantic = [...candidates].sort((a, b) => b.score - a.score || b.boosted - a.boosted);
+  assignDenseRanks(sortedBySemantic, (candidate) => candidate.score, (candidate, rank) => {
+    candidate.semanticRank = rank;
+  });
+
+  return candidates;
 }
 
 export function selectRecallResults(
@@ -194,7 +265,7 @@ export function selectRecallResults(
   limit: number,
   scope: "project" | "global" | "all"
 ): ScoredRecallCandidate[] {
-  const sorted = [...scored].sort((a, b) => computeHybridScore(b) - computeHybridScore(a));
+  const sorted = [...scored].sort(compareByHybridScore);
 
   if (scope !== "all") {
     return sorted.slice(0, limit);
@@ -227,7 +298,13 @@ export function selectWorkflowResults(
   limit: number,
   scope: "project" | "global" | "all"
 ): ScoredRecallCandidate[] {
-  const sorted = [...scored].sort((a, b) => computeWorkflowScore(b) - computeWorkflowScore(a));
+  const sorted = [...scored].sort((a, b) => {
+    const workflowDelta = computeWorkflowScore(b) - computeWorkflowScore(a);
+    if (workflowDelta !== 0) {
+      return workflowDelta;
+    }
+    return compareByHybridScore(a, b);
+  });
 
   if (scope !== "all") {
     return sorted.slice(0, limit);
