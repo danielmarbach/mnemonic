@@ -8,13 +8,15 @@ tags:
   - temporal
 lifecycle: permanent
 createdAt: '2026-04-25T11:55:14.816Z'
-updatedAt: '2026-04-25T11:55:30.633Z'
+updatedAt: '2026-04-25T11:59:52.787Z'
 role: summary
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
   - id: review-phase-5-temporal-parsing-and-filtering-verification-9a95dfc7
+    type: derives-from
+  - id: summary-performance-principles-compliance-audit-for-recall-p-b482b38b
     type: derives-from
 memoryVersion: 1
 ---
