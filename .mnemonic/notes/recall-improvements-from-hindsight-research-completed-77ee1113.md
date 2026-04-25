@@ -8,7 +8,7 @@ tags:
   - plan
 lifecycle: permanent
 createdAt: '2026-04-25T21:44:35.524Z'
-updatedAt: '2026-04-25T21:49:49.369Z'
+updatedAt: '2026-04-25T21:54:38.512Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
@@ -22,13 +22,17 @@ relatedTo:
     type: derives-from
   - id: research-hindsight-paper-analysis-for-mnemonic-recall-improv-ae8fd9eb
     type: derives-from
+  - id: phase-1-graph-spreading-activation-completed-1fbe86a2
+    type: related-to
+  - id: phase-4-temporal-retrieval-boost-completed-e5a5dec8
+    type: related-to
 memoryVersion: 1
 ---
 # Plan: mnemonic Recall Improvements from Hindsight Research
 
 ## Research Source
 
-ArXiv 2512.12818v1 — Hindsight Memory Architecture analysis identified six improvement opportunities for mnemonic's recall pipeline, of which five were implemented in phases 1-5.
+ArXiv 2512.12818v1 — Hindsight Memory Architecture analysis identified six improvement opportunities for mnemonic's recall pipeline, of which five were implemented in phases 1-5. See `research-hindsight-paper-analysis-for-mnemonic-recall-improv-ae8fd9eb` for the detailed gap analysis and "why" rationale.
 
 ### What mnemonic already had before this work
 
@@ -47,6 +51,14 @@ ArXiv 2512.12818v1 — Hindsight Memory Architecture analysis identified six imp
 3. **Phase 3 — TF-IDF rescue precomputation** (COMPLETED): Session-scoped cache and pre-tokenized corpus reuse to avoid retokenizing all notes on every rescue call.
 4. **Phase 4 — Temporal retrieval boost** (COMPLETED): Detect temporal cues in query text and adjust ranking by `updatedAt` recency.
 5. **Phase 5 — Temporal parsing + confidence-gated filtering** (COMPLETED): Explicit relative-window parsing for numeric windows, temporal confidence model (high/medium/low), strict filtering only for high-confidence explicit windows.
+
+### Implementation details per phase
+
+- **Phase 1**: `applyGraphSpreadingActivation` in `src/recall.ts`. Follow-up fix: re-assign `semanticRank` after spreading so graph-discovered candidates get proper RRF contribution.
+- **Phase 2**: `computeHybridScore` and rank assignment in `src/recall.ts`. Project boost reduced from 0.15 to 0.03 (tiebreaker). Canonical weight increased from 0.005 to 0.05.
+- **Phase 3**: `collectLexicalRescueCandidates` in `src/index.ts`; token/corpus helpers in `src/cache.ts` and `src/lexical.ts`. Session-scoped cache instead of persistent per-vault index.
+- **Phase 4**: `detectTemporalQueryHint` and `computeTemporalRecencyBoost` in `src/recall.ts`; boost integration in `src/index.ts`. Additive boost only, no strict filtering.
+- **Phase 5**: Temporal parser + gating helpers in `src/recall.ts`; gated application in `src/index.ts`. Confidence model: high/medium/low. Strict filtering only for high-confidence explicit windows.
 
 ### What was deferred
 
