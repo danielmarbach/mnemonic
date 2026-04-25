@@ -8,7 +8,7 @@ tags:
   - hindsight
 lifecycle: temporary
 createdAt: '2026-04-24T18:10:35.779Z'
-updatedAt: '2026-04-24T20:44:11.295Z'
+updatedAt: '2026-04-25T10:33:46.117Z'
 role: plan
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -18,6 +18,8 @@ relatedTo:
     type: follows
   - id: review-hindsight-plan-validation-against-design-principles-eae4ebe4
     type: derives-from
+  - id: apply-phase-3-lexical-rescue-pre-tokenized-tf-idf-cache-inte-5d1512f7
+    type: follows
 memoryVersion: 1
 ---
 # Plan: mnemonic Recall Improvements from Hindsight Research
