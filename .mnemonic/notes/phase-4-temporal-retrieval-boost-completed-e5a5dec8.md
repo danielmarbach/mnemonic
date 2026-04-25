@@ -10,9 +10,6 @@ createdAt: '2026-04-25T21:43:36.049Z'
 updatedAt: '2026-04-25T21:43:36.049Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
-relatedTo:
-  - id: plan-mnemonic-recall-improvements-from-hindsight-research-5b059160
-    type: follows
 memoryVersion: 1
 ---
 Phase 4 implemented temporal retrieval boost for recall.

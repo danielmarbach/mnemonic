@@ -11,8 +11,6 @@ updatedAt: '2026-04-25T21:43:29.712Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
-  - id: plan-mnemonic-recall-improvements-from-hindsight-research-5b059160
-    type: follows
   - id: rpir-workflow-design-for-mnemonic-research-plan-implement-re-80b00851
     type: example-of
 memoryVersion: 1

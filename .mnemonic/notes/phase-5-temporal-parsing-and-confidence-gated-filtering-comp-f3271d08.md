@@ -11,8 +11,6 @@ updatedAt: '2026-04-25T21:43:43.820Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
-  - id: plan-mnemonic-recall-improvements-from-hindsight-research-5b059160
-    type: follows
   - id: summary-performance-principles-compliance-audit-for-recall-p-b482b38b
     type: derives-from
 memoryVersion: 1

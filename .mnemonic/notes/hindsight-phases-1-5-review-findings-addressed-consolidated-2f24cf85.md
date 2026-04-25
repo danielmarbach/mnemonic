@@ -11,8 +11,6 @@ updatedAt: '2026-04-25T21:42:49.274Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
-  - id: plan-mnemonic-recall-improvements-from-hindsight-research-5b059160
-    type: derives-from
   - id: hybrid-recall-design-and-implementation-0-20-0-0-23-0-350317a0
     type: related-to
   - id: performance-principles-for-file-first-mcp-and-git-backed-wor-4e7d3bc8

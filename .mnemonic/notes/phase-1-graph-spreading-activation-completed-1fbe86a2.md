@@ -13,8 +13,6 @@ projectName: mnemonic
 relatedTo:
   - id: apply-fix-finding-1-boost-existing-candidates-via-graph-spre-51fad28b
     type: related-to
-  - id: review-phase-1-graph-spreading-activation-08de3943
-    type: derives-from
 memoryVersion: 1
 ---
 Phase 1 implemented graph spreading activation in recall.

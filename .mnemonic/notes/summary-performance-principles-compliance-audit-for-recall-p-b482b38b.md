@@ -19,8 +19,6 @@ projectName: mnemonic
 relatedTo:
   - id: performance-principles-for-file-first-mcp-and-git-backed-wor-4e7d3bc8
     type: derives-from
-  - id: plan-mnemonic-recall-improvements-from-hindsight-research-5b059160
-    type: explains
 memoryVersion: 1
 ---
 # Summary: Performance principles compliance audit for recall phases 1-5

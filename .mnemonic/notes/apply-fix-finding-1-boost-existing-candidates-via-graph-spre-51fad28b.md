@@ -11,9 +11,6 @@ role: plan
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
-relatedTo:
-  - id: review-phase-1-graph-spreading-finding-1-fix-5053b069
-    type: derives-from
 memoryVersion: 1
 ---
 # Apply: Fix Finding 1 — boost existing candidates via graph spreading

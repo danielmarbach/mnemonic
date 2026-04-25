@@ -12,9 +12,6 @@ role: context
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
-relatedTo:
-  - id: research-hindsight-paper-analysis-for-mnemonic-recall-improv-2d9317b3
-    type: follows
 memoryVersion: 1
 ---
 # Research: ArXiv 2512.12818v1 Embedding Design for mnemonic
