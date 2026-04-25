@@ -8,7 +8,7 @@ tags:
   - phase2
 lifecycle: temporary
 createdAt: '2026-04-25T06:36:45.984Z'
-updatedAt: '2026-04-25T06:36:54.213Z'
+updatedAt: '2026-04-25T06:37:09.857Z'
 role: plan
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -17,6 +17,8 @@ relatedTo:
   - id: plan-phase-2-reciprocal-rank-fusion-implementation-c8a07d89
     type: follows
   - id: review-phase-2-rrf-double-check-regression-findings-8556a52f
+    type: derives-from
+  - id: review-phase-2-rrf-stability-verification-after-tie-rank-adj-1b3f9752
     type: derives-from
 memoryVersion: 1
 ---
