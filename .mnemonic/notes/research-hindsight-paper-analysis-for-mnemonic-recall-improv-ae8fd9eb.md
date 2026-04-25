@@ -10,7 +10,7 @@ tags:
   - tempr
 lifecycle: permanent
 createdAt: '2026-04-25T21:49:44.853Z'
-updatedAt: '2026-04-25T21:49:49.369Z'
+updatedAt: '2026-04-25T21:52:19.376Z'
 role: research
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -48,25 +48,47 @@ These are merged via **Reciprocal Rank Fusion (RRF)** (Section 4.2.3), then refi
 
 ## Current mnemonic State (Verified from Source)
 
-### What mnemonic ALREADY does (fundamentals preserved)
+### What mnemonic now does (post phases 1-5)
 
-1. ✅ **Semantic embeddings** via `nomic-embed-text-v2-moe` through local Ollama
-2. ✅ **TF-IDF lexical rescue** — when semantic results are weak, scans all notes and ranks by TF-IDF cosine similarity (adopted v0.23.0)
-3. ✅ **Graph relationships** — bi-directional typed relationships between notes (`related-to`, `explains`, `example-of`, `supersedes`, `derives-from`, `follows`)
-4. ✅ **Projection text** — structured derived text for embedding (title, lifecycle, tags, summary, headings), max 1200 chars
-5. ✅ **Temporal metadata** — `updatedAt` on notes, git-backed history with temporal interpretation for change categorization
-6. ✅ **Git-backed, markdown, embedding-driven** — core design preserved
-7. ✅ **Language-independent** — signals are structural, not English-keyword dependent
+1. ✅ **Graph spreading activation** — related notes boost scores via spreading activation over the relationship graph
+2. ✅ **TF-IDF lexical rescue with session cache** — pre-tokenized corpus reuse, no re-tokenization per call
+3. ✅ **Reciprocal Rank Fusion** — rank-based fusion over semantic and lexical channels, calibration-free
+4. ✅ **Temporal retrieval boost** — detects temporal cues in queries and adjusts ranking by recency
+5. ✅ **Confidence-gated temporal filtering** — strict filtering only for high-confidence explicit windows
+6. ✅ **Semantic embeddings** via `nomic-embed-text-v2-moe` through local Ollama
+7. ✅ **Graph relationships** — bidirectional typed relationships
+8. ✅ **Projection text** — structured derived text for embedding
+9. ✅ **Temporal metadata** — git-backed history with temporal interpretation
+10. ✅ **Git-backed, markdown, embedding-driven** — core design
+11. ✅ **Language-independent** — structural signals, not English-keyword dependent (temporal hint detection is English-only, deferred M6)
 
-### What mnemonic DOES NOT do
+### What mnemonic still does not do
 
-1. ❌ **Graph traversal during recall** — relationships exist but are NOT used to discover indirectly related notes. Graph is only used for post-hoc relationship previews on top results.
-2. ❌ **BM25 with inverted index** — TF-IDF rescue re-tokenizes ALL notes on every rescue call. No pre-computed document frequency cache or inverted index.
-3. ❌ **Reciprocal Rank Fusion (RRF)** — mnemonic uses additive hybrid scoring (`boosted + 0.12*lexical + 0.08*coverage + 0.16*phrase + canonical`). RRF is rank-based and calibration-free across channels.
-4. ❌ **Four-way parallel retrieval** — Only semantic + lexical rescue (2 channels). No graph spreading activation or temporal constraint filtering as retrieval channels.
-5. ❌ **Cross-encoder reranking** — No neural reranker on top candidates.
-6. ❌ **Token budget filtering** — Fixed `limit` parameter instead of dynamic token budget.
-7. ❌ **Observation / entity synthesis** — No LLM-generated summaries of entities from multiple notes.
+1. ❌ **Cross-encoder reranking** — blocked on Ollama cross-encoder model availability
+2. ❌ **Observation / entity synthesis** — high cost, unclear benefit for human-authored structured notes
+3. ❌ **Token budget filtering** — fixed `limit` parameter instead of dynamic token budget
+
+1) ✅ **Semantic embeddings** via `nomic-embed-text-v2-moe` through local Ollama
+2) ✅ **TF-IDF lexical rescue** — when semantic results are weak, scans all notes and ranks by TF-IDF cosine similarity (adopted v0.23.0)
+3) ✅ **Graph relationships** — bi-directional typed relationships between notes (`related-to`, `explains`, `example-of`, `supersedes`, `derives-from`, `follows`)
+4) ✅ **Projection text** — structured derived text for embedding (title, lifecycle, tags, summary, headings), max 1200 chars
+5) ✅ **Temporal metadata** — `updatedAt` on notes, git-backed history with temporal interpretation for change categorization
+6) ✅ **Git-backed, markdown, embedding-driven** — core design preserved
+7) ✅ **Language-independent** — signals are structural, not English-keyword dependent
+
+### What mnemonic still does not do
+
+1. ❌ **Cross-encoder reranking** — blocked on Ollama cross-encoder model availability
+2. ❌ **Observation / entity synthesis** — high cost, unclear benefit for human-authored structured notes
+3. ❌ **Token budget filtering** — fixed `limit` parameter instead of dynamic token budget
+
+1) ❌ **Graph traversal during recall** — relationships exist but are NOT used to discover indirectly related notes. Graph is only used for post-hoc relationship previews on top results.
+2) ❌ **BM25 with inverted index** — TF-IDF rescue re-tokenizes ALL notes on every rescue call. No pre-computed document frequency cache or inverted index.
+3) ❌ **Reciprocal Rank Fusion (RRF)** — mnemonic uses additive hybrid scoring (`boosted + 0.12*lexical + 0.08*coverage + 0.16*phrase + canonical`). RRF is rank-based and calibration-free across channels.
+4) ❌ **Four-way parallel retrieval** — Only semantic + lexical rescue (2 channels). No graph spreading activation or temporal constraint filtering as retrieval channels.
+5) ❌ **Cross-encoder reranking** — No neural reranker on top candidates.
+6) ❌ **Token budget filtering** — Fixed `limit` parameter instead of dynamic token budget.
+7) ❌ **Observation / entity synthesis** — No LLM-generated summaries of entities from multiple notes.
 
 ## Identified Improvement Opportunities
 
