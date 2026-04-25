@@ -5,7 +5,7 @@ tags:
   - request
 lifecycle: temporary
 createdAt: '2026-04-24T20:13:47.389Z'
-updatedAt: '2026-04-24T22:38:12.418Z'
+updatedAt: '2026-04-25T21:43:08.351Z'
 role: context
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -13,6 +13,8 @@ projectName: mnemonic
 relatedTo:
   - id: apply-fix-finding-1-boost-existing-candidates-via-graph-spre-51fad28b
     type: related-to
+  - id: phase-1-graph-spreading-activation-completed-1fbe86a2
+    type: supersedes
 memoryVersion: 1
 ---
 # Request: Phase 1 Graph Spreading Activation in Recall

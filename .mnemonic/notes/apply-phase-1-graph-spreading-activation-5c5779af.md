@@ -4,13 +4,15 @@ tags:
   - apply
 lifecycle: temporary
 createdAt: '2026-04-24T20:16:34.882Z'
-updatedAt: '2026-04-24T20:44:32.978Z'
+updatedAt: '2026-04-25T21:43:08.351Z'
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
   - id: review-phase-1-graph-spreading-activation-08de3943
     type: derives-from
+  - id: phase-1-graph-spreading-activation-completed-1fbe86a2
+    type: supersedes
 memoryVersion: 1
 ---
 # Apply: Phase 1 Graph Spreading Activation
