@@ -8,7 +8,7 @@ tags:
   - temporal
 lifecycle: temporary
 createdAt: '2026-04-25T11:54:40.027Z'
-updatedAt: '2026-04-25T11:54:40.027Z'
+updatedAt: '2026-04-25T11:54:46.045Z'
 role: review
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -19,20 +19,28 @@ memoryVersion: 1
 
 ## Reviewed artifact
 
+- `apply-phase-5-temporal-parsing-and-confidence-gated-filterin-276b80d2`
+
 - `apply-phase-5-temporal-parsing-and-confidence-gated-filtering-8603d64a`
 
 ## Verification evidence
 
 - Command: `npm test -- tests/recall.unit.test.ts`
+
 - Result: pass
+
 - Details: 44/44 tests passed
 
 - Command: `npm run build && npm test -- tests/recall.unit.test.ts tests/recall-embeddings.integration.test.ts`
+
 - Result: pass
+
 - Details: 67/67 tests passed across temporal unit + integration coverage
 
 - Command: `npm test`
+
 - Result: pass
+
 - Details: 46 files, 719 tests passed
 
 ## Findings
