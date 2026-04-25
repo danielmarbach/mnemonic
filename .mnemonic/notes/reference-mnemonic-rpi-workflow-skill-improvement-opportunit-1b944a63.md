@@ -10,11 +10,14 @@ tags:
   - phase2
 lifecycle: permanent
 createdAt: '2026-04-25T07:47:46.589Z'
-updatedAt: '2026-04-25T07:47:46.589Z'
+updatedAt: '2026-04-25T07:47:56.352Z'
 role: reference
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: rpir-workflow-design-for-mnemonic-research-plan-implement-re-80b00851
+    type: related-to
 memoryVersion: 1
 ---
 # Reference: mnemonic-rpi-workflow skill improvement opportunities from Phase 2 execution
