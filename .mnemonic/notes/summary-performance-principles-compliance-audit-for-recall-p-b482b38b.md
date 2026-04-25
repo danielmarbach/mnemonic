@@ -19,8 +19,6 @@ projectName: mnemonic
 relatedTo:
   - id: performance-principles-for-file-first-mcp-and-git-backed-wor-4e7d3bc8
     type: derives-from
-  - id: summary-phase-5-temporal-parsing-and-confidence-gated-filter-bc395edc
-    type: derives-from
   - id: plan-mnemonic-recall-improvements-from-hindsight-research-5b059160
     type: explains
 memoryVersion: 1

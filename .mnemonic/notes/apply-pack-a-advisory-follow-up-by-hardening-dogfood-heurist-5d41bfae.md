@@ -16,10 +16,6 @@ projectName: mnemonic
 relatedTo:
   - id: mnemonic-key-design-decisions-3f2a6273
     type: related-to
-  - id: plan-phase-2-reciprocal-rank-fusion-implementation-c8a07d89
-    type: follows
-  - id: review-phase-2-rrf-commit-and-dogfooding-validation-complete-151ee91f
-    type: derives-from
   - id: review-pack-a-advisory-follow-up-verification-clean-c03c2fd3
     type: derives-from
 memoryVersion: 1

@@ -12,8 +12,6 @@ projectName: mnemonic
 relatedTo:
   - id: hybrid-recall-design-and-implementation-0-20-0-0-23-0-350317a0
     type: related-to
-  - id: apply-phase-1-graph-spreading-activation-5c5779af
-    type: derives-from
 memoryVersion: 1
 ---
 # Review: Phase 1 Graph Spreading Activation

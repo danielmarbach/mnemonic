@@ -13,11 +13,6 @@ role: decision
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
-relatedTo:
-  - id: plan-phase-2-reciprocal-rank-fusion-implementation-c8a07d89
-    type: derives-from
-  - id: summary-phase-2-reciprocal-rank-fusion-completed-with-adviso-b5f823ef
-    type: explains
 memoryVersion: 1
 ---
 # Decision: Phase 2 recall scoring uses RRF with dense rank tie handling

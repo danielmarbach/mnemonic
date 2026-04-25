@@ -16,22 +16,8 @@ projectName: mnemonic
 relatedTo:
   - id: research-hindsight-paper-analysis-for-mnemonic-recall-improv-2d9317b3
     type: follows
-  - id: review-hindsight-plan-validation-against-design-principles-eae4ebe4
-    type: derives-from
-  - id: apply-phase-3-lexical-rescue-pre-tokenized-tf-idf-cache-inte-5d1512f7
-    type: follows
-  - id: plan-phase-4-temporal-retrieval-boost-implementation-87d668c6
-    type: follows
-  - id: summary-phase-4-temporal-retrieval-boost-completed-1e1ab210
-    type: related-to
-  - id: review-hindsight-master-plan-coverage-against-delivered-phas-62608b1b
-    type: derives-from
-  - id: plan-phase-5-temporal-parsing-with-confidence-gated-filterin-0f45f3cd
-    type: follows
   - id: summary-performance-principles-compliance-audit-for-recall-p-b482b38b
     type: explains
-  - id: review-hindsight-phases-1-5-comprehensive-code-and-plan-audi-0be2b019
-    type: derives-from
 memoryVersion: 1
 ---
 # Plan: mnemonic Recall Improvements from Hindsight Research

@@ -16,8 +16,6 @@ projectName: mnemonic
 relatedTo:
   - id: apply-pack-a-advisory-follow-up-by-hardening-dogfood-heurist-5d41bfae
     type: derives-from
-  - id: plan-phase-2-reciprocal-rank-fusion-implementation-c8a07d89
-    type: derives-from
 memoryVersion: 1
 ---
 # Review: Pack A advisory follow-up verification clean

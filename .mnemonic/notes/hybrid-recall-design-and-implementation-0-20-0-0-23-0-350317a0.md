@@ -15,8 +15,6 @@ relatedTo:
     type: related-to
   - id: mnemonic-key-design-decisions-3f2a6273
     type: example-of
-  - id: review-hindsight-plan-validation-against-design-principles-eae4ebe4
-    type: related-to
 memoryVersion: 1
 ---
 Hybrid recall improves mnemonic recall quality by combining semantic retrieval with lexical reranking, lexical rescue, and canonical explanation promotion over existing projection data, while preserving mnemonic's core simplicity constraints.

@@ -17,8 +17,6 @@ relatedTo:
     type: related-to
   - id: active-session-project-cache-single-in-memory-vault-cache-pe-7463f124
     type: related-to
-  - id: review-hindsight-plan-validation-against-design-principles-eae4ebe4
-    type: explains
   - id: summary-performance-principles-compliance-audit-for-recall-p-b482b38b
     type: derives-from
 memoryVersion: 1
