@@ -6,9 +6,9 @@ tags:
   - dogfooding
   - phase2
   - rrf
-lifecycle: temporary
+lifecycle: permanent
 createdAt: '2026-04-25T07:40:36.174Z'
-updatedAt: '2026-04-25T07:41:06.653Z'
+updatedAt: '2026-04-25T20:54:27.648Z'
 role: plan
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -61,5 +61,17 @@ This keeps the advisory signal meaningful while reducing false positives caused 
 - `npm test -- tests/dogfooding-runner.unit.test.ts tests/dogfooding-isolated-vault.unit.test.ts` ✅
 
 ## Scope
+
+### Follow-up: deterministic assertions extracted to integration tests
+
+The dogfood runner's required checks have been fully extracted to integration tests:
+
+- `packA.warmOrientationStable` → `pipeline-smoke.integration.test.ts` (orientation determinism)
+- `packA.alwaysLoadFlipped` → `memory-lifecycle.integration.test.ts` (alwaysLoad toggle)
+- `packB.allTemporarySourcesAutoDelete` → `memory-lifecycle.integration.test.ts` (temp source auto-delete)
+- `packB.promptHasOrientationFirst` → `pipeline-smoke.integration.test.ts` (workflow hint prompt)
+- `packC.*` (semPatch, lint, retry) → `update-sem-patch.integration.test.ts` + `dogfood-semantic-patch.mjs`
+
+The dogfood runner now reports **advisory observations only** with no release gate. Pack C is fully covered by integration tests and no longer runs in the dogfood script. Unused helpers (`allTemporarySourcesAutoDelete`, `pickRecentNoteForRelationshipNavigation`, `resolveDogfoodVaultPath`) were removed from `dogfooding-runner-helpers.mjs` and their unit tests cleaned up.
 
 No runtime memory retrieval algorithm change in this apply step; changes are limited to dogfooding evaluation heuristics.
