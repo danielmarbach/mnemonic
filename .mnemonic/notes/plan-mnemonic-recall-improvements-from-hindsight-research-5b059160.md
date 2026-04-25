@@ -8,7 +8,7 @@ tags:
   - hindsight
 lifecycle: temporary
 createdAt: '2026-04-24T18:10:35.779Z'
-updatedAt: '2026-04-25T11:40:50.442Z'
+updatedAt: '2026-04-25T11:55:42.727Z'
 role: plan
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -52,12 +52,26 @@ Focus on the TEMPR recall layer (retain/recall), not CARA (opinion/reflect), bec
 - \[x] **Phase 2** Reciprocal Rank Fusion (RRF)
 - \[x] **Phase 3** TF-IDF rescue precomputation optimization
 - \[x] **Phase 4** Temporal retrieval boost
+- \[x] **Phase 5** Temporal parsing + confidence-gated filtering
+
+- \[x] **Phase 1** Graph spreading activation in recall
+
+- \[x] **Phase 2** Reciprocal Rank Fusion (RRF)
+
+- \[x] **Phase 3** TF-IDF rescue precomputation optimization
+
+- \[x] **Phase 4** Temporal retrieval boost
+
 - \[ ] **Phase 5** Temporal parsing + confidence-gated filtering (defined, pending implementation)
 
 - \[x] **Phase 1** Graph spreading activation in recall
+
 - \[x] **Phase 2** Reciprocal Rank Fusion (RRF)
+
 - \[x] **Phase 3** TF-IDF rescue precomputation optimization
+
 - \[x] **Phase 4** Temporal retrieval boost
+
 - \[ ] **Phase 5** Not defined yet
 
 ***
@@ -168,6 +182,15 @@ Higher cost and unclear benefit for human-authored structured notes.
 ***
 
 ## Immediate Next Action
+
+Hindsight plan phases are complete through Phase 5.
+
+Choose next direction from deferred items:
+
+- Cross-encoder reranking (if local model/runtime constraints are satisfied)
+- Observation synthesis (if evidence supports cost/benefit)
+
+Until then, continue dogfooding and regression validation on the completed recall stack.
 
 Execute Phase 5 plan: `plan-phase-5-temporal-parsing-with-confidence-gated-filterin-0f45f3cd`.
 
