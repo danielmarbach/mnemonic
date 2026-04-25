@@ -1,5 +1,5 @@
 ---
-name: mnemonic-rpir-workflow
+name: mnemonic-rpi-workflow
 description: Executes multi-step research-plan-implement-review workflows using mnemonic for workflow artifacts. Triggers on multi-step feature or bugfix work, subagent handoffs, plan-heavy tasks, or any work needing structured RPIR artifacts with explicit handoffs and consistent role/relationship conventions.
 ---
 
