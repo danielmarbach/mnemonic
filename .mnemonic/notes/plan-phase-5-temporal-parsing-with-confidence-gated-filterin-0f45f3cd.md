@@ -8,7 +8,7 @@ tags:
   - temporal
 lifecycle: temporary
 createdAt: '2026-04-25T11:40:18.666Z'
-updatedAt: '2026-04-25T11:40:38.648Z'
+updatedAt: '2026-04-25T11:54:58.567Z'
 role: plan
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -30,6 +30,11 @@ memoryVersion: 1
 - `research-phase-5-temporal-parsing-options-and-filtering-safe-cd641999`
 
 - `plan-mnemonic-recall-improvements-from-hindsight-research-5b059160`
+
+- `research-phase-5-temporal-parsing-options-and-filtering-safe-cd641999`
+
+- `plan-mnemonic-recall-improvements-from-hindsight-research-5b059160`
+
 - `research-phase-5-temporal-parsing-options-and-filtering-safe-7b2ff838`
 
 ## Strategy
@@ -37,6 +42,14 @@ memoryVersion: 1
 Implement temporal parsing in bounded steps, keeping boost-only fallback as the safety baseline.
 
 ## Execution checklist
+
+- \[x] Add parser primitives for explicit relative windows (`past N days`, `last N weeks`).
+- \[x] Add temporal confidence scoring (`high` | `medium` | `low`) from parser evidence quality.
+- \[x] Add filtering gate: apply strict date-window filtering only for `high` confidence explicit windows.
+- \[x] Preserve additive recency boost path for `medium/low` confidence or parsing failures.
+- \[x] Add/extend recall unit tests for parser extraction, confidence assignment, and filter gating behavior.
+- \[x] Add integration coverage for temporal precision gains and non-temporal no-regression behavior.
+- \[x] Run verification (`npm run typecheck`, focused temporal tests, `npm test`).
 
 - \[ ] Add parser primitives for explicit relative windows (`past N days`, `last N weeks`) and canonical named periods.
 - \[ ] Add temporal confidence scoring (`high` | `medium` | `low`) from parser evidence quality.
