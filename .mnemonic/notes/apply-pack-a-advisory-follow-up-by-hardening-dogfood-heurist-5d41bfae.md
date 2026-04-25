@@ -8,7 +8,7 @@ tags:
   - rrf
 lifecycle: temporary
 createdAt: '2026-04-25T07:40:36.174Z'
-updatedAt: '2026-04-25T07:40:49.567Z'
+updatedAt: '2026-04-25T07:41:06.653Z'
 role: plan
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -19,6 +19,8 @@ relatedTo:
   - id: plan-phase-2-reciprocal-rank-fusion-implementation-c8a07d89
     type: follows
   - id: review-phase-2-rrf-commit-and-dogfooding-validation-complete-151ee91f
+    type: derives-from
+  - id: review-pack-a-advisory-follow-up-verification-clean-c03c2fd3
     type: derives-from
 memoryVersion: 1
 ---

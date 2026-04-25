@@ -8,11 +8,16 @@ tags:
   - rrf
 lifecycle: temporary
 createdAt: '2026-04-25T07:41:00.107Z'
-updatedAt: '2026-04-25T07:41:00.107Z'
+updatedAt: '2026-04-25T07:41:06.735Z'
 role: review
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: apply-pack-a-advisory-follow-up-by-hardening-dogfood-heurist-5d41bfae
+    type: derives-from
+  - id: plan-phase-2-reciprocal-rank-fusion-implementation-c8a07d89
+    type: derives-from
 memoryVersion: 1
 ---
 # Review: Pack A advisory follow-up verification clean
