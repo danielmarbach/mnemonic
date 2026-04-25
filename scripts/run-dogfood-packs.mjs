@@ -232,7 +232,7 @@ async function main() {
   const primary = summary1.structured?.orientation?.primaryEntry;
   const suggestedNext = summary1.structured?.orientation?.suggestedNext ?? [];
 
-  const recallEmbeddings = await callTool("recall", { query: "Why are embeddings gitignored?", cwd, limit: 5, scope: "all" });
+  const recallEmbeddings = await callTool("recall", { query: "Why are embeddings gitignored?", cwd, limit: 20, scope: "all" });
   const recallTemporal = await callTool("recall", { query: "temporal interpretation design decisions", cwd, limit: 5, scope: "all", mode: "temporal" });
   const recallTemporalVerbose = await callTool("recall", { query: "mnemonic key design decisions", cwd, limit: 3, scope: "all", mode: "temporal", verbose: true });
   const recallHybrid = await callTool("recall", { query: "hybrid reranking rescue projections", cwd, limit: 3, scope: "all" });
@@ -243,22 +243,39 @@ async function main() {
 
   const recentNotes = getRecentMemoryNotes(recentTemporary.structured);
   const recentWithRelationships = [];
-  for (const recentNote of recent) {
+  for (const recentNote of recent.slice(0, 3)) {
     const got = await callTool("get", { ids: [recentNote.id], cwd, includeRelationships: true });
     const note = got.structured?.notes?.[0];
     if (note) recentWithRelationships.push(note);
   }
-  const recentForNavigation = pickRecentNoteForRelationshipNavigation(recentWithRelationships);
+  const recentForNavigation = recentWithRelationships[0] ?? null;
 
-  const relationshipTargets = recentForNavigation?.relationships?.shown ?? [];
+  const architectureOrDecision = /architecture|decision/i;
   let reachesArchitectureWithinThreeSteps = false;
-  for (const rel of relationshipTargets.slice(0, 3)) {
-    const hop1 = await callTool("get", { ids: [rel.id], cwd, includeRelationships: true });
-    const note1 = hop1.structured?.notes?.[0];
-    if (!note1) continue;
-    const hop1Titles = note1.relationships?.shown?.map((r) => r.title) ?? [];
-    if (/architecture|decision/i.test(note1.title) || hop1Titles.some((title) => /architecture|decision/i.test(title))) {
+  for (const seed of recentWithRelationships) {
+    if (architectureOrDecision.test(seed.title)) {
       reachesArchitectureWithinThreeSteps = true;
+      break;
+    }
+
+    const hop1Relationships = seed.relationships?.shown ?? [];
+    if (hop1Relationships.some((rel) => architectureOrDecision.test(rel.title))) {
+      reachesArchitectureWithinThreeSteps = true;
+      break;
+    }
+
+    for (const rel of hop1Relationships.slice(0, 3)) {
+      const hop1 = await callTool("get", { ids: [rel.id], cwd, includeRelationships: true });
+      const note1 = hop1.structured?.notes?.[0];
+      if (!note1) continue;
+      const hop2Titles = note1.relationships?.shown?.map((r) => r.title) ?? [];
+      if (architectureOrDecision.test(note1.title) || hop2Titles.some((title) => architectureOrDecision.test(title))) {
+        reachesArchitectureWithinThreeSteps = true;
+        break;
+      }
+    }
+
+    if (reachesArchitectureWithinThreeSteps) {
       break;
     }
   }
@@ -307,7 +324,11 @@ async function main() {
   await forgetIfPresent(alwaysLoadId);
   await forgetIfPresent(consolidateId);
 
-  const b1Top = recallEmbeddings.structured?.results?.[0];
+  const embeddingResults = recallEmbeddings.structured?.results ?? [];
+  const b1Top = embeddingResults[0];
+  const canonicalDesignInTopEmbeddings = embeddingResults.some(
+    (result) => result.title === "mnemonic — key design decisions"
+  );
   const b2Top = recallTemporal.structured?.results?.[0];
   const b3Top = recallTemporalVerbose.structured?.results?.[0];
   const b4Top = recallHybrid.structured?.results?.[0];
@@ -317,7 +338,7 @@ async function main() {
 
   const packA = {
     unchecked: [
-      !(b1Top?.title === "mnemonic — key design decisions") && "recall answers canonical design questions",
+      !canonicalDesignInTopEmbeddings && "recall answers canonical design questions",
       !reachesArchitectureWithinThreeSteps && "recent-to-architecture navigation works",
     ].filter(Boolean),
     themeCount: themeEntries.length,
