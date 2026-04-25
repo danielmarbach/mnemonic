@@ -6,6 +6,22 @@ The format is loosely based on Keep a Changelog and uses semver-style version he
 
 ## [Unreleased]
 
+## [0.26.0] - 2026-04-25
+
+### Added
+
+- Temporal recency boost: `recall` detects temporal intent in queries and applies an additive score nudge to newer notes for time-oriented searches.
+- Confidence-gated temporal filtering: explicit time windows in queries trigger strict date filtering when confidence is high.
+
+### Changed
+
+- Project scope boost reduced from 0.15 to 0.03 so it acts as a tiebreaker rather than dominating fused rankings.
+
+### Fixed
+
+- Graph-discovered candidates from relationship spreading now receive correct semantic ranks in the fused pipeline.
+- Temporal filtering no longer silently drops notes with invalid dates.
+
 ## [0.25.5] - 2026-04-25
 
 ### Changed
