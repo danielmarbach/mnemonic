@@ -8,7 +8,7 @@ tags:
   - phase2
 lifecycle: temporary
 createdAt: '2026-04-24T23:09:30.970Z'
-updatedAt: '2026-04-24T23:09:37.997Z'
+updatedAt: '2026-04-25T06:25:54.311Z'
 role: plan
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -32,6 +32,51 @@ memoryVersion: 1
 - RRF constant: `RRF_K = 60`
 - Option A for project boost: no additional post-RRF additive term (project-boosted semantic ranks already carry priority into the semanticRank)
 - Preserve discoverability of canonical explanation promotion via `semanticScoreForPromotion` gating
+
+## Status (2026-04-25)
+
+Implementation in progress. RRF formula with `boosted` backbone + scaled contributions works but test expectations need updating.
+
+### Design iteration
+
+Initial RRF implementation dropped `boosted` entirely, causing ranking failures. Corrected to:
+
+```typescript
+hybrid = boosted + (1/(K + semanticRank) + 1/(K + lexicalRank)) * 3.5 + canonicalExplanationScore
+```
+
+- `boosted` remains the semantic backbone (rawScore + project boost + metadata boost)
+- RRF replaces only the old additive lexical/coverage/phrase small weights
+- Scaling factor 3.5 chosen so max RRF ≈ 0.115, matching old additive contributions
+- Fallback: if semanticRank missing, returns boosted + canonical (backward-compatible)
+
+### Implementation changes made
+
+- `src/recall.ts`:
+  - Added `RRF_K = 60`
+  - `ScoredRecallCandidate` gains `semanticRank` and `lexicalRank`
+  - `computeHybridScore` uses RRF with scaled contributions
+  - `applyLexicalReranking` assigns `semanticRank` during its pass
+  - `applyCanonicalExplanationPromotion` assigns `lexicalRank` then sorts by RRF
+- `src/index.ts`:
+  - `collectLexicalRescueCandidates` sorts by lexicalScore instead of computeHybridScore
+
+### Remaining work
+
+1. ✅ `src/recall.ts` — RRF scoring implemented
+2. ✅ `src/index.ts` — rescue candidate sort updated
+3. 🔧 `tests/recall.unit.test.ts` — 4 unit tests failing (expected, test expectations need updating for RRF)
+4. 🔧 `tests/recall-embeddings.integration.test.ts` — 3 integration tests failing (lexical strength expectations)
+5. ⏳ Run verification after test fixes
+6. ⏳ Dogfooding validation
+7. ⏳ Review note
+
+### Notes
+
+- The `semanticScoreForPromotion` gating for canonical explanation promotion remains unchanged
+- `computeWorkflowScore` still adds role/temporary/centrality boosts on top of `computeHybridScore`
+- Fail-soft behavior preserved: no ranks → fallback to boosted + canonical
+- Language independence unaffected (no English wording tuning)
 
 ## Tasks
 
@@ -79,4 +124,4 @@ Expected: all existing tests pass or are updated to reflect RRF behavior.
 
 ## Immediate next action
 
-Edit `src/recall.ts` to replace additive scoring with RRF.
+Update tests to reflect RRF semantics, then run verification.
