@@ -10,6 +10,8 @@ import {
   applyGraphSpreadingActivation,
   detectTemporalQueryHint,
   computeTemporalRecencyBoost,
+  shouldApplyTemporalFiltering,
+  isWithinTemporalFilterWindow,
   type ScoredRecallCandidate,
 } from "../src/recall.js";
 import type { EffectiveNoteMetadata } from "../src/role-suggestions.js";
@@ -151,6 +153,40 @@ describe("temporal retrieval boost", () => {
 
     const stale = computeTemporalRecencyBoost("2026-01-01T00:00:00.000Z", hint, now);
     expect(stale).toBe(0);
+  });
+
+  it("detects explicit relative windows with high confidence", () => {
+    const hint = detectTemporalQueryHint("show notes from the last 10 days");
+
+    expect(hint).toBeDefined();
+    expect(hint?.windowDays).toBe(10);
+    expect(hint?.confidence).toBe("high");
+    expect(hint?.filterWindowDays).toBe(10);
+  });
+
+  it("keeps named periods as medium confidence and boost-only", () => {
+    const hint = detectTemporalQueryHint("what changed this week in recall");
+
+    expect(hint).toBeDefined();
+    expect(hint?.confidence).toBe("medium");
+    expect(hint?.filterWindowDays).toBeUndefined();
+    expect(shouldApplyTemporalFiltering(hint)).toBe(false);
+  });
+
+  it("applies filtering only for high-confidence explicit ranges", () => {
+    const high = detectTemporalQueryHint("changes in the past 3 weeks")!;
+    const medium = detectTemporalQueryHint("recent changes")!;
+
+    expect(shouldApplyTemporalFiltering(high)).toBe(true);
+    expect(shouldApplyTemporalFiltering(medium)).toBe(false);
+  });
+
+  it("evaluates temporal filter window membership by updatedAt", () => {
+    const now = new Date("2026-04-25T00:00:00.000Z");
+
+    expect(isWithinTemporalFilterWindow("2026-04-22T00:00:00.000Z", 7, now)).toBe(true);
+    expect(isWithinTemporalFilterWindow("2026-04-01T00:00:00.000Z", 7, now)).toBe(false);
+    expect(isWithinTemporalFilterWindow("not-a-date", 7, now)).toBe(false);
   });
 });
 

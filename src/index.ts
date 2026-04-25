@@ -45,6 +45,8 @@ import {
   applyGraphSpreadingActivation,
   detectTemporalQueryHint,
   computeTemporalRecencyBoost,
+  shouldApplyTemporalFiltering,
+  isWithinTemporalFilterWindow,
   type TemporalQueryHint,
   type ScoredRecallCandidate,
 } from "./recall.js";
@@ -2303,6 +2305,8 @@ async function collectLexicalRescueCandidates(
   existingIds: ScoredRecallCandidate[]
 ): Promise<ScoredRecallCandidate[]> {
   const projectId = project?.id;
+  const applyTemporalFilter = shouldApplyTemporalFiltering(temporalQueryHint);
+  const temporalFilterWindowDays = applyTemporalFilter ? temporalQueryHint?.filterWindowDays : undefined;
   const existingIdSet = new Set(existingIds.map((c) => c.id));
   const rescuePool: Array<{
     id: string;
@@ -2331,6 +2335,13 @@ async function collectLexicalRescueCandidates(
 
       if (scope === "project" && !isCurrentProject) continue;
       if (scope === "global" && isProjectNote) continue;
+      if (
+        applyTemporalFilter
+        && temporalFilterWindowDays !== undefined
+        && !isWithinTemporalFilterWindow(note.updatedAt, temporalFilterWindowDays)
+      ) {
+        continue;
+      }
 
       const projection = await getOrBuildProjection(vault.storage, note).catch(() => undefined);
       if (!projection) continue;
@@ -2506,6 +2517,8 @@ server.registerTool(
 
     const scored: ScoredRecallCandidate[] = [];
     const temporalQueryHint = detectTemporalQueryHint(query);
+    const applyTemporalFilter = shouldApplyTemporalFiltering(temporalQueryHint);
+    const temporalFilterWindowDays = applyTemporalFilter ? temporalQueryHint?.filterWindowDays : undefined;
 
     for (const vault of vaults) {
       const embeddings = project
@@ -2535,6 +2548,14 @@ server.registerTool(
           if (!isCurrentProject) continue;
         } else if (scope === "global") {
           if (isProjectNote) continue;
+        }
+
+        if (
+          applyTemporalFilter
+          && temporalFilterWindowDays !== undefined
+          && !isWithinTemporalFilterWindow(note.updatedAt, temporalFilterWindowDays)
+        ) {
+          continue;
         }
 
         const context = buildRecallCandidateContext(note);

@@ -31,6 +31,8 @@ const WORKFLOW_ROLE_BOOSTS: Partial<Record<NonNullable<EffectiveNoteMetadata["ro
 export interface TemporalQueryHint {
   windowDays: number;
   maxBoost: number;
+  confidence: "high" | "medium" | "low";
+  filterWindowDays?: number;
 }
 
 export interface ScoredRecallCandidate {
@@ -84,17 +86,43 @@ export function computeRecallMetadataBoost(metadata?: EffectiveNoteMetadata): nu
 }
 
 const TEMPORAL_QUERY_HINTS: Array<{ pattern: RegExp; hint: TemporalQueryHint }> = [
-  { pattern: /\b(today|latest)\b/i, hint: { windowDays: 2, maxBoost: 0.08 } },
-  { pattern: /\b(yesterday)\b/i, hint: { windowDays: 3, maxBoost: 0.08 } },
-  { pattern: /\b(this\s+week)\b/i, hint: { windowDays: 7, maxBoost: 0.06 } },
-  { pattern: /\b(last\s+week)\b/i, hint: { windowDays: 14, maxBoost: 0.06 } },
-  { pattern: /\b(this\s+month)\b/i, hint: { windowDays: 31, maxBoost: 0.05 } },
-  { pattern: /\b(last\s+month)\b/i, hint: { windowDays: 62, maxBoost: 0.05 } },
-  { pattern: /\b(this\s+year|last\s+year)\b/i, hint: { windowDays: 366, maxBoost: 0.03 } },
-  { pattern: /\b(recent|recently|newest)\b/i, hint: { windowDays: 30, maxBoost: 0.05 } },
+  { pattern: /\b(today|latest)\b/i, hint: { windowDays: 2, maxBoost: 0.08, confidence: "medium" } },
+  { pattern: /\b(yesterday)\b/i, hint: { windowDays: 3, maxBoost: 0.08, confidence: "medium" } },
+  { pattern: /\b(this\s+week)\b/i, hint: { windowDays: 7, maxBoost: 0.06, confidence: "medium" } },
+  { pattern: /\b(last\s+week)\b/i, hint: { windowDays: 14, maxBoost: 0.06, confidence: "medium" } },
+  { pattern: /\b(this\s+month)\b/i, hint: { windowDays: 31, maxBoost: 0.05, confidence: "medium" } },
+  { pattern: /\b(last\s+month)\b/i, hint: { windowDays: 62, maxBoost: 0.05, confidence: "medium" } },
+  { pattern: /\b(this\s+year|last\s+year)\b/i, hint: { windowDays: 366, maxBoost: 0.03, confidence: "medium" } },
+  { pattern: /\b(recent|recently|newest)\b/i, hint: { windowDays: 30, maxBoost: 0.05, confidence: "low" } },
 ];
 
+const EXPLICIT_TEMPORAL_WINDOW_PATTERN =
+  /\b(?:past|last|the\s+last|in\s+the\s+last)\s+(\d{1,3})\s+(day|days|week|weeks|month|months|year|years)\b/i;
+
+function toDays(value: number, unit: string): number {
+  const normalized = unit.toLowerCase();
+  if (normalized === "day" || normalized === "days") return value;
+  if (normalized === "week" || normalized === "weeks") return value * 7;
+  if (normalized === "month" || normalized === "months") return value * 31;
+  return value * 366;
+}
+
 export function detectTemporalQueryHint(query: string): TemporalQueryHint | undefined {
+  const explicitWindow = query.match(EXPLICIT_TEMPORAL_WINDOW_PATTERN);
+  if (explicitWindow) {
+    const value = Number.parseInt(explicitWindow[1], 10);
+    const unit = explicitWindow[2];
+    if (Number.isFinite(value) && value > 0) {
+      const windowDays = toDays(value, unit);
+      return {
+        windowDays,
+        filterWindowDays: windowDays,
+        maxBoost: Math.min(0.08, 0.03 + Math.log10(value + 1) * 0.02),
+        confidence: "high",
+      };
+    }
+  }
+
   for (const entry of TEMPORAL_QUERY_HINTS) {
     if (entry.pattern.test(query)) {
       return entry.hint;
@@ -121,6 +149,24 @@ export function computeTemporalRecencyBoost(
 
   const freshness = 1 - ageDays / hint.windowDays;
   return hint.maxBoost * freshness;
+}
+
+export function shouldApplyTemporalFiltering(hint: TemporalQueryHint | undefined): boolean {
+  return hint?.confidence === "high" && hint.filterWindowDays !== undefined;
+}
+
+export function isWithinTemporalFilterWindow(
+  updatedAt: string,
+  windowDays: number,
+  now: Date = new Date()
+): boolean {
+  const updated = new Date(updatedAt);
+  if (Number.isNaN(updated.getTime())) {
+    return false;
+  }
+
+  const ageDays = Math.max(0, (now.getTime() - updated.getTime()) / (1000 * 60 * 60 * 24));
+  return ageDays <= windowDays;
 }
 
 /**
