@@ -43,6 +43,9 @@ import {
   applyLexicalReranking,
   applyCanonicalExplanationPromotion,
   applyGraphSpreadingActivation,
+  detectTemporalQueryHint,
+  computeTemporalRecencyBoost,
+  type TemporalQueryHint,
   type ScoredRecallCandidate,
 } from "./recall.js";
 import {
@@ -2292,6 +2295,7 @@ function buildRecallCandidateContext(note: Note) {
 async function collectLexicalRescueCandidates(
   vaults: Vault[],
   query: string,
+  temporalQueryHint: TemporalQueryHint | undefined,
   project: { id: string; name: string } | undefined,
   scope: "project" | "global" | "all",
   tags: string[] | undefined,
@@ -2304,6 +2308,7 @@ async function collectLexicalRescueCandidates(
     id: string;
     vault: Vault;
     isCurrentProject: boolean;
+    updatedAt: string;
     projectionText: string;
     projectionTokens: string[];
     context: ReturnType<typeof buildRecallCandidateContext>;
@@ -2334,6 +2339,7 @@ async function collectLexicalRescueCandidates(
         id: note.id,
         vault,
         isCurrentProject: Boolean(isCurrentProject),
+        updatedAt: note.updatedAt,
         projectionText: projection.projectionText,
         projectionTokens: projectId
           ? getSessionCachedProjectionTokens(
@@ -2388,7 +2394,10 @@ async function collectLexicalRescueCandidates(
     const lexicalScore = tfIdfScore;
     if (lexicalScore < LEXICAL_RESCUE_THRESHOLD) continue;
 
-    const boost = (candidate.isCurrentProject ? 0.15 : 0) + candidate.context.metadataBoost;
+    const temporalBoost = temporalQueryHint
+      ? computeTemporalRecencyBoost(candidate.updatedAt, temporalQueryHint)
+      : 0;
+    const boost = (candidate.isCurrentProject ? 0.15 : 0) + candidate.context.metadataBoost + temporalBoost;
     candidates.push({
       id: candidate.id,
       score: lexicalScore,
@@ -2496,6 +2505,7 @@ server.registerTool(
     }
 
     const scored: ScoredRecallCandidate[] = [];
+    const temporalQueryHint = detectTemporalQueryHint(query);
 
     for (const vault of vaults) {
       const embeddings = project
@@ -2528,7 +2538,10 @@ server.registerTool(
         }
 
         const context = buildRecallCandidateContext(note);
-        const boost = (isCurrentProject ? 0.15 : 0) + context.metadataBoost;
+        const temporalBoost = temporalQueryHint
+          ? computeTemporalRecencyBoost(note.updatedAt, temporalQueryHint)
+          : 0;
+        const boost = (isCurrentProject ? 0.15 : 0) + context.metadataBoost + temporalBoost;
         scored.push({
           id: rec.id,
           score: rawScore,
@@ -2601,6 +2614,7 @@ server.registerTool(
       const rescueCandidates = await collectLexicalRescueCandidates(
         vaults,
         query,
+        temporalQueryHint,
         project ?? undefined,
         scope,
         tags,

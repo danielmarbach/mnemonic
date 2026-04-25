@@ -28,6 +28,11 @@ const WORKFLOW_ROLE_BOOSTS: Partial<Record<NonNullable<EffectiveNoteMetadata["ro
   summary: 0.008,
 };
 
+export interface TemporalQueryHint {
+  windowDays: number;
+  maxBoost: number;
+}
+
 export interface ScoredRecallCandidate {
   id: string;
   score: number;
@@ -76,6 +81,46 @@ export function computeRecallMetadataBoost(metadata?: EffectiveNoteMetadata): nu
   }
 
   return boost;
+}
+
+const TEMPORAL_QUERY_HINTS: Array<{ pattern: RegExp; hint: TemporalQueryHint }> = [
+  { pattern: /\b(today|latest)\b/i, hint: { windowDays: 2, maxBoost: 0.08 } },
+  { pattern: /\b(yesterday)\b/i, hint: { windowDays: 3, maxBoost: 0.08 } },
+  { pattern: /\b(this\s+week)\b/i, hint: { windowDays: 7, maxBoost: 0.06 } },
+  { pattern: /\b(last\s+week)\b/i, hint: { windowDays: 14, maxBoost: 0.06 } },
+  { pattern: /\b(this\s+month)\b/i, hint: { windowDays: 31, maxBoost: 0.05 } },
+  { pattern: /\b(last\s+month)\b/i, hint: { windowDays: 62, maxBoost: 0.05 } },
+  { pattern: /\b(this\s+year|last\s+year)\b/i, hint: { windowDays: 366, maxBoost: 0.03 } },
+  { pattern: /\b(recent|recently|newest)\b/i, hint: { windowDays: 30, maxBoost: 0.05 } },
+];
+
+export function detectTemporalQueryHint(query: string): TemporalQueryHint | undefined {
+  for (const entry of TEMPORAL_QUERY_HINTS) {
+    if (entry.pattern.test(query)) {
+      return entry.hint;
+    }
+  }
+
+  return undefined;
+}
+
+export function computeTemporalRecencyBoost(
+  updatedAt: string,
+  hint: TemporalQueryHint,
+  now: Date = new Date()
+): number {
+  const updated = new Date(updatedAt);
+  if (Number.isNaN(updated.getTime())) {
+    return 0;
+  }
+
+  const ageDays = Math.max(0, (now.getTime() - updated.getTime()) / (1000 * 60 * 60 * 24));
+  if (ageDays > hint.windowDays) {
+    return 0;
+  }
+
+  const freshness = 1 - ageDays / hint.windowDays;
+  return hint.maxBoost * freshness;
 }
 
 /**

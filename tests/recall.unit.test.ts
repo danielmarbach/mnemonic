@@ -8,6 +8,8 @@ import {
   computeCanonicalExplanationScore,
   computeHybridScore,
   applyGraphSpreadingActivation,
+  detectTemporalQueryHint,
+  computeTemporalRecencyBoost,
   type ScoredRecallCandidate,
 } from "../src/recall.js";
 import type { EffectiveNoteMetadata } from "../src/role-suggestions.js";
@@ -116,6 +118,39 @@ describe("computeRecallMetadataBoost", () => {
     const metadataBoosted = 0.9 + computeRecallMetadataBoost(summaryMetadata);
 
     expect(semanticBest).toBeGreaterThan(metadataBoosted);
+  });
+});
+
+describe("temporal retrieval boost", () => {
+  it("detects temporal cue phrases in recall queries", () => {
+    const hint = detectTemporalQueryHint("show recent decisions about recall");
+
+    expect(hint).toBeDefined();
+    expect(hint?.windowDays).toBeGreaterThan(0);
+    expect(hint?.maxBoost).toBeGreaterThan(0);
+  });
+
+  it("returns undefined when query has no temporal cue", () => {
+    expect(detectTemporalQueryHint("explain graph spreading activation")).toBeUndefined();
+  });
+
+  it("gives stronger boost to newer notes within the same window", () => {
+    const hint = detectTemporalQueryHint("recent decisions")!;
+    const now = new Date("2026-04-25T00:00:00.000Z");
+
+    const fresh = computeTemporalRecencyBoost("2026-04-24T00:00:00.000Z", hint, now);
+    const older = computeTemporalRecencyBoost("2026-04-15T00:00:00.000Z", hint, now);
+
+    expect(fresh).toBeGreaterThan(older);
+    expect(fresh).toBeGreaterThan(0);
+  });
+
+  it("returns zero boost for notes outside the temporal window", () => {
+    const hint = detectTemporalQueryHint("recent updates")!;
+    const now = new Date("2026-04-25T00:00:00.000Z");
+
+    const stale = computeTemporalRecencyBoost("2026-01-01T00:00:00.000Z", hint, now);
+    expect(stale).toBe(0);
   });
 });
 
