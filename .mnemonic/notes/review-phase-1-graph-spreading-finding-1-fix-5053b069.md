@@ -6,7 +6,7 @@ tags:
   - recall
 lifecycle: temporary
 createdAt: '2026-04-24T22:37:44.392Z'
-updatedAt: '2026-04-24T22:37:58.170Z'
+updatedAt: '2026-04-25T21:44:35.524Z'
 role: review
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -14,6 +14,8 @@ projectName: mnemonic
 relatedTo:
   - id: apply-fix-finding-1-boost-existing-candidates-via-graph-spre-51fad28b
     type: derives-from
+  - id: recall-improvements-from-hindsight-research-completed-77ee1113
+    type: supersedes
 memoryVersion: 1
 ---
 # Review: Phase 1 Graph Spreading — Finding 1 Fix

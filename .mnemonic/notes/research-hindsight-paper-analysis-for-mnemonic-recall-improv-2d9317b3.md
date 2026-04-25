@@ -10,7 +10,7 @@ tags:
   - tempr
 lifecycle: temporary
 createdAt: '2026-04-24T18:08:47.588Z'
-updatedAt: '2026-04-24T18:10:41.368Z'
+updatedAt: '2026-04-25T21:44:35.524Z'
 role: research
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -18,6 +18,8 @@ projectName: mnemonic
 relatedTo:
   - id: request-arxiv-2512-12818v1-embedding-research-for-mnemonic-6c0a8587
     type: follows
+  - id: recall-improvements-from-hindsight-research-completed-77ee1113
+    type: supersedes
 memoryVersion: 1
 ---
 # Research: ArXiv 2512.12818v1 — Hindsight Memory Architecture Analysis for mnemonic
