@@ -9,11 +9,16 @@ tags:
   - dogfooding
 lifecycle: temporary
 createdAt: '2026-04-25T07:31:02.746Z'
-updatedAt: '2026-04-25T07:31:02.746Z'
+updatedAt: '2026-04-25T07:31:12.614Z'
 role: review
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: plan-phase-2-reciprocal-rank-fusion-implementation-c8a07d89
+    type: derives-from
+  - id: apply-phase-2-rrf-ranking-stability-and-canonical-weight-tun-a00eb917
+    type: derives-from
 memoryVersion: 1
 ---
 # Review: Phase 2 RRF commit and dogfooding validation complete

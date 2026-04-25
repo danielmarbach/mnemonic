@@ -8,7 +8,7 @@ tags:
   - phase2
 lifecycle: temporary
 createdAt: '2026-04-24T23:09:30.970Z'
-updatedAt: '2026-04-25T06:37:09.857Z'
+updatedAt: '2026-04-25T07:31:12.599Z'
 role: plan
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -23,6 +23,8 @@ relatedTo:
   - id: apply-phase-2-rrf-ranking-stability-and-canonical-weight-tun-a00eb917
     type: follows
   - id: review-phase-2-rrf-stability-verification-after-tie-rank-adj-1b3f9752
+    type: derives-from
+  - id: review-phase-2-rrf-commit-and-dogfooding-validation-complete-151ee91f
     type: derives-from
 memoryVersion: 1
 ---
