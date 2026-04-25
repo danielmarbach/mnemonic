@@ -8,13 +8,15 @@ tags:
   - phases-1-5
 lifecycle: temporary
 createdAt: '2026-04-25T13:25:23.209Z'
-updatedAt: '2026-04-25T13:25:39.242Z'
+updatedAt: '2026-04-25T13:25:40.838Z'
 role: review
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
   - id: plan-mnemonic-recall-improvements-from-hindsight-research-5b059160
+    type: derives-from
+  - id: review-hindsight-plan-validation-against-design-principles-eae4ebe4
     type: derives-from
 memoryVersion: 1
 ---
