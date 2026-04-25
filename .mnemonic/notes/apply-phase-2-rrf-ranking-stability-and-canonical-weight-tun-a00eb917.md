@@ -8,11 +8,16 @@ tags:
   - phase2
 lifecycle: temporary
 createdAt: '2026-04-25T06:36:45.984Z'
-updatedAt: '2026-04-25T06:36:45.984Z'
+updatedAt: '2026-04-25T06:36:54.213Z'
 role: plan
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: plan-phase-2-reciprocal-rank-fusion-implementation-c8a07d89
+    type: follows
+  - id: review-phase-2-rrf-double-check-regression-findings-8556a52f
+    type: derives-from
 memoryVersion: 1
 ---
 # Apply: Phase 2 RRF ranking stability and canonical weight tuning
