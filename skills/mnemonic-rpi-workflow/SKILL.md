@@ -28,6 +28,7 @@ Use `derives-from` for lineage and `follows` for sequence by default. Fall back 
 - Create or update one current plan note: `role: plan`, `lifecycle: temporary`.
 - Link to request root and key research notes (`derives-from` for lineage, `follows` for sequence).
 - Keep the plan concise and executable.
+- For non-trivial work, include a short markdown checkbox list (`- [ ]`) for executable steps.
 - One current plan per request; update or supersede as needed.
 - Update plan note before continuing if scope, architecture, dependencies, or assumptions change materially.
 
@@ -35,6 +36,7 @@ Use `derives-from` for lineage and `follows` for sequence by default. Fall back 
 
 - Create apply/task notes: `lifecycle: temporary`, tagged `apply`.
 - `role: plan` for executable steps; `role: context` for observations and checkpoints.
+- Keep checkbox state current as work advances (`[ ]` → `[x]`), and add new items when scope expands.
 - Link to plan note (`follows` for ordered steps).
 - For non-trivial work, dispatch a subagent with narrow scope (see [handoff template](#subagent-handoff-template)).
 
@@ -43,6 +45,7 @@ Use `derives-from` for lineage and `follows` for sequence by default. Fall back 
 - Create review notes: `role: review`, `lifecycle: temporary`.
 - Link to apply/task notes or plan (`derives-from` when conclusions derive from specific artifacts).
 - Record outcome: continue, block, or update plan.
+- Reconcile checklist state with verification evidence; call out any unchecked items explicitly.
 - If review causes a material plan change, update plan note first.
 - Every review note must include verification evidence:
 
