@@ -9,11 +9,16 @@ tags:
   - lexical-cache
 lifecycle: permanent
 createdAt: '2026-04-25T10:44:41.682Z'
-updatedAt: '2026-04-25T10:44:41.682Z'
+updatedAt: '2026-04-25T10:44:50.875Z'
 role: decision
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: apply-phase-3-lexical-rescue-pre-tokenized-tf-idf-cache-inte-5d1512f7
+    type: derives-from
+  - id: summary-phase-3-lexical-rescue-pre-tokenized-tf-idf-cache-co-a492df41
+    type: explains
 memoryVersion: 1
 ---
 # Decision: Phase 3 lexical rescue uses session-cached projection tokens

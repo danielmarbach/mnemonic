@@ -9,7 +9,7 @@ tags:
   - lexical-cache
 lifecycle: temporary
 createdAt: '2026-04-25T10:33:29.411Z'
-updatedAt: '2026-04-25T10:33:46.128Z'
+updatedAt: '2026-04-25T10:44:50.809Z'
 role: plan
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -18,6 +18,8 @@ relatedTo:
   - id: plan-mnemonic-recall-improvements-from-hindsight-research-5b059160
     type: follows
   - id: review-phase-3-lexical-rescue-cache-verification-clean-e02d1ff5
+    type: derives-from
+  - id: decision-phase-3-lexical-rescue-uses-session-cached-projecti-6b5197fc
     type: derives-from
 memoryVersion: 1
 ---
