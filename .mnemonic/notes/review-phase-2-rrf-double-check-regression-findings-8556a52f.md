@@ -8,7 +8,7 @@ tags:
   - phase2
 lifecycle: temporary
 createdAt: '2026-04-25T06:30:54.111Z'
-updatedAt: '2026-04-25T06:36:54.213Z'
+updatedAt: '2026-04-25T21:43:24.549Z'
 role: review
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -18,6 +18,8 @@ relatedTo:
     type: derives-from
   - id: apply-phase-2-rrf-ranking-stability-and-canonical-weight-tun-a00eb917
     type: derives-from
+  - id: phase-2-rrf-ranking-completed-bb163f54
+    type: supersedes
 memoryVersion: 1
 ---
 # Review: Phase 2 RRF double-check regression findings

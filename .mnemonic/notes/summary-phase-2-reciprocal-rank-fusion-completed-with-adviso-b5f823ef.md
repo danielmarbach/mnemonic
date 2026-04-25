@@ -11,7 +11,7 @@ tags:
   - dogfooding
 lifecycle: permanent
 createdAt: '2026-04-25T07:46:21.416Z'
-updatedAt: '2026-04-25T07:47:56.559Z'
+updatedAt: '2026-04-25T21:43:24.549Z'
 role: summary
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -23,6 +23,8 @@ relatedTo:
     type: explains
   - id: reference-mnemonic-rpi-workflow-skill-improvement-opportunit-1b944a63
     type: derives-from
+  - id: phase-2-rrf-ranking-completed-bb163f54
+    type: supersedes
 memoryVersion: 1
 ---
 # Summary: Phase 2 Reciprocal Rank Fusion completed with advisory dogfood follow-up

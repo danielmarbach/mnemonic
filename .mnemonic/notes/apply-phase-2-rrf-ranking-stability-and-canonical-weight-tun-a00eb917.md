@@ -8,7 +8,7 @@ tags:
   - phase2
 lifecycle: temporary
 createdAt: '2026-04-25T06:36:45.984Z'
-updatedAt: '2026-04-25T07:31:12.614Z'
+updatedAt: '2026-04-25T21:43:24.549Z'
 role: plan
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -22,6 +22,8 @@ relatedTo:
     type: derives-from
   - id: review-phase-2-rrf-commit-and-dogfooding-validation-complete-151ee91f
     type: derives-from
+  - id: phase-2-rrf-ranking-completed-bb163f54
+    type: supersedes
 memoryVersion: 1
 ---
 # Apply: Phase 2 RRF ranking stability and canonical weight tuning

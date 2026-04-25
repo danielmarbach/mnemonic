@@ -9,7 +9,7 @@ tags:
   - dogfooding
 lifecycle: temporary
 createdAt: '2026-04-25T07:31:02.746Z'
-updatedAt: '2026-04-25T07:40:49.567Z'
+updatedAt: '2026-04-25T21:43:24.549Z'
 role: review
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -21,6 +21,8 @@ relatedTo:
     type: derives-from
   - id: apply-pack-a-advisory-follow-up-by-hardening-dogfood-heurist-5d41bfae
     type: derives-from
+  - id: phase-2-rrf-ranking-completed-bb163f54
+    type: supersedes
 memoryVersion: 1
 ---
 # Review: Phase 2 RRF commit and dogfooding validation complete

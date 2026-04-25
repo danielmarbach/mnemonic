@@ -8,13 +8,15 @@ tags:
   - plan
 lifecycle: permanent
 createdAt: '2026-04-20T21:46:51.934Z'
-updatedAt: '2026-04-23T17:02:23.545Z'
+updatedAt: '2026-04-25T21:43:24.549Z'
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
   - id: rpir-workflow-design-for-mnemonic-research-plan-implement-re-80b00851
     type: example-of
+  - id: phase-2-rrf-ranking-completed-bb163f54
+    type: supersedes
 memoryVersion: 1
 ---
 Phase 1 implementation plan for the RPIR workflow design. Also stored at `docs/superpowers/specs/2026-04-20-rpir-workflow-phase1-plan.md`.
