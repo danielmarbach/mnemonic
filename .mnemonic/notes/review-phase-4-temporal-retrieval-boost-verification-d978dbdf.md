@@ -8,7 +8,7 @@ tags:
   - temporal
 lifecycle: temporary
 createdAt: '2026-04-25T10:50:28.985Z'
-updatedAt: '2026-04-25T10:50:58.839Z'
+updatedAt: '2026-04-25T21:43:36.049Z'
 role: review
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -18,6 +18,8 @@ relatedTo:
     type: derives-from
   - id: summary-phase-4-temporal-retrieval-boost-completed-1e1ab210
     type: derives-from
+  - id: phase-4-temporal-retrieval-boost-completed-e5a5dec8
+    type: supersedes
 memoryVersion: 1
 ---
 # Review: Phase 4 temporal retrieval boost verification

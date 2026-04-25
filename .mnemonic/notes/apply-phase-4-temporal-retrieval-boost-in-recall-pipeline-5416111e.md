@@ -8,7 +8,7 @@ tags:
   - temporal
 lifecycle: temporary
 createdAt: '2026-04-25T10:50:28.987Z'
-updatedAt: '2026-04-25T10:50:58.764Z'
+updatedAt: '2026-04-25T21:43:36.049Z'
 role: plan
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -20,6 +20,8 @@ relatedTo:
     type: derives-from
   - id: decision-phase-4-recall-applies-additive-temporal-recency-bo-165fdbf3
     type: derives-from
+  - id: phase-4-temporal-retrieval-boost-completed-e5a5dec8
+    type: supersedes
 memoryVersion: 1
 ---
 # Apply: Phase 4 temporal retrieval boost in recall pipeline
