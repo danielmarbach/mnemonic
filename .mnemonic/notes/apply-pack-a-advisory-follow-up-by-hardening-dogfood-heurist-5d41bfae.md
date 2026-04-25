@@ -8,7 +8,7 @@ tags:
   - rrf
 lifecycle: temporary
 createdAt: '2026-04-25T07:40:36.174Z'
-updatedAt: '2026-04-25T07:40:36.174Z'
+updatedAt: '2026-04-25T07:40:49.567Z'
 role: plan
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -16,6 +16,10 @@ projectName: mnemonic
 relatedTo:
   - id: mnemonic-key-design-decisions-3f2a6273
     type: related-to
+  - id: plan-phase-2-reciprocal-rank-fusion-implementation-c8a07d89
+    type: follows
+  - id: review-phase-2-rrf-commit-and-dogfooding-validation-complete-151ee91f
+    type: derives-from
 memoryVersion: 1
 ---
 # Apply: Pack A advisory follow-up by hardening dogfood heuristics

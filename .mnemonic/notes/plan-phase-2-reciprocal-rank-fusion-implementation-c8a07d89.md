@@ -8,7 +8,7 @@ tags:
   - phase2
 lifecycle: temporary
 createdAt: '2026-04-24T23:09:30.970Z'
-updatedAt: '2026-04-25T07:31:12.599Z'
+updatedAt: '2026-04-25T07:40:49.517Z'
 role: plan
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -26,6 +26,8 @@ relatedTo:
     type: derives-from
   - id: review-phase-2-rrf-commit-and-dogfooding-validation-complete-151ee91f
     type: derives-from
+  - id: apply-pack-a-advisory-follow-up-by-hardening-dogfood-heurist-5d41bfae
+    type: follows
 memoryVersion: 1
 ---
 # Plan: Phase 2 Reciprocal Rank Fusion Implementation
