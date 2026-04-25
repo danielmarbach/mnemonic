@@ -7,7 +7,7 @@ tags:
   - completed
 lifecycle: permanent
 createdAt: '2026-04-25T21:42:49.274Z'
-updatedAt: '2026-04-25T21:42:49.274Z'
+updatedAt: '2026-04-25T21:58:27.743Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
@@ -17,6 +17,8 @@ relatedTo:
     type: explains
 memoryVersion: 1
 ---
+# Hindsight phases 1-5 review: findings addressed
+
 All hindsight phases 1-5 review findings have been addressed.
 
 ## HIGH issues fixed
@@ -32,19 +34,19 @@ All hindsight phases 1-5 review findings have been addressed.
 - **M10**: Temporal query hints reordered by specificity to fix first-match-wins.
 - **M12**: Added `in\s+the\s+past` temporal regex pattern.
 
-## Deferred (no code change required)
+## Deferred (no code change required) — with rationale
 
-- **M1** (mutation in-place): Acceptable, documented.
-- **M2** (cross-vault): Would require storage-layer changes beyond scope.
-- **M3** (graph boost cap): Acceptable for now.
-- **M4** (pipeline order): Fixed by H1 (semanticRank re-assigned post-spreading).
-- **M6** (English-only temporal hints): Acceptable design constraint for now.
-- **M7** (filter before spread): Desired behavior, documented.
-- **M9** (no cache for global scope): Acceptable.
-- **M11** ("today" strict filter): Acceptable boost-only for now.
-- **M13** (activation gate 0.5): Acceptable.
-- **M15** (lexicalRankSignal asymmetry): Partially mitigated by M8.
-- **M16** (cache invalidation spike): Acceptable.
+- **M1** (Graph spreading mutates candidate objects in-place): Acceptable in the linear pipeline. The implementation mutates `score` and `boosted` on existing candidates rather than copying, which works because the pipeline processes candidates sequentially. No concurrent access.
+- **M2** (Discovered candidates inherit entry point's vault — cross-vault bug): Related notes may live in a different vault. Downstream code looks in the wrong vault and silently drops the candidate. Would require storage-layer changes beyond current scope. Accepted because cross-vault discovery is infrequent and the behavior is fail-quiet rather than fail-wrong.
+- **M3** (No upper bound on accumulated graph-spreading boost): Multiple entry points pointing to the same candidate accumulate additively with no cap. A hub note can receive 1.5+ boost, dominating the hybrid score. Acceptable because hub notes are typically important anchors.
+- **M4** (Pipeline ordering differs from review recommendation): Fixed by H1 — `semanticRank` is now re-assigned after graph spreading, making the ordering concern moot.
+- **M6** (Temporal hint detection is English-only): `detectTemporalQueryHint` uses English regex exclusively ("recent", "this week", etc.), violating the language independence constraint. Boost computation is language-independent but the activation gate is not. Accepted as a pragmatic first pass; non-English queries still get semantic results.
+- **M7** (Temporal filtering runs before graph spreading): High-confidence temporal queries exclude candidates before spreading, so older notes can't serve as entry points. Desired behavior — if the user explicitly asks for recent notes, older ones shouldn't dilute results.
+- **M9** (Token caching skipped for global scope with no projectId): When scope is global with no project, token caching is bypassed entirely. Acceptable because global-only usage is less common and the cost is re-tokenization, not incorrect results.
+- **M11** ("today" maps to medium confidence, no strict filtering): Users saying "notes from today" likely expect strict filtering, not just a boost. Accepted as boost-only for now; strict filtering requires higher confidence calibration.
+- **M13** (Phase 1 activation gate of 0.5 may be too aggressive): Ollama embeddings often produce similarities in the 0.3–0.7 range. Many queries have few entry points above 0.5. Accepted because the gate prevents noise; lowering it would need benchmarking.
+- **M15** (lexicalRankSignal tiebreaker asymmetric for rescue candidates): Rescue candidates have undefined `coverageScore` and `phraseScore`, creating asymmetric tiebreaking. Partially mitigated by M8 (lexical RRF for rescue candidates).
+- **M16** (Full cache invalidation causes latency spike after mutations): Invalidating the entire session cache on every write-path tool call creates a measurable spike on next recall. Acceptable for correctness; optimization deferred.
 
 ## Design constraint compliance after fixes
 
@@ -58,7 +60,6 @@ All hindsight phases 1-5 review findings have been addressed.
 ## Plan validation
 
 Three reviews confirmed the plan-to-implementation alignment is strong with two explicit scope deltas:
+
 - Phase 3: session-scoped cache instead of persistent per-vault cache
 - Phase 4: additive boost only, no strict filtering
-
-The master plan at `plan-mnemonic-recall-improvements-from-hindsight-research-5b059160` has been updated to reflect all completed phases.
