@@ -8,7 +8,7 @@ tags:
   - plan
 lifecycle: permanent
 createdAt: '2026-04-25T21:44:35.524Z'
-updatedAt: '2026-04-25T21:44:35.524Z'
+updatedAt: '2026-04-25T21:49:49.369Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
@@ -19,6 +19,8 @@ relatedTo:
   - id: hybrid-recall-design-and-implementation-0-20-0-0-23-0-350317a0
     type: related-to
   - id: apply-fix-finding-1-boost-existing-candidates-via-graph-spre-51fad28b
+    type: derives-from
+  - id: research-hindsight-paper-analysis-for-mnemonic-recall-improv-ae8fd9eb
     type: derives-from
 memoryVersion: 1
 ---

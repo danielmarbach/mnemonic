@@ -10,11 +10,14 @@ tags:
   - tempr
 lifecycle: permanent
 createdAt: '2026-04-25T21:49:44.853Z'
-updatedAt: '2026-04-25T21:49:44.853Z'
+updatedAt: '2026-04-25T21:49:49.369Z'
 role: research
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: recall-improvements-from-hindsight-research-completed-77ee1113
+    type: derives-from
 memoryVersion: 1
 ---
 # Research: ArXiv 2512.12818v1 — Hindsight Memory Architecture Analysis for mnemonic
