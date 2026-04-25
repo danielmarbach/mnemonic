@@ -8,7 +8,7 @@ tags:
   - temporal
 lifecycle: permanent
 createdAt: '2026-04-25T11:55:14.816Z'
-updatedAt: '2026-04-25T11:59:52.787Z'
+updatedAt: '2026-04-25T21:43:43.820Z'
 role: summary
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -18,6 +18,8 @@ relatedTo:
     type: derives-from
   - id: summary-performance-principles-compliance-audit-for-recall-p-b482b38b
     type: derives-from
+  - id: phase-5-temporal-parsing-and-confidence-gated-filtering-comp-f3271d08
+    type: supersedes
 memoryVersion: 1
 ---
 # Summary: Phase 5 temporal parsing and confidence-gated filtering completed

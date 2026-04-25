@@ -8,7 +8,7 @@ tags:
   - temporal
 lifecycle: temporary
 createdAt: '2026-04-25T11:54:39.968Z'
-updatedAt: '2026-04-25T11:55:30.581Z'
+updatedAt: '2026-04-25T21:43:43.820Z'
 role: plan
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -20,6 +20,8 @@ relatedTo:
     type: derives-from
   - id: decision-phase-5-applies-strict-temporal-filtering-only-for--63146f96
     type: derives-from
+  - id: phase-5-temporal-parsing-and-confidence-gated-filtering-comp-f3271d08
+    type: supersedes
 memoryVersion: 1
 ---
 # Apply: Phase 5 temporal parsing and confidence-gated filtering
