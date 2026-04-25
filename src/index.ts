@@ -41,6 +41,7 @@ import {
   selectRecallResults,
   selectWorkflowResults,
   applyLexicalReranking,
+  enrichRescueCandidateScores,
   applyCanonicalExplanationPromotion,
   applyGraphSpreadingActivation,
   assignDenseRanks,
@@ -2564,7 +2565,7 @@ server.registerTool(
         const temporalBoost = temporalQueryHint
           ? computeTemporalRecencyBoost(note.updatedAt, temporalQueryHint)
           : 0;
-        const boost = (isCurrentProject ? 0.15 : 0) + context.metadataBoost + temporalBoost;
+        const boost = (isCurrentProject ? PROJECT_SCOPE_BOOST : 0) + context.metadataBoost + temporalBoost;
         scored.push({
           id: rec.id,
           score: rawScore,
@@ -2653,6 +2654,7 @@ server.registerTool(
         promoted
       );
       promoted.push(...rescueCandidates);
+      enrichRescueCandidateScores(promoted, query, getProjectionText);
       promoted = applyCanonicalExplanationPromotion(promoted);
     }
 

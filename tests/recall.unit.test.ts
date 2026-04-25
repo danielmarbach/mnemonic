@@ -4,6 +4,7 @@ import {
   computeRecallMetadataBoost,
   selectRecallResults,
   applyLexicalReranking,
+  enrichRescueCandidateScores,
   applyCanonicalExplanationPromotion,
   computeCanonicalExplanationScore,
   computeHybridScore,
@@ -306,6 +307,81 @@ describe("applyLexicalReranking", () => {
     const reranked = applyLexicalReranking(candidates, "test", (id) => `text for ${id}`);
 
     expect(reranked).toHaveLength(2);
+  });
+});
+
+describe("enrichRescueCandidateScores", () => {
+  it("computes coverageScore and phraseScore for rescue candidates missing them", () => {
+    const candidates: ScoredRecallCandidate[] = [
+      { id: "semantic-a", score: 0.6, boosted: 0.6, vault, isCurrentProject: true, lexicalScore: 0.4, coverageScore: 0.5, phraseScore: 0 },
+      { id: "rescue-b", score: 0.2, boosted: 0.2, vault, isCurrentProject: true, lexicalScore: 0.3 },
+    ];
+
+    const projectionTexts = new Map([
+      ["semantic-a", "Title: Design Decisions\nSummary: key design decisions for the system"],
+      ["rescue-b", "Title: Key Design Decisions\nSummary: embeddings gitignored because they are derived"],
+    ]);
+
+    enrichRescueCandidateScores(candidates, "design decisions", (id) => projectionTexts.get(id));
+
+    expect(candidates[0].coverageScore).toBe(0.5);
+    expect(candidates[0].phraseScore).toBe(0);
+    expect(candidates[1].coverageScore).toBeGreaterThan(0);
+    expect(candidates[1].phraseScore).toBeDefined();
+  });
+
+  it("skips candidates that already have coverageScore", () => {
+    const candidates: ScoredRecallCandidate[] = [
+      { id: "a", score: 0.6, boosted: 0.6, vault, isCurrentProject: true, lexicalScore: 0.4, coverageScore: 0.5, phraseScore: 1 },
+    ];
+
+    enrichRescueCandidateScores(candidates, "test query", (id) => `text for ${id}`);
+
+    expect(candidates[0].coverageScore).toBe(0.5);
+    expect(candidates[0].phraseScore).toBe(1);
+  });
+
+  it("handles missing projection text gracefully", () => {
+    const candidates: ScoredRecallCandidate[] = [
+      { id: "rescue-a", score: 0.2, boosted: 0.2, vault, isCurrentProject: true, lexicalScore: 0.3 },
+    ];
+
+    enrichRescueCandidateScores(candidates, "test query", () => undefined);
+
+    expect(candidates[0].coverageScore).toBeUndefined();
+    expect(candidates[0].phraseScore).toBeUndefined();
+  });
+
+  it("returns early when there are no rescue candidates to enrich", () => {
+    const candidates: ScoredRecallCandidate[] = [
+      { id: "a", score: 0.6, boosted: 0.6, vault, isCurrentProject: true, lexicalScore: 0.4, coverageScore: 0.5, phraseScore: 0 },
+    ];
+
+    enrichRescueCandidateScores(candidates, "test query", (id) => `text for ${id}`);
+
+    expect(candidates[0].coverageScore).toBe(0.5);
+  });
+
+  it("eliminates lexicalRankSignal asymmetry between semantic and rescue candidates with same lexicalScore", () => {
+    const baseLexicalScore = 0.5;
+    const candidates: ScoredRecallCandidate[] = [
+      { id: "semantic-a", score: 0.6, boosted: 0.6, vault, isCurrentProject: true, lexicalScore: baseLexicalScore, coverageScore: 0, phraseScore: 0 },
+      { id: "rescue-b", score: 0.2, boosted: 0.2, vault, isCurrentProject: true, lexicalScore: baseLexicalScore },
+    ];
+
+    const projectionTexts = new Map([
+      ["semantic-a", "Title: Key Design Decisions\nSummary: design decisions for the system"],
+      ["rescue-b", "Title: Key Design Decisions\nSummary: design decisions for the system"],
+    ]);
+
+    enrichRescueCandidateScores(candidates, "design decisions", (id) => projectionTexts.get(id));
+
+    expect(candidates[1].coverageScore).toBeDefined();
+    expect(candidates[1].phraseScore).toBeDefined();
+    const signalA = (candidates[0].lexicalScore ?? 0) + (candidates[0].coverageScore ?? 0) * 0.3 + (candidates[0].phraseScore ?? 0) * 0.5;
+    const signalB = (candidates[1].lexicalScore ?? 0) + (candidates[1].coverageScore ?? 0) * 0.3 + (candidates[1].phraseScore ?? 0) * 0.5;
+    expect(signalB).toBeGreaterThan(0);
+    expect(signalB).toBeGreaterThanOrEqual(signalA);
   });
 });
 
