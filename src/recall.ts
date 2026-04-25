@@ -518,3 +518,24 @@ export function applyGraphSpreadingActivation(
 
   return [...candidates, ...discovered.values()];
 }
+
+export function resolveDiscoveredVaults(
+  candidates: ScoredRecallCandidate[],
+  originalCandidateIds: Set<string>,
+  resolveVault: (id: string) => Promise<{ vault: Vault; isCurrentProject: boolean } | undefined>
+): Promise<void> {
+  const discovered = candidates.filter(
+    (c) => !originalCandidateIds.has(c.id) && c.vault !== undefined
+  );
+  if (discovered.length === 0) return Promise.resolve();
+
+  return Promise.all(
+    discovered.map(async (c) => {
+      const resolved = await resolveVault(c.id);
+      if (resolved) {
+        c.vault = resolved.vault;
+        c.isCurrentProject = resolved.isCurrentProject;
+      }
+    })
+  ).then(() => {});
+}

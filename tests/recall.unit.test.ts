@@ -9,6 +9,7 @@ import {
   computeCanonicalExplanationScore,
   computeHybridScore,
   applyGraphSpreadingActivation,
+  resolveDiscoveredVaults,
   detectTemporalQueryHint,
   computeTemporalRecencyBoost,
   shouldApplyTemporalFiltering,
@@ -910,5 +911,61 @@ describe("applyGraphSpreadingActivation", () => {
 
     const discovered = result.find((c) => c.id === "discovered");
     expect(discovered!.semanticScoreForPromotion).toBeCloseTo(0.7 * 0.5 * 1.0, 5);
+  });
+});
+
+describe("resolveDiscoveredVaults", () => {
+  const projectVault = { storage: { vaultPath: "/project" } } as ScoredRecallCandidate["vault"];
+  const mainVault = { storage: { vaultPath: "/main" } } as ScoredRecallCandidate["vault"];
+
+  it("resolves correct vault for graph-discovered candidates", async () => {
+    const candidates: ScoredRecallCandidate[] = [
+      { id: "entry", score: 0.6, boosted: 0.6, vault: projectVault, isCurrentProject: true },
+      { id: "discovered-global", score: 0.24, boosted: 0.24, vault: projectVault, isCurrentProject: true },
+    ];
+
+    const originalIds = new Set(["entry"]);
+    const resolveVault = async (id: string) => {
+      if (id === "discovered-global") {
+        return { vault: mainVault, isCurrentProject: false };
+      }
+      return undefined;
+    };
+
+    await resolveDiscoveredVaults(candidates, originalIds, resolveVault);
+
+    expect(candidates[0].vault).toBe(projectVault);
+    expect(candidates[0].isCurrentProject).toBe(true);
+    expect(candidates[1].vault).toBe(mainVault);
+    expect(candidates[1].isCurrentProject).toBe(false);
+  });
+
+  it("leaves existing candidates unchanged", async () => {
+    const candidates: ScoredRecallCandidate[] = [
+      { id: "existing", score: 0.6, boosted: 0.6, vault: projectVault, isCurrentProject: true },
+    ];
+
+    const originalIds = new Set(["existing"]);
+
+    await resolveDiscoveredVaults(candidates, originalIds, async () => {
+      throw new Error("should not be called for existing candidates");
+    });
+
+    expect(candidates[0].vault).toBe(projectVault);
+    expect(candidates[0].isCurrentProject).toBe(true);
+  });
+
+  it("does not change vault when resolver returns undefined", async () => {
+    const candidates: ScoredRecallCandidate[] = [
+      { id: "entry", score: 0.6, boosted: 0.6, vault: projectVault, isCurrentProject: true },
+      { id: "unresolvable", score: 0.24, boosted: 0.24, vault: projectVault, isCurrentProject: true },
+    ];
+
+    const originalIds = new Set(["entry"]);
+
+    await resolveDiscoveredVaults(candidates, originalIds, async () => undefined);
+
+    expect(candidates[1].vault).toBe(projectVault);
+    expect(candidates[1].isCurrentProject).toBe(true);
   });
 });

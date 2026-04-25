@@ -42,6 +42,7 @@ import {
   selectWorkflowResults,
   applyLexicalReranking,
   enrichRescueCandidateScores,
+  resolveDiscoveredVaults,
   applyCanonicalExplanationPromotion,
   applyGraphSpreadingActivation,
   assignDenseRanks,
@@ -2624,10 +2625,24 @@ server.registerTool(
     const reranked = applyLexicalReranking(scored, query, getProjectionText);
 
     // Apply graph spreading activation: traverse related notes and boost their scores
+    const preSpreadIds = new Set(reranked.map((c) => c.id));
     const getNoteRelationships = (id: string): Array<{ id: string; type: RelationshipType }> | undefined => {
       return noteRelationships.get(id);
     };
     const withGraphSpread = applyGraphSpreadingActivation(reranked, getNoteRelationships);
+
+    // Resolve correct vault for graph-discovered candidates that inherited their
+    // entry point's vault instead of their own.
+    await resolveDiscoveredVaults(withGraphSpread, preSpreadIds, async (id) => {
+      for (const v of vaults) {
+        const note = await v.storage.readNote(id).catch(() => null);
+        if (note) {
+          const isCurrentProject = project ? note.project === project.id : false;
+          return { vault: v, isCurrentProject };
+        }
+      }
+      return undefined;
+    });
 
     // Re-assign semanticRank after graph spreading since scores are now modified
     // and graph-discovered candidates have no semanticRank.
