@@ -9,7 +9,7 @@ tags:
   - completed
 lifecycle: permanent
 createdAt: '2026-03-14T22:14:46.759Z'
-updatedAt: '2026-04-24T18:37:23.661Z'
+updatedAt: '2026-04-25T11:59:52.769Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
@@ -19,6 +19,8 @@ relatedTo:
     type: related-to
   - id: review-hindsight-plan-validation-against-design-principles-eae4ebe4
     type: explains
+  - id: summary-performance-principles-compliance-audit-for-recall-p-b482b38b
+    type: derives-from
 memoryVersion: 1
 ---
 ## Durable Performance Principles
