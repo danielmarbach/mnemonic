@@ -8,7 +8,7 @@ tags:
   - plan
 lifecycle: permanent
 createdAt: '2026-04-23T19:14:07.158Z'
-updatedAt: '2026-04-24T15:35:59.606Z'
+updatedAt: '2026-04-25T21:43:29.712Z'
 role: plan
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -16,6 +16,8 @@ projectName: mnemonic
 relatedTo:
   - id: rpir-workflow-design-for-mnemonic-research-plan-implement-re-80b00851
     type: example-of
+  - id: phase-3-lexical-rescue-optimization-completed-fc722b32
+    type: supersedes
 memoryVersion: 1
 ---
 Phase 3 implementation plan for RPIR workflow support in mnemonic.

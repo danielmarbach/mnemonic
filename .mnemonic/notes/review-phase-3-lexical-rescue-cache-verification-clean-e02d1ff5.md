@@ -9,7 +9,7 @@ tags:
   - lexical-cache
 lifecycle: temporary
 createdAt: '2026-04-25T10:33:39.817Z'
-updatedAt: '2026-04-25T10:44:50.854Z'
+updatedAt: '2026-04-25T21:43:29.712Z'
 role: review
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -19,6 +19,8 @@ relatedTo:
     type: derives-from
   - id: summary-phase-3-lexical-rescue-pre-tokenized-tf-idf-cache-co-a492df41
     type: derives-from
+  - id: phase-3-lexical-rescue-optimization-completed-fc722b32
+    type: supersedes
 memoryVersion: 1
 ---
 # Review: Phase 3 lexical rescue cache verification clean
