@@ -8,7 +8,7 @@ tags:
   - phase2
 lifecycle: temporary
 createdAt: '2026-04-24T23:09:30.970Z'
-updatedAt: '2026-04-25T07:41:06.735Z'
+updatedAt: '2026-04-25T07:46:31.394Z'
 role: plan
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -29,6 +29,10 @@ relatedTo:
   - id: apply-pack-a-advisory-follow-up-by-hardening-dogfood-heurist-5d41bfae
     type: follows
   - id: review-pack-a-advisory-follow-up-verification-clean-c03c2fd3
+    type: derives-from
+  - id: decision-phase-2-recall-scoring-uses-rrf-with-dense-rank-tie-7969c37d
+    type: derives-from
+  - id: summary-phase-2-reciprocal-rank-fusion-completed-with-adviso-b5f823ef
     type: derives-from
 memoryVersion: 1
 ---

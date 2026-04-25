@@ -8,11 +8,14 @@ tags:
   - workflow
 lifecycle: permanent
 createdAt: '2026-04-25T07:46:10.910Z'
-updatedAt: '2026-04-25T07:46:10.910Z'
+updatedAt: '2026-04-25T07:46:31.370Z'
 role: decision
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: plan-phase-2-reciprocal-rank-fusion-implementation-c8a07d89
+    type: derives-from
 memoryVersion: 1
 ---
 # Decision: Phase 2 recall scoring uses RRF with dense rank tie handling
