@@ -8,7 +8,7 @@ tags:
   - hindsight
 lifecycle: temporary
 createdAt: '2026-04-24T18:10:35.779Z'
-updatedAt: '2026-04-25T11:40:38.648Z'
+updatedAt: '2026-04-25T11:40:50.442Z'
 role: plan
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -44,17 +44,23 @@ Improve mnemonic's recall quality without discarding its core design: git-backed
 
 Focus on the TEMPR recall layer (retain/recall), not CARA (opinion/reflect), because mnemonic is a developer context store, not a conversational agent with disposition parameters.
 
----
+***
 
 ## Phase Status Overview (current)
 
-- [x] **Phase 1** Graph spreading activation in recall
-- [x] **Phase 2** Reciprocal Rank Fusion (RRF)
-- [x] **Phase 3** TF-IDF rescue precomputation optimization
-- [x] **Phase 4** Temporal retrieval boost
-- [ ] **Phase 5** Not defined yet
+- \[x] **Phase 1** Graph spreading activation in recall
+- \[x] **Phase 2** Reciprocal Rank Fusion (RRF)
+- \[x] **Phase 3** TF-IDF rescue precomputation optimization
+- \[x] **Phase 4** Temporal retrieval boost
+- \[ ] **Phase 5** Temporal parsing + confidence-gated filtering (defined, pending implementation)
 
----
+- \[x] **Phase 1** Graph spreading activation in recall
+- \[x] **Phase 2** Reciprocal Rank Fusion (RRF)
+- \[x] **Phase 3** TF-IDF rescue precomputation optimization
+- \[x] **Phase 4** Temporal retrieval boost
+- \[ ] **Phase 5** Not defined yet
+
+***
 
 ## Phase 1: Graph Spreading Activation in Recall (COMPLETED)
 
@@ -72,7 +78,7 @@ When semantic recall produces candidate notes, traverse related notes and boost 
 - Phase request artifact: `phase-1-graph-spreading-activation-in-recall-b50cd362`.
 - Phase 1 follow-up fix for discovery-only behavior was applied and verified.
 
----
+***
 
 ## Phase 2: Reciprocal Rank Fusion (COMPLETED)
 
@@ -91,7 +97,7 @@ Replace additive lexical weighting with rank-based fusion over semantic and lexi
 - Decision artifact: `decision-phase-2-recall-scoring-uses-rrf-with-dense-rank-tie-7969c37d`.
 - Summary artifact: `summary-phase-2-reciprocal-rank-fusion-completed-with-adviso-b5f823ef`.
 
----
+***
 
 ## Phase 3: TF-IDF Rescue Precomputation Optimization (COMPLETED)
 
@@ -115,7 +121,7 @@ Original wording targeted a persistent per-vault BM25/IDF cache.
 - Decision artifact: `decision-phase-3-lexical-rescue-uses-session-cached-projecti-6b5197fc`.
 - Summary artifact: `summary-phase-3-lexical-rescue-pre-tokenized-tf-idf-cache-co-a492df41`.
 
----
+***
 
 ## Phase 4: Temporal Retrieval Boost (COMPLETED)
 
@@ -138,7 +144,7 @@ Detect temporal cues in query text and adjust ranking by `updatedAt` recency.
 - Decision artifact: `decision-phase-4-recall-applies-additive-temporal-recency-bo-165fdbf3`.
 - Summary artifact: `summary-phase-4-temporal-retrieval-boost-completed-1e1ab210`.
 
----
+***
 
 ## Deferred Items (unchanged)
 
@@ -148,20 +154,24 @@ Blocked on Ollama cross-encoder model availability and runtime fit.
 **Observation Synthesis — Deferred:**
 Higher cost and unclear benefit for human-authored structured notes.
 
----
+***
 
 ## Success Criteria Check
 
-- [x] Each phase shipped independently and remains reversible
-- [x] No new committed artifacts or databases introduced
-- [x] Recall quality improved in dogfooding and benchmark-driven phases
-- [x] No regression on existing test suites at each phase closeout
-- [x] Language independence maintained by design constraints
-- [x] Fail-soft behavior specified and preserved across phases
+- \[x] Each phase shipped independently and remains reversible
+- \[x] No new committed artifacts or databases introduced
+- \[x] Recall quality improved in dogfooding and benchmark-driven phases
+- \[x] No regression on existing test suites at each phase closeout
+- \[x] Language independence maintained by design constraints
+- \[x] Fail-soft behavior specified and preserved across phases
 
----
+***
 
 ## Immediate Next Action
+
+Execute Phase 5 plan: `plan-phase-5-temporal-parsing-with-confidence-gated-filterin-0f45f3cd`.
+
+Start with test-first parser and confidence-gating coverage, then implement filtering gate with boost-only fallback.
 
 Define Phase 5 explicitly before implementation.
 
