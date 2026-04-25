@@ -6,6 +6,13 @@ The format is loosely based on Keep a Changelog and uses semver-style version he
 
 ## [Unreleased]
 
+## [0.25.5] - 2026-04-25
+
+### Changed
+
+- `mnemonic-rpi-workflow` skill revised for conciseness (112 lines, down from 149): removed redundant "When to Use" section, consolidated relationship guidance, tightened commit discipline into a script-like sequence, and moved closeout templates to a separate `closeout-templates.md` for progressive disclosure.
+- Skill now requires verification evidence in review notes and includes dirty worktree safety rules, closeout templates (decision + summary), and explicit commit-class separation.
+
 ## [0.25.4] - 2026-04-25
 
 ### Changed

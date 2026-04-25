@@ -1,151 +1,113 @@
 ---
 name: mnemonic-rpi-workflow
-description: Use when executing multi-step research-plan-implement-review workflows, especially when you need explicit handoffs, one current plan note, and consistent role/relationship conventions.
+description: Executes multi-step research-plan-implement-review workflows using mnemonic for workflow artifacts. Triggers on multi-step feature or bugfix work, subagent handoffs, plan-heavy tasks, or any work needing structured RPIR artifacts with explicit handoffs and consistent role/relationship conventions.
 ---
 
-# Skill: mnemonic-rpi-workflow
-
-# RPIR Workflow: Research -> Plan -> Implement -> Review
-
-Use this skill when work needs structured workflow artifacts.
-
-## When to Use
-
-- Multi-step feature or bugfix work where you need research, plan, execution, and review artifacts.
-- Work delegated to subagents that needs explicit handoff and continuity.
-- Tasks where plan drift risk is high and you want one current plan note.
+# RPIR Workflow: Research → Plan → Implement → Review
 
 ## Core Principle
 
-mnemonic is the canonical store for workflow artifacts, not the workflow runtime.
+mnemonic stores workflow artifacts; it does not run the workflow.
+
+## Relationship Conventions
+
+Use `derives-from` for lineage and `follows` for sequence by default. Fall back to `related-to` only when direction is unclear. Keep relationships sparse — link only to immediate upstream artifacts.
 
 ## Stage Checklists
 
 ### 1. Research
 
-- Create or update one request root note with `role: context`, `lifecycle: temporary`, `tags: ["workflow", "request"]`.
-- Before creating new notes, call `recall` for related prior work.
-- Create research notes with `role: research`, `lifecycle: temporary`.
-- Distill a short research summary when findings are scattered.
-- Link research notes to request root. Prefer `derives-from` when lineage is explicit; otherwise use `related-to`.
+- Create or update one request root: `role: context`, `lifecycle: temporary`, `tags: ["workflow", "request"]`.
+- Call `recall` before creating notes to avoid duplicates.
+- Create research notes: `role: research`, `lifecycle: temporary`.
+- Distill when findings are scattered.
+- Link research to request root (`derives-from` preferred).
 
 ### 2. Plan
 
-- Create or update one current plan note with `role: plan`, `lifecycle: temporary`.
-- Link plan note to request root and key research notes. Prefer `derives-from` for lineage and `follows` for sequence; fallback to `related-to` when direction is unclear.
-- Keep the plan concise, executable, and scoped to the current request.
-- Prefer one current plan per request; update or supersede as needed.
-- If the plan changes materially, update the plan note before continuing implementation.
-
-Material plan changes include architecture direction, file/module scope, ordering/dependencies, validation strategy, and key assumptions.
+- Create or update one current plan note: `role: plan`, `lifecycle: temporary`.
+- Link to request root and key research notes (`derives-from` for lineage, `follows` for sequence).
+- Keep the plan concise and executable.
+- One current plan per request; update or supersede as needed.
+- Update plan note before continuing if scope, architecture, dependencies, or assumptions change materially.
 
 ### 3. Implement
 
-- Create apply/task notes as `lifecycle: temporary`, tagged with `apply`.
-- Use `role: plan` for intended executable steps.
-- Use `role: context` for observations, checkpoints, and execution notes.
-- Link apply/task notes to the plan note. Prefer `follows` for ordered execution steps.
-- For non-trivial work, dispatch a subagent with narrow scope and explicit handoff context.
+- Create apply/task notes: `lifecycle: temporary`, tagged `apply`.
+- `role: plan` for executable steps; `role: context` for observations and checkpoints.
+- Link to plan note (`follows` for ordered steps).
+- For non-trivial work, dispatch a subagent with narrow scope (see [handoff template](#subagent-handoff-template)).
 
 ### 4. Review
 
-- Create review notes with `role: review`, `lifecycle: temporary`.
-- Link review notes to apply/task notes or plan. Use `derives-from` when review conclusions derive from specific artifacts.
-- Record outcomes: continue, block, or update plan.
+- Create review notes: `role: review`, `lifecycle: temporary`.
+- Link to apply/task notes or plan (`derives-from` when conclusions derive from specific artifacts).
+- Record outcome: continue, block, or update plan.
 - If review causes a material plan change, update plan note first.
+- Every review note must include verification evidence:
+
+```text
+- Command: <run command>
+- Result: pass | fail | partial
+- Details: <counts, errors>
+```
 
 ### 5. Consolidate
 
-- Create permanent decision note(s) for resolved approaches.
-- Create permanent summary note(s) for outcomes and verification.
+- Create permanent decision note(s) and summary note(s).
 - Promote reusable patterns into permanent reference notes.
-- Let pure temporary scaffolding expire when no longer useful.
+- Let temporary scaffolding expire.
+
+Use the templates in [closeout-templates.md](closeout-templates.md).
 
 ## Subagent Handoff Template
 
-Use this template for subagent delegation:
-
 ```text
-Request note:
-- <note-id/title>
-
-Current plan note (or relevant slice):
-- <note-id/title>
-
-Relevant research notes:
-- <note-id/title>
-- <note-id/title>
-
-Durable recalled context:
-- <note-id/title>
-- <note-id/title>
+Request note:      <note-id/title>
+Plan note:         <note-id/title>
+Research notes:    <note-id/title>, ...
+Durable context:   <note-id/title>, ...
 
 Task scope:
 - Files/modules: <paths>
 - Goal: <what to change>
 - Validation: <tests/checks>
 
-Subagent must return:
-1) Updated apply note content
-2) Optional review note content
-3) Recommendation: continue | block | update plan
+Must return: apply note content, optional review note, recommendation (continue | block | update plan)
 ```
 
-## Note Conventions
-
-- Request root: one per workflow, `role: context`, `lifecycle: temporary`, `tags: workflow/request`.
-- Apply/task split: no new role; use existing `plan` and `context` roles plus `apply` tag.
-- Relationship density: keep sparse; link only to immediate upstream artifacts.
-- Plan currency: one current plan note per request.
-
-Relationship preference order:
-
-1. `derives-from` for explicit lineage.
-2. `follows` for explicit sequence.
-3. `related-to` only when direction is unknown or intentionally generic.
-
-Canonical graph:
+## Canonical Graph
 
 ```text
 request root (context, temporary)
-  -> research (temporary)
-  -> plan (temporary)
-  -> apply/task (temporary; plan for steps, context for observations)
-  -> review (temporary)
-  -> outcome/decision/summary (permanent)
+  → research (temporary)
+  → plan (temporary)
+  → apply/task (temporary; plan for steps, context for observations)
+  → review (temporary)
+  → outcome/decision/summary (permanent)
 ```
 
 ## Commit Discipline
 
-Use three commit classes through the workflow:
+Three commit classes:
 
-1. Memory commit: research/plan/review artifacts.
-2. Work commit: code/test/docs implementation.
-3. Memory commit: consolidation and promotion of durable knowledge.
+1. **Memory** — research/plan/review artifacts
+2. **Work** — code/test/docs implementation
+3. **Memory** — consolidation of durable knowledge
 
-If plan changes materially during implementation, do memory update first, then continue work.
+Never mix classes. Before every commit, run this sequence:
+
+1. `git status --short`
+2. Stage only intended paths (never `git add .` or `git add -A`)
+3. If unsure whether dirty files belong together, ask before committing
+4. `git status --short` after commit to confirm
+
+Material plan changes during implementation: commit the memory update first.
 
 ## Examples
 
-### Example 1: Research-heavy bug investigation
+**Research-heavy bug:** request root + research notes → plan with validation → apply + review → permanent decision + summary.
 
-- Create request root + two research notes.
-- Link research to request.
-- Write one plan note with validation steps.
-- Execute with apply notes and one review note.
-- Consolidate into permanent decision + summary notes.
+**Multi-file refactor:** request root + concise plan → subagent handoff → apply note + recommendation → review, consolidate.
 
-### Example 2: Multi-file refactor with subagent
-
-- Create request root and concise plan note.
-- Hand subagent request/plan/research plus narrow file list.
-- Receive updated apply note + recommendation.
-- Add review note, update plan if material drift occurred.
-- Promote reusable patterns into reference note.
-
-### Example 3: Small task with no iteration
-
-- Create/update request root and one plan note.
-- Implement directly with one apply note.
-- Review note says continue and close.
-- Consolidate to one permanent summary note.
+**Small task:** request root + plan → one apply note → review says continue → one permanent summary.
