@@ -10,11 +10,16 @@ tags:
   - temporal
 lifecycle: permanent
 createdAt: '2026-04-25T11:55:14.712Z'
-updatedAt: '2026-04-25T11:55:14.712Z'
+updatedAt: '2026-04-25T11:55:30.633Z'
 role: decision
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: apply-phase-5-temporal-parsing-and-confidence-gated-filterin-276b80d2
+    type: derives-from
+  - id: summary-phase-5-temporal-parsing-and-confidence-gated-filter-bc395edc
+    type: explains
 memoryVersion: 1
 ---
 # Decision: Phase 5 applies strict temporal filtering only for high-confidence explicit windows
