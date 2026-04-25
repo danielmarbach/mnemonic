@@ -8,11 +8,14 @@ tags:
   - phase2
 lifecycle: temporary
 createdAt: '2026-04-25T06:37:02.787Z'
-updatedAt: '2026-04-25T06:37:02.787Z'
+updatedAt: '2026-04-25T06:37:09.857Z'
 role: review
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: apply-phase-2-rrf-ranking-stability-and-canonical-weight-tun-a00eb917
+    type: derives-from
 memoryVersion: 1
 ---
 # Review: Phase 2 RRF stability verification after tie/rank adjustments
