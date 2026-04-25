@@ -238,6 +238,7 @@ async function main() {
   const recallHybrid = await callTool("recall", { query: "hybrid reranking rescue projections", cwd, limit: 3, scope: "all" });
   const recallReadFirst = await callTool("recall", { query: "what should I read first to understand temporal interpretation", cwd, limit: 5, scope: "all" });
   const recallArchitecture = await callTool("recall", { query: "projections enrichment layer design", cwd, limit: 5, scope: "all" });
+  const recallRecentWeek = await callTool("recall", { query: "recent changes this week", cwd, limit: 5, scope: "all" });
   const recentTemporary = await callTool("recent_memories", { cwd, scope: "all", storedIn: "any", limit: 5, lifecycle: "temporary" });
   const recalledTemporary = await callTool("recall", { query: "phase 2 working-state continuity", cwd, limit: 5, scope: "all", lifecycle: "temporary" });
 
@@ -332,6 +333,8 @@ async function main() {
   const b2Top = recallTemporal.structured?.results?.[0];
   const b3Top = recallTemporalVerbose.structured?.results?.[0];
   const b4Top = recallHybrid.structured?.results?.[0];
+  const b5Results = recallRecentWeek.structured?.results ?? [];
+  const b5HasResults = b5Results.length > 0;
   const readFirstTop = recallReadFirst.structured?.results?.[0];
   const architectureTop = recallArchitecture.structured?.results?.[0];
   const tempRecallResults = recalledTemporary.structured?.results ?? [];
@@ -340,6 +343,7 @@ async function main() {
     unchecked: [
       !canonicalDesignInTopEmbeddings && "recall answers canonical design questions",
       !reachesArchitectureWithinThreeSteps && "recent-to-architecture navigation works",
+      !b5HasResults && "temporal filter not over-excluding",
     ].filter(Boolean),
     themeCount: themeEntries.length,
     topEmbeddingResult: b1Top?.title,
@@ -353,6 +357,7 @@ async function main() {
     temporalTop: b2Top?.title ?? null,
     verboseTemporalTop: b3Top?.title ?? null,
     hybridTop: b4Top?.title ?? null,
+    temporalFilterNotOverExcluding: b5HasResults,
   };
 
   const packB = {
