@@ -8,7 +8,7 @@ tags:
   - scorecard
 lifecycle: permanent
 createdAt: '2026-03-28T18:54:38.792Z'
-updatedAt: '2026-04-05T10:30:26.227Z'
+updatedAt: '2026-04-25T20:53:12.593Z'
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
@@ -20,7 +20,22 @@ Reusable dogfooding packs for validating mnemonic behavior against a released bu
 
 After running a pack, capture results in a new project note with a dated title and the relevant scorecard.
 
----
+***
+
+## Deterministic assertions now in integration tests
+
+The following checks from Packs A/B/C were deterministic assertions that belong in CI, not dogfood runs. They have been extracted to `tests/pipeline-smoke.integration.test.ts` and existing integration test files:
+
+| Former dogfood check | Integration test file |
+|---|---|
+| D1 — warm-session stability (`project_memory_summary` identical on two calls) | `pipeline-smoke.integration.test.ts` |
+| F2 — alwaysLoad toggle persists via remember/update | `memory-lifecycle.integration.test.ts` |
+| Pack A — temporal filter not over-excluding (with `mode: "temporal"`) | `pipeline-smoke.integration.test.ts` + `recall-pipeline.integration.test.ts` |
+| W4 — workflow-hint prompt contains orientation guidance | `pipeline-smoke.integration.test.ts` |
+| W6 — all-temporary consolidation auto-deletes sources | `memory-lifecycle.integration.test.ts` |
+| Pack C — semanticPatch multi-insert, lint warning, retry | `update-sem-patch.integration.test.ts` + `dogfood-semantic-patch.mjs` |
+
+The dogfood runner (`scripts/run-dogfood-packs.mjs`) no longer has a release gate mechanism. It runs Pack A and Pack B quality observations only and reports advisory findings. Pack C is fully covered by integration tests.
 
 ## Pack A — Core enrichment and orientation regression pack
 
@@ -70,28 +85,28 @@ Run a structured dogfooding test of the mnemonic MCP against the released versio
 
 **CLEANUP:** Call `forget` on any test notes created during F2.
 
-**CAPTURE:** Call `remember` with title "Dogfooding results: core enrichment/orientation pack (YYYY-MM-DD)", lifecycle permanent, scope project, tags [dogfooding, testing, scorecard, regression], containing all test results and the completed scorecard.
+**CAPTURE:** Call `remember` with title "Dogfooding results: core enrichment/orientation pack (YYYY-MM-DD)", lifecycle permanent, scope project, tags \[dogfooding, testing, scorecard, regression], containing all test results and the completed scorecard.
 
 ### Pack A scorecard template
 
-- [ ] cold-start orientation useful
-- [ ] design entry path coherent
-- [ ] recall answers canonical design questions
-- [ ] temporal recall bounded and informative
-- [ ] cold hybrid phrasing still works
-- [ ] relationship follow-ups useful
-- [ ] warm-session behavior stable
-- [ ] themes meaningful
-- [ ] provenance and confidence sensible
-- [ ] alwaysLoad persistence behaves cleanly
-- [ ] single-commit history summary correct
-- [ ] multi-commit history summary useful
-- [ ] resume-after-a-week works
-- [ ] design archaeology works
-- [ ] recent-to-architecture navigation works
-- [ ] "what should I read first?" works
+- \[ ] cold-start orientation useful
+- \[ ] design entry path coherent
+- \[ ] recall answers canonical design questions
+- \[ ] temporal recall bounded and informative
+- \[ ] cold hybrid phrasing still works
+- \[ ] relationship follow-ups useful
+- \[ ] warm-session behavior stable
+- \[ ] themes meaningful
+- \[ ] provenance and confidence sensible
+- \[ ] alwaysLoad persistence behaves cleanly
+- \[ ] single-commit history summary correct
+- \[ ] multi-commit history summary useful
+- \[ ] resume-after-a-week works
+- \[ ] design archaeology works
+- \[ ] recent-to-architecture navigation works
+- \[ ] "what should I read first?" works
 
----
+***
 
 ## Pack B — Working-state continuity pack
 
@@ -121,19 +136,19 @@ Run a focused dogfooding test of working-state continuity in mnemonic. Use cwd=/
 
 **CLEANUP:** Call `forget` on any temporary test notes created only for this run.
 
-**CAPTURE:** Call `remember` with title "Dogfooding results: working-state continuity pack (YYYY-MM-DD)", lifecycle permanent, scope project, tags [dogfooding, testing, scorecard, workflow, temporary-notes], containing all test results and the completed scorecard.
+**CAPTURE:** Call `remember` with title "Dogfooding results: working-state continuity pack (YYYY-MM-DD)", lifecycle permanent, scope project, tags \[dogfooding, testing, scorecard, workflow, temporary-notes], containing all test results and the completed scorecard.
 
 ### Pack B scorecard template
 
-- [ ] summary-first orientation still holds
-- [ ] `recall(lifecycle: temporary)` is useful
-- [ ] `recent_memories(lifecycle: temporary)` is useful
-- [ ] workflow hint matches the design
-- [ ] lifecycle distinction stays clear
-- [ ] temporary scaffolding is not preserved by default
-- [ ] end-to-end resume flow feels coherent
+- \[ ] summary-first orientation still holds
+- \[ ] `recall(lifecycle: temporary)` is useful
+- \[ ] `recent_memories(lifecycle: temporary)` is useful
+- \[ ] workflow hint matches the design
+- \[ ] lifecycle distinction stays clear
+- \[ ] temporary scaffolding is not preserved by default
+- \[ ] end-to-end resume flow feels coherent
 
----
+***
 
 ## Pack C — Blind interruption and resumption usefulness pack
 
@@ -177,20 +192,20 @@ Run a blind resumption test of mnemonic working-state continuity. Use cwd=/path/
 
 **C8 — Cleanup decision:** At the end, should the checkpoint remain temporary, be updated, or be consolidated into a durable note? Record the answer explicitly. Rate: Pass / Pass with friction / Fail.
 
-**CAPTURE:** Call `remember` with title "Dogfooding results: blind interruption/resumption pack (YYYY-MM-DD)", lifecycle permanent, scope project, tags [dogfooding, testing, scorecard, workflow, temporary-notes, continuity], containing all results plus the measured or estimated resumption time.
+**CAPTURE:** Call `remember` with title "Dogfooding results: blind interruption/resumption pack (YYYY-MM-DD)", lifecycle permanent, scope project, tags \[dogfooding, testing, scorecard, workflow, temporary-notes, continuity], containing all results plus the measured or estimated resumption time.
 
 ### Pack C scorecard template
 
-- [ ] orientation still came first
-- [ ] the right checkpoint surfaced quickly
-- [ ] the next action was recoverable
-- [ ] blockers and prior attempts were preserved
-- [ ] resumption time felt materially reduced
-- [ ] wrong turns were avoided
-- [ ] the workflow did not feel parallel or competing
-- [ ] checkpoint cleanup/consolidation decision was clear
+- \[ ] orientation still came first
+- \[ ] the right checkpoint surfaced quickly
+- \[ ] the next action was recoverable
+- \[ ] blockers and prior attempts were preserved
+- \[ ] resumption time felt materially reduced
+- \[ ] wrong turns were avoided
+- \[ ] the workflow did not feel parallel or competing
+- \[ ] checkpoint cleanup/consolidation decision was clear
 
----
+***
 
 ## Known runs
 
