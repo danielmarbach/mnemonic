@@ -8,7 +8,7 @@ tags:
   - hindsight
 lifecycle: temporary
 createdAt: '2026-04-24T18:10:35.779Z'
-updatedAt: '2026-04-25T12:01:27.949Z'
+updatedAt: '2026-04-25T13:25:39.242Z'
 role: plan
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -30,6 +30,8 @@ relatedTo:
     type: follows
   - id: summary-performance-principles-compliance-audit-for-recall-p-b482b38b
     type: explains
+  - id: review-hindsight-phases-1-5-comprehensive-code-and-plan-audi-0be2b019
+    type: derives-from
 memoryVersion: 1
 ---
 # Plan: mnemonic Recall Improvements from Hindsight Research
