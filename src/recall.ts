@@ -2,15 +2,22 @@ import type { Vault } from "./vault.js";
 import type { EffectiveNoteMetadata } from "./role-suggestions.js";
 import { computeLexicalScore, tokenize } from "./lexical.js";
 
+import type { RelationshipType } from "./storage.js";
+
+const RRF_K = 60;
+const CANONICAL_HYBRID_WEIGHT = 0.05;
+
 const RECALL_ALWAYS_LOAD_BOOST = 0.01;
 const RECALL_SUMMARY_BOOST = 0.012;
 const RECALL_DECISION_BOOST = 0.009;
 const RECALL_HIGH_IMPORTANCE_BOOST = 0.006;
 
-/** Weight applied to lexical score when computing hybrid boosted score. */
-const LEXICAL_HYBRID_WEIGHT = 0.12;
-const COVERAGE_HYBRID_WEIGHT = 0.08;
-const PHRASE_HYBRID_WEIGHT = 0.16;
+const SPREADING_ENTRY_POINT_LIMIT = 5;
+const SPREADING_HOP_DECAY = 0.5;
+const SPREADING_ACTIVATION_GATE = 0.5;
+const SPREADING_RELATED_TO_MULTIPLIER = 0.8;
+const SPREADING_EXPLAINS_DERIVES_MULTIPLIER = 1.0;
+
 const MIN_CANONICAL_EXPLANATION_SCORE = 0.5;
 const WORKFLOW_ROLE_BOOSTS: Partial<Record<NonNullable<EffectiveNoteMetadata["role"]>, number>> = {
   plan: 0.03,
@@ -21,11 +28,22 @@ const WORKFLOW_ROLE_BOOSTS: Partial<Record<NonNullable<EffectiveNoteMetadata["ro
   summary: 0.008,
 };
 
+export interface TemporalQueryHint {
+  windowDays: number;
+  maxBoost: number;
+  confidence: "high" | "medium" | "low";
+  filterWindowDays?: number;
+}
+
 export interface ScoredRecallCandidate {
   id: string;
   score: number;
   /** Semantic plausibility used to gate canonical explanation promotion. */
   semanticScoreForPromotion?: number;
+  /** Rank from the initial semantic retrieval ordering (1-based). */
+  semanticRank?: number;
+  /** Rank from the lexical reranking step (1-based). */
+  lexicalRank?: number;
   boosted: number;
   vault: Vault;
   isCurrentProject: boolean;
@@ -67,26 +85,166 @@ export function computeRecallMetadataBoost(metadata?: EffectiveNoteMetadata): nu
   return boost;
 }
 
+const TEMPORAL_QUERY_HINTS: Array<{ pattern: RegExp; hint: TemporalQueryHint }> = [
+  // Ordered by specificity (longer/more specific patterns first) to avoid first-match-wins issues.
+  { pattern: /\b(in\s+the\s+past)\b/i, hint: { windowDays: 365, maxBoost: 0.03, confidence: "low" } },
+  { pattern: /\b(this\s+year|last\s+year)\b/i, hint: { windowDays: 366, maxBoost: 0.03, confidence: "medium" } },
+  { pattern: /\b(last\s+month)\b/i, hint: { windowDays: 62, maxBoost: 0.05, confidence: "medium" } },
+  { pattern: /\b(this\s+month)\b/i, hint: { windowDays: 31, maxBoost: 0.05, confidence: "medium" } },
+  { pattern: /\b(last\s+week)\b/i, hint: { windowDays: 14, maxBoost: 0.06, confidence: "medium" } },
+  { pattern: /\b(this\s+week)\b/i, hint: { windowDays: 7, maxBoost: 0.06, confidence: "medium" } },
+  { pattern: /\b(yesterday)\b/i, hint: { windowDays: 3, maxBoost: 0.08, confidence: "medium" } },
+  { pattern: /\b(today|latest)\b/i, hint: { windowDays: 2, maxBoost: 0.08, confidence: "medium" } },
+  { pattern: /\b(recent|recently|newest)\b/i, hint: { windowDays: 30, maxBoost: 0.05, confidence: "low" } },
+];
+
+const EXPLICIT_TEMPORAL_WINDOW_PATTERN =
+  /\b(?:past|last|the\s+last|in\s+the\s+last)\s+(\d{1,3})\s+(day|days|week|weeks|month|months|year|years)\b/i;
+
+function toDays(value: number, unit: string): number {
+  const normalized = unit.toLowerCase();
+  if (normalized === "day" || normalized === "days") return value;
+  if (normalized === "week" || normalized === "weeks") return value * 7;
+  if (normalized === "month" || normalized === "months") return value * 31;
+  return value * 366;
+}
+
+export function detectTemporalQueryHint(query: string): TemporalQueryHint | undefined {
+  const explicitWindow = query.match(EXPLICIT_TEMPORAL_WINDOW_PATTERN);
+  if (explicitWindow) {
+    const value = Number.parseInt(explicitWindow[1], 10);
+    const unit = explicitWindow[2];
+    if (Number.isFinite(value) && value > 0) {
+      const windowDays = toDays(value, unit);
+      return {
+        windowDays,
+        filterWindowDays: windowDays,
+        maxBoost: Math.min(0.08, 0.03 + Math.log10(value + 1) * 0.02),
+        confidence: "high",
+      };
+    }
+  }
+
+  for (const entry of TEMPORAL_QUERY_HINTS) {
+    if (entry.pattern.test(query)) {
+      return entry.hint;
+    }
+  }
+
+  return undefined;
+}
+
+export function computeTemporalRecencyBoost(
+  updatedAt: string,
+  hint: TemporalQueryHint,
+  now: Date = new Date()
+): number {
+  const updated = new Date(updatedAt);
+  if (Number.isNaN(updated.getTime())) {
+    return 0;
+  }
+
+  const ageDays = Math.max(0, (now.getTime() - updated.getTime()) / (1000 * 60 * 60 * 24));
+  if (ageDays > hint.windowDays) {
+    return 0;
+  }
+
+  const freshness = 1 - ageDays / hint.windowDays;
+  return hint.maxBoost * freshness;
+}
+
+export function shouldApplyTemporalFiltering(hint: TemporalQueryHint | undefined): boolean {
+  return hint?.confidence === "high" && hint.filterWindowDays !== undefined;
+}
+
+export function isWithinTemporalFilterWindow(
+  updatedAt: string,
+  windowDays: number,
+  now: Date = new Date()
+): boolean {
+  const updated = new Date(updatedAt);
+  if (Number.isNaN(updated.getTime())) {
+    return true;
+  }
+
+  const ageDays = Math.max(0, (now.getTime() - updated.getTime()) / (1000 * 60 * 60 * 24));
+  return ageDays <= windowDays;
+}
+
 /**
- * Compute a hybrid score that combines semantic similarity with additive
- * lexical, coverage, phrase, and canonical explanation signals.
+ * Compute RRF-based hybrid score.
  *
- * The formula is:
- * boosted
- *   + LEXICAL_HYBRID_WEIGHT * lexical
- *   + COVERAGE_HYBRID_WEIGHT * coverage
- *   + PHRASE_HYBRID_WEIGHT * phrase
- *   + canonicalExplanation
+ * Formula:
+ *   boosted + RRF + canonicalExplanationScore * CANONICAL_HYBRID_WEIGHT
  *
- * These additive signals act as tiebreakers and small reranking signals. They
- * cannot overcome a large semantic gap but can reorder close candidates.
+ * where RRF = 1/(K + semanticRank) + 1/(K + lexicalRank)
+ *
+ * When semanticRank is missing but lexicalRank is available (rescue candidates)
+ * only the lexical channel contributes. When both are missing the function
+ * falls back to pure boosted (pre-RRF scoring stage).
  */
 export function computeHybridScore(candidate: ScoredRecallCandidate): number {
+  const canonical = candidate.canonicalExplanationScore ?? 0;
+
+  if (candidate.semanticRank === undefined && candidate.lexicalRank === undefined) {
+    return candidate.boosted + canonical;
+  }
+
+  const semanticContribution = candidate.semanticRank !== undefined
+    ? 1 / (RRF_K + candidate.semanticRank)
+    : 0;
+  const lexicalContribution = candidate.lexicalRank !== undefined
+    ? 1 / (RRF_K + candidate.lexicalRank)
+    : 0;
+
+  // Scale RRF so its maximum influence is comparable to the old additive
+  // lexical weight (~0.12). With K = 60 and two channels the max RRF is
+  // roughly 2/60 ≈ 0.033. Multiplied by 3.5 this hits ~0.115, matching the
+  // old order-of-magnitude while remaining calibration-free.
+  const rrf = semanticContribution + lexicalContribution;
+
+  return candidate.boosted + rrf * 3.5 + canonical * CANONICAL_HYBRID_WEIGHT;
+}
+
+function computeLexicalRankSignal(candidate: ScoredRecallCandidate): number {
   const lexical = candidate.lexicalScore ?? 0;
   const coverage = candidate.coverageScore ?? 0;
   const phrase = candidate.phraseScore ?? 0;
-  const canonical = candidate.canonicalExplanationScore ?? 0;
-  return candidate.boosted + LEXICAL_HYBRID_WEIGHT * lexical + COVERAGE_HYBRID_WEIGHT * coverage + PHRASE_HYBRID_WEIGHT * phrase + canonical;
+  return lexical + coverage * 0.3 + phrase * 0.5;
+}
+
+const RANK_EPSILON = 1e-9;
+
+export function assignDenseRanks<T>(items: T[], scoreOf: (item: T) => number, setRank: (item: T, rank: number) => void): void {
+  let currentRank = 0;
+  let previousScore: number | undefined;
+  for (let i = 0; i < items.length; i++) {
+    const score = scoreOf(items[i]);
+    if (previousScore === undefined || Math.abs(score - previousScore) > RANK_EPSILON) {
+      currentRank = i + 1;
+      previousScore = score;
+    }
+    setRank(items[i], currentRank);
+  }
+}
+
+function compareByHybridScore(a: ScoredRecallCandidate, b: ScoredRecallCandidate): number {
+  const hybridDelta = computeHybridScore(b) - computeHybridScore(a);
+  if (hybridDelta !== 0) {
+    return hybridDelta;
+  }
+
+  const boostedDelta = b.boosted - a.boosted;
+  if (boostedDelta !== 0) {
+    return boostedDelta;
+  }
+
+  const lexicalDelta = computeLexicalRankSignal(b) - computeLexicalRankSignal(a);
+  if (lexicalDelta !== 0) {
+    return lexicalDelta;
+  }
+
+  return b.score - a.score;
 }
 
 export function computeCanonicalExplanationScore(candidate: ScoredRecallCandidate): number {
@@ -115,7 +273,14 @@ export function applyCanonicalExplanationPromotion(candidates: ScoredRecallCandi
     candidate.canonicalExplanationScore = computeCanonicalExplanationScore(candidate);
   }
 
-  return [...candidates].sort((a, b) => computeHybridScore(b) - computeHybridScore(a));
+  // Assign lexicalRank based on lexicalScore (undefined scores rank last).
+  const sortedByLexical = [...candidates]
+    .sort((a, b) => computeLexicalRankSignal(b) - computeLexicalRankSignal(a) || b.score - a.score);
+  assignDenseRanks(sortedByLexical, computeLexicalRankSignal, (candidate, rank) => {
+    candidate.lexicalRank = rank;
+  });
+
+  return [...candidates].sort(compareByHybridScore);
 }
 
 function computeSignificantPhraseScore(query: string, candidateText: string): number {
@@ -152,13 +317,14 @@ function computeWeightedQueryCoverage(query: string, candidateText: string, corp
 }
 
 /**
- * Apply lexical reranking to a set of semantic candidates.
+ * Apply lexical scoring to semantic candidates. Returns the same array.
  *
- * For each candidate, compute lexical overlap against the query using the
- * provided projection text, then re-sort by hybrid score.
+ * Computes lexical overlap, coverage, and phrase scores using projection
+ * text.  When projection text is unavailable, lexicalScore stays undefined.
  *
- * When projection text is unavailable for a candidate, lexicalScore stays
- * undefined and contributes 0 to the hybrid score.
+ * Also assigns semanticRank (1-based) based on the current boosted ordering.
+ * Sorting by RRF + canonical is deferred until applyCanonicalExplanationPromotion
+ * so that lexicalRank can be assigned after all scores are known.
  */
 export function applyLexicalReranking(
   candidates: ScoredRecallCandidate[],
@@ -178,7 +344,40 @@ export function applyLexicalReranking(
     }
   }
 
-  return [...candidates].sort((a, b) => computeHybridScore(b) - computeHybridScore(a));
+  // Assign semanticRank using dense semantic score ordering.
+  // Tied semantic scores share the same rank so lexical rank can break ties.
+  const sortedBySemantic = [...candidates].sort((a, b) => b.score - a.score || b.boosted - a.boosted);
+  assignDenseRanks(sortedBySemantic, (candidate) => candidate.score, (candidate, rank) => {
+    candidate.semanticRank = rank;
+  });
+
+  return candidates;
+}
+
+export function enrichRescueCandidateScores(
+  allCandidates: ScoredRecallCandidate[],
+  query: string,
+  getProjectionText: (id: string) => string | undefined
+): void {
+  const rescueIds = new Set(
+    allCandidates
+      .filter((c) => c.coverageScore === undefined && c.lexicalScore !== undefined)
+      .map((c) => c.id)
+  );
+  if (rescueIds.size === 0) return;
+
+  const corpusTexts = allCandidates
+    .map((candidate) => getProjectionText(candidate.id))
+    .filter((text): text is string => Boolean(text));
+
+  for (const candidate of allCandidates) {
+    if (!rescueIds.has(candidate.id)) continue;
+    const projText = getProjectionText(candidate.id);
+    if (projText) {
+      candidate.coverageScore = computeWeightedQueryCoverage(query, projText, corpusTexts);
+      candidate.phraseScore = computeSignificantPhraseScore(query, projText);
+    }
+  }
 }
 
 export function selectRecallResults(
@@ -186,7 +385,7 @@ export function selectRecallResults(
   limit: number,
   scope: "project" | "global" | "all"
 ): ScoredRecallCandidate[] {
-  const sorted = [...scored].sort((a, b) => computeHybridScore(b) - computeHybridScore(a));
+  const sorted = [...scored].sort(compareByHybridScore);
 
   if (scope !== "all") {
     return sorted.slice(0, limit);
@@ -219,7 +418,13 @@ export function selectWorkflowResults(
   limit: number,
   scope: "project" | "global" | "all"
 ): ScoredRecallCandidate[] {
-  const sorted = [...scored].sort((a, b) => computeWorkflowScore(b) - computeWorkflowScore(a));
+  const sorted = [...scored].sort((a, b) => {
+    const workflowDelta = computeWorkflowScore(b) - computeWorkflowScore(a);
+    if (workflowDelta !== 0) {
+      return workflowDelta;
+    }
+    return compareByHybridScore(a, b);
+  });
 
   if (scope !== "all") {
     return sorted.slice(0, limit);
@@ -238,4 +443,99 @@ export function selectWorkflowResults(
   const selectedIds = new Set(topProject.map((candidate) => candidate.id));
   const fallback = sorted.filter((candidate) => !selectedIds.has(candidate.id));
   return [...topProject, ...fallback].slice(0, limit);
+}
+
+function getRelationshipMultiplier(type: RelationshipType): number {
+  switch (type) {
+    case "explains":
+    case "derives-from":
+      return SPREADING_EXPLAINS_DERIVES_MULTIPLIER;
+    case "related-to":
+    case "example-of":
+    case "supersedes":
+    case "follows":
+      return SPREADING_RELATED_TO_MULTIPLIER;
+  }
+}
+
+export function applyGraphSpreadingActivation(
+  candidates: ScoredRecallCandidate[],
+  getNoteRelationships: (id: string) => Array<{ id: string; type: RelationshipType }> | undefined
+): ScoredRecallCandidate[] {
+  if (candidates.length === 0) {
+    return candidates;
+  }
+
+  const sortedByScore = [...candidates].sort((a, b) => b.score - a.score);
+  const entryPoints = sortedByScore.slice(0, SPREADING_ENTRY_POINT_LIMIT);
+
+  const eligibleEntries = entryPoints.filter((e) => e.score >= SPREADING_ACTIVATION_GATE);
+  if (eligibleEntries.length === 0) {
+    return candidates;
+  }
+
+  const candidateMap = new Map(candidates.map((c) => [c.id, c]));
+  const discovered = new Map<string, ScoredRecallCandidate>();
+
+  for (const entry of eligibleEntries) {
+    const relationships = getNoteRelationships(entry.id);
+    if (!relationships) continue;
+
+    for (const rel of relationships) {
+      const multiplier = getRelationshipMultiplier(rel.type);
+      const propagatedScore = entry.score * SPREADING_HOP_DECAY * multiplier;
+
+      const existingCandidate = candidateMap.get(rel.id);
+      if (existingCandidate) {
+        existingCandidate.score += propagatedScore;
+        existingCandidate.boosted += propagatedScore;
+        if (existingCandidate.semanticScoreForPromotion !== undefined) {
+          existingCandidate.semanticScoreForPromotion += propagatedScore;
+        }
+      } else if (!discovered.has(rel.id)) {
+        discovered.set(rel.id, {
+          id: rel.id,
+          score: propagatedScore,
+          semanticScoreForPromotion: propagatedScore,
+          boosted: propagatedScore,
+          vault: entry.vault,
+          isCurrentProject: entry.isCurrentProject,
+        });
+      } else {
+        const existing = discovered.get(rel.id)!;
+        existing.score += propagatedScore;
+        existing.boosted += propagatedScore;
+        if (existing.semanticScoreForPromotion !== undefined) {
+          existing.semanticScoreForPromotion += propagatedScore;
+        }
+      }
+    }
+  }
+
+  if (discovered.size === 0) {
+    return candidates;
+  }
+
+  return [...candidates, ...discovered.values()];
+}
+
+export function resolveDiscoveredVaults(
+  candidates: ScoredRecallCandidate[],
+  originalCandidateIds: Set<string>,
+  resolveVault: (id: string) => Promise<{ vault: Vault; isCurrentProject: boolean } | undefined>
+): Promise<void> {
+  const discovered = candidates.filter(
+    (c) => !originalCandidateIds.has(c.id) && c.vault !== undefined
+  );
+  if (discovered.length === 0) return Promise.resolve();
+
+  return Promise.all(
+    discovered.map(async (c) => {
+      const resolved = await resolveVault(c.id);
+      if (resolved) {
+        c.vault = resolved.vault;
+        c.isCurrentProject = resolved.isCurrentProject;
+      }
+    })
+  ).then(() => {});
 }

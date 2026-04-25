@@ -9,7 +9,7 @@ tags:
   - completed
 lifecycle: permanent
 createdAt: '2026-03-14T22:14:46.759Z'
-updatedAt: '2026-04-16T19:34:48.386Z'
+updatedAt: '2026-04-25T11:59:52.769Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
@@ -17,6 +17,8 @@ relatedTo:
     type: related-to
   - id: active-session-project-cache-single-in-memory-vault-cache-pe-7463f124
     type: related-to
+  - id: summary-performance-principles-compliance-audit-for-recall-p-b482b38b
+    type: derives-from
 memoryVersion: 1
 ---
 ## Durable Performance Principles

@@ -10,7 +10,9 @@ import {
   getOrBuildVaultEmbeddings,
   getSessionCachedNote,
   getSessionCachedProjection,
+  getSessionCachedProjectionTokens,
   setSessionCachedProjection,
+  setSessionCachedProjectionTokens,
 } from "../src/cache.js";
 
 // ── Test helpers ──────────────────────────────────────────────────────────────
@@ -270,6 +272,73 @@ describe("projection cache", () => {
 
   it("setSessionCachedProjection is a no-op when no cache exists", () => {
     expect(() => setSessionCachedProjection("test-project", "note-1", makeProjection("note-1"))).not.toThrow();
+  });
+
+  it("stores and retrieves projection tokens when projection text matches", async () => {
+    const vault = makeVault("/vault/project", [], []);
+    await getOrBuildVaultNoteList("test-project", vault);
+
+    const projectionText = "Title: Note note-1\nSummary: hybrid recall design";
+    setSessionCachedProjectionTokens("test-project", "/vault/project", "note-1", projectionText, [
+      "title",
+      "note",
+      "hybrid",
+      "recall",
+      "design",
+    ]);
+
+    expect(
+      getSessionCachedProjectionTokens("test-project", "/vault/project", "note-1", projectionText)
+    ).toEqual(["title", "note", "hybrid", "recall", "design"]);
+  });
+
+  it("returns undefined projection tokens when projection text has changed", async () => {
+    const vault = makeVault("/vault/project", [], []);
+    await getOrBuildVaultNoteList("test-project", vault);
+
+    const originalText = "Title: Note note-1\nSummary: original";
+    setSessionCachedProjectionTokens("test-project", "/vault/project", "note-1", originalText, [
+      "title",
+      "original",
+    ]);
+
+    expect(
+      getSessionCachedProjectionTokens(
+        "test-project",
+        "/vault/project",
+        "note-1",
+        "Title: Note note-1\nSummary: updated"
+      )
+    ).toBeUndefined();
+  });
+
+  it("projection token cache is cleared on invalidation", async () => {
+    const vault = makeVault("/vault/project", [], []);
+    await getOrBuildVaultNoteList("test-project", vault);
+
+    const projectionText = "Title: Note note-1";
+    setSessionCachedProjectionTokens("test-project", "/vault/project", "note-1", projectionText, [
+      "title",
+      "note",
+    ]);
+
+    invalidateActiveProjectCache();
+
+    expect(
+      getSessionCachedProjectionTokens("test-project", "/vault/project", "note-1", projectionText)
+    ).toBeUndefined();
+  });
+
+  it("setSessionCachedProjectionTokens is a no-op when no cache exists", () => {
+    expect(() =>
+      setSessionCachedProjectionTokens(
+        "test-project",
+        "/vault/project",
+        "note-1",
+        "Title: Note note-1",
+        ["title", "note"]
+      )
+    ).not.toThrow();
   });
 });
 

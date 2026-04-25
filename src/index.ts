@@ -20,9 +20,11 @@ import {
   getRecentSessionAccessNote,
   getSessionCachedNote,
   getSessionCachedProjection,
+  getSessionCachedProjectionTokens,
   recordSessionNoteAccess,
   setSessionCachedNote,
   setSessionCachedProjection,
+  setSessionCachedProjectionTokens,
 } from "./cache.js";
 import { performance } from "perf_hooks";
 
@@ -39,16 +41,27 @@ import {
   selectRecallResults,
   selectWorkflowResults,
   applyLexicalReranking,
+  enrichRescueCandidateScores,
+  resolveDiscoveredVaults,
   applyCanonicalExplanationPromotion,
+  applyGraphSpreadingActivation,
+  assignDenseRanks,
+  detectTemporalQueryHint,
+  computeTemporalRecencyBoost,
+  shouldApplyTemporalFiltering,
+  isWithinTemporalFilterWindow,
+  type TemporalQueryHint,
   type ScoredRecallCandidate,
 } from "./recall.js";
 import {
   shouldTriggerLexicalRescue,
   computeLexicalScore,
+  prepareTfIdfCorpusFromTokenizedDocuments,
   rankDocumentsByTfIdf,
   LEXICAL_RESCUE_CANDIDATE_LIMIT,
   LEXICAL_RESCUE_THRESHOLD,
   LEXICAL_RESCUE_RESULT_LIMIT,
+  tokenize,
 } from "./lexical.js";
 import { getRelationshipPreview } from "./relationships.js";
 import { MarkdownLintError, cleanMarkdown } from "./markdown.js";
@@ -436,6 +449,7 @@ const VAULT_PATH = process.env["VAULT_PATH"]
 
 const DEFAULT_RECALL_LIMIT = 5;
 const DEFAULT_MIN_SIMILARITY = 0.3;
+const PROJECT_SCOPE_BOOST = 0.03;
 const TEMPORAL_HISTORY_NOTE_LIMIT = 5;
 const TEMPORAL_HISTORY_COMMIT_LIMIT = 5;
 
@@ -2287,18 +2301,24 @@ function buildRecallCandidateContext(note: Note) {
 async function collectLexicalRescueCandidates(
   vaults: Vault[],
   query: string,
+  temporalQueryHint: TemporalQueryHint | undefined,
   project: { id: string; name: string } | undefined,
   scope: "project" | "global" | "all",
   tags: string[] | undefined,
   lifecycle: NoteLifecycle | undefined,
   existingIds: ScoredRecallCandidate[]
 ): Promise<ScoredRecallCandidate[]> {
+  const projectId = project?.id;
+  const applyTemporalFilter = shouldApplyTemporalFiltering(temporalQueryHint);
+  const temporalFilterWindowDays = applyTemporalFilter ? temporalQueryHint?.filterWindowDays : undefined;
   const existingIdSet = new Set(existingIds.map((c) => c.id));
   const rescuePool: Array<{
     id: string;
     vault: Vault;
     isCurrentProject: boolean;
+    updatedAt: string;
     projectionText: string;
+    projectionTokens: string[];
     context: ReturnType<typeof buildRecallCandidateContext>;
   }> = [];
 
@@ -2319,6 +2339,13 @@ async function collectLexicalRescueCandidates(
 
       if (scope === "project" && !isCurrentProject) continue;
       if (scope === "global" && isProjectNote) continue;
+      if (
+        applyTemporalFilter
+        && temporalFilterWindowDays !== undefined
+        && !isWithinTemporalFilterWindow(note.updatedAt, temporalFilterWindowDays)
+      ) {
+        continue;
+      }
 
       const projection = await getOrBuildProjection(vault.storage, note).catch(() => undefined);
       if (!projection) continue;
@@ -2327,17 +2354,50 @@ async function collectLexicalRescueCandidates(
         id: note.id,
         vault,
         isCurrentProject: Boolean(isCurrentProject),
+        updatedAt: note.updatedAt,
         projectionText: projection.projectionText,
+        projectionTokens: projectId
+          ? getSessionCachedProjectionTokens(
+            projectId,
+            vault.storage.vaultPath,
+            note.id,
+            projection.projectionText
+          ) ?? tokenize(projection.projectionText)
+          : tokenize(projection.projectionText),
         context: buildRecallCandidateContext(note),
       });
+
+      if (projectId) {
+        setSessionCachedProjectionTokens(
+          projectId,
+          vault.storage.vaultPath,
+          note.id,
+          projection.projectionText,
+          rescuePool[rescuePool.length - 1]!.projectionTokens
+        );
+      }
     }
   }
+
+  const rescueDocuments = rescuePool.map((candidate) => ({
+    id: candidate.id,
+    text: candidate.projectionText,
+  }));
+
+  const preparedRescueCorpus = prepareTfIdfCorpusFromTokenizedDocuments(
+    rescuePool.map((candidate) => ({
+      id: candidate.id,
+      text: candidate.projectionText,
+      tokens: candidate.projectionTokens,
+    }))
+  );
 
   const rankedRescueIds = new Map(
     rankDocumentsByTfIdf(
       query,
-      rescuePool.map((candidate) => ({ id: candidate.id, text: candidate.projectionText })),
-      LEXICAL_RESCUE_CANDIDATE_LIMIT
+      rescueDocuments,
+      LEXICAL_RESCUE_CANDIDATE_LIMIT,
+      preparedRescueCorpus
     ).map((candidate) => [candidate.id, candidate.score])
   );
 
@@ -2349,7 +2409,10 @@ async function collectLexicalRescueCandidates(
     const lexicalScore = tfIdfScore;
     if (lexicalScore < LEXICAL_RESCUE_THRESHOLD) continue;
 
-    const boost = (candidate.isCurrentProject ? 0.15 : 0) + candidate.context.metadataBoost;
+    const temporalBoost = temporalQueryHint
+      ? computeTemporalRecencyBoost(candidate.updatedAt, temporalQueryHint)
+      : 0;
+    const boost = (candidate.isCurrentProject ? PROJECT_SCOPE_BOOST : 0) + candidate.context.metadataBoost + temporalBoost;
     candidates.push({
       id: candidate.id,
       score: lexicalScore,
@@ -2367,7 +2430,7 @@ async function collectLexicalRescueCandidates(
   }
 
   return candidates
-    .sort((a, b) => computeHybridScore(b) - computeHybridScore(a))
+    .sort((a, b) => (b.lexicalScore ?? 0) - (a.lexicalScore ?? 0))
     .slice(0, LEXICAL_RESCUE_RESULT_LIMIT);
 }
 
@@ -2457,6 +2520,9 @@ server.registerTool(
     }
 
     const scored: ScoredRecallCandidate[] = [];
+    const temporalQueryHint = detectTemporalQueryHint(query);
+    const applyTemporalFilter = shouldApplyTemporalFiltering(temporalQueryHint);
+    const temporalFilterWindowDays = applyTemporalFilter ? temporalQueryHint?.filterWindowDays : undefined;
 
     for (const vault of vaults) {
       const embeddings = project
@@ -2488,8 +2554,19 @@ server.registerTool(
           if (isProjectNote) continue;
         }
 
+        if (
+          applyTemporalFilter
+          && temporalFilterWindowDays !== undefined
+          && !isWithinTemporalFilterWindow(note.updatedAt, temporalFilterWindowDays)
+        ) {
+          continue;
+        }
+
         const context = buildRecallCandidateContext(note);
-        const boost = (isCurrentProject ? 0.15 : 0) + context.metadataBoost;
+        const temporalBoost = temporalQueryHint
+          ? computeTemporalRecencyBoost(note.updatedAt, temporalQueryHint)
+          : 0;
+        const boost = (isCurrentProject ? PROJECT_SCOPE_BOOST : 0) + context.metadataBoost + temporalBoost;
         scored.push({
           id: rec.id,
           score: rawScore,
@@ -2507,10 +2584,15 @@ server.registerTool(
     }
 
     const projectionTexts = new Map<string, string>();
+    const noteRelationships = new Map<string, Array<{ id: string; type: RelationshipType }>>();
     for (const candidate of scored) {
       const note = await readCachedNote(candidate.vault, candidate.id).catch(() => null);
       if (!note) {
         continue;
+      }
+
+      if (note.relatedTo && note.relatedTo.length > 0) {
+        noteRelationships.set(candidate.id, note.relatedTo.map((r) => ({ id: r.id, type: r.type })));
       }
 
       const projection = await getOrBuildProjection(candidate.vault.storage, note).catch(() => undefined);
@@ -2541,7 +2623,35 @@ server.registerTool(
       undefined
     );
     const reranked = applyLexicalReranking(scored, query, getProjectionText);
-    let promoted = applyCanonicalExplanationPromotion(reranked);
+
+    // Apply graph spreading activation: traverse related notes and boost their scores
+    const preSpreadIds = new Set(reranked.map((c) => c.id));
+    const getNoteRelationships = (id: string): Array<{ id: string; type: RelationshipType }> | undefined => {
+      return noteRelationships.get(id);
+    };
+    const withGraphSpread = applyGraphSpreadingActivation(reranked, getNoteRelationships);
+
+    // Resolve correct vault for graph-discovered candidates that inherited their
+    // entry point's vault instead of their own.
+    await resolveDiscoveredVaults(withGraphSpread, preSpreadIds, async (id) => {
+      for (const v of vaults) {
+        const note = await v.storage.readNote(id).catch(() => null);
+        if (note) {
+          const isCurrentProject = project ? note.project === project.id : false;
+          return { vault: v, isCurrentProject };
+        }
+      }
+      return undefined;
+    });
+
+    // Re-assign semanticRank after graph spreading since scores are now modified
+    // and graph-discovered candidates have no semanticRank.
+    const sortedByScore = [...withGraphSpread].sort((a, b) => b.score - a.score || b.boosted - a.boosted);
+    assignDenseRanks(sortedByScore, (candidate) => candidate.score, (candidate, rank) => {
+      candidate.semanticRank = rank;
+    });
+
+    let promoted = applyCanonicalExplanationPromotion(withGraphSpread);
 
     // Lexical rescue: when semantic results are weak, scan projections for additional candidates.
     // Skip rescue when the caller set a strict minSimilarity above the default,
@@ -2551,6 +2661,7 @@ server.registerTool(
       const rescueCandidates = await collectLexicalRescueCandidates(
         vaults,
         query,
+        temporalQueryHint,
         project ?? undefined,
         scope,
         tags,
@@ -2558,6 +2669,7 @@ server.registerTool(
         promoted
       );
       promoted.push(...rescueCandidates);
+      enrichRescueCandidateScores(promoted, query, getProjectionText);
       promoted = applyCanonicalExplanationPromotion(promoted);
     }
 

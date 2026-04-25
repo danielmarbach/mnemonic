@@ -2080,21 +2080,20 @@ VAULT_PATH = <span class="str">"/Users/you/mnemonic-vault"</span></pre>
       <div class="dogfood-card fade-up">
         <div class="dogfood-card-top">
           <div class="dogfood-meta">
-            <span class="dogfood-tag">design</span>
-            <span class="dogfood-tag">architecture</span>
-            <span class="dogfood-tag">decisions</span>
+            <span class="dogfood-tag">workflow</span>
+            <span class="dogfood-tag">orientation</span>
+            <span class="dogfood-tag">decision</span>
           </div>
-          <div class="dogfood-id">mnemonic-key-design-decisions-3f2a6273</div>
+          <div class="dogfood-id">phase-2-design-workflow-hint-first-working-state-continuity-07153fcb</div>
         </div>
-        <h3 class="dogfood-title">mnemonic — key design decisions</h3>
+        <h3 class="dogfood-title">Orientation before recovery</h3>
         <div class="dogfood-body">
-          <p><strong>Similarity boost, not hard filter.</strong> <code>recall</code> gives project notes +0.15 cosine similarity rather than excluding global notes. Global memories (user prefs, cross-project patterns) remain accessible in project context.</p>
-          <p><strong>No auto-relationship via LLM.</strong> Decided against using a local model to auto-build relationships. Small models lack session context, produce spurious edges, and corrupt the graph silently. Instead: agent instructions prompt <code>relate</code> immediately after <code>remember</code> while session context is warm.</p>
-          <p><strong>Embeddings gitignored.</strong> Derived data — always recomputable. Committing them causes unresolvable merge conflicts (can't merge float arrays).</p>
+          <p><strong>Call <code>project_memory_summary</code> first for orientation</strong>, then recover working state. The <code>mnemonic-workflow-hint</code> prompt establishes this order explicitly so agents orient on project context before diving into temporary-note recovery.</p>
+          <p><strong>Temporary notes are scaffolding, not permanent knowledge.</strong> When consolidating finished work, default to deleting temporary sources rather than preserving them. The working-state section in <code>project_memory_summary</code> surfaces WIP notes so agents can resume without searching.</p>
         </div>
         <div class="dogfood-footer">
-          <span class="dogfood-rel">relates to 5 other notes</span>
-          <span class="dogfood-date">Mar 7, 2026</span>
+          <span class="dogfood-rel">relates to 3 other notes</span>
+          <span class="dogfood-date">Apr 5, 2026</span>
         </div>
       </div>
 

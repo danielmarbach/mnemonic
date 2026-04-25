@@ -167,7 +167,7 @@ export function computeTfIdfCosineSimilarity(query: string, document: string, co
   return dotProduct / (Math.sqrt(queryMagnitude) * Math.sqrt(documentMagnitude));
 }
 
-interface PreparedTfIdfDocument {
+export interface PreparedTfIdfDocument {
   id: string;
   text: string;
   tokens: string[];
@@ -181,15 +181,21 @@ export interface PreparedTfIdfCorpus {
 export function prepareTfIdfCorpus(
   documents: Array<{ id: string; text: string }>
 ): PreparedTfIdfCorpus {
-  const preparedDocuments = documents.map((document) => ({
-    id: document.id,
-    text: document.text,
-    tokens: tokenize(document.text),
-  }));
+  return prepareTfIdfCorpusFromTokenizedDocuments(
+    documents.map((document) => ({
+      id: document.id,
+      text: document.text,
+      tokens: tokenize(document.text),
+    }))
+  );
+}
 
+export function prepareTfIdfCorpusFromTokenizedDocuments(
+  documents: PreparedTfIdfDocument[]
+): PreparedTfIdfCorpus {
   return {
-    documents: preparedDocuments,
-    idf: computeInverseDocumentFrequency(preparedDocuments.map((document) => document.tokens)),
+    documents,
+    idf: computeInverseDocumentFrequency(documents.map((document) => document.tokens)),
   };
 }
 

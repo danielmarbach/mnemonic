@@ -352,9 +352,9 @@ Project identity derives from the **git remote URL**, normalized to a stable slu
 
 ### Recall
 
-`recall` with `cwd` searches both vaults. Project notes get a **+0.15 similarity boost** — a soft signal, not a hard filter — so global memories remain accessible while project context floats to the top.
+`recall` with `cwd` searches both vaults. Project notes get a **small tiebreaker boost** — a soft signal, not a hard filter — so global memories remain accessible while project context floats to the top.
 
-**Hybrid recall** enhances semantic search with lightweight lexical reranking over note projections. When semantic results are weak, a bounded lexical rescue path scans projections for additional candidates, improving exact-match and identifier-heavy recall without changing the storage model or adding new infrastructure. **Canonical explanation promotion** boosts notes that explain key decisions and concepts for "why"-style questions, using structural signals like role, connections, and format rather than keyword matching.
+**Hybrid recall** enhances semantic search with lightweight lexical reranking over note projections. When semantic results are weak, a bounded lexical rescue path scans projections for additional candidates, improving exact-match and identifier-heavy recall without changing the storage model or adding new infrastructure. **Canonical explanation promotion** boosts notes that explain key decisions and concepts for "why"-style questions, using structural signals like role, connections, and format rather than keyword matching. **Temporal recency:** when a query suggests temporal intent, newer notes receive an additive ranking nudge in default mode.
 
 Recall modes:
 

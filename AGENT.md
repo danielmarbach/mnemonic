@@ -191,7 +191,7 @@ https://github.com/acme/myapp → github-com-acme-myapp
 Ensures consistency across machines. Default remote is `origin`; for forks, `set_project_identity` can switch identity resolution to another remote such as `upstream`. Fallback: git remote → git root folder → directory name.
 
 ### Project-boosted recall
-When `recall` called with `cwd`, project notes get **+0.15 cosine similarity boost** (not hard filter). Keeps global memories accessible while prioritizing project context.
+When `recall` called with `cwd`, project notes get a small **tiebreaker boost** (not hard filter). Keeps global memories accessible while prioritizing project context.
 
 ### Temporal recall
 - `recall` supports opt-in temporal enrichment via `mode: "temporal"`

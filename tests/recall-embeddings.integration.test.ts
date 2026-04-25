@@ -392,6 +392,139 @@ This note has no embedding.`,
     }
   }, 15000);
 
+  it("applies strict explicit temporal filtering for semantic recall candidates", async () => {
+    const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-temporal-filter-semantic-"));
+    tempDirs.push(vaultDir);
+    const embeddingServer = await startFakeEmbeddingServer();
+
+    try {
+      const now = Date.now();
+      const twoDaysAgo = new Date(now - 2 * 24 * 60 * 60 * 1000).toISOString();
+      const fortyDaysAgo = new Date(now - 40 * 24 * 60 * 60 * 1000).toISOString();
+
+      await writeSeedNote(vaultDir, {
+        id: "fresh-temporal-semantic",
+        title: "Fresh temporal semantic note",
+        content: "Recent temporal recall changes for semantic filtering test.",
+        tags: ["temporal", "integration"],
+        updatedAt: twoDaysAgo,
+      });
+      await writeSeedNote(vaultDir, {
+        id: "stale-temporal-semantic",
+        title: "Stale temporal semantic note",
+        content: "Older temporal recall changes for semantic filtering test.",
+        tags: ["temporal", "integration"],
+        updatedAt: fortyDaysAgo,
+      });
+
+      await writeSeedEmbedding(vaultDir, "fresh-temporal-semantic", [0.1, 0.2, 0.3]);
+      await writeSeedEmbedding(vaultDir, "stale-temporal-semantic", [0.1, 0.2, 0.3]);
+
+      const response = await callLocalMcpResponse(vaultDir, "recall", {
+        query: "show recall changes from the last 7 days",
+        limit: 10,
+        scope: "global",
+      }, embeddingServer.url);
+
+      const parsed = RecallResultSchema.parse(response.structuredContent);
+      const ids = parsed.results.map((result) => result.id);
+
+      expect(ids).toContain("fresh-temporal-semantic");
+      expect(ids).not.toContain("stale-temporal-semantic");
+    } finally {
+      await embeddingServer.close();
+    }
+  }, 15000);
+
+  it("keeps named-period temporal hints as boost-only without strict filtering", async () => {
+    const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-temporal-filter-boost-only-"));
+    tempDirs.push(vaultDir);
+    const embeddingServer = await startFakeEmbeddingServer();
+
+    try {
+      const now = Date.now();
+      const twoDaysAgo = new Date(now - 2 * 24 * 60 * 60 * 1000).toISOString();
+      const fortyDaysAgo = new Date(now - 40 * 24 * 60 * 60 * 1000).toISOString();
+
+      await writeSeedNote(vaultDir, {
+        id: "fresh-temporal-boost",
+        title: "Fresh temporal boost note",
+        content: "Recent temporal recall changes for boost-only test.",
+        tags: ["temporal", "integration"],
+        updatedAt: twoDaysAgo,
+      });
+      await writeSeedNote(vaultDir, {
+        id: "stale-temporal-boost",
+        title: "Stale temporal boost note",
+        content: "Older temporal recall changes for boost-only test.",
+        tags: ["temporal", "integration"],
+        updatedAt: fortyDaysAgo,
+      });
+
+      await writeSeedEmbedding(vaultDir, "fresh-temporal-boost", [0.1, 0.2, 0.3]);
+      await writeSeedEmbedding(vaultDir, "stale-temporal-boost", [0.1, 0.2, 0.3]);
+
+      const response = await callLocalMcpResponse(vaultDir, "recall", {
+        query: "what changed this week in recall",
+        limit: 10,
+        scope: "global",
+      }, embeddingServer.url);
+
+      const parsed = RecallResultSchema.parse(response.structuredContent);
+      const ids = parsed.results.map((result) => result.id);
+
+      expect(ids).toContain("fresh-temporal-boost");
+      expect(ids).toContain("stale-temporal-boost");
+    } finally {
+      await embeddingServer.close();
+    }
+  }, 15000);
+
+  it("applies strict explicit temporal filtering to lexical rescue candidates", async () => {
+    const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-temporal-filter-rescue-"));
+    tempDirs.push(vaultDir);
+    const embeddingServer = await startFakeEmbeddingServer();
+
+    try {
+      const now = Date.now();
+      const twoDaysAgo = new Date(now - 2 * 24 * 60 * 60 * 1000).toISOString();
+      const fiftyDaysAgo = new Date(now - 50 * 24 * 60 * 60 * 1000).toISOString();
+
+      await writeSeedNote(vaultDir, {
+        id: "fresh-temporal-rescue",
+        title: "Fresh temporal rescue note",
+        content: "Temporal rescue candidate with projectiontext recovery semantics.",
+        tags: ["temporal", "rescue"],
+        updatedAt: twoDaysAgo,
+      });
+      await writeSeedNote(vaultDir, {
+        id: "stale-temporal-rescue",
+        title: "Stale temporal rescue note",
+        content: "Temporal rescue candidate with projectiontext recovery semantics.",
+        tags: ["temporal", "rescue"],
+        updatedAt: fiftyDaysAgo,
+      });
+
+      // Force semantic misses so lexical rescue path is exercised.
+      await writeSeedEmbedding(vaultDir, "fresh-temporal-rescue", [-0.1, -0.2, -0.3]);
+      await writeSeedEmbedding(vaultDir, "stale-temporal-rescue", [-0.1, -0.2, -0.3]);
+
+      const response = await callLocalMcpResponse(vaultDir, "recall", {
+        query: "projectiontext recovery in the last 7 days",
+        limit: 10,
+        scope: "global",
+      }, embeddingServer.url);
+
+      const parsed = RecallResultSchema.parse(response.structuredContent);
+      const ids = parsed.results.map((result) => result.id);
+
+      expect(ids).toContain("fresh-temporal-rescue");
+      expect(ids).not.toContain("stale-temporal-rescue");
+    } finally {
+      await embeddingServer.close();
+    }
+  }, 15000);
+
   it("RecallResultSchema accepts provenance and confidence fields in results", async () => {
     const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-vault-"));
     tempDirs.push(vaultDir);
@@ -717,7 +850,7 @@ This note has no embedding.`,
     try {
       await callLocalMcp(vaultDir, "remember", {
         title: "API endpoint port",
-        content: "The local API listens on port 4317.",
+        content: "The local API listens on port 4317 and the port can be changed via configuration.",
         tags: ["fact"],
         cwd: repoDir,
         scope: "project",
@@ -726,7 +859,7 @@ This note has no embedding.`,
 
       await callLocalMcp(vaultDir, "remember", {
         title: "System overview",
-        content: "## Overview\nThis note explains architecture, decisions, and system context in a broad durable form.",
+        content: "This note explains architecture, decisions, and system context in a broad durable form.",
         tags: ["overview"],
         cwd: repoDir,
         scope: "project",

@@ -20,10 +20,6 @@ relatedTo:
     type: related-to
   - id: phase-2-design-workflow-hint-first-working-state-continuity-07153fcb
     type: related-to
-  - id: rpir-workflow-phase-1-implementation-plan-f10a7f81
-    type: example-of
-  - id: rpir-workflow-phase-3-implementation-plan-22ac514b
-    type: example-of
   - id: reference-mnemonic-rpi-workflow-skill-improvement-opportunit-1b944a63
     type: related-to
 memoryVersion: 1

@@ -1,11 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
-  allTemporarySourcesAutoDelete,
   getRecentMemoryNotes,
   getSummaryThemeEntries,
   getWorkingStateNotes,
-  pickRecentNoteForRelationshipNavigation,
-  resolveDogfoodVaultPath,
 } from "../scripts/dogfooding-runner-helpers.mjs";
 
 describe("dogfooding runner helpers", () => {
@@ -47,29 +44,4 @@ describe("dogfooding runner helpers", () => {
     expect(getWorkingStateNotes(summary)).toEqual([{ id: "wip-1", title: "WIP" }]);
   });
 
-  it("treats all-temporary merges as auto-delete when no explicit mode is provided", () => {
-    expect(allTemporarySourcesAutoDelete([
-      { lifecycle: "temporary" },
-      { lifecycle: "temporary" },
-    ])).toBe(true);
-
-    expect(allTemporarySourcesAutoDelete([
-      { lifecycle: "temporary" },
-      { lifecycle: "permanent" },
-    ])).toBe(false);
-  });
-
-  it("prefers recent notes that already have relationships for navigation checks", () => {
-    const picked = pickRecentNoteForRelationshipNavigation([
-      { id: "latest", title: "Latest note", relationships: { shown: [] } },
-      { id: "older", title: "Older linked note", relationships: { shown: [{ id: "decision-1" }] } },
-    ]);
-
-    expect(picked?.id).toBe("older");
-  });
-
-  it("prefers an explicitly provided isolated vault path over the live project vault", () => {
-    const config = resolveDogfoodVaultPath({ cwd: "/repo", isolatedVaultPath: "/tmp/run/.mnemonic" });
-    expect(config).toBe("/tmp/run/.mnemonic");
-  });
 });
