@@ -8,11 +8,18 @@ tags:
   - temporal
 lifecycle: temporary
 createdAt: '2026-04-25T11:40:18.666Z'
-updatedAt: '2026-04-25T11:40:28.282Z'
+updatedAt: '2026-04-25T11:40:38.648Z'
 role: plan
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: request-phase-5-temporal-parsing-and-confidence-gated-filter-92f587a3
+    type: derives-from
+  - id: research-phase-5-temporal-parsing-options-and-filtering-safe-cd641999
+    type: derives-from
+  - id: plan-mnemonic-recall-improvements-from-hindsight-research-5b059160
+    type: follows
 memoryVersion: 1
 ---
 # Plan: Phase 5 temporal parsing with confidence-gated filtering
