@@ -19,12 +19,19 @@ interface SessionAccessRecord {
   score?: number;
 }
 
+interface ProjectionTokenCacheEntry {
+  projectionText: string;
+  tokens: string[];
+}
+
 export interface SessionProjectCache {
   projectId: string;
   /** Per-vault caches keyed by vaultPath. Built lazily per vault on first access. */
   vaultCaches: Map<string, VaultCache>;
   /** Projection cache shared across all cached vaults for this project. */
   projectionsById: Map<string, NoteProjection>;
+  /** Tokenized projection text snapshots keyed by vaultPath::noteId. */
+  projectionTokensByKey: Map<string, ProjectionTokenCacheEntry>;
   /** Recently inspected notes in the current MCP session. */
   recentAccesses: SessionAccessRecord[];
   /** Snapshots of recently inspected notes that survive cache invalidation. */
@@ -60,6 +67,7 @@ function ensureActiveProjectCache(projectId: string): SessionProjectCache {
     projectId,
     vaultCaches: new Map(),
     projectionsById: new Map(),
+    projectionTokensByKey: new Map(),
     recentAccesses: [],
     recentNotesByKey: new Map(),
     lastBuiltAt: new Date().toISOString(),
@@ -83,6 +91,7 @@ export function invalidateActiveProjectCache(): void {
       projectId: sessionCaches.activeProject.projectId,
       vaultCaches: new Map(),
       projectionsById: new Map(),
+      projectionTokensByKey: new Map(),
       recentAccesses: sessionCaches.activeProject.recentAccesses,
       recentNotesByKey: sessionCaches.activeProject.recentNotesByKey,
       lastBuiltAt: new Date().toISOString(),
@@ -264,6 +273,38 @@ export function setSessionCachedProjection(
   const cache = sessionCaches.activeProject;
   if (!cache || cache.projectId !== projectId) return;
   cache.projectionsById.set(noteId, projection);
+}
+
+function projectionTokenKey(vaultPath: string, noteId: string): string {
+  return `${vaultPath}::${noteId}`;
+}
+
+export function getSessionCachedProjectionTokens(
+  projectId: string,
+  vaultPath: string,
+  noteId: string,
+  projectionText: string
+): string[] | undefined {
+  const cache = sessionCaches.activeProject;
+  if (!cache || cache.projectId !== projectId) return undefined;
+  const cached = cache.projectionTokensByKey.get(projectionTokenKey(vaultPath, noteId));
+  if (!cached) return undefined;
+  return cached.projectionText === projectionText ? cached.tokens : undefined;
+}
+
+export function setSessionCachedProjectionTokens(
+  projectId: string,
+  vaultPath: string,
+  noteId: string,
+  projectionText: string,
+  tokens: string[]
+): void {
+  const cache = sessionCaches.activeProject;
+  if (!cache || cache.projectId !== projectId) return;
+  cache.projectionTokensByKey.set(projectionTokenKey(vaultPath, noteId), {
+    projectionText,
+    tokens,
+  });
 }
 
 export function recordSessionNoteAccess(

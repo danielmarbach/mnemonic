@@ -10,6 +10,7 @@ import {
   computeTermFrequency,
   computeInverseDocumentFrequency,
   computeTfIdfCosineSimilarity,
+  prepareTfIdfCorpusFromTokenizedDocuments,
   prepareTfIdfCorpus,
   rankDocumentsByTfIdf,
   shouldTriggerLexicalRescue,
@@ -217,6 +218,38 @@ describe("TF-IDF primitives", () => {
     const directRanked = rankDocumentsByTfIdf("projectiontext staleness", documents, documents.length);
 
     expect(preparedRanked).toEqual(directRanked);
+  });
+
+  it("reuses pre-tokenized documents without changing ranking behavior", () => {
+    const documents = [
+      { id: "rare-target", text: "projectiontext staleness derived retrieval text" },
+      { id: "broad-related", text: "staleness retrieval text notes design" },
+      { id: "unrelated", text: "cooking recipes weekly menu" },
+    ];
+
+    const preparedFromTokenizer = prepareTfIdfCorpus(documents);
+    const preparedFromTokens = prepareTfIdfCorpusFromTokenizedDocuments(
+      documents.map((document) => ({
+        id: document.id,
+        text: document.text,
+        tokens: tokenize(document.text),
+      }))
+    );
+
+    const rankedFromTokenizer = rankDocumentsByTfIdf(
+      "projectiontext staleness",
+      documents,
+      documents.length,
+      preparedFromTokenizer
+    );
+    const rankedFromTokens = rankDocumentsByTfIdf(
+      "projectiontext staleness",
+      documents,
+      documents.length,
+      preparedFromTokens
+    );
+
+    expect(rankedFromTokens).toEqual(rankedFromTokenizer);
   });
 
   it("prefers an exact title match over repeated generic design decoys", () => {

@@ -20,9 +20,11 @@ import {
   getRecentSessionAccessNote,
   getSessionCachedNote,
   getSessionCachedProjection,
+  getSessionCachedProjectionTokens,
   recordSessionNoteAccess,
   setSessionCachedNote,
   setSessionCachedProjection,
+  setSessionCachedProjectionTokens,
 } from "./cache.js";
 import { performance } from "perf_hooks";
 
@@ -46,10 +48,12 @@ import {
 import {
   shouldTriggerLexicalRescue,
   computeLexicalScore,
+  prepareTfIdfCorpusFromTokenizedDocuments,
   rankDocumentsByTfIdf,
   LEXICAL_RESCUE_CANDIDATE_LIMIT,
   LEXICAL_RESCUE_THRESHOLD,
   LEXICAL_RESCUE_RESULT_LIMIT,
+  tokenize,
 } from "./lexical.js";
 import { getRelationshipPreview } from "./relationships.js";
 import { MarkdownLintError, cleanMarkdown } from "./markdown.js";
@@ -2294,12 +2298,14 @@ async function collectLexicalRescueCandidates(
   lifecycle: NoteLifecycle | undefined,
   existingIds: ScoredRecallCandidate[]
 ): Promise<ScoredRecallCandidate[]> {
+  const projectId = project?.id;
   const existingIdSet = new Set(existingIds.map((c) => c.id));
   const rescuePool: Array<{
     id: string;
     vault: Vault;
     isCurrentProject: boolean;
     projectionText: string;
+    projectionTokens: string[];
     context: ReturnType<typeof buildRecallCandidateContext>;
   }> = [];
 
@@ -2329,16 +2335,48 @@ async function collectLexicalRescueCandidates(
         vault,
         isCurrentProject: Boolean(isCurrentProject),
         projectionText: projection.projectionText,
+        projectionTokens: projectId
+          ? getSessionCachedProjectionTokens(
+            projectId,
+            vault.storage.vaultPath,
+            note.id,
+            projection.projectionText
+          ) ?? tokenize(projection.projectionText)
+          : tokenize(projection.projectionText),
         context: buildRecallCandidateContext(note),
       });
+
+      if (projectId) {
+        setSessionCachedProjectionTokens(
+          projectId,
+          vault.storage.vaultPath,
+          note.id,
+          projection.projectionText,
+          rescuePool[rescuePool.length - 1]!.projectionTokens
+        );
+      }
     }
   }
+
+  const rescueDocuments = rescuePool.map((candidate) => ({
+    id: candidate.id,
+    text: candidate.projectionText,
+  }));
+
+  const preparedRescueCorpus = prepareTfIdfCorpusFromTokenizedDocuments(
+    rescuePool.map((candidate) => ({
+      id: candidate.id,
+      text: candidate.projectionText,
+      tokens: candidate.projectionTokens,
+    }))
+  );
 
   const rankedRescueIds = new Map(
     rankDocumentsByTfIdf(
       query,
-      rescuePool.map((candidate) => ({ id: candidate.id, text: candidate.projectionText })),
-      LEXICAL_RESCUE_CANDIDATE_LIMIT
+      rescueDocuments,
+      LEXICAL_RESCUE_CANDIDATE_LIMIT,
+      preparedRescueCorpus
     ).map((candidate) => [candidate.id, candidate.score])
   );
 
