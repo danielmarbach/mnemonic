@@ -8,7 +8,7 @@ tags:
   - hindsight
 lifecycle: temporary
 createdAt: '2026-04-24T18:10:35.779Z'
-updatedAt: '2026-04-25T11:36:53.221Z'
+updatedAt: '2026-04-25T11:40:38.648Z'
 role: plan
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -26,6 +26,8 @@ relatedTo:
     type: related-to
   - id: review-hindsight-master-plan-coverage-against-delivered-phas-62608b1b
     type: derives-from
+  - id: plan-phase-5-temporal-parsing-with-confidence-gated-filterin-0f45f3cd
+    type: follows
 memoryVersion: 1
 ---
 # Plan: mnemonic Recall Improvements from Hindsight Research
