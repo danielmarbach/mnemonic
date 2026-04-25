@@ -9,13 +9,15 @@ tags:
   - lexical-cache
 lifecycle: temporary
 createdAt: '2026-04-25T10:33:39.817Z'
-updatedAt: '2026-04-25T10:33:46.128Z'
+updatedAt: '2026-04-25T10:44:50.854Z'
 role: review
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
   - id: apply-phase-3-lexical-rescue-pre-tokenized-tf-idf-cache-inte-5d1512f7
+    type: derives-from
+  - id: summary-phase-3-lexical-rescue-pre-tokenized-tf-idf-cache-co-a492df41
     type: derives-from
 memoryVersion: 1
 ---
