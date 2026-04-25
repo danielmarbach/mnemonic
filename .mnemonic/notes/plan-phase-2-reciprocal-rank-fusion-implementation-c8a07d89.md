@@ -8,7 +8,7 @@ tags:
   - phase2
 lifecycle: temporary
 createdAt: '2026-04-24T23:09:30.970Z'
-updatedAt: '2026-04-25T07:40:49.517Z'
+updatedAt: '2026-04-25T07:41:06.735Z'
 role: plan
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -28,6 +28,8 @@ relatedTo:
     type: derives-from
   - id: apply-pack-a-advisory-follow-up-by-hardening-dogfood-heurist-5d41bfae
     type: follows
+  - id: review-pack-a-advisory-follow-up-verification-clean-c03c2fd3
+    type: derives-from
 memoryVersion: 1
 ---
 # Plan: Phase 2 Reciprocal Rank Fusion Implementation
