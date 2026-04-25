@@ -22,8 +22,6 @@ relatedTo:
     type: derives-from
   - id: research-hindsight-paper-analysis-for-mnemonic-recall-improv-ae8fd9eb
     type: derives-from
-  - id: phase-4-temporal-retrieval-boost-completed-e5a5dec8
-    type: related-to
 memoryVersion: 1
 ---
 # Plan: mnemonic Recall Improvements from Hindsight Research
