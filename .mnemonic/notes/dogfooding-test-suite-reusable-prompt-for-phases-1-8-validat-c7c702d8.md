@@ -8,7 +8,7 @@ tags:
   - scorecard
 lifecycle: permanent
 createdAt: '2026-03-28T18:54:38.792Z'
-updatedAt: '2026-04-25T20:53:12.593Z'
+updatedAt: '2026-04-25T21:24:15.658Z'
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
@@ -20,14 +20,12 @@ Reusable dogfooding packs for validating mnemonic behavior against a released bu
 
 After running a pack, capture results in a new project note with a dated title and the relevant scorecard.
 
-***
-
 ## Deterministic assertions now in integration tests
 
 The following checks from Packs A/B/C were deterministic assertions that belong in CI, not dogfood runs. They have been extracted to `tests/pipeline-smoke.integration.test.ts` and existing integration test files:
 
 | Former dogfood check | Integration test file |
-|---|---|
+| --- | --- |
 | D1 — warm-session stability (`project_memory_summary` identical on two calls) | `pipeline-smoke.integration.test.ts` |
 | F2 — alwaysLoad toggle persists via remember/update | `memory-lifecycle.integration.test.ts` |
 | Pack A — temporal filter not over-excluding (with `mode: "temporal"`) | `pipeline-smoke.integration.test.ts` + `recall-pipeline.integration.test.ts` |
@@ -63,13 +61,9 @@ Run a structured dogfooding test of the mnemonic MCP against the released versio
 
 **C1 — Relationship follow-up from recent note:** Identify the most recent note from the summary's recent section. Call `get` with that id, cwd, includeRelationships=true. Follow one relationship: does it lead to a useful connected note? Rate: Pass / Pass with friction / Fail.
 
-**D1 — Warm session:** Call `project_memory_summary` a second time (same session, same cwd). Same structure? Any dropped results? Felt faster? Rate: Pass / Pass with friction / Fail.
-
 **E1 — Theme quality:** Count themes from the summary output. How many have only 1 note? Does "other" appear? Are the top 3 themes meaningful? Rate: Pass / Pass with friction / Fail.
 
 **F1 — Provenance and confidence:** From recall results (B1 or B2), inspect provenance: lastUpdatedAt, lastCommitHash, recentlyChanged. Is confidence "high" on anchor notes? "medium" on others? Rate: Pass / Pass with friction / Fail.
-
-**F2 — AlwaysLoad via MCP:** Create a test note with `remember` including `alwaysLoad: true`, then update it with `alwaysLoad: false`. Use the returned note id to inspect `/path/to/mnemonic/.mnemonic/notes/<id>.md` directly and verify the frontmatter changes from `alwaysLoad: true` to `alwaysLoad: false`. Rate: Pass / Pass with friction / Fail.
 
 **G1 — Single-commit note history:** From temporal results, find a note with 1 commit. Is `historySummary` "This note was created and has not been modified since."? Rate: Pass / Pass with friction / Fail.
 
@@ -83,30 +77,26 @@ Run a structured dogfooding test of the mnemonic MCP against the released versio
 
 **E2E-4 — "What should I read first?"** Call `recall` with query="what should I read first to understand temporal interpretation" and cwd. Does the right note rank at top? Do its relationships form a coherent cluster? Rate: Pass / Pass with friction / Fail.
 
-**CLEANUP:** Call `forget` on any test notes created during F2.
-
-**CAPTURE:** Call `remember` with title "Dogfooding results: core enrichment/orientation pack (YYYY-MM-DD)", lifecycle permanent, scope project, tags \[dogfooding, testing, scorecard, regression], containing all test results and the completed scorecard.
+**CAPTURE:** Call `remember` with title "Dogfooding results: core enrichment/orientation pack (YYYY-MM-DD)", lifecycle permanent, scope project, tags [dogfooding, testing, scorecard, regression], containing all test results and the completed scorecard.
 
 ### Pack A scorecard template
 
-- \[ ] cold-start orientation useful
-- \[ ] design entry path coherent
-- \[ ] recall answers canonical design questions
-- \[ ] temporal recall bounded and informative
-- \[ ] cold hybrid phrasing still works
-- \[ ] relationship follow-ups useful
-- \[ ] warm-session behavior stable
-- \[ ] themes meaningful
-- \[ ] provenance and confidence sensible
-- \[ ] alwaysLoad persistence behaves cleanly
-- \[ ] single-commit history summary correct
-- \[ ] multi-commit history summary useful
-- \[ ] resume-after-a-week works
-- \[ ] design archaeology works
-- \[ ] recent-to-architecture navigation works
-- \[ ] "what should I read first?" works
-
-***
+- [ ] cold-start orientation useful
+- [ ] design entry path coherent
+- [ ] recall answers canonical design questions
+- [ ] temporal recall bounded and informative
+- [ ] cold hybrid phrasing still works
+- [ ] relationship follow-ups useful
+- [ ] warm-session behavior stable
+- [ ] themes meaningful
+- [ ] provenance and confidence sensible
+- [ ] alwaysLoad persistence behaves cleanly
+- [ ] single-commit history summary correct
+- [ ] multi-commit history summary useful
+- [ ] resume-after-a-week works
+- [ ] design archaeology works
+- [ ] recent-to-architecture navigation works
+- [ ] "what should I read first?" works
 
 ## Pack B — Working-state continuity pack
 
@@ -126,29 +116,21 @@ Run a focused dogfooding test of working-state continuity in mnemonic. Use cwd=/
 
 **W3 — Temporary recovery via recent:** Call `recent_memories` with `lifecycle="temporary"` and confirm it returns only temporary notes. Rate: Pass / Pass with friction / Fail.
 
-**W4 — Guidance alignment:** Inspect `mnemonic-workflow-hint`. Does it clearly say orientation comes first, recovery comes second, and temporary checkpoints should not be preserved by default when consolidating finished work? Rate: Pass / Pass with friction / Fail.
-
 **W5 — Lifecycle distinction:** Confirm the guidance still separates `temporary` plans/WIP from `permanent` decisions and durable lessons. Rate: Pass / Pass with friction / Fail.
-
-**W6 — Consolidation behavior:** Create temporary test notes if needed and verify the guidance and tool behavior do not push agents toward preserving temporary scaffolding by default after consolidation. Rate: Pass / Pass with friction / Fail.
 
 **W7 — End-to-end resume flow:** Start from summary output, recover temporary notes, choose the right next step, and verify the flow feels like a continuation of project orientation rather than a parallel system. Rate: Pass / Pass with friction / Fail.
 
 **CLEANUP:** Call `forget` on any temporary test notes created only for this run.
 
-**CAPTURE:** Call `remember` with title "Dogfooding results: working-state continuity pack (YYYY-MM-DD)", lifecycle permanent, scope project, tags \[dogfooding, testing, scorecard, workflow, temporary-notes], containing all test results and the completed scorecard.
+**CAPTURE:** Call `remember` with title "Dogfooding results: working-state continuity pack (YYYY-MM-DD)", lifecycle permanent, scope project, tags [dogfooding, testing, scorecard, workflow, temporary-notes], containing all test results and the completed scorecard.
 
 ### Pack B scorecard template
 
-- \[ ] summary-first orientation still holds
-- \[ ] `recall(lifecycle: temporary)` is useful
-- \[ ] `recent_memories(lifecycle: temporary)` is useful
-- \[ ] workflow hint matches the design
-- \[ ] lifecycle distinction stays clear
-- \[ ] temporary scaffolding is not preserved by default
-- \[ ] end-to-end resume flow feels coherent
-
-***
+- [ ] summary-first orientation still holds
+- [ ] `recall(lifecycle: temporary)` is useful
+- [ ] `recent_memories(lifecycle: temporary)` is useful
+- [ ] lifecycle distinction stays clear
+- [ ] end-to-end resume flow feels coherent
 
 ## Pack C — Blind interruption and resumption usefulness pack
 
@@ -192,20 +174,18 @@ Run a blind resumption test of mnemonic working-state continuity. Use cwd=/path/
 
 **C8 — Cleanup decision:** At the end, should the checkpoint remain temporary, be updated, or be consolidated into a durable note? Record the answer explicitly. Rate: Pass / Pass with friction / Fail.
 
-**CAPTURE:** Call `remember` with title "Dogfooding results: blind interruption/resumption pack (YYYY-MM-DD)", lifecycle permanent, scope project, tags \[dogfooding, testing, scorecard, workflow, temporary-notes, continuity], containing all results plus the measured or estimated resumption time.
+**CAPTURE:** Call `remember` with title "Dogfooding results: blind interruption/resumption pack (YYYY-MM-DD)", lifecycle permanent, scope project, tags [dogfooding, testing, scorecard, workflow, temporary-notes, continuity], containing all results plus the measured or estimated resumption time.
 
 ### Pack C scorecard template
 
-- \[ ] orientation still came first
-- \[ ] the right checkpoint surfaced quickly
-- \[ ] the next action was recoverable
-- \[ ] blockers and prior attempts were preserved
-- \[ ] resumption time felt materially reduced
-- \[ ] wrong turns were avoided
-- \[ ] the workflow did not feel parallel or competing
-- \[ ] checkpoint cleanup/consolidation decision was clear
-
-***
+- [ ] orientation still came first
+- [ ] the right checkpoint surfaced quickly
+- [ ] the next action was recoverable
+- [ ] blockers and prior attempts were preserved
+- [ ] resumption time felt materially reduced
+- [ ] wrong turns were avoided
+- [ ] the workflow did not feel parallel or competing
+- [ ] checkpoint cleanup/consolidation decision was clear
 
 ## Known runs
 
