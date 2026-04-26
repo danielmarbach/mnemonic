@@ -6,6 +6,12 @@ The format is loosely based on Keep a Changelog and uses semver-style version he
 
 ## [Unreleased]
 
+## [0.26.1] - 2026-04-26
+
+### Changed
+
+- Improved `heading` selector error message to suggest `headingStartsWith` for prefix matching when exact headings are uncertain.
+
 ## [0.26.0] - 2026-04-25
 
 ### Added
