@@ -12,7 +12,7 @@ tags:
   - token-efficiency
 lifecycle: temporary
 createdAt: '2026-04-26T10:11:01.959Z'
-updatedAt: '2026-04-26T17:34:23.254Z'
+updatedAt: '2026-04-26T18:59:39.381Z'
 role: plan
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -246,3 +246,10 @@ Lower priority since get already returns full relationships and the primary gap 
 - Not changing consolidate execution logic (strategies, modes)
 - Not adding new storage, ontologies, or relationship types
 - Not a mandatory workflow step — evidence is opt-in discoverability
+
+## Status update
+
+- Completed: Phase 1 (recall evidence), Phase 2 (consolidate evidence + warnings/risk), and Phase 2.5 (workflow/tool discoverability updates).
+- Validation completed with targeted typecheck/build/tests and review note evidence.
+- Scope note: consolidate evidence shipped as opt-in (`evidence: true`) for analysis strategies to preserve default compact output while still enabling trust enrichment on demand.
+- Next RPIR phase: Consolidate durable outcomes (promote decision/summary notes, keep apply/review as temporary scaffolding).
