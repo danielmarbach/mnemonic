@@ -140,49 +140,183 @@ export function generateTitle(notes) {
   return primary.frontmatter.title ?? baseName(primary.file);
 }
 
+/**
+ * Classifies a note into its RPIR workflow role or 'permanent'.
+ *
+ * When the RPIR workflow skill is used, notes carry an explicit `role` field —
+ * that is the authoritative signal. Notes without a role (or with lifecycle
+ * 'permanent') are treated as permanent decision/design notes.
+ * Unroled temporary notes (e.g. ad-hoc scaffolding) fall back to 'context'.
+ *
+ * @returns {'research'|'plan'|'review'|'context'|'permanent'}
+ */
+export function classifyNote(note) {
+  const role = note.frontmatter.role;
+  const lifecycle = note.frontmatter.lifecycle;
+
+  if (role === "research") return "research";
+  if (role === "plan") return "plan";
+  if (role === "review") return "review";
+  if (role === "context") return "context";
+  if (lifecycle === "temporary") return "context"; // unroled temporary note
+  return "permanent";
+}
+
+/**
+ * Extracts the first complete sentence from a block of text.
+ * Skips leading headings; falls back to the first line.
+ */
+function extractFirstSentence(text) {
+  // Strip any leading heading line
+  const clean = text.replace(/^#+\s[^\n]*\n?/, "").trim();
+  const match = clean.match(/^(.*?[.!?])(?:\s|$)/s);
+  return match ? match[1].trim() : clean.split("\n")[0].trim();
+}
+
+/**
+ * Extracts the content of a named section (level-2+ heading) from a note body.
+ * Uses case-insensitive matching. Returns trimmed content, or null if not found.
+ *
+ * @param {string} body           - Note body markdown
+ * @param {string} headingPattern - Case-insensitive regex alternation, e.g. "open questions?|risks?"
+ */
+function extractNamedSection(body, headingPattern) {
+  const lines = body.split("\n");
+  const headingRe = new RegExp(`^#{2,}\\s+(?:${headingPattern})\\s*$`, "i");
+  const anyHeadingRe = /^#{2,}\s/;
+  let inSection = false;
+  const sectionLines = [];
+
+  for (const line of lines) {
+    if (headingRe.test(line)) {
+      inSection = true;
+      continue;
+    }
+    if (inSection) {
+      if (anyHeadingRe.test(line)) break;
+      sectionLines.push(line);
+    }
+  }
+
+  return sectionLines.join("\n").trim() || null;
+}
+
 export function generateDescription(notes) {
   const lines = [];
-  const sortedNotes = sortNotesByPriority(notes);
 
-  lines.push("## Summary");
-  lines.push("");
+  // Classify notes into permanent decisions vs RPIR workflow artifacts.
+  const sortedPermanent = sortNotesByPriority(
+    notes.filter((n) => classifyNote(n) === "permanent"),
+  );
+  const researchNotes = notes.filter((n) => classifyNote(n) === "research");
+  const planNotes = notes.filter((n) => classifyNote(n) === "plan");
+  const reviewNotes = notes.filter((n) => classifyNote(n) === "review");
+  const contextNotes = notes.filter((n) => classifyNote(n) === "context");
+  const workflowNotes = [...researchNotes, ...planNotes, ...reviewNotes, ...contextNotes];
+
+  // --------------------------------------------------------------------------
+  // ## Summary
+  // --------------------------------------------------------------------------
+  lines.push("## Summary", "");
 
   if (notes.length === 1) {
-    const summary = extractLeadingSummary(notes[0].body);
+    const note = notes[0];
+    // Workflow notes get a one-sentence summary; permanent notes get the full leading paragraph.
+    const summary =
+      classifyNote(note) === "permanent"
+        ? extractLeadingSummary(note.body)
+        : extractFirstSentence(extractLeadingSummary(note.body));
     lines.push(summary);
-  } else {
-    const hasBugs = notes.some((n) => hasAnyTag(n.frontmatter.tags, BUG_TAGS));
-    const hasEnhancements = notes.some((n) => hasAnyTag(n.frontmatter.tags, ENHANCEMENT_TAGS));
-    lines.push(buildSummaryIntro(hasBugs, hasEnhancements));
-    lines.push("");
-    for (const note of sortedNotes) {
-      const title = note.frontmatter.title ?? baseName(note.file);
-      lines.push(`- **${title}**`);
+  } else if (sortedPermanent.length > 0) {
+    const hasBugs = sortedPermanent.some((n) => hasAnyTag(n.frontmatter.tags, BUG_TAGS));
+    const hasEnhancements = sortedPermanent.some((n) =>
+      hasAnyTag(n.frontmatter.tags, ENHANCEMENT_TAGS),
+    );
+    lines.push(buildSummaryIntro(hasBugs, hasEnhancements), "");
+    for (const note of sortedPermanent) {
+      lines.push(`- **${note.frontmatter.title ?? baseName(note.file)}**`);
     }
+  } else {
+    // Only workflow notes — lead with the plan note if available, else first note.
+    const primary = planNotes[0] ?? notes[0];
+    lines.push(extractLeadingSummary(primary.body));
   }
 
   lines.push("");
-  lines.push("## Design Decisions");
-  lines.push("");
 
-  for (const note of sortedNotes) {
-    const title = note.frontmatter.title ?? baseName(note.file);
-    const tags = normalizeTags(note.frontmatter.tags);
+  // --------------------------------------------------------------------------
+  // ## Changes  (permanent notes, condensed — one leading paragraph each)
+  // Only rendered for multi-note PRs so single-note PRs aren't redundant.
+  // --------------------------------------------------------------------------
+  if (sortedPermanent.length > 0 && notes.length > 1) {
+    lines.push("## Changes", "");
+    for (const note of sortedPermanent) {
+      const title = note.frontmatter.title ?? baseName(note.file);
+      const tags = normalizeTags(note.frontmatter.tags);
+      lines.push(`### ${title}`, "");
+      if (tags.length > 0) {
+        lines.push(`**Tags:** ${tags.join(", ")}`, "");
+      }
+      lines.push(extractLeadingSummary(note.body), "");
+    }
+  }
 
-    lines.push(`### ${title}`);
-    lines.push("");
-
-    if (tags.length > 0) {
-      lines.push(`**Tags:** ${tags.join(", ")}`);
+  // --------------------------------------------------------------------------
+  // ## Workflow Artifacts  (RPIR notes — title + first sentence only)
+  // --------------------------------------------------------------------------
+  if (workflowNotes.length > 0) {
+    lines.push("## Workflow Artifacts", "");
+    const groups = [
+      ["Research", researchNotes],
+      ["Plan", planNotes],
+      ["Review", reviewNotes],
+      ["Context", contextNotes],
+    ];
+    for (const [label, group] of groups) {
+      if (group.length === 0) continue;
+      lines.push(`**${label}:**`, "");
+      for (const note of group) {
+        const title = note.frontmatter.title ?? baseName(note.file);
+        const summary = extractFirstSentence(extractLeadingSummary(note.body));
+        lines.push(`- ${title} — ${summary}`);
+      }
       lines.push("");
     }
-
-    lines.push(note.body.trim());
-    lines.push("");
   }
 
-  lines.push("---");
+  // --------------------------------------------------------------------------
+  // ## Open Questions  (extracted from any note that has that section)
+  // --------------------------------------------------------------------------
+  const openQFragments = [];
+  for (const note of notes) {
+    const content = extractNamedSection(note.body, "open questions?|risks?");
+    if (content) {
+      const title = note.frontmatter.title ?? baseName(note.file);
+      openQFragments.push(
+        openQFragments.length > 0
+          ? `**${title}:**\n\n${content}`
+          : content,
+      );
+    }
+  }
+  if (openQFragments.length > 0) {
+    lines.push("## Open Questions", "", openQFragments.join("\n\n"), "");
+  }
+
+  // --------------------------------------------------------------------------
+  // ## Notes / References
+  // --------------------------------------------------------------------------
+  lines.push("## Notes / References", "");
+  lines.push("_Detailed notes in `.mnemonic/notes/`:_", "");
+  for (const note of sortNotesByPriority(notes)) {
+    const title = note.frontmatter.title ?? baseName(note.file);
+    const cls = classifyNote(note);
+    const label = cls !== "permanent" ? ` _(${cls})_` : "";
+    lines.push(`- \`${note.file}\` — ${title}${label}`);
+  }
+
   lines.push("");
+  lines.push("---", "");
   lines.push(
     `_Generated from ${notes.length} design decision note(s) in \`.mnemonic/notes/\`. Run \`/update-pr\` to regenerate._`,
   );
