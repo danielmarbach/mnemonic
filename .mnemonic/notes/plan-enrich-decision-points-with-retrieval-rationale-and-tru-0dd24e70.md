@@ -9,9 +9,10 @@ tags:
   - evidence
   - workflow-hint
   - tool-descriptions
+  - token-efficiency
 lifecycle: temporary
 createdAt: '2026-04-26T10:11:01.959Z'
-updatedAt: '2026-04-26T10:16:15.516Z'
+updatedAt: '2026-04-26T10:19:30.601Z'
 role: plan
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -47,6 +48,24 @@ The proposal for `explain` before `consolidate` identified a real gap: LLMs curr
 **Core design shift: explainability is a capability layer, not a workflow step.**
 
 The principle "explain before mutate" survives even without a standalone explain command. Evidence should be available at every decision point where memory is about to change, but not as a mandatory step.
+
+## Token efficiency constraints (from established design principles)
+
+The evidence feature must adhere to mnemonic's existing token efficiency constraints:
+
+1. **Compact by default, enriched on demand** — evidence defaults off. When enabled, `"compact"` adds ~2 lines per result, not a full provenance dump. Follows the established pattern: `mode: "temporal"` is opt-in enrichment, `verbose: true` is richer but still bounded, `includeRelationships` is bounded to top N.
+
+2. **Serialization boundary, not pipeline boundary** — evidence signals are computed during the normal pipeline (they already exist in `ScoredRecallCandidate` and during consolidate entry iteration). The `evidence` flag controls what reaches the caller, not what the pipeline computes. This mirrors the verbose/temporal design: enrich fully in the pipeline, filter at the output layer.
+
+3. **No raw note bodies or verbose diagnostics in evidence** — `retrievalEvidence` contains structured enums and booleans (channels, rankBand, freshness, superseded), not raw scores, not note content, not full relationship graphs. `mergeEvidence` contains compact per-note fields (lifecycle, role, ageDays, relatedCount), not full note bodies.
+
+4. **Bounded enrichment, not unbounded expansion** — recall limits relationship previews to top N (1-3). Consolidate strategies iterate all entries but output is already bounded by the strategy. Evidence adds ~8 fields per entry in structured output and ~2 lines per entry in text output. Total evidence output is additive to existing output, not multiplicative.
+
+5. **Different tools get different payload shapes** — recall evidence answers "why retrieved?" with stable abstraction enums. Consolidate evidence answers "should merge?" with precise comparison fields (ageDays, not freshness enum). One payload shape does not fit both decision points.
+
+6. **Structured output carries the full detail; text output carries the summary** — this matches how recall already works: `structuredContent` has `provenance`, `confidence`, `historySummary` while text output has `**confidence: medium** | **recently changed**`. Evidence follows the same pattern.
+
+7. **Opt-in discoverability, not mandatory step** — the workflow hint documents `evidence` as a capability that improves decision confidence, not as a required precondition. This matches how `mode: "temporal"` and `includeRelationships` are documented: available when you need them, not needed every time.
 
 ## Design constraint: stable abstractions, not raw internals
 
@@ -95,13 +114,22 @@ top3, lexical | channels: semantic, graph | project-relevant
 permanent, decision | thisWeek | supersedes 2 notes
 ```
 
+### Phase 1 token budget
+
+Per result in text: ~2 additional lines. Per result in structured: ~8 fields.
+
+Typical 5-result recall: ~10 additional text lines, ~40 structured fields.
+Maximum 20-result recall: ~40 additional text lines, ~160 structured fields.
+
+Comparable to `mode: "temporal"` enrichment which adds ~3-5 lines per top-3 result (~9-15 total lines). Evidence is within this envelope.
+
 ### Phase 1 constraints
 
 - Default off — no output change for existing callers
 - Fail-soft: if relationship data is unavailable, omit superseded fields
-- Token budget: ~2 additional lines per result in text output, ~8 fields in structured output
 - No session state required
 - Stable abstractions only — no raw internal scores
+- Enrich in the pipeline, serialize at the output boundary
 
 ## Phase 2 — Consolidate enrichment
 
@@ -110,8 +138,6 @@ Enrich detect-duplicates, find-clusters, and suggest-merges output with per-note
 **Consolidation evidence answers a different question than recall**: "Should these merge / prune / supersede?" not "Why was this retrieved?"
 
 ### Per-note enrichment in consolidate output
-
-For each note mentioned in strategies:
 
 ```text
 Note A (0.923) | permanent, decision | 2 days old | supersedes 1 note
@@ -140,6 +166,13 @@ mergeEvidence?: {
 - "note supersedes another — merging may orphan the supersedes chain"
 - "newer note would be merged into older summary — stale summary risk"
 - "same role but different lifecycles — verify merge intent"
+
+### Phase 2 token budget
+
+Per note: ~1 additional text line, ~5-8 structured fields.
+Typical 5-20 note pairs: ~5-20 additional text lines, ~25-160 structured fields.
+
+Comparable to existing `suggest-merges` output which already shows similarity and source titles per note. Evidence adds compact fields, not prose.
 
 ### Phase 2 constraints
 
@@ -198,6 +231,7 @@ Lower priority since get already returns full relationships and the primary gap 
 - LLMs can see why a note was retrieved and whether it should be merged
 - No token bloat for callers that do not opt in
 - Stable abstraction surface preserves implementation freedom
+- Evidence output stays within the token envelope established by mode: "temporal" and includeRelationships
 
 ## Non-goals
 
