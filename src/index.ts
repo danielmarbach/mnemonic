@@ -29,6 +29,9 @@ import {
 import { performance } from "perf_hooks";
 
 import {
+  buildConsolidateNoteEvidence,
+  buildMergeWarnings,
+  deriveMergeRisk,
   filterRelationships,
   mergeRelationshipsFromNotes,
   normalizeMergePlanSourceIds,
@@ -130,6 +133,7 @@ import type {
   ThemeSection,
   AnchorNote,
   RelationshipPreview,
+  RetrievalEvidence,
 } from "./structured-content.js";
 import {
   RememberResultSchema,
@@ -645,6 +649,33 @@ function formatRelationshipPreview(preview: RelationshipPreview): string {
     ? ` [+${preview.totalDirectRelations - preview.shown.length} more]`
     : "";
   return `**related (${preview.totalDirectRelations}):** ${shown}${more}`;
+}
+
+function toRecallFreshness(updatedAt: string): "today" | "thisWeek" | "thisMonth" | "older" {
+  const updated = new Date(updatedAt);
+  if (Number.isNaN(updated.getTime())) {
+    return "older";
+  }
+
+  const ageDays = Math.max(0, (Date.now() - updated.getTime()) / (1000 * 60 * 60 * 24));
+  if (ageDays <= 1) return "today";
+  if (ageDays <= 7) return "thisWeek";
+  if (ageDays <= 31) return "thisMonth";
+  return "older";
+}
+
+function toRecallRankBand(semanticRank?: number): "top3" | "top10" | "lower" {
+  if (semanticRank !== undefined && semanticRank <= 3) return "top3";
+  if (semanticRank !== undefined && semanticRank <= 10) return "top10";
+  return "lower";
+}
+
+function formatRetrievalEvidenceHint(evidence: RetrievalEvidence, role?: NoteRole): string {
+  const rolePart = role ?? "untyped";
+  const supersedesPart = evidence.superseded
+    ? ` | supersedes ${evidence.supersededCount ?? 1} note${(evidence.supersededCount ?? 1) === 1 ? "" : "s"}`
+    : "";
+  return `${evidence.rankBand} | channels: ${evidence.channels.join(", ")} | ${evidence.projectRelevant ? "project-relevant" : "cross-project"}\n${rolePart}, ${evidence.freshness}${supersedesPart}`;
 }
 
 // ── Git commit message helpers ────────────────────────────────────────────────
@@ -2455,7 +2486,8 @@ server.registerTool(
       "Returns:\n" +
       "- Ranked memory matches with scores, vault label, tags, lifecycle, and updated time\n" +
       "- Bounded 1-hop relationship previews automatically attached to top results\n" +
-      "- In temporal mode, optional compact history entries for top matches\n\n" +
+      "- In temporal mode, optional compact history entries for top matches\n" +
+      "- Optional retrieval evidence via `evidence: \"compact\"` for why a result ranked\n\n" +
       "Read-only.\n\n" +
       "Typical next step:\n" +
       "- Use `get`, `update`, `relate`, or `consolidate` based on the results.",
@@ -2472,6 +2504,7 @@ server.registerTool(
       minSimilarity: z.number().min(0).max(1).optional().default(DEFAULT_MIN_SIMILARITY),
       mode: z.enum(["default", "temporal", "workflow"]).optional().default("default").describe("Use `temporal` for compact git-backed history, or `workflow` for RPIR-oriented chain reconstruction."),
       verbose: z.boolean().optional().default(false).describe("Only meaningful with `mode: \"temporal\"`. Adds richer stats-based history context without returning raw diffs."),
+      evidence: z.enum(["compact"]).optional().describe("Optional retrieval rationale. Omit for default output; use `compact` for bounded rank and lineage signals."),
       tags: z.array(z.string()).optional().describe("Filter results to notes with all of these tags."),
       scope: z
         .enum(["project", "global", "all"])
@@ -2486,7 +2519,7 @@ server.registerTool(
     }),
     outputSchema: RecallResultSchema,
   },
-  async ({ query, cwd, limit, minSimilarity, mode, verbose, tags, scope, lifecycle }) => {
+  async ({ query, cwd, limit, minSimilarity, mode, verbose, evidence, tags, scope, lifecycle }) => {
     const t0Recall = performance.now();
     await ensureBranchSynced(cwd);
 
@@ -2624,6 +2657,7 @@ server.registerTool(
       undefined
     );
     const reranked = applyLexicalReranking(scored, query, getProjectionText);
+    const semanticCandidateIds = new Set(reranked.map((candidate) => candidate.id));
 
     // Apply graph spreading activation: traverse related notes and boost their scores
     const preSpreadIds = new Set(reranked.map((c) => c.id));
@@ -2631,6 +2665,7 @@ server.registerTool(
       return noteRelationships.get(id);
     };
     const withGraphSpread = applyGraphSpreadingActivation(reranked, getNoteRelationships);
+    const graphDiscoveredIds = new Set(withGraphSpread.filter((candidate) => !semanticCandidateIds.has(candidate.id)).map((candidate) => candidate.id));
 
     // Resolve correct vault for graph-discovered candidates that inherited their
     // entry point's vault instead of their own.
@@ -2653,6 +2688,7 @@ server.registerTool(
     });
 
     let promoted = applyCanonicalExplanationPromotion(withGraphSpread);
+    let rescueCandidateIds = new Set<string>();
 
     // Lexical rescue: when semantic results are weak, scan projections for additional candidates.
     // Skip rescue when the caller set a strict minSimilarity above the default,
@@ -2670,6 +2706,7 @@ server.registerTool(
         promoted
       );
       promoted.push(...rescueCandidates);
+      rescueCandidateIds = new Set(rescueCandidates.map((candidate) => candidate.id));
       enrichRescueCandidateScores(promoted, query, getProjectionText);
       promoted = applyCanonicalExplanationPromotion(promoted);
     }
@@ -2717,16 +2754,17 @@ server.registerTool(
           filesChanged: number;
           changeType: "metadata-only change" | "minor edit" | "substantial update";
         };
-      }>;
+      }>; 
       historySummary?: string;
       relationships?: RelationshipPreview;
+      retrievalEvidence?: RetrievalEvidence;
     }> = [];
     
     // Determine how many top results get relationship expansion
     // Top 1 by default, top 3 if result count is small
     const recallRelationshipLimit = top.length <= 3 ? 3 : 1;
     
-    for (const [index, { id, score, vault, boosted }] of top.entries()) {
+    for (const [index, { id, score, vault, boosted, semanticRank, lexicalRank, canonicalExplanationScore, metadata, isCurrentProject }] of top.entries()) {
       const note = await readCachedNote(vault, id);
       if (note) {
         const centrality = note.relatedTo?.length ?? 0;
@@ -2784,8 +2822,29 @@ server.registerTool(
         const provenanceLine = provenance || confidence
           ? `\n**confidence:** ${confidence ?? "medium"}${provenance?.recentlyChanged ? " | **recently changed**" : ""}`
           : "";
+        const supersededRelations = (note.relatedTo ?? []).filter((rel) => rel.type === "supersedes");
+        const retrievalEvidence: RetrievalEvidence | undefined = evidence === "compact"
+          ? {
+            channels: [
+              semanticRank !== undefined ? "semantic" : undefined,
+              lexicalRank !== undefined ? "lexical" : undefined,
+              graphDiscoveredIds.has(id) ? "graph" : undefined,
+              rescueCandidateIds.has(id) ? "rescue" : undefined,
+              canonicalExplanationScore !== undefined && canonicalExplanationScore > 0 ? "canonical" : undefined,
+              temporalQueryHint ? "temporal-boost" : undefined,
+            ].filter((value): value is RetrievalEvidence["channels"][number] => value !== undefined),
+            rankBand: toRecallRankBand(semanticRank),
+            projectRelevant: isCurrentProject,
+            freshness: toRecallFreshness(note.updatedAt),
+            superseded: supersededRelations.length > 0,
+            supersededCount: supersededRelations.length > 0 ? supersededRelations.length : undefined,
+          }
+          : undefined;
+        const evidenceLine = retrievalEvidence
+          ? `\n${formatRetrievalEvidenceHint(retrievalEvidence, metadata?.role)}`
+          : "";
         // Suppress raw related IDs when enriched preview is shown to avoid duplication
-        sections.push(`${formatNote(note, score, relationships === undefined)}${provenanceLine}${formattedHistory}${formattedRelationships}`);
+        sections.push(`${formatNote(note, score, relationships === undefined)}${provenanceLine}${evidenceLine}${formattedHistory}${formattedRelationships}`);
 
         structuredResults.push({
           id,
@@ -2803,6 +2862,7 @@ server.registerTool(
           history,
           historySummary,
           relationships,
+          retrievalEvidence,
         });
 
         if (project) {
@@ -5293,7 +5353,8 @@ server.registerTool(
       "- The canonical memory, source ids, resulting relationships, and persistence status\n\n" +
       "Side effects: creates or updates the canonical note, modifies or removes source notes according to mode, git commits, and may push.\n\n" +
       "Typical next step:\n" +
-      "- Use `get` to inspect the canonical note and `recall` to confirm duplication is reduced.",
+      "- Use `get` to inspect the canonical note and `recall` to confirm duplication is reduced.\n" +
+      "- Use optional `evidence: true` on analysis strategies when you need trust signals before deciding.",
     annotations: {
       readOnlyHint: false,
       destructiveHint: true,
@@ -5314,7 +5375,8 @@ server.registerTool(
         .describe(
           "What to do: 'dry-run' = full analysis without changes, 'detect-duplicates' = find similar pairs, " +
           "'find-clusters' = group by theme and relationships, 'suggest-merges' = actionable merge recommendations, " +
-          "'execute-merge' = perform a merge (requires mergePlan), 'prune-superseded' = delete notes marked as superseded"
+          "'execute-merge' = perform a merge (requires mergePlan), 'prune-superseded' = delete notes marked as superseded. " +
+          "Use `evidence: true` on analysis strategies for trust/risk signals."
         ),
       mode: z
         .enum(CONSOLIDATION_MODES)
@@ -5327,6 +5389,10 @@ server.registerTool(
         .optional()
         .default(0.85)
         .describe("Cosine similarity threshold for duplicate detection (0.85 default)"),
+      evidence: z
+        .boolean()
+        .optional()
+        .describe("Optional confidence signals for analysis strategies (duplicate/merge evidence, warnings, risk)."),
       mergePlan: z
         .object({
           sourceIds: z.array(z.string()).min(2).describe("Ids of notes to merge into one consolidated note"),
@@ -5348,7 +5414,7 @@ server.registerTool(
     }),
     outputSchema: ConsolidateResultSchema,
   },
-  async ({ cwd, strategy, mode, threshold, mergePlan, allowProtectedBranch = false }) => {
+  async ({ cwd, strategy, mode, threshold, evidence = false, mergePlan, allowProtectedBranch = false }) => {
     await ensureBranchSynced(cwd);
 
     const project = await resolveProject(cwd);
@@ -5371,15 +5437,15 @@ server.registerTool(
     const policy = project ? await configStore.getProjectPolicy(project.id) : undefined;
     const defaultConsolidationMode = resolveConsolidationMode(policy);
 
-    switch (strategy) {
+      switch (strategy) {
       case "detect-duplicates":
-        return detectDuplicates(projectNotes, threshold, project);
+        return detectDuplicates(projectNotes, threshold, project, evidence);
 
       case "find-clusters":
         return findClusters(projectNotes, project);
 
       case "suggest-merges":
-        return suggestMerges(projectNotes, threshold, defaultConsolidationMode, project, mode);
+        return suggestMerges(projectNotes, threshold, defaultConsolidationMode, project, mode, evidence);
 
       case "execute-merge": {
         if (!mergePlan) {
@@ -5397,7 +5463,7 @@ server.registerTool(
       }
 
       case "dry-run":
-        return dryRunAll(projectNotes, threshold, defaultConsolidationMode, project, mode);
+        return dryRunAll(projectNotes, threshold, defaultConsolidationMode, project, mode, evidence);
 
       default:
         return { content: [{ type: "text", text: `Unknown strategy: ${strategy}` }], isError: true };
@@ -5410,6 +5476,7 @@ async function detectDuplicates(
   entries: NoteEntry[],
   threshold: number,
   project: Awaited<ReturnType<typeof resolveProject>>,
+  evidence: boolean,
 ): Promise<{ content: Array<{ type: "text"; text: string }>; structuredContent: ConsolidateResult }> {
   const lines: string[] = [];
   lines.push(`Duplicate detection for ${project?.name ?? "global"} (similarity > ${threshold}):`);
@@ -5418,7 +5485,9 @@ async function detectDuplicates(
   const checked = new Set<string>();
   let foundCount = 0;
   const duplicates: Array<{ noteA: { id: string; title: string }; noteB: { id: string; title: string }; similarity: number }> = [];
+  const duplicatePairs: NonNullable<ConsolidateResult["duplicatePairs"]> = [];
   const embeddings = await loadEmbeddingsByNoteId(entries);
+  const allNotes = entries.map((entry) => entry.note);
 
   for (let i = 0; i < entries.length; i++) {
     const entryA = entries[i]!;
@@ -5436,10 +5505,22 @@ async function detectDuplicates(
 
       const similarity = cosineSimilarity(embeddingA, embeddingB);
       if (similarity >= threshold) {
+        const pairWarnings = buildMergeWarnings([entryA.note, entryB.note], entryA.note);
+        const pairRisk = deriveMergeRisk(pairWarnings);
+        const noteAEvidence = buildConsolidateNoteEvidence(entryA.note, allNotes, pairWarnings);
+        const noteBEvidence = buildConsolidateNoteEvidence(entryB.note, allNotes, pairWarnings);
         foundCount++;
         lines.push(`${foundCount}. ${entryA.note.title} (${entryA.note.id})`);
         lines.push(`   └── ${entryB.note.title} (${entryB.note.id})`);
         lines.push(`   Similarity: ${similarity.toFixed(3)}`);
+        if (evidence) {
+          lines.push(`   A: ${noteAEvidence.lifecycle}, ${noteAEvidence.role ?? "untyped"} | ${Math.round(noteAEvidence.ageDays)}d old | rel: ${noteAEvidence.relatedCount} | supersedes: ${noteAEvidence.supersededCount ?? 0} | risk: ${noteAEvidence.mergeRisk}`);
+          lines.push(`   B: ${noteBEvidence.lifecycle}, ${noteBEvidence.role ?? "untyped"} | ${Math.round(noteBEvidence.ageDays)}d old | rel: ${noteBEvidence.relatedCount} | supersedes: ${noteBEvidence.supersededCount ?? 0} | risk: ${noteBEvidence.mergeRisk}`);
+          if (pairWarnings.length > 0) {
+            lines.push(`   Warnings: ${pairWarnings.join("; ")}`);
+          }
+          lines.push(`   Merge risk: ${pairRisk}`);
+        }
         lines.push("");
         checked.add(entryA.note.id);
         checked.add(entryB.note.id);
@@ -5449,6 +5530,15 @@ async function detectDuplicates(
           noteB: { id: entryB.note.id, title: entryB.note.title },
           similarity,
         });
+        if (evidence) {
+          duplicatePairs.push({
+            similarity,
+            noteA: noteAEvidence,
+            noteB: noteBEvidence,
+            warnings: pairWarnings.length > 0 ? pairWarnings : undefined,
+            mergeRisk: pairRisk,
+          });
+        }
       }
     }
   }
@@ -5466,6 +5556,7 @@ async function detectDuplicates(
     project: toProjectRef(project),
     notesProcessed: entries.length,
     notesModified: 0,
+    duplicatePairs: evidence ? duplicatePairs : undefined,
   };
 
   return { content: [{ type: "text", text: lines.join("\n") }], structuredContent };
@@ -5581,6 +5672,7 @@ async function suggestMerges(
   defaultConsolidationMode: ConsolidationMode,
   project: Awaited<ReturnType<typeof resolveProject>>,
   explicitMode?: ConsolidationMode,
+  evidence: boolean = false,
 ): Promise<{ content: Array<{ type: "text"; text: string }>; structuredContent: ConsolidateResult }> {
   const lines: string[] = [];
   const modeLabel = explicitMode ?? `${defaultConsolidationMode} (project/default; all-temporary merges auto-delete)`;
@@ -5594,7 +5686,9 @@ async function suggestMerges(
     sourceIds: string[];
     similarities: Array<{ id: string; similarity: number }>;
   }> = [];
+  const mergeSuggestions: NonNullable<ConsolidateResult["mergeSuggestions"]> = [];
   const embeddings = await loadEmbeddingsByNoteId(entries);
+  const allNotes = entries.map((entry) => entry.note);
 
   for (let i = 0; i < entries.length; i++) {
     const entryA = entries[i]!;
@@ -5647,7 +5741,21 @@ async function suggestMerges(
           }
         }
       })();
+
+      const mergeWarnings = buildMergeWarnings(sources.map((source) => source.note), entryA.note);
+      const mergeRisk = deriveMergeRisk(mergeWarnings);
+      const noteEvidence = sources.map((source) => buildConsolidateNoteEvidence(source.note, allNotes, mergeWarnings));
+
       lines.push(`   Mode: ${effectiveMode} (${modeDescription})`);
+      if (evidence) {
+        for (const note of noteEvidence) {
+          lines.push(`   Evidence: ${note.title} | ${note.lifecycle}, ${note.role ?? "untyped"} | ${Math.round(note.ageDays)}d | rel:${note.relatedCount} | risk:${note.mergeRisk}`);
+        }
+        if (mergeWarnings.length > 0) {
+          lines.push(`   Warnings: ${mergeWarnings.join("; ")}`);
+        }
+        lines.push(`   Merge risk: ${mergeRisk}`);
+      }
       lines.push("   To execute:");
       lines.push(`     consolidate({ strategy: "execute-merge", mergePlan: {`);
       lines.push(`       sourceIds: [${sources.map((s) => `"${s.note.id}"`).join(", ")}],`);
@@ -5660,6 +5768,16 @@ async function suggestMerges(
         sourceIds: sources.map((s) => s.note.id),
         similarities: similar.map((s) => ({ id: s.entry.note.id, similarity: s.similarity })),
       });
+      if (evidence) {
+        mergeSuggestions.push({
+          targetTitle: `${entryA.note.title} (consolidated)`,
+          sourceIds: sources.map((source) => source.note.id),
+          mode: effectiveMode,
+          notes: noteEvidence,
+          warnings: mergeWarnings.length > 0 ? mergeWarnings : undefined,
+          mergeRisk,
+        });
+      }
 
       checked.add(entryA.note.id);
       for (const s of similar) checked.add(s.entry.note.id);
@@ -5678,6 +5796,7 @@ async function suggestMerges(
     project: toProjectRef(project),
     notesProcessed: entries.length,
     notesModified: 0,
+    mergeSuggestions: evidence ? mergeSuggestions : undefined,
   };
 
   return { content: [{ type: "text", text: lines.join("\n") }], structuredContent };
@@ -6219,6 +6338,7 @@ async function dryRunAll(
   defaultConsolidationMode: ConsolidationMode,
   project: Awaited<ReturnType<typeof resolveProject>>,
   explicitMode?: ConsolidationMode,
+  evidence: boolean = false,
 ): Promise<{ content: Array<{ type: "text"; text: string }>; structuredContent: ConsolidateResult }> {
   const lines: string[] = [];
   lines.push(`Consolidation analysis for ${project?.name ?? "global"}:`);
@@ -6227,7 +6347,7 @@ async function dryRunAll(
   lines.push("");
 
   // Run all analysis strategies
-  const dupes = await detectDuplicates(entries, threshold, project);
+  const dupes = await detectDuplicates(entries, threshold, project, evidence);
   lines.push("=== DUPLICATE DETECTION ===");
   lines.push(dupes.content[0]?.text ?? "No output");
   lines.push("");
@@ -6237,7 +6357,7 @@ async function dryRunAll(
   lines.push(clusters.content[0]?.text ?? "No output");
   lines.push("");
 
-  const merges = await suggestMerges(entries, threshold, defaultConsolidationMode, project, explicitMode);
+  const merges = await suggestMerges(entries, threshold, defaultConsolidationMode, project, explicitMode, evidence);
   lines.push("=== MERGE SUGGESTIONS ===");
   lines.push(merges.content[0]?.text ?? "No output");
 
@@ -6304,6 +6424,7 @@ server.registerPrompt(
             "- When unsure, prefer `recall` over `remember`.\n" +
             "- For repo-related tasks, pass `cwd` so mnemonic can route project memories correctly.\n\n" +
             "Workflow: `recall`/`list` -> `get` -> `update` or `remember` -> `relate`/`consolidate`/`move_memory`. Use `discover_tags` only when tag choice is ambiguous.\n\n" +
+            "When a merge/prune decision is uncertain, use optional evidence enrichment: `recall` with `evidence: \"compact\"` and `consolidate` analysis strategies with `evidence: true`. Evidence improves confidence but is not required.\n\n" +
             "Roles are optional prioritization hints, not schema. Lifecycle still governs durability. When `lifecycle` is omitted, `remember` applies soft defaults based on role: `research`, `plan`, and `review` default to `temporary`; `decision`, `summary`, and `reference` default to `permanent`. Explicit `lifecycle` always overrides the role-based default. Inferred roles are internal hints only. Prioritization is language-independent by default.\n\n" +
             "### Working-state continuity\n\n" +
             "Preserve in-progress work as temporary notes when continuation value is high. Recovery happens after project orientation.\n\n" +
@@ -6344,6 +6465,8 @@ server.registerPrompt(
             "- Existing bug note found by `recall` -> inspect with `get` -> refine with `update`.\n" +
             "- No matching note found by `recall` -> optional `discover_tags` with note context -> create with `remember`.\n" +
             "- Two notes overlap heavily -> inspect -> clean up with `consolidate`.\n" +
+            "- Unsure why a recall hit ranked high -> rerun `recall` with `evidence: \"compact\"`.\n" +
+            "- Unsure whether to merge/prune -> run `consolidate` analysis with `evidence: true` before `execute-merge` or `prune-superseded`.\n" +
             "- Resume work: `project_memory_summary` -> `recall` (lifecycle: temporary) -> continue from temporary notes.\n\n" +
             "### semanticPatch format\n\n" +
             "When using `update` with `semanticPatch`:\n" +

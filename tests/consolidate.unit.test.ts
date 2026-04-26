@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  buildConsolidateNoteEvidence,
+  buildMergeWarnings,
+  deriveMergeRisk,
   filterRelationships,
   mergeRelationshipsFromNotes,
   normalizeMergePlanSourceIds,
@@ -69,5 +72,73 @@ describe("consolidate helpers", () => {
         "supersedes",
       ),
     ).toBe("supersedes");
+  });
+
+  it("derives merge risk from warning severity", () => {
+    expect(deriveMergeRisk([])).toBe("low");
+    expect(deriveMergeRisk(["temporary research note in merge - consider whether it contains unique evidence"])).toBe("medium");
+    expect(deriveMergeRisk(["same role but different lifecycles - verify merge intent"])).toBe("high");
+    expect(
+      deriveMergeRisk([
+        "temporary research note in merge - consider whether it contains unique evidence",
+        "note supersedes another - merging may orphan the supersedes chain",
+      ])
+    ).toBe("high");
+  });
+
+  it("builds merge warnings for temporary research, supersedes chain, lifecycle mismatch and stale target", () => {
+    const warnings = buildMergeWarnings(
+      [
+        {
+          id: "a",
+          title: "A",
+          lifecycle: "temporary" as const,
+          role: "research" as const,
+          updatedAt: "2026-04-10T00:00:00.000Z",
+          relatedTo: [{ id: "b", type: "supersedes" as const }],
+        },
+        {
+          id: "b",
+          title: "B",
+          lifecycle: "permanent" as const,
+          role: "research" as const,
+          updatedAt: "2026-04-12T00:00:00.000Z",
+          relatedTo: [],
+        },
+      ],
+      { id: "a", updatedAt: "2026-04-10T00:00:00.000Z" }
+    );
+
+    expect(warnings).toContain("temporary research note in merge - consider whether it contains unique evidence");
+    expect(warnings).toContain("note supersedes another - merging may orphan the supersedes chain");
+    expect(warnings).toContain("newer note would be merged into older summary - stale summary risk");
+    expect(warnings).toContain("same role but different lifecycles - verify merge intent");
+  });
+
+  it("builds consolidate note evidence with superseded and inbound superseder fields", () => {
+    const evidence = buildConsolidateNoteEvidence(
+      {
+        id: "source",
+        title: "Source",
+        lifecycle: "permanent",
+        role: "decision",
+        updatedAt: "2026-04-10T00:00:00.000Z",
+        relatedTo: [{ id: "target", type: "supersedes" }],
+      },
+      [
+        { id: "source", relatedTo: [{ id: "target", type: "supersedes" }] },
+        { id: "other", relatedTo: [{ id: "source", type: "supersedes" }] },
+      ],
+      ["note supersedes another - merging may orphan the supersedes chain"],
+      new Date("2026-04-15T00:00:00.000Z")
+    );
+
+    expect(evidence.id).toBe("source");
+    expect(evidence.superseded).toBe(true);
+    expect(evidence.supersededCount).toBe(1);
+    expect(evidence.supersededBy).toBe("other");
+    expect(evidence.relatedCount).toBe(1);
+    expect(evidence.ageDays).toBeGreaterThan(0);
+    expect(evidence.mergeRisk).toBe("high");
   });
 });

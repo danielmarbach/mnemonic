@@ -26,6 +26,8 @@ describe("tool-descriptions", () => {
     expect(promptText).toContain("REQUIRES: Before `remember`, call `recall` or `list` first.");
     expect(promptText).toContain("If `recall` or `list` returns a plausible match, call `get` before deciding whether to `update` or `remember`.");
     expect(promptText).toContain("When unsure, prefer `recall` over `remember`.");
+    expect(promptText).toContain("evidence enrichment");
+    expect(promptText).toContain("not required");
     expect(promptText).toContain("Bad: call `remember` immediately because the user said 'remember'.");
     expect(promptText).toContain("Roles are optional prioritization hints, not schema.");
     expect(promptText).toContain("Lifecycle still governs durability.");
@@ -69,8 +71,10 @@ describe("tool-descriptions", () => {
     expect(byName.get("remember")).toContain("REQUIRES: Call `recall` or `list` first to check whether this memory already exists.");
     expect(byName.get("get")).toContain("Use after `recall`, `list`, or `recent_memories` when you need the full note content.");
     expect(byName.get("update")).toContain("Use after `recall` + `get` when an existing memory should be refined instead of creating a duplicate.");
+    expect(byName.get("recall")).toContain("Optional retrieval evidence via `evidence: \"compact\"`");
     expect(byName.get("relate")).toContain("Use after you have identified the exact memories to connect.");
     expect(byName.get("consolidate")).toContain("Use after `recall`, `list`, or `memory_graph` shows overlap that should be merged or cleaned up.");
+    expect(byName.get("consolidate")).toContain("Use optional `evidence: true` on analysis strategies");
     expect(byName.get("move_memory")).toContain("Use `relate` if the moved memory connects to existing notes in the new vault.");
     expect(byName.get("discover_tags")).toContain("Suggest canonical tags for a specific note before `remember` when tag choice is ambiguous.");
   }, 15000);

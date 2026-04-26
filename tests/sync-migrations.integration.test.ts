@@ -294,6 +294,66 @@ describe("sync-migrations", () => {
     }
   }, 15000);
 
+  it("returns consolidate evidence payloads for detect-duplicates and suggest-merges", async () => {
+    const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-vault-"));
+    tempDirs.push(vaultDir);
+    const embeddingServer = await startFakeEmbeddingServer();
+
+    try {
+      const noteAText = await callLocalMcp(vaultDir, "remember", {
+        title: "Evidence merge note A",
+        content: "Merge evidence payload test for duplicate and merge suggestion analysis.",
+        tags: ["evidence", "merge"],
+        lifecycle: "permanent",
+        summary: "Create note A for consolidate evidence",
+        scope: "global",
+      }, embeddingServer.url);
+      const noteAId = extractRememberedId(noteAText);
+
+      const noteBText = await callLocalMcp(vaultDir, "remember", {
+        title: "Evidence merge note B",
+        content: "Merge evidence payload test for duplicate and merge suggestion analysis.",
+        tags: ["evidence", "merge"],
+        lifecycle: "temporary",
+        role: "research",
+        summary: "Create note B for consolidate evidence",
+        scope: "global",
+      }, embeddingServer.url);
+      const noteBId = extractRememberedId(noteBText);
+
+      await callLocalMcp(vaultDir, "relate", {
+        fromId: noteAId,
+        toId: noteBId,
+        type: "supersedes",
+        bidirectional: false,
+      }, embeddingServer.url);
+
+      const dupResponse = await callLocalMcpResponse(vaultDir, "consolidate", {
+        strategy: "detect-duplicates",
+        threshold: 0,
+        evidence: true,
+      }, embeddingServer.url);
+      const dupParsed = ConsolidateResultSchema.parse(dupResponse.structuredContent);
+      expect(dupParsed.duplicatePairs?.length).toBeGreaterThan(0);
+      expect(dupParsed.duplicatePairs?.[0]?.noteA.mergeRisk).toMatch(/low|medium|high/);
+      expect(dupParsed.duplicatePairs?.[0]?.mergeRisk).toMatch(/low|medium|high/);
+      expect(dupResponse.text).toContain("Merge risk:");
+
+      const suggestResponse = await callLocalMcpResponse(vaultDir, "consolidate", {
+        strategy: "suggest-merges",
+        threshold: 0,
+        evidence: true,
+      }, embeddingServer.url);
+      const suggestParsed = ConsolidateResultSchema.parse(suggestResponse.structuredContent);
+      expect(suggestParsed.mergeSuggestions?.length).toBeGreaterThan(0);
+      expect(suggestParsed.mergeSuggestions?.[0]?.notes[0]?.ageDays).toBeTypeOf("number");
+      expect(suggestParsed.mergeSuggestions?.[0]?.mergeRisk).toMatch(/low|medium|high/);
+      expect(suggestResponse.text).toContain("Evidence:");
+    } finally {
+      await embeddingServer.close();
+    }
+  }, 15000);
+
   it("keeps sync structured output aligned with SyncResultSchema", async () => {
     const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-vault-"));
     tempDirs.push(vaultDir);
