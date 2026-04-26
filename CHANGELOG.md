@@ -6,6 +6,14 @@ The format is loosely based on Keep a Changelog and uses semver-style version he
 
 ## [Unreleased]
 
+## [0.26.2] - 2026-04-26
+
+### Fixed
+
+- `update` skips write/commit/embed when no fields actually changed.
+- `update` `fieldsModified` tracks actual value differences, not parameter presence.
+- Metadata-only updates no longer trigger re-embedding.
+
 ## [0.26.1] - 2026-04-26
 
 ### Changed
