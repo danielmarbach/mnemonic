@@ -8,7 +8,7 @@ tags:
   - verification
 lifecycle: permanent
 createdAt: '2026-04-26T19:00:03.718Z'
-updatedAt: '2026-04-26T19:00:13.866Z'
+updatedAt: '2026-04-26T19:01:27.561Z'
 role: summary
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -18,6 +18,8 @@ relatedTo:
     type: derives-from
   - id: decision-expose-trust-evidence-at-decision-points-via-opt-in-244d8317
     type: follows
+  - id: request-implement-evidence-enrichment-phases-from-explainabi-abe55a21
+    type: derives-from
 memoryVersion: 1
 ---
 # Summary: evidence enrichment implementation across recall and consolidate
