@@ -8,7 +8,7 @@ tags:
   - evidence
 lifecycle: temporary
 createdAt: '2026-04-26T17:34:15.560Z'
-updatedAt: '2026-04-26T17:34:23.250Z'
+updatedAt: '2026-04-26T18:46:33.743Z'
 role: plan
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -34,3 +34,11 @@ memoryVersion: 1
 ## Notes
 
 Implement directly from the active plan `plan-enrich-decision-points-with-retrieval-rationale-and-tru-0dd24e70` and keep output compact by default.
+
+## Implementation findings (important)
+
+- Recall already computes most ranking/provenance signals; evidence can be serialized at output boundary without changing ranking pipeline.
+- `detect-duplicates` and `suggest-merges` currently build text-first output and discard structured pair/suggestion details; explicit schema fields are needed for machine-consumable evidence.
+- Consolidation warning/risk logic belongs in `src/consolidate.ts` for deterministic unit testing and reuse across strategies.
+- `dry-run` reuses detect/suggest output, so evidence must be threaded through those functions to keep one behavior surface.
+- `mnemonic-workflow-hint` should frame evidence as optional confidence aid, not a mandatory pre-step.
