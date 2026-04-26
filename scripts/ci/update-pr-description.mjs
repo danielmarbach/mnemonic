@@ -6,6 +6,16 @@
  * Reads `.mnemonic/notes/` files changed in a PR and generates a structured
  * PR title and description from their design decision content.
  *
+ * Routing: fetches recent merged PR history at runtime to compute repo-relative
+ * percentile thresholds, then routes to one of four tiers:
+ *   A - trivial (formula bumps, lockfiles): deterministic minimal output
+ *   B - normal: standard deterministic description
+ *   C - complex (>p75 or medium semantic): deterministic + cheap AI enhancement attempt
+ *   D - very complex (>p90 or high semantic): deterministic + AI with premium fallback
+ *
+ * All AI calls are optional — the script degrades to deterministic output if the
+ * GitHub Models API is unavailable or returns a weak result.
+ *
  * Usage:
  *   node scripts/ci/update-pr-description.mjs --pr <number> --repo <owner/repo> [--head-sha <sha>] [--cwd <path>] [--dry-run]
  *
@@ -29,6 +39,28 @@ const args = parseArgs(process.argv.slice(2));
 const BUG_TAGS = ["bug", "bugs", "fix", "bugfix", "hotfix"];
 const ENHANCEMENT_TAGS = ["enhancement", "feature"];
 
+// Fallback thresholds used when fewer than 5 historical PRs are available.
+// Tuned conservatively for this repo's typical PR size distribution.
+const CONSERVATIVE_DEFAULTS = {
+  files: { p75: 10, p90: 25 },
+  lines: { p75: 500, p90: 1500 },
+  commits: { p75: 8, p90: 25 },
+};
+
+// GitHub Models API endpoint and model names.
+const MODELS_API = "https://models.inference.ai.azure.com/chat/completions";
+const MODEL_CHEAP = "gpt-4o-mini";
+const MODEL_PREMIUM = "gpt-4o";
+
+// System prompt for AI summary enhancement.
+const AI_SYSTEM_PROMPT =
+  "You are a senior engineer reviewing GitHub PRs. " +
+  "Your only task is to improve the Summary paragraph of a PR description. " +
+  "Rules: focus on WHAT changed and WHY (not HOW); be specific about components or decisions; " +
+  "avoid vague phrases like 'various improvements' or 'several changes'; " +
+  "do not list filenames or file extensions; keep it to 2–4 sentences. " +
+  "Output ONLY the improved summary paragraph — no headers, no markdown formatting, no preamble.";
+
 if (import.meta.url === `file://${process.argv[1]}`) {
   await main();
 }
@@ -43,19 +75,14 @@ export async function main() {
   // still reading note content from the PR head without checking out untrusted fork code.
   const headSha = typeof args["head-sha"] === "string" ? args["head-sha"] : null;
 
-  // Get the list of files changed in the PR
-  const result = spawnSync(
-    "gh",
-    ["pr", "view", prNumber, "--repo", repo, "--json", "files", "--jq", ".files[].path"],
-    { encoding: "utf-8", cwd },
-  );
-
-  if (result.status !== 0) {
-    process.stderr.write(`Error fetching PR files: ${result.stderr}\n`);
+  // --- Step 1: Fetch PR files and size stats in one call ---
+  const prData = fetchCurrentPrData(prNumber, repo, cwd);
+  if (!prData) {
+    process.stderr.write(`Error fetching PR data for PR #${prNumber}.\n`);
     process.exit(1);
   }
+  const { changedFiles, prStats } = prData;
 
-  const changedFiles = result.stdout.trim().split("\n").filter(Boolean);
   const noteFiles = changedFiles.filter(
     (f) => f.startsWith(".mnemonic/notes/") && f.endsWith(".md"),
   );
@@ -71,7 +98,21 @@ export async function main() {
     `Found ${noteFiles.length} mnemonic note(s) in PR #${prNumber}: ${noteFiles.join(", ")}\n`,
   );
 
-  // Read and parse each changed note — via GitHub API if headSha is given, else from disk
+  // --- Step 2: Fetch PR history for calibration (read-only, in-memory) ---
+  const history = fetchPrHistory(repo, cwd);
+  const thresholds = computeThresholds(history);
+  process.stdout.write(
+    `Calibrated from ${history.length} historical PR(s): ` +
+      `files p75=${thresholds.files.p75.toFixed(0)}/p90=${thresholds.files.p90.toFixed(0)}, ` +
+      `lines p75=${thresholds.lines.p75.toFixed(0)}/p90=${thresholds.lines.p90.toFixed(0)}, ` +
+      `commits p75=${thresholds.commits.p75.toFixed(0)}/p90=${thresholds.commits.p90.toFixed(0)}\n`,
+  );
+
+  // --- Step 3: Route to tier A / B / C / D ---
+  const tier = routeTier(prStats, changedFiles, thresholds);
+  process.stdout.write(`Tier ${tier} (${tierLabel(tier)}) — ${describeStats(prStats)}\n`);
+
+  // --- Step 4: Read and parse notes ---
   const notes = [];
   for (const noteFile of noteFiles) {
     try {
@@ -90,9 +131,20 @@ export async function main() {
     process.exit(0);
   }
 
-  // Generate the PR title and description from the notes
+  // --- Step 5: Generate deterministic description ---
   const title = generateTitle(notes);
-  const description = generateDescription(notes);
+  let description = generateDescription(notes);
+
+  // --- Step 6: Optional AI enhancement for Tier C and D ---
+  if (tier === "C" || tier === "D") {
+    const enhanced = await enhancedSummary(description, notes, tier);
+    if (enhanced) {
+      description = enhanced;
+      process.stdout.write(`AI-enhanced Summary section applied.\n`);
+    } else {
+      process.stdout.write(`AI enhancement skipped or degraded to deterministic.\n`);
+    }
+  }
 
   if (dryRun) {
     process.stdout.write(`[dry-run] Would update PR #${prNumber} with:\n\n`);
@@ -124,6 +176,401 @@ export async function main() {
     `Updated PR #${prNumber} title and description from ${notes.length} mnemonic note(s).\n`,
   );
   process.stdout.write(`Title: ${title}\n`);
+}
+
+// =============================================================================
+// PR STATS & HISTORY
+// =============================================================================
+
+/**
+ * Fetches the current PR's changed file paths and size statistics in one gh call.
+ * Returns null on failure so callers can handle gracefully.
+ *
+ * @returns {{ changedFiles: string[], prStats: PrStats } | null}
+ */
+function fetchCurrentPrData(prNumber, repo, cwd) {
+  const result = spawnSync(
+    "gh",
+    [
+      "pr", "view", prNumber,
+      "--repo", repo,
+      "--json", "files,additions,deletions,changedFiles,commits",
+      "--jq",
+      "{paths: [.files[].path], additions, deletions, changedFiles, commits: (.commits | length)}",
+    ],
+    { encoding: "utf-8", cwd },
+  );
+
+  if (result.status !== 0) {
+    process.stderr.write(`Error fetching PR data: ${result.stderr}\n`);
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(result.stdout.trim());
+    return {
+      changedFiles: parsed.paths ?? [],
+      prStats: {
+        changedFiles: parsed.changedFiles ?? 0,
+        additions: parsed.additions ?? 0,
+        deletions: parsed.deletions ?? 0,
+        commits: parsed.commits ?? 0,
+      },
+    };
+  } catch {
+    process.stderr.write(`Error parsing PR data: ${result.stdout}\n`);
+    return null;
+  }
+}
+
+/**
+ * Fetches recent merged PR history for percentile calibration.
+ * Read-only — no files written. Returns empty array on any failure.
+ *
+ * @returns {Array<{changedFiles:number, additions:number, deletions:number, commits:number}>}
+ */
+function fetchPrHistory(repo, cwd) {
+  const result = spawnSync(
+    "gh",
+    [
+      "api",
+      `repos/${repo}/pulls?state=closed&per_page=50`,
+      "--jq",
+      "[.[] | select(.merged_at != null) | {changedFiles: .changed_files, additions, deletions, commits}]",
+    ],
+    { encoding: "utf-8", cwd },
+  );
+
+  if (result.status !== 0) return [];
+
+  try {
+    const parsed = JSON.parse(result.stdout.trim());
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+// =============================================================================
+// CALIBRATION
+// =============================================================================
+
+/**
+ * Computes a percentile value from an unsorted array using linear interpolation.
+ * Returns 0 for an empty array.
+ */
+function percentile(values, p) {
+  if (values.length === 0) return 0;
+  const sorted = [...values].sort((a, b) => a - b);
+  const idx = (p / 100) * (sorted.length - 1);
+  const lo = Math.floor(idx);
+  const hi = Math.ceil(idx);
+  return sorted[lo] + (sorted[hi] - sorted[lo]) * (idx - lo);
+}
+
+/**
+ * Computes p75/p90 thresholds from a history array.
+ * Falls back to CONSERVATIVE_DEFAULTS when there are fewer than 5 data points.
+ *
+ * @param {Array<{changedFiles:number, additions:number, deletions:number, commits:number}>} history
+ * @returns {{ files: {p75:number,p90:number}, lines: {p75:number,p90:number}, commits: {p75:number,p90:number} }}
+ */
+export function computeThresholds(history) {
+  if (history.length < 5) return CONSERVATIVE_DEFAULTS;
+
+  const files = history.map((p) => p.changedFiles ?? 0);
+  const lines = history.map((p) => (p.additions ?? 0) + (p.deletions ?? 0));
+  const commits = history.map((p) => p.commits ?? 0);
+
+  return {
+    files: { p75: percentile(files, 75), p90: percentile(files, 90) },
+    lines: { p75: percentile(lines, 75), p90: percentile(lines, 90) },
+    commits: { p75: percentile(commits, 75), p90: percentile(commits, 90) },
+  };
+}
+
+// =============================================================================
+// COMPLEXITY SCORING
+// =============================================================================
+
+/**
+ * Scores the semantic complexity of a PR's changed file paths.
+ *
+ * Trivial patterns (formula-only, lockfile-only) return `isTrivial: true`.
+ * Otherwise returns a complexity level based on how many distinct top-level
+ * directories are touched and whether CI/workflow files are involved.
+ *
+ * @param {string[]} paths  Repository-relative file paths changed in the PR.
+ * @returns {{ isTrivial: boolean, complexity: 'low'|'normal'|'medium'|'high' }}
+ */
+export function scoreSemanticPaths(paths) {
+  // Exclude mnemonic notes — they're always present in this workflow and
+  // should not inflate the complexity signal.
+  const nonNotePaths = paths.filter((p) => !p.startsWith(".mnemonic/"));
+
+  if (nonNotePaths.length === 0) {
+    // Notes-only change: low complexity (notes are the content, not the code)
+    return { isTrivial: false, complexity: "low" };
+  }
+
+  // Trivial: only automated/generated files with no code logic
+  if (nonNotePaths.every((p) => p.startsWith("Formula/"))) {
+    return { isTrivial: true, complexity: "low" };
+  }
+  if (
+    nonNotePaths.every(
+      (p) => p.endsWith("package-lock.json") || p.endsWith("package.json") || p.includes("lock"),
+    )
+  ) {
+    return { isTrivial: true, complexity: "low" };
+  }
+
+  const topFolders = new Set(nonNotePaths.map((p) => p.split("/")[0]));
+  const hasCiScripts = nonNotePaths.some((p) => p.startsWith("scripts/ci/"));
+  const hasWorkflows = nonNotePaths.some((p) => p.startsWith(".github/workflows/"));
+  const hasCore = nonNotePaths.some((p) => p.startsWith("src/"));
+  const hasTests = nonNotePaths.some((p) => p.startsWith("tests/") || p.includes(".test."));
+  const isDocsOnly = nonNotePaths.every((p) => p.endsWith(".md") || p.startsWith("docs/"));
+
+  if (isDocsOnly) return { isTrivial: false, complexity: "low" };
+
+  let score = 0;
+  if (topFolders.size >= 3) score += 2;
+  else if (topFolders.size >= 2) score += 1;
+  if (hasCiScripts || hasWorkflows) score += 3;
+  if (hasCore && hasTests) score += 1;
+
+  if (score >= 4) return { isTrivial: false, complexity: "high" };
+  if (score >= 2) return { isTrivial: false, complexity: "medium" };
+  return { isTrivial: false, complexity: "normal" };
+}
+
+/**
+ * Routes a PR to one of four tiers based on repo-relative size thresholds and
+ * semantic path complexity.
+ *
+ * Tiers:
+ *   A — trivial  : deterministic minimal output (formula bumps, lockfiles)
+ *   B — normal   : standard deterministic description
+ *   C — complex  : deterministic + cheap AI enhancement attempt
+ *   D — very complex : deterministic + cheap AI, premium fallback on weak result
+ *
+ * Semantic complexity can raise the tier by at most one level relative to the
+ * size-based tier, preventing small but cross-cutting PRs from jumping straight
+ * to premium.
+ *
+ * @param {{ changedFiles:number, additions:number, deletions:number, commits:number }} stats
+ * @param {string[]} changedPaths
+ * @param {{ files:{p75:number,p90:number}, lines:{p75:number,p90:number}, commits:{p75:number,p90:number} }} thresholds
+ * @returns {'A'|'B'|'C'|'D'}
+ */
+export function routeTier(stats, changedPaths, thresholds) {
+  const { changedFiles, additions, deletions, commits } = stats;
+  const totalLines = (additions ?? 0) + (deletions ?? 0);
+  const semantic = scoreSemanticPaths(changedPaths);
+
+  if (semantic.isTrivial) return "A";
+
+  // Size-based tier (0=B, 1=C, 2=D)
+  let sizeTier = 0;
+  if (
+    changedFiles > thresholds.files.p90 ||
+    totalLines > thresholds.lines.p90 ||
+    commits > thresholds.commits.p90
+  ) {
+    sizeTier = 2;
+  } else if (
+    changedFiles > thresholds.files.p75 ||
+    totalLines > thresholds.lines.p75 ||
+    commits > thresholds.commits.p75
+  ) {
+    sizeTier = 1;
+  }
+
+  // Semantic boost: only `high` complexity raises the tier (CI/workflow changes).
+  // `medium` complexity (multi-folder code changes) does not bump — it reflects
+  // breadth, not necessarily the need for AI enhancement.
+  const boost = semantic.complexity === "high" ? 1 : 0;
+  const effective = Math.min(2, sizeTier + boost);
+
+  if (effective >= 2) return "D";
+  if (effective >= 1) return "C";
+  return "B";
+}
+
+// =============================================================================
+// QUALITY GATE
+// =============================================================================
+
+// Phrases that indicate a vague or generic AI summary.
+const WEAK_PHRASES = [
+  "various improvements",
+  "miscellaneous",
+  "several changes",
+  "some updates",
+  "multiple files",
+  "this pr",
+  "todo",
+  "[insert",
+  "see changes",
+  "no description",
+  "overall improvements",
+];
+
+/**
+ * Returns true when the given text is likely a weak or unhelpful AI summary.
+ *
+ * Checks for:
+ * - Too short (< 80 chars)
+ * - Known generic/vague phrases
+ * - High ratio of file-extension references to words (file-dump pattern)
+ *
+ * @param {string} text
+ * @returns {boolean}
+ */
+export function isWeakSummary(text) {
+  if (!text || text.trim().length < 80) return true;
+
+  const lower = text.toLowerCase();
+  if (WEAK_PHRASES.some((p) => lower.includes(p))) return true;
+
+  // File-dump detection: more than 20% of tokens look like filenames
+  const fileRefs = (text.match(/\b\w[\w-]*\.\w{2,4}\b/g) ?? []).length;
+  const wordCount = (text.match(/\b\w+\b/g) ?? []).length;
+  if (wordCount > 0 && fileRefs / wordCount > 0.2) return true;
+
+  return false;
+}
+
+// =============================================================================
+// AI ENHANCEMENT
+// =============================================================================
+
+/**
+ * Calls the GitHub Models API with the given prompt and model.
+ * Returns the generated text or null on any error (network, auth, rate-limit).
+ *
+ * Uses `fetch` (Node 18+ built-in). Token comes from GH_TOKEN / GITHUB_TOKEN,
+ * which GitHub Actions sets automatically — no extra secrets needed.
+ *
+ * @param {string} prompt
+ * @param {string} model  GitHub Models model identifier
+ * @returns {Promise<string|null>}
+ */
+async function fetchAiEnhancement(prompt, model) {
+  const token = process.env.GH_TOKEN ?? process.env.GITHUB_TOKEN;
+  if (!token) return null;
+
+  try {
+    const response = await fetch(MODELS_API, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model,
+        messages: [
+          { role: "system", content: AI_SYSTEM_PROMPT },
+          { role: "user", content: prompt },
+        ],
+        max_tokens: 400,
+        temperature: 0.3,
+      }),
+      signal: AbortSignal.timeout(15_000),
+    });
+
+    if (!response.ok) return null;
+
+    const data = await response.json();
+    return data?.choices?.[0]?.message?.content?.trim() ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Builds the user-facing prompt for AI summary enhancement.
+ *
+ * @param {string} currentSummary  The deterministic summary text.
+ * @param {string} noteContext     Condensed context from the changed notes.
+ * @returns {string}
+ */
+function buildEnhancementPrompt(currentSummary, noteContext) {
+  return (
+    `Current summary:\n${currentSummary}\n\n` +
+    `Context from design notes:\n${noteContext}\n\n` +
+    "Write an improved summary paragraph (2–4 sentences, no headers, no markdown)."
+  );
+}
+
+/**
+ * Tries to improve the `## Summary` section of a generated description using AI.
+ *
+ * Strategy by tier:
+ *   C — one attempt with the cheap model; fall back to deterministic if weak.
+ *   D — cheap attempt first; if weak, one premium attempt; fall back if still weak.
+ *
+ * The rest of the description (Changes, Workflow Artifacts, etc.) is kept intact.
+ * Returns null when no improvement was produced, so the caller can keep the original.
+ *
+ * @param {string} description     Full deterministic PR description.
+ * @param {Array}  notes           Parsed note objects.
+ * @param {'C'|'D'} tier
+ * @returns {Promise<string|null>}
+ */
+async function enhancedSummary(description, notes, tier) {
+  // Extract the existing summary content (between ## Summary and the next section)
+  const summaryRe = /^(## Summary\s*\n\n)([\s\S]*?)(?=\n## |\n---\n|$)/m;
+  const match = description.match(summaryRe);
+  if (!match) return null;
+
+  const currentSummary = match[2].trim();
+
+  // Build condensed note context — permanent notes first, max 3, 400 chars each
+  const permanent = sortNotesByPriority(notes.filter((n) => classifyNote(n) === "permanent"));
+  const contextNotes = (permanent.length > 0 ? permanent : notes).slice(0, 3);
+  const noteContext = contextNotes
+    .map((n) => {
+      const title = n.frontmatter.title ?? baseName(n.file);
+      const snippet = n.body.slice(0, 400).replace(/\n+/g, " ").trim();
+      return `[${title}] ${snippet}`;
+    })
+    .join("\n");
+
+  const prompt = buildEnhancementPrompt(currentSummary, noteContext);
+
+  // Try cheap model first
+  const cheapResult = await fetchAiEnhancement(prompt, MODEL_CHEAP);
+  if (cheapResult && !isWeakSummary(cheapResult)) {
+    return description.replace(summaryRe, `## Summary\n\n${cheapResult}\n\n`);
+  }
+
+  // Tier D only: escalate to premium if cheap result was weak
+  if (tier === "D") {
+    const premiumResult = await fetchAiEnhancement(prompt, MODEL_PREMIUM);
+    if (premiumResult && !isWeakSummary(premiumResult)) {
+      return description.replace(summaryRe, `## Summary\n\n${premiumResult}\n\n`);
+    }
+  }
+
+  return null;
+}
+
+// =============================================================================
+// HELPERS
+// =============================================================================
+
+/** Returns a human-readable label for a routing tier. */
+function tierLabel(tier) {
+  const map = { A: "trivial", B: "normal", C: "complex", D: "very complex" };
+  return map[tier] ?? "unknown";
+}
+
+/** Returns a compact description of PR size statistics for logging. */
+function describeStats(stats) {
+  const { changedFiles, additions, deletions, commits } = stats;
+  return `${changedFiles} file(s), +${additions}/-${deletions} lines, ${commits} commit(s)`;
 }
 
 export function generateTitle(notes) {
