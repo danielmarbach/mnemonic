@@ -11,6 +11,7 @@ The format is loosely based on Keep a Changelog and uses semver-style version he
 ### Changed
 
 - Improved `heading` selector error message to suggest `headingStartsWith` for prefix matching when exact headings are uncertain.
+- `mnemonic-rpi-workflow` skill: added explicit handoff checkpoints between Research→Plan and Plan→Implement to prevent proceeding without user confirmation at natural workflow boundaries.
 
 ## [0.26.0] - 2026-04-25
 
