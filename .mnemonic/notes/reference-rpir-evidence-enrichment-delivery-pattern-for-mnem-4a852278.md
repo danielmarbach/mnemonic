@@ -8,11 +8,16 @@ tags:
   - mnemonic
 lifecycle: permanent
 createdAt: '2026-04-26T19:01:36.389Z'
-updatedAt: '2026-04-26T19:01:36.389Z'
+updatedAt: '2026-04-26T19:01:43.790Z'
 role: reference
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: decision-expose-trust-evidence-at-decision-points-via-opt-in-244d8317
+    type: derives-from
+  - id: summary-evidence-enrichment-implementation-across-recall-and-10b7ba37
+    type: follows
 memoryVersion: 1
 ---
 # Reference: RPIR evidence-enrichment delivery pattern for mnemonic

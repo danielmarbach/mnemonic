@@ -8,7 +8,7 @@ tags:
   - workflow
 lifecycle: permanent
 createdAt: '2026-04-26T19:00:03.668Z'
-updatedAt: '2026-04-26T19:01:27.543Z'
+updatedAt: '2026-04-26T19:01:43.773Z'
 role: decision
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -19,6 +19,8 @@ relatedTo:
   - id: summary-evidence-enrichment-implementation-across-recall-and-10b7ba37
     type: follows
   - id: request-implement-evidence-enrichment-phases-from-explainabi-abe55a21
+    type: derives-from
+  - id: reference-rpir-evidence-enrichment-delivery-pattern-for-mnem-4a852278
     type: derives-from
 memoryVersion: 1
 ---
