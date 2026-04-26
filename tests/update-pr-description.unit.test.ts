@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildSummaryIntro,
+  classifyNote,
   generateDescription,
   generateTitle,
   parseFrontmatter,
@@ -19,6 +20,69 @@ function makeNote(title: string, tags: string[], body = "Body text.") {
     body,
   };
 }
+
+function makeWorkflowNote(
+  title: string,
+  role: string,
+  lifecycle: "temporary" | "permanent",
+  body = "Body text.",
+) {
+  return {
+    file: `.mnemonic/notes/${title.toLowerCase().replace(/\s+/g, "-")}.md`,
+    frontmatter: { title, tags: ["workflow"], role, lifecycle },
+    body,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// classifyNote
+// ---------------------------------------------------------------------------
+
+describe("classifyNote", () => {
+  it("returns 'research' for role: research", () => {
+    expect(classifyNote(makeWorkflowNote("R", "research", "temporary"))).toBe("research");
+  });
+
+  it("returns 'plan' for role: plan", () => {
+    expect(classifyNote(makeWorkflowNote("P", "plan", "temporary"))).toBe("plan");
+  });
+
+  it("returns 'review' for role: review", () => {
+    expect(classifyNote(makeWorkflowNote("V", "review", "temporary"))).toBe("review");
+  });
+
+  it("returns 'context' for role: context", () => {
+    expect(classifyNote(makeWorkflowNote("C", "context", "temporary"))).toBe("context");
+  });
+
+  it("returns 'context' for unroled temporary notes (ad-hoc scaffolding)", () => {
+    const note = {
+      file: ".mnemonic/notes/adhoc.md",
+      frontmatter: { title: "Adhoc", tags: [], lifecycle: "temporary" },
+      body: "",
+    };
+    expect(classifyNote(note)).toBe("context");
+  });
+
+  it("returns 'permanent' for notes with no role and no lifecycle", () => {
+    expect(classifyNote(makeNote("Design Decision", ["design"]))).toBe("permanent");
+  });
+
+  it("returns 'permanent' for notes with lifecycle: permanent regardless of tags", () => {
+    const note = {
+      file: ".mnemonic/notes/perm.md",
+      frontmatter: { title: "Perm", tags: ["plan"], lifecycle: "permanent" },
+      body: "",
+    };
+    expect(classifyNote(note)).toBe("permanent");
+  });
+
+  it("role takes precedence over lifecycle for RPIR workflow notes", () => {
+    // A research note promoted to permanent still shows as 'research'
+    const note = makeWorkflowNote("Promoted Research", "research", "permanent");
+    expect(classifyNote(note)).toBe("research");
+  });
+});
 
 // ---------------------------------------------------------------------------
 // buildSummaryIntro
@@ -167,10 +231,10 @@ describe("generateDescription — summary section", () => {
 });
 
 // ---------------------------------------------------------------------------
-// generateDescription — ordering of Design Decisions section
+// generateDescription — ordering of Changes section
 // ---------------------------------------------------------------------------
 
-describe("generateDescription — Design Decisions ordering", () => {
+describe("generateDescription — Changes section ordering", () => {
   it("lists bug-tagged notes before design notes", () => {
     const design = makeNote("Design Note", ["architecture"], "Design body.");
     const bug = makeNote("Bug Fix", ["bug"], "Bug body.");
@@ -199,6 +263,12 @@ describe("generateDescription — Design Decisions ordering", () => {
     const bugIdx = desc.indexOf("**Bug Fix**");
     const designIdx = desc.indexOf("**Design Note**");
     expect(bugIdx).toBeLessThan(designIdx);
+  });
+
+  it("does not render a Changes section for a single-note PR", () => {
+    const note = makeNote("My Note", ["design"], "First para.\n\nSecond para.");
+    const desc = generateDescription([note]);
+    expect(desc).not.toContain("## Changes");
   });
 });
 
@@ -236,15 +306,132 @@ describe("smoke test: PR #47 notes (bug + audit note)", () => {
     expect(desc).toContain("This PR fixes the following issues:");
   });
 
-  it("lists audit note (bugs tag) before policy note in both Summary and Design Decisions", () => {
+  it("lists audit note (bugs tag) before policy note in both Summary and Changes", () => {
     const desc = generateDescription([policyNote, auditNote]);
     const auditInSummary = desc.indexOf("**Vault creation audit");
     const policyInSummary = desc.indexOf("**project memory storage policy**");
     expect(auditInSummary).toBeLessThan(policyInSummary);
 
-    const auditInDecisions = desc.indexOf("### Vault creation audit");
-    const policyInDecisions = desc.indexOf("### project memory storage policy");
-    expect(auditInDecisions).toBeLessThan(policyInDecisions);
+    const auditInChanges = desc.indexOf("### Vault creation audit");
+    const policyInChanges = desc.indexOf("### project memory storage policy");
+    expect(auditInChanges).toBeLessThan(policyInChanges);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// generateDescription — Workflow Artifacts section (RPIR notes)
+// ---------------------------------------------------------------------------
+
+describe("generateDescription — Workflow Artifacts section", () => {
+  it("renders Workflow Artifacts section when RPIR notes are present", () => {
+    const plan = makeWorkflowNote("My Plan", "plan", "temporary", "Plan to fix the thing.");
+    const desc = generateDescription([plan]);
+    expect(desc).toContain("## Workflow Artifacts");
+    expect(desc).toContain("**Plan:**");
+    expect(desc).toContain("My Plan");
+  });
+
+  it("shows first sentence of workflow note body, not full body", () => {
+    const research = makeWorkflowNote(
+      "My Research",
+      "research",
+      "temporary",
+      "Short finding. Much more detail follows here that should not appear.",
+    );
+    const desc = generateDescription([research]);
+    expect(desc).toContain("Short finding.");
+    expect(desc).not.toContain("Much more detail follows here");
+  });
+
+  it("groups workflow notes under their correct role label", () => {
+    const research = makeWorkflowNote("R Note", "research", "temporary", "Research body.");
+    const plan = makeWorkflowNote("P Note", "plan", "temporary", "Plan body.");
+    const review = makeWorkflowNote("V Note", "review", "temporary", "Review body.");
+    const desc = generateDescription([research, plan, review]);
+    expect(desc).toContain("**Research:**");
+    expect(desc).toContain("**Plan:**");
+    expect(desc).toContain("**Review:**");
+  });
+
+  it("omits Workflow Artifacts section when there are no RPIR notes", () => {
+    const note = makeNote("Design Note", ["architecture"], "Decision body.");
+    const desc = generateDescription([note]);
+    expect(desc).not.toContain("## Workflow Artifacts");
+  });
+
+  it("does not render a Changes section for workflow-only PRs", () => {
+    const plan = makeWorkflowNote("My Plan", "plan", "temporary", "Plan body.");
+    const desc = generateDescription([plan]);
+    expect(desc).not.toContain("## Changes");
+  });
+
+  it("renders both Changes and Workflow Artifacts when PR has both note types", () => {
+    const decision = makeNote("Design Decision", ["design"], "Decision body.");
+    const plan = makeWorkflowNote("Implementation Plan", "plan", "temporary", "Plan body.");
+    const desc = generateDescription([decision, plan]);
+    expect(desc).toContain("## Changes");
+    expect(desc).toContain("## Workflow Artifacts");
+    expect(desc).toContain("### Design Decision");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// generateDescription — Open Questions section (conditional)
+// ---------------------------------------------------------------------------
+
+describe("generateDescription — Open Questions section", () => {
+  it("renders Open Questions section when a note contains that heading", () => {
+    const note = makeNote(
+      "Design Note",
+      ["design"],
+      "Summary para.\n\n## Open Questions\n\n- Question one\n- Question two\n",
+    );
+    const desc = generateDescription([note]);
+    expect(desc).toContain("## Open Questions");
+    expect(desc).toContain("Question one");
+  });
+
+  it("omits Open Questions section when no note has that heading", () => {
+    const note = makeNote("Design Note", ["design"], "Summary para.");
+    const desc = generateDescription([note]);
+    expect(desc).not.toContain("## Open Questions");
+  });
+
+  it("extracts Risks section under Open Questions", () => {
+    const note = makeNote(
+      "Design Note",
+      ["design"],
+      "Summary.\n\n## Risks\n\n- Risk A\n",
+    );
+    const desc = generateDescription([note]);
+    expect(desc).toContain("## Open Questions");
+    expect(desc).toContain("Risk A");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// generateDescription — Notes / References section
+// ---------------------------------------------------------------------------
+
+describe("generateDescription — Notes / References section", () => {
+  it("always includes a Notes / References section", () => {
+    const note = makeNote("My Note", ["design"]);
+    const desc = generateDescription([note]);
+    expect(desc).toContain("## Notes / References");
+    expect(desc).toContain(".mnemonic/notes/");
+  });
+
+  it("labels workflow notes with their role in the references list", () => {
+    const plan = makeWorkflowNote("My Plan", "plan", "temporary", "Plan body.");
+    const desc = generateDescription([plan]);
+    expect(desc).toMatch(/my-plan\.md.*\(plan\)/);
+  });
+
+  it("does not add a role label for permanent notes", () => {
+    const note = makeNote("Design Note", ["design"]);
+    const desc = generateDescription([note]);
+    // Permanent notes should not have a _(role)_ label
+    expect(desc).not.toMatch(/design-note\.md.*\(permanent\)/);
   });
 });
 
