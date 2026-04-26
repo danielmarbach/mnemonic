@@ -302,12 +302,16 @@ export function computeThresholds(history) {
   const isFiniteNumber = (v) => typeof v === "number" && Number.isFinite(v);
 
   const files = history.map((p) => p.changedFiles).filter(isFiniteNumber);
+  // Both additions and deletions must be present to produce a meaningful total-lines
+  // figure; entries where only one side is available are excluded to avoid under-counting.
   const lines = history
     .filter((p) => isFiniteNumber(p.additions) && isFiniteNumber(p.deletions))
     .map((p) => p.additions + p.deletions);
   const commits = history.map((p) => p.commits).filter(isFiniteNumber);
 
-  // Fall back if any dimension lacks enough valid samples.
+  // Fall back when the primary size dimensions (files and lines) lack enough valid
+  // samples to produce reliable percentiles. Commits uses its own independent fallback
+  // below so that a repo with commit data but missing file counts still works correctly.
   if (files.length < 5 || lines.length < 5) return CONSERVATIVE_DEFAULTS;
 
   return {
