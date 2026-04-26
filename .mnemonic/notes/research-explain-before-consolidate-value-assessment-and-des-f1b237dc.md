@@ -8,13 +8,15 @@ tags:
   - research
 lifecycle: temporary
 createdAt: '2026-04-26T10:07:45.462Z'
-updatedAt: '2026-04-26T10:07:54.583Z'
+updatedAt: '2026-04-26T10:07:58.945Z'
 role: research
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
   - id: mnemonic-key-design-decisions-3f2a6273
+    type: derives-from
+  - id: hybrid-recall-design-and-implementation-0-20-0-0-23-0-350317a0
     type: derives-from
 memoryVersion: 1
 ---
