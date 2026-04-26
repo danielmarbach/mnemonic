@@ -8,7 +8,7 @@ tags:
   - verification
 lifecycle: permanent
 createdAt: '2026-04-26T19:00:03.718Z'
-updatedAt: '2026-04-26T19:01:27.561Z'
+updatedAt: '2026-04-26T19:01:43.790Z'
 role: summary
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -20,6 +20,8 @@ relatedTo:
     type: follows
   - id: request-implement-evidence-enrichment-phases-from-explainabi-abe55a21
     type: derives-from
+  - id: reference-rpir-evidence-enrichment-delivery-pattern-for-mnem-4a852278
+    type: follows
 memoryVersion: 1
 ---
 # Summary: evidence enrichment implementation across recall and consolidate
