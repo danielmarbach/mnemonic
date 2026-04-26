@@ -9,13 +9,17 @@ tags:
   - evidence
 lifecycle: temporary
 createdAt: '2026-04-26T17:34:05.404Z'
-updatedAt: '2026-04-26T17:34:23.254Z'
+updatedAt: '2026-04-26T19:01:27.561Z'
 role: context
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
   - id: plan-enrich-decision-points-with-retrieval-rationale-and-tru-0dd24e70
+    type: derives-from
+  - id: decision-expose-trust-evidence-at-decision-points-via-opt-in-244d8317
+    type: derives-from
+  - id: summary-evidence-enrichment-implementation-across-recall-and-10b7ba37
     type: derives-from
 memoryVersion: 1
 ---
