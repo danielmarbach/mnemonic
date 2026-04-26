@@ -12,7 +12,7 @@ tags:
   - token-efficiency
 lifecycle: temporary
 createdAt: '2026-04-26T10:11:01.959Z'
-updatedAt: '2026-04-26T18:59:39.381Z'
+updatedAt: '2026-04-26T19:00:13.770Z'
 role: plan
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -25,6 +25,8 @@ relatedTo:
   - id: apply-implement-evidence-enrichment-phases-1-2-and-2-5-f18137eb
     type: follows
   - id: request-implement-evidence-enrichment-phases-from-explainabi-abe55a21
+    type: derives-from
+  - id: decision-expose-trust-evidence-at-decision-points-via-opt-in-244d8317
     type: derives-from
 memoryVersion: 1
 ---

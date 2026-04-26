@@ -8,11 +8,16 @@ tags:
   - workflow
 lifecycle: permanent
 createdAt: '2026-04-26T19:00:03.668Z'
-updatedAt: '2026-04-26T19:00:03.668Z'
+updatedAt: '2026-04-26T19:00:13.866Z'
 role: decision
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: plan-enrich-decision-points-with-retrieval-rationale-and-tru-0dd24e70
+    type: derives-from
+  - id: summary-evidence-enrichment-implementation-across-recall-and-10b7ba37
+    type: follows
 memoryVersion: 1
 ---
 # Decision: expose trust evidence at decision points via opt-in enrichment
