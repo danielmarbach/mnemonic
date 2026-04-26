@@ -8,13 +8,15 @@ tags:
   - evidence
 lifecycle: temporary
 createdAt: '2026-04-26T18:54:31.332Z'
-updatedAt: '2026-04-26T18:54:39.398Z'
+updatedAt: '2026-04-26T19:00:13.776Z'
 role: review
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
   - id: apply-implement-evidence-enrichment-phases-1-2-and-2-5-f18137eb
+    type: derives-from
+  - id: summary-evidence-enrichment-implementation-across-recall-and-10b7ba37
     type: derives-from
 memoryVersion: 1
 ---
