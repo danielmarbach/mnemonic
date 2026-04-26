@@ -509,7 +509,8 @@ describe("computeThresholds", () => {
     expect(t.files.p75).toBeGreaterThan(1);
     expect(t.files.p75).toBeLessThan(35);
     expect(t.files.p90).toBeGreaterThan(t.files.p75);
-    expect(t.lines.p75).toBeGreaterThan(t.lines.p75 - 1);
+    expect(t.lines.p75).toBeGreaterThan(0);
+    expect(t.lines.p75).toBeLessThan(2000);
     expect(t.commits.p90).toBeGreaterThan(t.commits.p75);
   });
 

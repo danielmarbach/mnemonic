@@ -257,11 +257,13 @@ function fetchPrHistory(repo, cwd) {
 
 /**
  * Computes a percentile value from an unsorted array using linear interpolation.
+ * Non-finite values (NaN, Infinity) are excluded before sorting.
  * Returns 0 for an empty array.
  */
 function percentile(values, p) {
-  if (values.length === 0) return 0;
-  const sorted = [...values].sort((a, b) => a - b);
+  const finite = values.filter((v) => Number.isFinite(v));
+  if (finite.length === 0) return 0;
+  const sorted = [...finite].sort((a, b) => a - b);
   const idx = (p / 100) * (sorted.length - 1);
   const lo = Math.floor(idx);
   const hi = Math.ceil(idx);
@@ -434,8 +436,10 @@ export function isWeakSummary(text) {
   const lower = text.toLowerCase();
   if (WEAK_PHRASES.some((p) => lower.includes(p))) return true;
 
-  // File-dump detection: more than 20% of tokens look like filenames
-  const fileRefs = (text.match(/\b\w[\w-]*\.\w{2,4}\b/g) ?? []).length;
+  // File-dump detection: more than 20% of tokens look like source filenames.
+  // The pattern requires an alphabetic extension to avoid matching decimals (1.5)
+  // or version strings (v1.2.3).
+  const fileRefs = (text.match(/\b\w[\w-]*\.[a-z]{2,4}\b/g) ?? []).length;
   const wordCount = (text.match(/\b\w+\b/g) ?? []).length;
   if (wordCount > 0 && fileRefs / wordCount > 0.2) return true;
 
