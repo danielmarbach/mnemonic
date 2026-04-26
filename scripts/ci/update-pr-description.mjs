@@ -108,6 +108,11 @@ export async function main() {
       `lines p75=${thresholds.lines.p75.toFixed(0)}/p90=${thresholds.lines.p90.toFixed(0)}, ` +
       `commits p75=${thresholds.commits.p75.toFixed(0)}/p90=${thresholds.commits.p90.toFixed(0)}\n`,
   );
+  if (history.length === 0) {
+    process.stderr.write(
+      "[history] 0 historical PRs returned — check the [history] lines above for the gh exit code and stderr.\n",
+    );
+  }
 
   // --- Step 3: Route to tier A / B / C / D ---
   const tier = routeTier(prStats, changedFiles, thresholds);
@@ -224,46 +229,146 @@ function fetchCurrentPrData(prNumber, repo, cwd) {
   }
 }
 
+// Fields for the primary attempt (includes commits for full calibration).
+const PR_HISTORY_FIELDS_FULL = "number,changedFiles,additions,deletions,commits";
+// Fallback fields used when the primary attempt fails (commits may be unsupported).
+const PR_HISTORY_FIELDS_FALLBACK = "number,changedFiles,additions,deletions";
+// Maximum per-PR rejection messages to emit before switching to a summary line.
+const PR_REJECTION_LOG_LIMIT = 5;
+
 /**
  * Fetches recent merged PR history for percentile calibration.
- * Uses `gh pr list` (GraphQL) which reliably returns changedFiles, additions,
- * deletions, and commits per PR — unlike the REST list endpoint which omits them.
- * Read-only — no files written. Returns empty array on any failure.
+ *
+ * Strategy:
+ *   1. Try `gh pr list --json changedFiles,additions,deletions,commits` (preferred).
+ *   2. If that fails (e.g. `commits` unsupported in this gh version), retry without
+ *      `commits` — commits data will be missing but size percentiles still work.
+ *
+ * All steps emit diagnostics to stderr so CI logs show exactly what happened.
+ * Read-only — no files written. Returns empty array on any unrecoverable failure.
  *
  * @returns {Array<{changedFiles:number|null, additions:number|null, deletions:number|null, commits:number|null}>}
  */
 function fetchPrHistory(repo, cwd) {
-  const result = spawnSync(
-    "gh",
-    [
-      "pr", "list",
-      "--state", "merged",
-      "--limit", "50",
-      "--repo", repo,
-      "--json", "changedFiles,additions,deletions,commits",
-    ],
-    { encoding: "utf-8", cwd },
+  const baseArgs = ["pr", "list", "--state", "merged", "--limit", "50", "--repo", repo];
+
+  // --- Attempt 1: with commits field ---
+  const fullArgs = [...baseArgs, "--json", PR_HISTORY_FIELDS_FULL];
+  process.stderr.write(
+    `[history] Running: gh ${fullArgs.join(" ")}\n`,
   );
+  const fullResult = spawnSync("gh", fullArgs, { encoding: "utf-8", cwd });
+  process.stderr.write(`[history] Exit code: ${fullResult.status}\n`);
+  if (fullResult.stderr?.trim()) {
+    process.stderr.write(`[history] stderr: ${fullResult.stderr.trim()}\n`);
+  }
 
-  if (result.status !== 0) return [];
+  let rawJson = null;
+  let commitsIncluded = true;
 
+  if (fullResult.status === 0) {
+    rawJson = fullResult.stdout.trim();
+  } else {
+    // --- Attempt 2: without commits field (may not be supported in all gh versions) ---
+    const fallbackArgs = [...baseArgs, "--json", PR_HISTORY_FIELDS_FALLBACK];
+    process.stderr.write(
+      `[history] Retrying without commits: gh ${fallbackArgs.join(" ")}\n`,
+    );
+    const fallbackResult = spawnSync("gh", fallbackArgs, { encoding: "utf-8", cwd });
+    process.stderr.write(`[history] Retry exit code: ${fallbackResult.status}\n`);
+    if (fallbackResult.stderr?.trim()) {
+      process.stderr.write(`[history] Retry stderr: ${fallbackResult.stderr.trim()}\n`);
+    }
+    if (fallbackResult.status !== 0) {
+      process.stderr.write("[history] Both gh pr list attempts failed. Cannot calibrate.\n");
+      return [];
+    }
+    rawJson = fallbackResult.stdout.trim();
+    commitsIncluded = false;
+    process.stderr.write("[history] Using fallback fields (no commits data).\n");
+  }
+
+  let parsed;
   try {
-    const parsed = JSON.parse(result.stdout.trim());
-    if (!Array.isArray(parsed)) return [];
-    return parsed.map((pr) => ({
-      changedFiles: typeof pr.changedFiles === "number" ? pr.changedFiles : null,
-      additions: typeof pr.additions === "number" ? pr.additions : null,
-      deletions: typeof pr.deletions === "number" ? pr.deletions : null,
-      // GraphQL returns commits as an array of objects; extract the count.
-      commits: Array.isArray(pr.commits)
-        ? pr.commits.length
-        : typeof pr.commits === "number"
-          ? pr.commits
-          : null,
-    }));
-  } catch {
+    parsed = JSON.parse(rawJson);
+  } catch (err) {
+    process.stderr.write(`[history] JSON parse error: ${err.message}\n`);
+    process.stderr.write(`[history] Raw output (first 500 chars): ${rawJson.slice(0, 500)}\n`);
     return [];
   }
+
+  if (!Array.isArray(parsed)) {
+    process.stderr.write(
+      `[history] Unexpected response shape (not an array). Keys: ${Object.keys(parsed ?? {}).join(", ")}\n`,
+    );
+    return [];
+  }
+
+  process.stderr.write(`[history] Raw PRs returned: ${parsed.length}\n`);
+
+  if (parsed.length > 0) {
+    process.stderr.write(
+      `[history] Sample PR[0] keys: ${Object.keys(parsed[0]).join(", ")}\n`,
+    );
+    process.stderr.write(
+      `[history] Sample PR[0] values: ${JSON.stringify(parsed[0])}\n`,
+    );
+  }
+
+  // Map to metrics, logging why each PR is rejected.
+  // Per-PR rejection messages are capped at PR_REJECTION_LOG_LIMIT to keep
+  // logs readable for large histories; a summary line is emitted afterwards.
+  let validCount = 0;
+  let rejectionCount = 0;
+  const mapped = parsed.map((pr, index) => {
+    const changedFiles = typeof pr.changedFiles === "number" ? pr.changedFiles : null;
+    const additions = typeof pr.additions === "number" ? pr.additions : null;
+    const deletions = typeof pr.deletions === "number" ? pr.deletions : null;
+    // GraphQL returns commits as an array of objects; extract the count.
+    const commits = commitsIncluded
+      ? (Array.isArray(pr.commits)
+          ? pr.commits.length
+          : typeof pr.commits === "number"
+            ? pr.commits
+            : null)
+      : null;
+
+    const missing = [];
+    if (changedFiles === null) missing.push("changedFiles");
+    if (additions === null) missing.push("additions");
+    if (deletions === null) missing.push("deletions");
+    if (commits === null && commitsIncluded) missing.push("commits");
+
+    if (missing.length > 0) {
+      rejectionCount += 1;
+      if (rejectionCount <= PR_REJECTION_LOG_LIMIT) {
+        process.stderr.write(
+          `[history] PR[${index}] (#${pr.number ?? "?"}) rejected: missing ${missing.join(", ")}\n`,
+        );
+      }
+    } else {
+      validCount += 1;
+    }
+
+    return { changedFiles, additions, deletions, commits };
+  });
+
+  if (rejectionCount > PR_REJECTION_LOG_LIMIT) {
+    process.stderr.write(
+      `[history] ... and ${rejectionCount - PR_REJECTION_LOG_LIMIT} more rejected PR(s) (suppressed).\n`,
+    );
+  }
+
+  process.stderr.write(`[history] PRs with valid metrics: ${validCount}/${parsed.length}\n`);
+
+  if (validCount === 0 && parsed.length > 0) {
+    process.stderr.write(
+      "[history] WARNING: No PRs had valid metrics despite non-empty response. " +
+        "Field names may not match what the gh CLI returns for this repo.\n",
+    );
+  }
+
+  return mapped;
 }
 
 // =============================================================================
