@@ -2837,6 +2837,7 @@ server.registerTool(
             projectRelevant: isCurrentProject,
             freshness: toRecallFreshness(note.updatedAt),
             superseded: supersededRelations.length > 0,
+            supersededBy: supersededRelations.length > 0 ? supersededRelations[0]?.id : undefined,
             supersededCount: supersededRelations.length > 0 ? supersededRelations.length : undefined,
           }
           : undefined;

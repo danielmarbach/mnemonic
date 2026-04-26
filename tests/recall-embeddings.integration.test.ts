@@ -936,6 +936,7 @@ This note has no embedding.`,
       expect(["today", "thisWeek", "thisMonth", "older"]).toContain(evidenceMatch?.retrievalEvidence?.freshness);
       expect(evidenceMatch?.retrievalEvidence?.projectRelevant).toBe(false);
       expect(evidenceMatch?.retrievalEvidence?.superseded).toBe(true);
+      expect(evidenceMatch?.retrievalEvidence?.supersededBy).toBe(childId);
       expect(evidenceMatch?.retrievalEvidence?.supersededCount).toBeGreaterThan(0);
       expect(evidenceResponse.text).toContain("channels:");
       expect(evidenceResponse.text).toContain("supersedes");
