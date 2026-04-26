@@ -8,7 +8,7 @@ tags:
   - research
 lifecycle: temporary
 createdAt: '2026-04-26T10:07:45.462Z'
-updatedAt: '2026-04-26T10:11:06.175Z'
+updatedAt: '2026-04-26T10:14:43.416Z'
 role: research
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -34,95 +34,123 @@ Should mnemonic introduce an `explain` tool (or explain enrichment) that surface
 
 The proposal argues: "Do not let LLMs mutate memory from text alone. Let them mutate memory from text + ranking evidence + lineage + freshness + trust signals."
 
-## What mnemonic already has (signal inventory)
+## Signal inventory
 
-### Retrieval signals already computed but not surfaced
+### Retrieval signals computed but not surfaced
 
-The `ScoredRecallCandidate` interface in `recall.ts` already computes a rich set of signals per candidate that are **never exposed to the LLM**:
-
-- `semanticRank` — not exposed
-- `lexicalRank` — not exposed
-- `lexicalScore` — not exposed
-- `coverageScore` — not exposed
-- `phraseScore` — not exposed
-- `canonicalExplanationScore` — not exposed
-- `relatedCount` — not exposed
-- `connectionDiversity` — not exposed
-- `structureScore` — not exposed
-- `isCurrentProject` — not exposed
-- Graph spreading source — not exposed
-- Was rescue candidate — not exposed
-- Temporal boost amount — not exposed
-- `metadata` (role, importance, alwaysLoad) — partially exposed (role only)
+`ScoredRecallCandidate` in `recall.ts` computes signals never exposed to the LLM: `semanticRank`, `lexicalRank`, `lexicalScore`, `coverageScore`, `phraseScore`, `canonicalExplanationScore`, `relatedCount`, `connectionDiversity`, `structureScore`, `isCurrentProject`, graph spreading source, rescue candidate flag, temporal boost amount, and `metadata` (partially exposed — role only).
 
 ### Signals already exposed in recall output
 
-- `score` and `boosted` numbers
-- `provenance` (lastUpdatedAt, lastCommitHash, recentlyChanged)
-- `confidence` (high/medium/low)
-- `lifecycle` and `role`
-- `tags`
-- Bounded 1-hop relationship previews (top N results only)
-- `history` and `historySummary` (temporal mode only)
+`score`, `boosted`, `provenance` (lastUpdatedAt, lastCommitHash, recentlyChanged), `confidence` (high/medium/low), `lifecycle`, `role`, `tags`, bounded 1-hop relationship previews (top N), `history`/`historySummary` (temporal mode only).
 
 ### Key gap in consolidate strategies
 
-`detect-duplicates` and `suggest-merges` compute pairwise cosine similarity in isolation. They do not have access to the recall pipeline's rich signal stack (lexical scores, canonical explanation scores, graph spreading, temporal signals, project boost). They also lack per-note lineage, freshness, and supersession chain information.
+`detect-duplicates` and `suggest-merges` compute pairwise cosine similarity in isolation — no recall pipeline signals, no per-note lineage, freshness, or supersession chain information.
 
 ## Design principle analysis
 
-### Principles that support enriching existing tools over adding a new one
+### Principles supporting enrichment over a new tool
 
-1. **No new storage** — all signals already exist in memory during recall. Aligns with file-first, no-new-artifacts.
-2. **Additive, bounded, reversible** — surfacing existing signals is purely additive. Mirrors how temporal recall was added.
+1. **No new storage** — all signals already exist in memory during recall. File-first, no-new-artifacts.
+2. **Additive, bounded, reversible** — surfacing existing signals mirrors how temporal recall was added.
 3. **Fail-soft** — partial signals degrade gracefully, exactly like lexical rescue.
-4. **Token efficiency** — this is the strongest argument against a separate `explain` tool.
+4. **Token efficiency** — the strongest argument against a separate explain tool.
+5. **Stable abstractions over raw internals** — expose bands, booleans, enums, not raw scores that may churn.
 
-### Principles that challenge a separate `explain` tool
+### Principles challenging a separate explain tool
 
-1. **Mnemonic is the canonical store, not the workflow runtime** — `explain` as a separate step risks turning mnemonic into a reasoning engine. Established principle: mnemonic provides artifacts; the LLM reasons over them.
-2. **Workflow guidance lives in prompts/skills, not mandatory tool sequences** — adding `explain` before consolidate contradicts this.
-3. **Token budget discipline** — recall already limits relationship previews. An `explain` dump for every candidate would blow past budgets.
-4. **Consolidate uses its own similarity computation** — recall signals use different weighting (project boost, canonical promotion, graph spreading) not applicable to pairwise similarity.
+1. **Store, not runtime** — `explain` as a step risks making mnemonic a reasoning engine. Mnemonic provides artifacts; the LLM reasons over them.
+2. **Workflow guidance in prompts/skills, not mandatory tool sequences** — adding `explain` before consolidate contradicts this.
+3. **Token budget discipline** — recall already limits previews. An explain dump for every candidate blows past budgets.
+4. **Consolidate uses its own similarity** — recall weighting (project boost, canonical promotion, graph spreading) doesn't apply to pairwise similarity.
+5. **Different decision points answer different questions** — recall asks "why retrieved?", consolidate asks "should merge?". One explain payload doesn't fit both.
 
-## Recommended approach: enrich at decision points, no new tool
+## Stakeholder refinements incorporated
 
-### Enrich recall output (opt-in)
+Three key refinements from the proposal author's review:
 
-Add compact `retrievalEvidence` to recall results via an opt-in parameter (like `mode: "temporal"`). Per-result compact format:
+### 1. Do not expose raw internal scores too early
+
+Avoid leaking unstable internals (`coverageScore`, `phraseScore`, `structureScore`, `lexicalScore` — these may churn). Instead expose stable abstractions:
+
+- `channels` (enum) instead of raw rank + score
+- `rankBand` ("top3" / "top10" / "lower") instead of raw `semanticRank`
+- `projectRelevant` (boolean) instead of `isCurrentProject`
+- `freshness` (enum) instead of raw `ageDays` in recall
+- `superseded` (boolean) instead of requiring chain traversal
+
+This gives freedom to evolve internals later without contract breaks.
+
+### 2. Compact by default
+
+Default `evidence` mode is `"compact"` (opt-in, not default). Verbose mode only when requested. Follows the pattern of `mode: "temporal"` and `verbose: true`.
+
+### 3. Consolidation gets different evidence than recall
+
+Recall evidence answers: **Why was this retrieved?**
+
+Consolidation evidence answers: **Should these merge / prune / supersede?**
+
+Different question, different payload:
+
+- Recall: channels, rankBand, projectRelevant, freshness enum, superseded boolean
+- Consolidation: lifecycle, role, ageDays (precise for comparison), supersession chain, relatedCount, merge-specific warnings
+
+## Recommended approach: explainability as capability layer
+
+**The core design shift: explainability is not a workflow step, it is a capability layer.**
+
+The principle "explain before mutate" survives even without a standalone command. Evidence should be available at every decision point where memory is about to change.
+
+Surface points:
+
+- `recall(evidence: "compact")` — compact retrieval rationale inline in recall results
+- `detectDuplicates(evidence: true)` — per-note trust metadata alongside similarity
+- `suggestMerges(evidence: true)` — per-note trust + merge warnings alongside suggestions
+- `consolidate(dryRun: true, evidence: true)` — full evidence at the preview stage
+
+No standalone `explain` tool initially. Only add an explicit explain command later if real workflows demand it.
+
+### Recall evidence shape (stable abstractions)
 
 ```typescript
 retrievalEvidence?: {
-  semanticRank: number;
-  lexicalRank?: number;
-  channels: ("semantic" | "lexical-rescue" | "graph-spreading" | "temporal-boost")[];
-  canonicalExplanationScore?: number;
-  isCurrentProject: boolean;
+  channels: Array<"semantic" | "lexical" | "graph" | "temporal-boost" | "canonical" | "rescue">;
+  rankBand: "top3" | "top10" | "lower";
+  projectRelevant: boolean;
+  freshness: "today" | "thisWeek" | "thisMonth" | "older";
+  superseded: boolean;
   supersededBy?: string;
   supersededCount?: number;
-  ageDays: number;
 }
 ```
 
-### Enrich consolidate strategies
+### Consolidation evidence shape (merge decision payload)
 
-Enhance `suggest-merges` and `detect-duplicates` to include per-note trust and lineage metadata:
+```typescript
+mergeEvidence?: {
+  lifecycle: "temporary" | "permanent";
+  role?: string;
+  ageDays: number;
+  superseded: boolean;
+  supersededBy?: string;
+  supersededCount?: number;
+  relatedCount: number;
+  warnings?: string[];
+}
+```
 
-- lifecycle and role (already available)
-- freshness: updatedAt age in days
-- supersession status: is this note already superseded? does it supersed others?
-- relationship count: how connected is this note?
-- conflict warnings: temporary research vs permanent decision in same merge suggestion
+### Heuristic warnings for suggest-merges
 
-### No new `explain` tool needed
+- "temporary research note in merge — consider unique evidence"
+- "note supersedes another — merging may orphan the supersedes chain"
+- "newer note would be merged into older summary — stale summary risk"
+- "same role but different lifecycles — verify merge intent"
 
-The proposal's core insight is correct: LLMs should not mutate memory from text alone when richer signals exist. But the right shape is enriching the existing decision points (recall, consolidate), not adding a separate reasoning step.
+### Implementation path
 
-**Implementation path:**
-
-1. Add `retrievalEvidence` to recall results (opt-in parameter)
-2. Enrich `suggest-merges` and `detect-duplicates` with per-note lineage, freshness, and trust metadata
-3. Add `supersededBy` / `supersededCount` to both recall and consolidate output
-4. No new tool required
-
-This preserves the "store, not runtime" principle, avoids session state, keeps token budgets tight, and follows established opt-in enrichment patterns.
+1. Phase 1: Add `evidence: "compact"` to recall (stable abstractions, opt-in, default off)
+2. Phase 2: Add `evidence: true` to consolidate strategies (merge-specific payload, always-on for suggest-merges and detect-duplicates)
+3. Phase 3: Use evidence fields in workflow prompts and skills
+4. Phase 4 (only if real workflows demand it): Consider standalone explain command
