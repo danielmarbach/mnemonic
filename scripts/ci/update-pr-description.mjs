@@ -266,12 +266,12 @@ export function generateDescription(notes) {
   // --------------------------------------------------------------------------
   if (workflowNotes.length > 0) {
     lines.push("## Workflow Artifacts", "");
-    const groups = /** @type {[string, typeof notes][]} */ ([
+    const groups = [
       ["Research", researchNotes],
       ["Plan", planNotes],
       ["Review", reviewNotes],
       ["Context", contextNotes],
-    ]);
+    ];
     for (const [label, group] of groups) {
       if (group.length === 0) continue;
       lines.push(`**${label}:**`, "");
