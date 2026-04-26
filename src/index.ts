@@ -66,6 +66,7 @@ import {
 import { getRelationshipPreview } from "./relationships.js";
 import { MarkdownLintError, cleanMarkdown } from "./markdown.js";
 import { applySemanticPatches, type SemanticPatch } from "./semantic-patch.js";
+import { hasActualChanges, computeFieldsModified } from "./update-detect-changes.js";
 import { MnemonicConfigStore, readVaultSchemaVersion, type MutationPushMode } from "./config.js";
 import {
   CONSOLIDATION_MODES,
@@ -2989,61 +2990,144 @@ server.registerTool(
     }
     const cleanedContent = content === undefined ? undefined : await cleanMarkdown(content);
 
-    const updated: Note = {
-      ...note,
-      title: title ?? note.title,
-      content: patchedContent ?? cleanedContent ?? note.content,
-      tags: tags ?? note.tags,
-      lifecycle: lifecycle ?? note.lifecycle,
-      ...(role !== undefined ? { role } : (note.role ? { role: note.role } : {})),
-      alwaysLoad: alwaysLoad !== undefined ? alwaysLoad : note.alwaysLoad,
-      updatedAt: now,
-    };
+    const resolvedTitle = title ?? note.title;
+    const resolvedContent = patchedContent ?? cleanedContent ?? note.content;
+    const resolvedTags = tags ?? note.tags;
+    const resolvedLifecycle = lifecycle ?? note.lifecycle;
+    const resolvedRole = role !== undefined ? role : (note.role ? note.role : undefined);
+    const resolvedAlwaysLoad = alwaysLoad !== undefined ? alwaysLoad : note.alwaysLoad;
 
-    if (updated.project) {
-      const accessCandidates = getRecentSessionNoteAccesses(updated.project)
+    let relatedToChanged = false;
+    let resolvedRelatedTo = note.relatedTo;
+    if (note.project) {
+      const accessCandidates = getRecentSessionNoteAccesses(note.project)
         .map((entry) => {
-          const cachedNote = getSessionCachedNote(updated.project!, entry.vaultPath, entry.noteId)
-            ?? getRecentSessionAccessNote(updated.project!, entry.vaultPath, entry.noteId);
+          const cachedNote = getSessionCachedNote(note.project!, entry.vaultPath, entry.noteId)
+            ?? getRecentSessionAccessNote(note.project!, entry.vaultPath, entry.noteId);
           return cachedNote
             ? { note: cachedNote, accessedAt: entry.accessedAt, accessKind: entry.accessKind, score: entry.score }
             : null;
         })
         .filter((entry): entry is NonNullable<typeof entry> => entry !== null);
-      const autoRelationships = suggestAutoRelationships(updated, accessCandidates);
+      const autoRelationships = suggestAutoRelationships({
+        ...note,
+        title: resolvedTitle,
+        content: resolvedContent,
+        tags: resolvedTags,
+        lifecycle: resolvedLifecycle,
+        alwaysLoad: resolvedAlwaysLoad,
+      }, accessCandidates);
       if (autoRelationships.length > 0) {
-        const existing = [...(updated.relatedTo ?? [])];
+        const existing = [...(note.relatedTo ?? [])];
         for (const relationship of autoRelationships) {
           if (!existing.some((rel) => rel.id === relationship.id && rel.type === relationship.type)) {
             existing.push(relationship);
           }
         }
-        updated.relatedTo = existing;
+        resolvedRelatedTo = existing;
+        relatedToChanged = true;
       }
     }
 
-    await vault.storage.writeNote(updated);
+    const changes = computeFieldsModified({
+      patchedContent,
+      originalContent: note.content,
+      contentExplicitlyProvided: content !== undefined,
+      semanticPatchProvided: semanticPatch !== undefined && semanticPatch.length > 0,
+      newTitle: resolvedTitle,
+      originalTitle: note.title,
+      titleExplicitlyProvided: title !== undefined,
+      newLifecycle: resolvedLifecycle,
+      originalLifecycle: note.lifecycle,
+      lifecycleExplicitlyProvided: lifecycle !== undefined,
+      newRole: resolvedRole,
+      originalRole: note.role,
+      roleExplicitlySet: role !== undefined,
+      newTags: resolvedTags,
+      originalTags: note.tags,
+      tagsExplicitlyProvided: tags !== undefined,
+      newAlwaysLoad: resolvedAlwaysLoad,
+      originalAlwaysLoad: note.alwaysLoad,
+      alwaysLoadExplicitlyProvided: alwaysLoad !== undefined,
+      relatedToChanged,
+    });
 
-    let embeddingStatus: { status: "written" | "skipped"; reason?: string } = { status: "written" };
+    const hasChanges = hasActualChanges({
+      content: cleanedContent,
+      originalContent: note.content,
+      title,
+      originalTitle: note.title,
+      tags,
+      originalTags: note.tags,
+      lifecycle,
+      originalLifecycle: note.lifecycle,
+      role,
+      originalRole: note.role,
+      roleExplicitlySet: role !== undefined,
+      alwaysLoad,
+      originalAlwaysLoad: note.alwaysLoad,
+      semanticPatchApplied: semanticPatch !== undefined && semanticPatch.length > 0,
+      relatedToChanged,
+    });
 
-    try {
-      const text = await embedTextForNote(vault.storage, updated);
-      const vector = await embed(text);
-      await vault.storage.writeEmbedding({ id, model: embedModel, embedding: vector, updatedAt: now });
-    } catch (err) {
-      embeddingStatus = { status: "skipped", reason: err instanceof Error ? err.message : String(err) };
-      console.error(`[embedding] Re-embed failed for '${id}': ${err}`);
+    if (!hasChanges) {
+      const noOpPersistence: PersistenceStatus = {
+        notePath: vault.storage.notePath(id),
+        embeddingPath: vault.storage.embeddingPath(id),
+        embedding: { status: "skipped", model: embedModel, reason: "no-changes" },
+        git: {
+          commit: "skipped",
+          push: "skipped",
+          commitReason: "no-changes",
+          pushReason: "no-changes",
+        },
+        durability: "local-only",
+      };
+      return {
+        content: [{ type: "text", text: `No changes to memory '${id}'` }],
+        structuredContent: {
+          action: "updated" as const,
+          id,
+          title: note.title,
+          fieldsModified: [],
+          timestamp: note.updatedAt,
+          project: noteProjectRef(note),
+          lifecycle: note.lifecycle,
+          role: note.role,
+          persistence: noOpPersistence,
+        },
+      };
     }
 
-    // Build change summary (LLM-provided or auto-generated)
-    const changes: string[] = [];
-    if (title !== undefined && title !== note.title) changes.push("title");
-    if (content !== undefined) changes.push("content");
-    if (semanticPatch !== undefined) changes.push("semanticPatch");
-    if (tags !== undefined) changes.push("tags");
-    if (lifecycle !== undefined && lifecycle !== note.lifecycle) changes.push("lifecycle");
-    if (role !== undefined && role !== note.role) changes.push("role");
-    if (alwaysLoad !== undefined && alwaysLoad !== note.alwaysLoad) changes.push("alwaysLoad");
+    const updated: Note = {
+      ...note,
+      title: resolvedTitle,
+      content: resolvedContent,
+      tags: resolvedTags,
+      lifecycle: resolvedLifecycle,
+      ...(role !== undefined ? { role: resolvedRole } : (note.role ? { role: note.role } : {})),
+      alwaysLoad: resolvedAlwaysLoad,
+      updatedAt: now,
+      relatedTo: resolvedRelatedTo,
+    };
+
+    await vault.storage.writeNote(updated);
+
+    const shouldReembed = patchedContent !== undefined || cleanedContent !== undefined;
+    let embeddingStatus: { status: "written" | "skipped"; reason?: string } = { status: "skipped", reason: shouldReembed ? undefined : "metadata-only" };
+
+    if (shouldReembed) {
+      try {
+        const text = await embedTextForNote(vault.storage, updated);
+        const vector = await embed(text);
+        await vault.storage.writeEmbedding({ id, model: embedModel, embedding: vector, updatedAt: now });
+        embeddingStatus = { status: "written" };
+      } catch (err) {
+        embeddingStatus = { status: "skipped", reason: err instanceof Error ? err.message : String(err) };
+        console.error(`[embedding] Re-embed failed for '${id}': ${err}`);
+      }
+    }
+
     const changeDesc = changes.length > 0 ? `Updated ${changes.join(", ")}` : "No changes";
     const commitSummary = summary ?? changeDesc;
 
