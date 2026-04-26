@@ -3,9 +3,13 @@ import { describe, expect, it } from "vitest";
 import {
   buildSummaryIntro,
   classifyNote,
+  computeThresholds,
   generateDescription,
   generateTitle,
+  isWeakSummary,
   parseFrontmatter,
+  routeTier,
+  scoreSemanticPaths,
   sortNotesByPriority,
 } from "../scripts/ci/update-pr-description.mjs";
 
@@ -459,5 +463,265 @@ Body text.
     const { frontmatter, body } = parseFrontmatter("Just a body.");
     expect(frontmatter).toEqual({});
     expect(body).toBe("Just a body.");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// computeThresholds
+// ---------------------------------------------------------------------------
+
+describe("computeThresholds", () => {
+  it("returns conservative defaults when history has fewer than 5 entries", () => {
+    const t = computeThresholds([]);
+    expect(t.files.p75).toBeGreaterThan(0);
+    expect(t.lines.p75).toBeGreaterThan(0);
+    expect(t.commits.p75).toBeGreaterThan(0);
+  });
+
+  it("returns conservative defaults for a 4-entry history", () => {
+    const small = [
+      { changedFiles: 1, additions: 2, deletions: 0, commits: 1 },
+      { changedFiles: 2, additions: 5, deletions: 1, commits: 2 },
+      { changedFiles: 3, additions: 10, deletions: 0, commits: 1 },
+      { changedFiles: 4, additions: 20, deletions: 5, commits: 3 },
+    ];
+    const t = computeThresholds(small);
+    // Falls back to CONSERVATIVE_DEFAULTS
+    expect(t.files.p75).toBe(10);
+  });
+
+  it("computes thresholds from a real history sample", () => {
+    // 10 PRs: 5 trivial formula bumps + 5 moderate feature PRs
+    const history = [
+      { changedFiles: 1, additions: 2, deletions: 2, commits: 1 },
+      { changedFiles: 1, additions: 2, deletions: 2, commits: 1 },
+      { changedFiles: 1, additions: 2, deletions: 2, commits: 1 },
+      { changedFiles: 1, additions: 2, deletions: 2, commits: 1 },
+      { changedFiles: 1, additions: 2, deletions: 2, commits: 1 },
+      { changedFiles: 5, additions: 80, deletions: 20, commits: 3 },
+      { changedFiles: 8, additions: 200, deletions: 50, commits: 6 },
+      { changedFiles: 12, additions: 400, deletions: 80, commits: 10 },
+      { changedFiles: 20, additions: 900, deletions: 200, commits: 18 },
+      { changedFiles: 35, additions: 1800, deletions: 600, commits: 40 },
+    ];
+    const t = computeThresholds(history);
+    // p75 should be between the mid-range and high-range PRs
+    expect(t.files.p75).toBeGreaterThan(1);
+    expect(t.files.p75).toBeLessThan(35);
+    expect(t.files.p90).toBeGreaterThan(t.files.p75);
+    expect(t.lines.p75).toBeGreaterThan(0);
+    expect(t.lines.p75).toBeLessThan(2000);
+    expect(t.commits.p90).toBeGreaterThan(t.commits.p75);
+  });
+
+  it("p90 is always >= p75", () => {
+    const history = Array.from({ length: 20 }, (_, i) => ({
+      changedFiles: i + 1,
+      additions: (i + 1) * 10,
+      deletions: i * 5,
+      commits: i + 1,
+    }));
+    const t = computeThresholds(history);
+    expect(t.files.p90).toBeGreaterThanOrEqual(t.files.p75);
+    expect(t.lines.p90).toBeGreaterThanOrEqual(t.lines.p75);
+    expect(t.commits.p90).toBeGreaterThanOrEqual(t.commits.p75);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// scoreSemanticPaths
+// ---------------------------------------------------------------------------
+
+describe("scoreSemanticPaths", () => {
+  it("marks Formula-only changes as trivial", () => {
+    const r = scoreSemanticPaths(["Formula/mnemonic-mcp.rb"]);
+    expect(r.isTrivial).toBe(true);
+  });
+
+  it("marks lockfile-only changes as trivial", () => {
+    const r = scoreSemanticPaths(["package-lock.json"]);
+    expect(r.isTrivial).toBe(true);
+  });
+
+  it("marks notes-only changes as non-trivial with low complexity", () => {
+    const r = scoreSemanticPaths([".mnemonic/notes/my-decision.md"]);
+    expect(r.isTrivial).toBe(false);
+    expect(r.complexity).toBe("low");
+  });
+
+  it("marks docs-only changes as low complexity", () => {
+    const r = scoreSemanticPaths(["README.md", "docs/guide.md"]);
+    expect(r.isTrivial).toBe(false);
+    expect(r.complexity).toBe("low");
+  });
+
+  it("rates CI script changes as high complexity", () => {
+    const r = scoreSemanticPaths([
+      "scripts/ci/update-pr-description.mjs",
+      "tests/update-pr-description.unit.test.ts",
+      ".mnemonic/notes/decision.md",
+    ]);
+    expect(r.isTrivial).toBe(false);
+    expect(r.complexity).toBe("high");
+  });
+
+  it("rates workflow file changes as high complexity", () => {
+    const r = scoreSemanticPaths([
+      ".github/workflows/ci.yml",
+      "src/index.ts",
+    ]);
+    expect(r.isTrivial).toBe(false);
+    expect(r.complexity).toBe("high");
+  });
+
+  it("rates cross-folder src+tests change as medium complexity", () => {
+    const r = scoreSemanticPaths([
+      "src/index.ts",
+      "src/markdown.ts",
+      "tests/unit.test.ts",
+    ]);
+    expect(r.isTrivial).toBe(false);
+    expect(["medium", "high"]).toContain(r.complexity);
+  });
+
+  it("rates single-folder src change as normal complexity", () => {
+    const r = scoreSemanticPaths(["src/index.ts", "src/markdown.ts"]);
+    expect(r.isTrivial).toBe(false);
+    expect(r.complexity).toBe("normal");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// routeTier
+// ---------------------------------------------------------------------------
+
+describe("routeTier", () => {
+  // Use a realistic threshold set based on this repo's actual PR distribution
+  const thresholds = {
+    files: { p75: 9, p90: 22 },
+    lines: { p75: 400, p90: 1400 },
+    commits: { p75: 7, p90: 20 },
+  };
+
+  it("routes formula-bump PRs to Tier A", () => {
+    const stats = { changedFiles: 1, additions: 2, deletions: 2, commits: 1 };
+    const paths = ["Formula/mnemonic-mcp.rb"];
+    expect(routeTier(stats, paths, thresholds)).toBe("A");
+  });
+
+  it("routes small focused PRs to Tier B", () => {
+    // PR #176: 4 files, 16 lines, 1 commit, no CI scripts
+    const stats = { changedFiles: 4, additions: 12, deletions: 4, commits: 1 };
+    const paths = ["src/index.ts", "AGENT.md", ".mnemonic/notes/decision.md"];
+    expect(routeTier(stats, paths, thresholds)).toBe("B");
+  });
+
+  it("routes CI script changes to Tier C even when small", () => {
+    // PR #185: 3 files, 389 lines, 2 commits — but touches scripts/ci/
+    const stats = { changedFiles: 3, additions: 352, deletions: 37, commits: 2 };
+    const paths = [
+      "scripts/ci/update-pr-description.mjs",
+      "tests/update-pr-description.unit.test.ts",
+      ".mnemonic/notes/decision.md",
+    ];
+    expect(routeTier(stats, paths, thresholds)).toBe("C");
+  });
+
+  it("routes medium-sized multi-folder PRs to Tier C", () => {
+    // PR #169: 13 files, 417 lines, 11 commits — above p75 commits
+    const stats = { changedFiles: 13, additions: 360, deletions: 57, commits: 11 };
+    const paths = [
+      "src/markdown.ts",
+      "src/semantic-patch.ts",
+      "src/index.ts",
+      "tests/semantic-patch.unit.test.ts",
+      "tests/markdown.unit.test.ts",
+      "scripts/run-dogfood-packs.mjs",
+    ];
+    expect(routeTier(stats, paths, thresholds)).toBe("C");
+  });
+
+  it("routes large cross-cutting PRs to Tier D", () => {
+    // PR #163: 30 files, 1588 lines, 41 commits — well above p90
+    const stats = { changedFiles: 30, additions: 1512, deletions: 76, commits: 41 };
+    const paths = [
+      "src/index.ts",
+      "tests/unit.test.ts",
+      ".github/workflows/ci.yml",
+      "scripts/ci/something.mjs",
+      ".mnemonic/notes/decision.md",
+    ];
+    expect(routeTier(stats, paths, thresholds)).toBe("D");
+  });
+
+  it("routes PRs above p90 lines to Tier D", () => {
+    const stats = { changedFiles: 5, additions: 1500, deletions: 200, commits: 3 };
+    const paths = ["src/index.ts", "tests/unit.test.ts"];
+    expect(routeTier(stats, paths, thresholds)).toBe("D");
+  });
+
+  it("semantic high + size B results in Tier C (at most +1 bump)", () => {
+    // Small PR touching CI scripts — should bump B→C, not B→D
+    const stats = { changedFiles: 2, additions: 50, deletions: 10, commits: 2 };
+    const paths = ["scripts/ci/something.mjs", "tests/ci.test.ts"];
+    expect(routeTier(stats, paths, thresholds)).toBe("C");
+  });
+
+  it("semantic high + size C results in Tier D", () => {
+    // PR above p75 + high semantic = C+1 = D
+    const stats = { changedFiles: 10, additions: 500, deletions: 100, commits: 10 };
+    const paths = [
+      "scripts/ci/something.mjs",
+      "src/index.ts",
+      "tests/unit.test.ts",
+    ];
+    expect(routeTier(stats, paths, thresholds)).toBe("D");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// isWeakSummary
+// ---------------------------------------------------------------------------
+
+describe("isWeakSummary", () => {
+  it("flags empty string as weak", () => {
+    expect(isWeakSummary("")).toBe(true);
+  });
+
+  it("flags null/undefined as weak", () => {
+    expect(isWeakSummary(null as unknown as string)).toBe(true);
+    expect(isWeakSummary(undefined as unknown as string)).toBe(true);
+  });
+
+  it("flags text shorter than 80 chars as weak", () => {
+    expect(isWeakSummary("Small change.")).toBe(true);
+  });
+
+  it("flags text containing vague phrases as weak", () => {
+    const vague =
+      "This PR contains various improvements to the codebase and fixes several issues across multiple files.";
+    expect(isWeakSummary(vague)).toBe(true);
+  });
+
+  it("flags text with high file-reference ratio as weak", () => {
+    const fileDump =
+      "Changed index.ts, markdown.ts, semantic-patch.ts, structured-content.ts, migration.ts, vault.ts to update.";
+    expect(isWeakSummary(fileDump)).toBe(true);
+  });
+
+  it("does not flag a substantive summary as weak", () => {
+    const good =
+      "Restructures the PR description generator to be RPIR-aware, separating permanent " +
+      "decision notes from workflow artifacts and condensing the output to surface only " +
+      "reviewer-relevant signal — preventing the 38k-char bloat seen in PR #184.";
+    expect(isWeakSummary(good)).toBe(false);
+  });
+
+  it("does not flag a specific technical summary as weak", () => {
+    const good =
+      "Introduces relative percentile thresholds computed from recent PR history to route " +
+      "description generation to one of four tiers, replacing hardcoded cutoffs and avoiding " +
+      "unnecessary premium model usage for simple formula-bump PRs.";
+    expect(isWeakSummary(good)).toBe(false);
   });
 });
