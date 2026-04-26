@@ -8,7 +8,7 @@ tags:
   - research
 lifecycle: temporary
 createdAt: '2026-04-26T10:07:45.462Z'
-updatedAt: '2026-04-26T10:08:02.412Z'
+updatedAt: '2026-04-26T10:11:06.175Z'
 role: research
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -21,6 +21,8 @@ relatedTo:
   - id: consolidate-tool-design-execute-merge-behavior-idempotency-a-0911e2cd
     type: derives-from
   - id: mcp-workflow-ux-hint-prompt-tool-descriptions-and-session-st-e89a18fc
+    type: derives-from
+  - id: plan-enrich-decision-points-with-retrieval-rationale-and-tru-0dd24e70
     type: derives-from
 memoryVersion: 1
 ---
