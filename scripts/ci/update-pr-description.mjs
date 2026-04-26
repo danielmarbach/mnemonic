@@ -100,7 +100,8 @@ export async function main() {
 
   // --- Step 2: Fetch PR history for calibration (read-only, in-memory) ---
   const history = fetchPrHistory(repo, cwd);
-  const thresholds = computeThresholds(history);
+  const rawThresholds = computeThresholds(history);
+  const thresholds = validateThresholds(rawThresholds);
   process.stdout.write(
     `Calibrated from ${history.length} historical PR(s): ` +
       `files p75=${thresholds.files.p75.toFixed(0)}/p90=${thresholds.files.p90.toFixed(0)}, ` +
@@ -225,18 +226,21 @@ function fetchCurrentPrData(prNumber, repo, cwd) {
 
 /**
  * Fetches recent merged PR history for percentile calibration.
+ * Uses `gh pr list` (GraphQL) which reliably returns changedFiles, additions,
+ * deletions, and commits per PR — unlike the REST list endpoint which omits them.
  * Read-only — no files written. Returns empty array on any failure.
  *
- * @returns {Array<{changedFiles:number, additions:number, deletions:number, commits:number}>}
+ * @returns {Array<{changedFiles:number|null, additions:number|null, deletions:number|null, commits:number|null}>}
  */
 function fetchPrHistory(repo, cwd) {
   const result = spawnSync(
     "gh",
     [
-      "api",
-      `repos/${repo}/pulls?state=closed&per_page=50`,
-      "--jq",
-      "[.[] | select(.merged_at != null) | {changedFiles: .changed_files, additions, deletions, commits}]",
+      "pr", "list",
+      "--state", "merged",
+      "--limit", "50",
+      "--repo", repo,
+      "--json", "changedFiles,additions,deletions,commits",
     ],
     { encoding: "utf-8", cwd },
   );
@@ -245,7 +249,18 @@ function fetchPrHistory(repo, cwd) {
 
   try {
     const parsed = JSON.parse(result.stdout.trim());
-    return Array.isArray(parsed) ? parsed : [];
+    if (!Array.isArray(parsed)) return [];
+    return parsed.map((pr) => ({
+      changedFiles: typeof pr.changedFiles === "number" ? pr.changedFiles : null,
+      additions: typeof pr.additions === "number" ? pr.additions : null,
+      deletions: typeof pr.deletions === "number" ? pr.deletions : null,
+      // GraphQL returns commits as an array of objects; extract the count.
+      commits: Array.isArray(pr.commits)
+        ? pr.commits.length
+        : typeof pr.commits === "number"
+          ? pr.commits
+          : null,
+    }));
   } catch {
     return [];
   }
@@ -274,21 +289,63 @@ function percentile(values, p) {
  * Computes p75/p90 thresholds from a history array.
  * Falls back to CONSERVATIVE_DEFAULTS when there are fewer than 5 data points.
  *
- * @param {Array<{changedFiles:number, additions:number, deletions:number, commits:number}>} history
+ * Missing (null/undefined) values are excluded rather than coerced to zero —
+ * treating them as zero would collapse all thresholds and misclassify every PR
+ * as oversized.
+ *
+ * @param {Array<{changedFiles:number|null, additions:number|null, deletions:number|null, commits:number|null}>} history
  * @returns {{ files: {p75:number,p90:number}, lines: {p75:number,p90:number}, commits: {p75:number,p90:number} }}
  */
 export function computeThresholds(history) {
   if (history.length < 5) return CONSERVATIVE_DEFAULTS;
 
-  const files = history.map((p) => p.changedFiles ?? 0);
-  const lines = history.map((p) => (p.additions ?? 0) + (p.deletions ?? 0));
-  const commits = history.map((p) => p.commits ?? 0);
+  const isFiniteNumber = (v) => typeof v === "number" && Number.isFinite(v);
+
+  const files = history.map((p) => p.changedFiles).filter(isFiniteNumber);
+  const lines = history
+    .filter((p) => isFiniteNumber(p.additions) && isFiniteNumber(p.deletions))
+    .map((p) => p.additions + p.deletions);
+  const commits = history.map((p) => p.commits).filter(isFiniteNumber);
+
+  // Fall back if any dimension lacks enough valid samples.
+  if (files.length < 5 || lines.length < 5) return CONSERVATIVE_DEFAULTS;
 
   return {
     files: { p75: percentile(files, 75), p90: percentile(files, 90) },
     lines: { p75: percentile(lines, 75), p90: percentile(lines, 90) },
-    commits: { p75: percentile(commits, 75), p90: percentile(commits, 90) },
+    commits:
+      commits.length >= 5
+        ? { p75: percentile(commits, 75), p90: percentile(commits, 90) }
+        : CONSERVATIVE_DEFAULTS.commits,
   };
+}
+
+/**
+ * Validates that computed thresholds are realistic (non-zero for at least one
+ * dimension). Returns CONSERVATIVE_DEFAULTS when all thresholds are zero,
+ * which indicates a data extraction failure rather than a legitimate all-tiny
+ * PR history.
+ *
+ * @param {{ files:{p75:number,p90:number}, lines:{p75:number,p90:number}, commits:{p75:number,p90:number} }} thresholds
+ * @returns {{ files:{p75:number,p90:number}, lines:{p75:number,p90:number}, commits:{p75:number,p90:number} }}
+ */
+export function validateThresholds(thresholds) {
+  const allZero =
+    thresholds.files.p75 === 0 &&
+    thresholds.files.p90 === 0 &&
+    thresholds.lines.p75 === 0 &&
+    thresholds.lines.p90 === 0 &&
+    thresholds.commits.p75 === 0 &&
+    thresholds.commits.p90 === 0;
+
+  if (allZero) {
+    process.stderr.write(
+      "Warning: all calibration thresholds are zero — data extraction likely failed. " +
+        "Falling back to conservative defaults.\n",
+    );
+    return CONSERVATIVE_DEFAULTS;
+  }
+  return thresholds;
 }
 
 // =============================================================================
