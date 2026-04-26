@@ -9,7 +9,7 @@ tags:
   - evidence
 lifecycle: temporary
 createdAt: '2026-04-26T10:11:01.959Z'
-updatedAt: '2026-04-26T10:11:06.175Z'
+updatedAt: '2026-04-26T10:11:07.464Z'
 role: plan
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -17,6 +17,8 @@ projectName: mnemonic
 relatedTo:
   - id: research-explain-before-consolidate-value-assessment-and-des-f1b237dc
     type: derives-from
+  - id: rpir-workflow-design-for-mnemonic-research-plan-implement-re-80b00851
+    type: follows
 memoryVersion: 1
 ---
 # Plan: enrich decision points with retrieval rationale and trust signals
