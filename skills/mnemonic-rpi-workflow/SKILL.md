@@ -23,6 +23,15 @@ Use `derives-from` for lineage and `follows` for sequence by default. Fall back 
 - Distill when findings are scattered.
 - Link research to request root (`derives-from` preferred).
 
+### 1a. Research → Plan Handoff
+
+Before creating a plan note:
+1. Present research findings to the user
+2. Confirm direction, priorities, and constraints
+3. Do not assume the plan direction based on research alone — the user may have refinements that reshape the plan materially
+
+Only after confirmation: proceed to Plan checklist.
+
 ### 2. Plan
 
 - Create or update one current plan note: `role: plan`, `lifecycle: temporary`.
@@ -31,6 +40,14 @@ Use `derives-from` for lineage and `follows` for sequence by default. Fall back 
 - For non-trivial work, include a short markdown checkbox list (`- [ ]`) for executable steps.
 - One current plan per request; update or supersede as needed.
 - Update plan note before continuing if scope, architecture, dependencies, or assumptions change materially.
+
+### 2a. Plan → Implement Handoff
+
+Before dispatching subagents or starting implementation:
+1. Confirm the plan is endorsed
+2. Confirm scope and priorities haven't shifted since planning
+
+Only after confirmation: proceed to Implement checklist.
 
 ### 3. Implement
 
