@@ -6,6 +6,17 @@ The format is loosely based on Keep a Changelog and uses semver-style version he
 
 ## [Unreleased]
 
+## [0.27.0] - Unreleased
+
+### Added
+
+- `recall` now supports optional `evidence: "compact"` output to explain why each result ranked, including channels, rank band, project relevance, freshness, and supersession signals (`supersededBy` and `supersededCount` when available).
+- Consolidation analysis previews (`detect-duplicates`, `suggest-merges`, and `consolidate` dry-run) now support optional `evidence: true` output with per-note merge evidence, warnings, and `mergeRisk` classification.
+
+### Changed
+
+- `mnemonic-workflow-hint` and tool descriptions now document evidence enrichment as an optional confidence aid at decision points, not a mandatory workflow step.
+
 ## [0.26.2] - 2026-04-26
 
 ### Fixed
