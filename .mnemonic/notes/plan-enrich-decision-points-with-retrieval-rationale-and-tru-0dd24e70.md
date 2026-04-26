@@ -140,9 +140,9 @@ Enrich detect-duplicates, find-clusters, and suggest-merges output with per-note
 ### Per-note enrichment in consolidate output
 
 ```text
-Note A (0.923) | permanent, decision | 2 days old | supersedes 1 note
-Note B (0.891) | temporary, research | 30 days old | no relationships
-Note C (0.854) | permanent, context | 5 days old | 3 related notes
+Note A (0.923) | permanent, decision | 2 days old | supersedes 1 note | risk: low
+Note B (0.891) | temporary, research | 30 days old | no relationships | risk: medium
+Note C (0.854) | permanent, context | 5 days old | 3 related notes | risk: high
 ```
 
 ### Consolidation evidence shape (merge decision payload)
@@ -156,6 +156,7 @@ mergeEvidence?: {
   supersededBy?: string;
   supersededCount?: number;
   relatedCount: number;
+  mergeRisk: "low" | "medium" | "high";  // coarse triage derived from warnings
   warnings?: string[];
 }
 ```
@@ -180,6 +181,7 @@ Comparable to existing `suggest-merges` output which already shows similarity an
 - No additional I/O: lifecycle, role, updatedAt, and relatedTo are already in memory during strategies
 - Supersession chain data requires scanning relatedTo (already loaded per entry)
 - ageDays computed from updatedAt (no git call needed)
+- `mergeRisk` derivation: 0 warnings → "low", 1 non-critical → "medium", 2+ or any critical (supersession chain, lifecycle mismatch) → "high"
 
 ## Phase 2.5 — Workflow hint and tool description updates
 
