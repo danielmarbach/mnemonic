@@ -229,6 +229,13 @@ function fetchCurrentPrData(prNumber, repo, cwd) {
   }
 }
 
+// Fields for the primary attempt (includes commits for full calibration).
+const PR_HISTORY_FIELDS_FULL = "number,changedFiles,additions,deletions,commits";
+// Fallback fields used when the primary attempt fails (commits may be unsupported).
+const PR_HISTORY_FIELDS_FALLBACK = "number,changedFiles,additions,deletions";
+// Maximum per-PR rejection messages to emit before switching to a summary line.
+const PR_REJECTION_LOG_LIMIT = 5;
+
 /**
  * Fetches recent merged PR history for percentile calibration.
  *
@@ -246,7 +253,7 @@ function fetchPrHistory(repo, cwd) {
   const baseArgs = ["pr", "list", "--state", "merged", "--limit", "50", "--repo", repo];
 
   // --- Attempt 1: with commits field ---
-  const fullArgs = [...baseArgs, "--json", "changedFiles,additions,deletions,commits"];
+  const fullArgs = [...baseArgs, "--json", PR_HISTORY_FIELDS_FULL];
   process.stderr.write(
     `[history] Running: gh ${fullArgs.join(" ")}\n`,
   );
@@ -263,7 +270,7 @@ function fetchPrHistory(repo, cwd) {
     rawJson = fullResult.stdout.trim();
   } else {
     // --- Attempt 2: without commits field (may not be supported in all gh versions) ---
-    const fallbackArgs = [...baseArgs, "--json", "changedFiles,additions,deletions,number"];
+    const fallbackArgs = [...baseArgs, "--json", PR_HISTORY_FIELDS_FALLBACK];
     process.stderr.write(
       `[history] Retrying without commits: gh ${fallbackArgs.join(" ")}\n`,
     );
@@ -308,8 +315,11 @@ function fetchPrHistory(repo, cwd) {
     );
   }
 
-  // Map to metrics, logging why each PR is rejected
+  // Map to metrics, logging why each PR is rejected.
+  // Per-PR rejection messages are capped at PR_REJECTION_LOG_LIMIT to keep
+  // logs readable for large histories; a summary line is emitted afterwards.
   let validCount = 0;
+  let rejectionCount = 0;
   const mapped = parsed.map((pr, index) => {
     const changedFiles = typeof pr.changedFiles === "number" ? pr.changedFiles : null;
     const additions = typeof pr.additions === "number" ? pr.additions : null;
@@ -330,15 +340,24 @@ function fetchPrHistory(repo, cwd) {
     if (commits === null && commitsIncluded) missing.push("commits");
 
     if (missing.length > 0) {
-      process.stderr.write(
-        `[history] PR[${index}] (number=${pr.number ?? "?"}) rejected: missing ${missing.join(", ")}\n`,
-      );
+      rejectionCount += 1;
+      if (rejectionCount <= PR_REJECTION_LOG_LIMIT) {
+        process.stderr.write(
+          `[history] PR[${index}] (#${pr.number ?? "?"}) rejected: missing ${missing.join(", ")}\n`,
+        );
+      }
     } else {
       validCount += 1;
     }
 
     return { changedFiles, additions, deletions, commits };
   });
+
+  if (rejectionCount > PR_REJECTION_LOG_LIMIT) {
+    process.stderr.write(
+      `[history] ... and ${rejectionCount - PR_REJECTION_LOG_LIMIT} more rejected PR(s) (suppressed).\n`,
+    );
+  }
 
   process.stderr.write(`[history] PRs with valid metrics: ${validCount}/${parsed.length}\n`);
 
