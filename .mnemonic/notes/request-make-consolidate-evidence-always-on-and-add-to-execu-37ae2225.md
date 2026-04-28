@@ -7,11 +7,14 @@ tags:
   - evidence
 lifecycle: temporary
 createdAt: '2026-04-28T10:31:57.558Z'
-updatedAt: '2026-04-28T10:31:57.558Z'
+updatedAt: '2026-04-28T10:32:18.795Z'
 role: context
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: research-consolidate-evidence-defaults-and-execute-merge-saf-8560d01e
+    type: derives-from
 memoryVersion: 1
 ---
 # Request: make consolidate evidence always-on and add safety net at mutation point

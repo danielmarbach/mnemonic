@@ -6,11 +6,14 @@ tags:
   - execute-merge
 lifecycle: temporary
 createdAt: '2026-04-28T10:32:15.261Z'
-updatedAt: '2026-04-28T10:32:15.261Z'
+updatedAt: '2026-04-28T10:32:18.795Z'
 role: research
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: request-make-consolidate-evidence-always-on-and-add-to-execu-37ae2225
+    type: derives-from
 memoryVersion: 1
 ---
 # Research: consolidate evidence defaults and execute-merge safety gap
