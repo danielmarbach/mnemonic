@@ -68,6 +68,20 @@ const PR_HISTORY_FIELDS_FALLBACK = "number,changedFiles,additions,deletions";
 // Maximum per-PR rejection messages to emit before switching to a summary line.
 const PR_REJECTION_LOG_LIMIT = 5;
 
+// Phrases that indicate a vague or generic AI summary.
+const WEAK_PHRASES = [
+  "various improvements",
+  "miscellaneous",
+  "several changes",
+  "some updates",
+  "multiple files",
+  "todo",
+  "[insert",
+  "see changes",
+  "no description",
+  "overall improvements",
+];
+
 if (import.meta.url === `file://${process.argv[1]}`) {
   await main();
 }
@@ -569,21 +583,6 @@ export function routeTier(stats, changedPaths, thresholds) {
 // =============================================================================
 // QUALITY GATE
 // =============================================================================
-
-// Phrases that indicate a vague or generic AI summary.
-const WEAK_PHRASES = [
-  "various improvements",
-  "miscellaneous",
-  "several changes",
-  "some updates",
-  "multiple files",
-  "this pr",
-  "todo",
-  "[insert",
-  "see changes",
-  "no description",
-  "overall improvements",
-];
 
 /**
  * Returns true when the given text is likely a weak or unhelpful AI summary.
