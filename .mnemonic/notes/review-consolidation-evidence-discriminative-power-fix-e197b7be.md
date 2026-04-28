@@ -7,11 +7,14 @@ tags:
   - discriminative-power
 lifecycle: temporary
 createdAt: '2026-04-28T12:07:26.133Z'
-updatedAt: '2026-04-28T12:07:26.133Z'
+updatedAt: '2026-04-28T12:08:14.515Z'
 role: review
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: plan-fix-consolidation-evidence-discriminative-power-2c34bb7b
+    type: derives-from
 memoryVersion: 1
 ---
 # Review: consolidation evidence discriminative power fix
