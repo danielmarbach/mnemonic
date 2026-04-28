@@ -44,46 +44,82 @@ function isTemporaryResearchNote(note: Pick<Note, "lifecycle" | "role">): boolea
   return note.lifecycle === "temporary" && note.role === "research";
 }
 
-export function buildMergeWarnings(
-  notes: Array<Pick<Note, "id" | "title" | "lifecycle" | "role" | "updatedAt" | "relatedTo">>,
+function majorityLifecycle(notes: Array<Pick<Note, "lifecycle">>): "temporary" | "permanent" | undefined {
+  const counts = new Map<"temporary" | "permanent", number>();
+  for (const note of notes) {
+    counts.set(note.lifecycle, (counts.get(note.lifecycle) ?? 0) + 1);
+  }
+  let best: "temporary" | "permanent" | undefined;
+  let bestCount = 0;
+  for (const [lc, count] of counts) {
+    if (count > bestCount) {
+      best = lc;
+      bestCount = count;
+    }
+  }
+  const total = [...counts.values()].reduce((a, b) => a + b, 0);
+  if (bestCount <= total - bestCount) {
+    return undefined;
+  }
+  return best;
+}
+
+type NoteForWarnings = Pick<Note, "id" | "title" | "lifecycle" | "role" | "updatedAt" | "relatedTo">;
+
+export function buildNoteWarnings(
+  note: NoteForWarnings,
+  allNotes: NoteForWarnings[],
   targetNote?: Pick<Note, "id" | "updatedAt">,
 ): string[] {
   const warnings: string[] = [];
 
-  if (notes.some(isTemporaryResearchNote)) {
-    warnings.push("temporary research note in merge - consider whether it contains unique evidence");
+  if (isTemporaryResearchNote(note)) {
+    warnings.push("temporary research - consider whether it contains unique evidence");
   }
 
-  if (notes.some((note) => (note.relatedTo ?? []).some((rel) => rel.type === "supersedes"))) {
-    warnings.push("note supersedes another - merging may orphan the supersedes chain");
+  const supersedesCount = (note.relatedTo ?? []).filter((rel) => rel.type === "supersedes").length;
+  if (supersedesCount > 0) {
+    warnings.push(`supersedes ${supersedesCount} other${supersedesCount > 1 ? "s" : ""} - merging may orphan the supersedes chain`);
   }
 
-  if (targetNote) {
+  if (targetNote && targetNote.id === note.id) {
     const targetUpdatedAt = new Date(targetNote.updatedAt);
     if (!Number.isNaN(targetUpdatedAt.getTime())) {
-      const hasNewerSource = notes
-        .filter((note) => note.id !== targetNote.id)
-        .some((note) => {
-          const updated = new Date(note.updatedAt);
-          return !Number.isNaN(updated.getTime()) && updated.getTime() > targetUpdatedAt.getTime();
-        });
-      if (hasNewerSource) {
-        warnings.push("newer note would be merged into older summary - stale summary risk");
+      const newerCount = allNotes
+        .filter((n) => n.id !== targetNote.id)
+        .reduce((count, n) => {
+          const updated = new Date(n.updatedAt);
+          return !Number.isNaN(updated.getTime()) && updated.getTime() > targetUpdatedAt.getTime()
+            ? count + 1
+            : count;
+        }, 0);
+      if (newerCount > 0) {
+        warnings.push(`target is older than ${newerCount} source${newerCount > 1 ? "s" : ""} - stale summary risk`);
       }
     }
   }
 
-  const roleLifecycles = new Map<string, Set<"temporary" | "permanent">>();
-  for (const note of notes) {
-    if (!note.role) continue;
-    const lifecycleSet = roleLifecycles.get(note.role) ?? new Set<"temporary" | "permanent">();
-    lifecycleSet.add(note.lifecycle);
-    roleLifecycles.set(note.role, lifecycleSet);
-  }
-  if (Array.from(roleLifecycles.values()).some((lifecycles) => lifecycles.size > 1)) {
-    warnings.push("same role but different lifecycles - verify merge intent");
+  if (note.role) {
+    const majority = majorityLifecycle(allNotes);
+    if (majority && note.lifecycle !== majority) {
+      warnings.push(`lifecycle (${note.lifecycle}) differs from group majority (${majority})`);
+    }
   }
 
+  return warnings;
+}
+
+export function buildGroupWarnings(
+  notes: NoteForWarnings[],
+  targetNote?: Pick<Note, "id" | "updatedAt">,
+): string[] {
+  const warnings: string[] = [];
+  for (const note of notes) {
+    const noteWarnings = buildNoteWarnings(note, notes, targetNote);
+    for (const w of noteWarnings) {
+      warnings.push(`${note.title}: ${w}`);
+    }
+  }
   return warnings;
 }
 
@@ -94,25 +130,35 @@ export function deriveMergeRisk(warnings: string[]): MergeRisk {
 
   const hasCritical = warnings.some((warning) =>
     warning.includes("supersedes chain")
-    || warning.includes("different lifecycles")
     || warning.includes("stale summary risk")
   );
 
-  if (hasCritical || warnings.length >= 2) {
+  if (hasCritical) {
+    return "high";
+  }
+
+  if (warnings.length >= 2) {
     return "high";
   }
 
   return "medium";
 }
 
+export function aggregateMergeRisk(noteRisks: MergeRisk[]): MergeRisk {
+  const riskOrder: Record<MergeRisk, number> = { low: 0, medium: 1, high: 2 };
+  if (noteRisks.length === 0) return "low";
+  return noteRisks.reduce((max, r) => riskOrder[r] > riskOrder[max] ? r : max, "low" as MergeRisk);
+}
+
 export function buildConsolidateNoteEvidence(
-  note: Pick<Note, "id" | "title" | "lifecycle" | "role" | "updatedAt" | "relatedTo">,
-  allNotes: Array<Pick<Note, "id" | "relatedTo">>,
-  warnings?: string[],
+  note: NoteForWarnings,
+  allNotes: NoteForWarnings[],
+  targetNote?: Pick<Note, "id" | "updatedAt">,
   now: Date = new Date(),
 ): ConsolidateNoteEvidence {
   const supersededByMap = buildSupersededByMap(allNotes);
   const supersedes = (note.relatedTo ?? []).filter((rel) => rel.type === "supersedes");
+  const noteWarnings = buildNoteWarnings(note, allNotes, targetNote);
   return {
     id: note.id,
     title: note.title,
@@ -123,8 +169,8 @@ export function buildConsolidateNoteEvidence(
     supersededBy: supersededByMap.get(note.id),
     supersededCount: supersedes.length > 0 ? supersedes.length : undefined,
     relatedCount: note.relatedTo?.length ?? 0,
-    warnings: warnings && warnings.length > 0 ? warnings : undefined,
-    mergeRisk: deriveMergeRisk(warnings ?? []),
+    warnings: noteWarnings.length > 0 ? noteWarnings : undefined,
+    mergeRisk: deriveMergeRisk(noteWarnings),
   };
 }
 

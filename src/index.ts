@@ -29,8 +29,9 @@ import {
 import { performance } from "perf_hooks";
 
 import {
+  aggregateMergeRisk,
   buildConsolidateNoteEvidence,
-  buildMergeWarnings,
+  buildGroupWarnings,
   deriveMergeRisk,
   filterRelationships,
   mergeRelationshipsFromNotes,
@@ -5507,10 +5508,10 @@ async function detectDuplicates(
 
       const similarity = cosineSimilarity(embeddingA, embeddingB);
       if (similarity >= threshold) {
-        const pairWarnings = buildMergeWarnings([entryA.note, entryB.note], entryA.note);
-        const pairRisk = deriveMergeRisk(pairWarnings);
-        const noteAEvidence = buildConsolidateNoteEvidence(entryA.note, allNotes, pairWarnings);
-        const noteBEvidence = buildConsolidateNoteEvidence(entryB.note, allNotes, pairWarnings);
+        const noteAEvidence = buildConsolidateNoteEvidence(entryA.note, allNotes, entryA.note);
+        const noteBEvidence = buildConsolidateNoteEvidence(entryB.note, allNotes, entryA.note);
+        const groupWarnings = buildGroupWarnings([entryA.note, entryB.note], entryA.note);
+        const pairRisk = aggregateMergeRisk([noteAEvidence.mergeRisk, noteBEvidence.mergeRisk]);
         foundCount++;
         lines.push(`${foundCount}. ${entryA.note.title} (${entryA.note.id})`);
         lines.push(`   └── ${entryB.note.title} (${entryB.note.id})`);
@@ -5518,8 +5519,8 @@ async function detectDuplicates(
         if (evidence) {
           lines.push(`   A: ${noteAEvidence.lifecycle}, ${noteAEvidence.role ?? "untyped"} | ${Math.round(noteAEvidence.ageDays)}d old | rel: ${noteAEvidence.relatedCount} | supersedes: ${noteAEvidence.supersededCount ?? 0} | risk: ${noteAEvidence.mergeRisk}`);
           lines.push(`   B: ${noteBEvidence.lifecycle}, ${noteBEvidence.role ?? "untyped"} | ${Math.round(noteBEvidence.ageDays)}d old | rel: ${noteBEvidence.relatedCount} | supersedes: ${noteBEvidence.supersededCount ?? 0} | risk: ${noteBEvidence.mergeRisk}`);
-          if (pairWarnings.length > 0) {
-            lines.push(`   Warnings: ${pairWarnings.join("; ")}`);
+          if (groupWarnings.length > 0) {
+            lines.push(`   Warnings: ${groupWarnings.join("; ")}`);
           }
           lines.push(`   Merge risk: ${pairRisk}`);
         }
@@ -5537,7 +5538,7 @@ async function detectDuplicates(
             similarity,
             noteA: noteAEvidence,
             noteB: noteBEvidence,
-            warnings: pairWarnings.length > 0 ? pairWarnings : undefined,
+            warnings: groupWarnings.length > 0 ? groupWarnings : undefined,
             mergeRisk: pairRisk,
           });
         }
@@ -5744,9 +5745,9 @@ async function suggestMerges(
         }
       })();
 
-      const mergeWarnings = buildMergeWarnings(sources.map((source) => source.note), entryA.note);
-      const mergeRisk = deriveMergeRisk(mergeWarnings);
-      const noteEvidence = sources.map((source) => buildConsolidateNoteEvidence(source.note, allNotes, mergeWarnings));
+      const noteEvidence = sources.map((source) => buildConsolidateNoteEvidence(source.note, allNotes, entryA.note));
+      const mergeWarnings = buildGroupWarnings(sources.map((source) => source.note), entryA.note);
+      const mergeRisk = aggregateMergeRisk(noteEvidence.map((e) => e.mergeRisk));
 
       lines.push(`   Mode: ${effectiveMode} (${modeDescription})`);
       if (evidence) {
@@ -6136,13 +6137,14 @@ async function executeMerge(
   let executeMergeEvidence: ConsolidateExecuteMergeEvidence | undefined;
   if (evidence) {
     const allNotes = entries.map((entry) => entry.note);
-    const mergeWarnings = buildMergeWarnings(
+    const noteEvidence = sourceEntries.map((entry) =>
+      buildConsolidateNoteEvidence(entry.note, allNotes, sourceEntries[0]?.note),
+    );
+    const mergeWarnings = buildGroupWarnings(
       sourceEntries.map((entry) => entry.note),
       sourceEntries[0]?.note,
     );
-    const noteEvidence = sourceEntries.map((entry) =>
-      buildConsolidateNoteEvidence(entry.note, allNotes, mergeWarnings),
-    );
+    const mergeRisk = aggregateMergeRisk(noteEvidence.map((e) => e.mergeRisk));
     lines.push("  Evidence:");
     for (const note of noteEvidence) {
       lines.push(`    ${note.title} | ${note.lifecycle}, ${note.role ?? "untyped"} | ${Math.round(note.ageDays)}d | rel:${note.relatedCount} | risk:${note.mergeRisk}`);
@@ -6150,7 +6152,6 @@ async function executeMerge(
     if (mergeWarnings.length > 0) {
       lines.push(`  Warnings: ${mergeWarnings.join("; ")}`);
     }
-    const mergeRisk = deriveMergeRisk(mergeWarnings);
     lines.push(`  Merge risk: ${mergeRisk}`);
     executeMergeEvidence = {
       notes: noteEvidence,
