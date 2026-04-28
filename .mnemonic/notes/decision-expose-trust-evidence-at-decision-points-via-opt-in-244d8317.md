@@ -14,8 +14,6 @@ alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
-  - id: plan-enrich-decision-points-with-retrieval-rationale-and-tru-0dd24e70
-    type: derives-from
   - id: summary-evidence-enrichment-implementation-across-recall-and-10b7ba37
     type: follows
   - id: request-implement-evidence-enrichment-phases-from-explainabi-abe55a21
