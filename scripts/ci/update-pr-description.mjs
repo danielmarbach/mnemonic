@@ -61,6 +61,13 @@ const AI_SYSTEM_PROMPT =
   "do not list filenames or file extensions; keep it to 2–4 sentences. " +
   "Output ONLY the improved summary paragraph — no headers, no markdown formatting, no preamble.";
 
+// Fields for the primary attempt (includes commits for full calibration).
+const PR_HISTORY_FIELDS_FULL = "number,changedFiles,additions,deletions,commits";
+// Fallback fields used when the primary attempt fails (commits may be unsupported).
+const PR_HISTORY_FIELDS_FALLBACK = "number,changedFiles,additions,deletions";
+// Maximum per-PR rejection messages to emit before switching to a summary line.
+const PR_REJECTION_LOG_LIMIT = 5;
+
 if (import.meta.url === `file://${process.argv[1]}`) {
   await main();
 }
@@ -228,13 +235,6 @@ function fetchCurrentPrData(prNumber, repo, cwd) {
     return null;
   }
 }
-
-// Fields for the primary attempt (includes commits for full calibration).
-const PR_HISTORY_FIELDS_FULL = "number,changedFiles,additions,deletions,commits";
-// Fallback fields used when the primary attempt fails (commits may be unsupported).
-const PR_HISTORY_FIELDS_FALLBACK = "number,changedFiles,additions,deletions";
-// Maximum per-PR rejection messages to emit before switching to a summary line.
-const PR_REJECTION_LOG_LIMIT = 5;
 
 /**
  * Fetches recent merged PR history for percentile calibration.
