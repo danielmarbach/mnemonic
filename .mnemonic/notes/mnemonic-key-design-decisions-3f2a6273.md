@@ -27,8 +27,6 @@ relatedTo:
     type: related-to
   - id: performance-principles-for-file-first-mcp-and-git-backed-wor-4e7d3bc8
     type: related-to
-  - id: research-explain-before-consolidate-value-assessment-and-des-f1b237dc
-    type: derives-from
 memoryVersion: 1
 ---
 **One file per note:** Critical for git conflict isolation. Never aggregate notes into a single file.

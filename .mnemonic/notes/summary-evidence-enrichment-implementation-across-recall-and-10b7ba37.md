@@ -8,20 +8,18 @@ tags:
   - verification
 lifecycle: permanent
 createdAt: '2026-04-26T19:00:03.718Z'
-updatedAt: '2026-04-26T19:01:43.790Z'
+updatedAt: '2026-04-28T16:06:00.244Z'
 role: summary
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
-  - id: review-evidence-enrichment-phases-1-2-and-2-5-verification-5501cdf6
-    type: derives-from
   - id: decision-expose-trust-evidence-at-decision-points-via-opt-in-244d8317
     type: follows
-  - id: request-implement-evidence-enrichment-phases-from-explainabi-abe55a21
-    type: derives-from
   - id: reference-rpir-evidence-enrichment-delivery-pattern-for-mnem-4a852278
     type: follows
+  - id: theme-evidence-enrichment-design-research-signal-inventory-d-294ccd73
+    type: derives-from
 memoryVersion: 1
 ---
 # Summary: evidence enrichment implementation across recall and consolidate

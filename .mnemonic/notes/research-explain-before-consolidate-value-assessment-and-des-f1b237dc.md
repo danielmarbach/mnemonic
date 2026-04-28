@@ -22,8 +22,6 @@ relatedTo:
     type: derives-from
   - id: mcp-workflow-ux-hint-prompt-tool-descriptions-and-session-st-e89a18fc
     type: derives-from
-  - id: plan-enrich-decision-points-with-retrieval-rationale-and-tru-0dd24e70
-    type: derives-from
 memoryVersion: 1
 ---
 # Research: explain before consolidate — value assessment and design analysis

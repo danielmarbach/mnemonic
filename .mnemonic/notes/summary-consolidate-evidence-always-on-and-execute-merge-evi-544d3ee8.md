@@ -7,13 +7,15 @@ tags:
   - execute-merge
 lifecycle: permanent
 createdAt: '2026-04-28T10:40:03.748Z'
-updatedAt: '2026-04-28T10:40:12.702Z'
+updatedAt: '2026-04-28T16:06:00.251Z'
 role: summary
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
   - id: decision-expose-trust-evidence-at-decision-points-via-opt-in-244d8317
+    type: derives-from
+  - id: theme-evidence-enrichment-design-research-signal-inventory-d-294ccd73
     type: derives-from
 memoryVersion: 1
 ---

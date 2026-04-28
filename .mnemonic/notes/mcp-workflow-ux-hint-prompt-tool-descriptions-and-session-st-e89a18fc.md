@@ -23,8 +23,6 @@ relatedTo:
     type: related-to
   - id: rpir-workflow-design-for-mnemonic-research-plan-implement-re-80b00851
     type: related-to
-  - id: research-explain-before-consolidate-value-assessment-and-des-f1b237dc
-    type: derives-from
 memoryVersion: 1
 ---
 ## Decision: MCP prompt over system prompt injection

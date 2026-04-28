@@ -13,8 +13,6 @@ alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
-  - id: plan-fix-consolidation-evidence-discriminative-power-2c34bb7b
-    type: derives-from
   - id: dogfood-findings-consolidation-evidence-metadata-alone-insuf-7278ec64
     type: follows
 memoryVersion: 1

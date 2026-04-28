@@ -9,7 +9,7 @@ tags:
   - merge-decisions
 lifecycle: permanent
 createdAt: '2026-04-28T13:09:46.833Z'
-updatedAt: '2026-04-28T13:14:13.938Z'
+updatedAt: '2026-04-28T16:06:00.250Z'
 role: research
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -17,8 +17,8 @@ projectName: mnemonic
 relatedTo:
   - id: decision-expose-trust-evidence-at-decision-points-via-opt-in-244d8317
     type: derives-from
-  - id: review-consolidation-evidence-discriminative-power-fix-e197b7be
-    type: follows
+  - id: theme-consolidation-evidence-discriminative-power-fix-proble-aa49ac2a
+    type: derives-from
 memoryVersion: 1
 ---
 # Dogfood findings: consolidation evidence metadata alone insufficient for merge decisions
