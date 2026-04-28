@@ -17,8 +17,6 @@ projectName: mnemonic
 relatedTo:
   - id: decision-expose-trust-evidence-at-decision-points-via-opt-in-244d8317
     type: derives-from
-  - id: review-consolidation-evidence-discriminative-power-fix-e197b7be
-    type: follows
   - id: theme-consolidation-evidence-discriminative-power-fix-proble-aa49ac2a
     type: derives-from
 memoryVersion: 1
