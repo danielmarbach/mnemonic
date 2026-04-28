@@ -6,7 +6,7 @@ tags:
   - conventions
 lifecycle: permanent
 createdAt: '2026-03-14T13:06:56.354Z'
-updatedAt: '2026-04-05T10:22:28.155Z'
+updatedAt: '2026-04-28T13:20:57.503Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
@@ -14,6 +14,28 @@ relatedTo:
     type: related-to
 memoryVersion: 1
 ---
-Keep changelog entries concise — 1-2 sentences max per bullet. Implementation details (retry logic, concurrency protection, internal parameters) belong in commit messages, not changelog. Follow the verbosity level of existing entries: 0.7.0 uses brief 1-sentence bullets, 0.8.0 initially had verbose multi-sentence entries that were trimmed. When trimming verbose entries, preserve API changes as they're useful reference.
+# Changelog writing principles
 
-Refinement from later review work: concise workflow-level behavior changes are worth naming when they change how agents or users are expected to operate, even if the implementation behind them is small. Keep those bullets outcome-first and avoid internal mechanics unless the mechanic itself is the user-visible API change.
+Changelog is a curated, user-focused log of notable changes — not a raw commit log.
+
+## Rules
+
+- Concise: 1-2 sentences max per bullet. Long paragraphs are unreadable.
+- User-focused: explain what changed for the user, not how it was implemented. Implementation details (retry logic, internal parameters, function names) belong in commit messages.
+- Outcome-first: describe the end result, not the transition. Never "X replaces Y" when Y never shipped.
+- No redundancy: if one bullet covers an outcome, don't add more bullets restating the same change at a lower level of detail. How the outcome is achieved is an implementation detail.
+- API changes as reference: when trimming verbose entries, preserve API changes (new parameters, new defaults) since they're useful for integration.
+- Follow existing verbosity: 0.7.0 uses brief 1-sentence bullets as the target density.
+
+## What's worth naming
+
+- Workflow-level behavior changes that change how agents or users operate, even if the implementation is small.
+- New parameters, new defaults, removed features.
+- Anything a user would need to know to adapt their usage.
+
+## Common pitfalls
+
+- Treating it like a commit log (implementation details, internal function names).
+- Describing transitions from unreleased internal states instead of shipped end results.
+- Repeating the same change at multiple levels of detail.
+- Missing the user impact in favor of technical jargon.
