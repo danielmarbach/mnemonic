@@ -8,7 +8,7 @@ tags:
   - workflow
 lifecycle: permanent
 createdAt: '2026-04-26T19:00:03.668Z'
-updatedAt: '2026-04-28T10:39:56.951Z'
+updatedAt: '2026-04-28T10:40:12.702Z'
 role: decision
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -23,6 +23,8 @@ relatedTo:
   - id: reference-rpir-evidence-enrichment-delivery-pattern-for-mnem-4a852278
     type: derives-from
   - id: research-consolidate-evidence-defaults-and-execute-merge-saf-8560d01e
+    type: derives-from
+  - id: summary-consolidate-evidence-always-on-and-execute-merge-evi-544d3ee8
     type: derives-from
 memoryVersion: 1
 ---
