@@ -17,8 +17,6 @@ relatedTo:
     type: explains
   - id: agent-instruction-improvements-session-start-recall-first-an-ecd402c3
     type: example-of
-  - id: research-explain-before-consolidate-value-assessment-and-des-f1b237dc
-    type: derives-from
 memoryVersion: 1
 ---
 ## Tool design
