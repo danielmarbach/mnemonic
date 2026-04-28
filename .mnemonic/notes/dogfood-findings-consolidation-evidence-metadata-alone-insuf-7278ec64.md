@@ -9,7 +9,7 @@ tags:
   - merge-decisions
 lifecycle: permanent
 createdAt: '2026-04-28T13:09:46.833Z'
-updatedAt: '2026-04-28T13:10:11.466Z'
+updatedAt: '2026-04-28T13:14:13.938Z'
 role: research
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -50,6 +50,14 @@ Per-note risk calibration restored discriminative power (risk spreads across low
 
 Risk calibration fix = triage vitals. What's needed = diagnosis. Metadata evidence separates safe-from-risky in theory, but the vault's note graph is dense enough that most pairs trigger at least one warning, making the signal-to-noise ratio low for actual decision-making.
 
-## Possible next step
+## Assessment
+
+Evidence is still worth shipping. The original success criteria target preventing **accidental** bad merges — lifecycle contamination, orphaned chains, stale summary replacement. Evidence warnings catch those. Before evidence, an LLM merged blindly; now it gets triage signals that actually discriminate.
+
+What the dogfood revealed isn't a design failure — it's a scope boundary. The original research asked "let LLMs mutate memory from text + signals, not text alone." Evidence delivers the signals. That it can't also answer "should I merge?" is the next question, not a reason to roll back.
+
+The four gaps (content overlap, freshness authority, relationship impact, merge direction) are a different layer — they require reading note bodies, not just frontmatter. That's a natural extension, not a pivot.
+
+## Next step
 
 Given a high-similarity pair, show a compact content diff or redundancy summary so the LLM can judge whether notes actually duplicate each other or just share vocabulary. This is a different feature from evidence metadata — it requires reading and comparing note bodies, not just frontmatter fields.
