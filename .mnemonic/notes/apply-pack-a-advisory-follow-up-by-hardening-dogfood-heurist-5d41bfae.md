@@ -16,8 +16,6 @@ projectName: mnemonic
 relatedTo:
   - id: mnemonic-key-design-decisions-3f2a6273
     type: related-to
-  - id: review-pack-a-advisory-follow-up-verification-clean-c03c2fd3
-    type: derives-from
 memoryVersion: 1
 ---
 # Apply: Pack A advisory follow-up by hardening dogfood heuristics
