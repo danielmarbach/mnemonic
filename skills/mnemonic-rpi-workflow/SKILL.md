@@ -40,6 +40,7 @@ Only after confirmation: proceed to Plan checklist.
 - For non-trivial work, include a short markdown checkbox list (`- [ ]`) for executable steps.
 - One current plan per request; update or supersede as needed.
 - Update plan note before continuing if scope, architecture, dependencies, or assumptions change materially.
+- After drafting, run a self-check: does each research requirement map to a plan item? Are there placeholders (TBD, TODO)? Are step references internally consistent?
 
 ### 2a. Plan → Implement Handoff
 
@@ -59,12 +60,30 @@ Only after confirmation: proceed to Implement checklist.
 
 ### 4. Review
 
-- Create review notes: `role: review`, `lifecycle: temporary`.
-- Link to apply/task notes or plan (`derives-from` when conclusions derive from specific artifacts).
-- Record outcome: continue, block, or update plan.
-- Reconcile checklist state with verification evidence; call out any unchecked items explicitly.
-- If review causes a material plan change, update plan note first.
-- Every review note must include verification evidence:
+Before reviewing, retrieve the context that informed implementation:
+1. `get` the research note(s) and plan note linked to this work
+2. Read the apply/task note(s) to confirm what actually shipped
+
+Create review notes: `role: review`, `lifecycle: temporary`.
+Link to apply/task notes or plan (`derives-from` when conclusions derive from specific artifacts).
+
+Review against research and plan:
+- Does the implementation satisfy the requirements identified in research?
+- Were all planned deliverables completed? If not, why?
+- Are there gaps between what was planned and what was delivered?
+- Were any assumptions from research invalidated during implementation?
+
+Before recording outcome, run a self-review checklist:
+- Re-read research requirements — is each addressed in implementation or explicitly deferred?
+- Re-read plan deliverables — do all checkboxes have matching verification evidence?
+- Is any unchecked item silently ignored rather than called out?
+
+For non-trivial work, dispatch a subagent with the full artifact chain (research, plan, apply notes) using the [review handoff variant](#review-handoff-variant) below.
+
+Record outcome: continue, block, or update plan.
+Reconcile checklist state with verification evidence; call out any unchecked items explicitly.
+If review causes a material plan change, update plan note first.
+Every verification command must be run fresh during this review — do not reuse results from implementation. Every review note must include verification evidence:
 
 ```text
 - Command: <run command>
@@ -94,6 +113,25 @@ Task scope:
 - Validation: <tests/checks>
 
 Must return: apply note content, optional review note, recommendation (continue | block | update plan)
+```
+
+### Review Handoff Variant
+
+For subagent-driven review, include the full artifact chain so the reviewer has the same context as the implementer:
+
+```text
+Request note:      <note-id/title>
+Research notes:    <note-id/title>, ...
+Plan note:         <note-id/title>
+Apply/task notes:  <note-id/title>, ...
+Durable context:   <note-id/title>, ...
+
+Review scope:
+- What was planned: <summary from plan note>
+- What was implemented: <summary from apply note>
+- Validation: <tests/checks>
+
+Instructions: Compare implementation against research requirements and plan deliverables. Identify gaps, regressions, or deviations. Return: review note content, recommendation (continue | block | update plan), and any unchecked items.
 ```
 
 ## Canonical Graph
