@@ -11,11 +11,16 @@ tags:
   - recall
 lifecycle: permanent
 createdAt: '2026-04-28T15:58:21.379Z'
-updatedAt: '2026-04-28T16:05:07.782Z'
+updatedAt: '2026-04-28T16:06:00.251Z'
 role: reference
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: summary-evidence-enrichment-implementation-across-recall-and-10b7ba37
+    type: derives-from
+  - id: summary-consolidate-evidence-always-on-and-execute-merge-evi-544d3ee8
+    type: derives-from
 memoryVersion: 1
 ---
 # Theme: Evidence enrichment design research — signal inventory, design principles, and stakeholder refinements
