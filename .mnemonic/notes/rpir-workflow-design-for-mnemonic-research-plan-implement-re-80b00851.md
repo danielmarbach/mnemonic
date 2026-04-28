@@ -22,8 +22,6 @@ relatedTo:
     type: related-to
   - id: reference-mnemonic-rpi-workflow-skill-improvement-opportunit-1b944a63
     type: related-to
-  - id: plan-enrich-decision-points-with-retrieval-rationale-and-tru-0dd24e70
-    type: follows
 memoryVersion: 1
 ---
 Approved design for evolving mnemonic into a canonical workflow artifact store with first-class research/plan/review support.
