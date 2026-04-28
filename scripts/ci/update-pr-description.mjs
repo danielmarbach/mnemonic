@@ -61,6 +61,27 @@ const AI_SYSTEM_PROMPT =
   "do not list filenames or file extensions; keep it to 2–4 sentences. " +
   "Output ONLY the improved summary paragraph — no headers, no markdown formatting, no preamble.";
 
+// Fields for the primary attempt (includes commits for full calibration).
+const PR_HISTORY_FIELDS_FULL = "number,changedFiles,additions,deletions,commits";
+// Fallback fields used when the primary attempt fails (commits may be unsupported).
+const PR_HISTORY_FIELDS_FALLBACK = "number,changedFiles,additions,deletions";
+// Maximum per-PR rejection messages to emit before switching to a summary line.
+const PR_REJECTION_LOG_LIMIT = 5;
+
+// Phrases that indicate a vague or generic AI summary.
+const WEAK_PHRASES = [
+  "various improvements",
+  "miscellaneous",
+  "several changes",
+  "some updates",
+  "multiple files",
+  "todo",
+  "[insert",
+  "see changes",
+  "no description",
+  "overall improvements",
+];
+
 if (import.meta.url === `file://${process.argv[1]}`) {
   await main();
 }
@@ -228,13 +249,6 @@ function fetchCurrentPrData(prNumber, repo, cwd) {
     return null;
   }
 }
-
-// Fields for the primary attempt (includes commits for full calibration).
-const PR_HISTORY_FIELDS_FULL = "number,changedFiles,additions,deletions,commits";
-// Fallback fields used when the primary attempt fails (commits may be unsupported).
-const PR_HISTORY_FIELDS_FALLBACK = "number,changedFiles,additions,deletions";
-// Maximum per-PR rejection messages to emit before switching to a summary line.
-const PR_REJECTION_LOG_LIMIT = 5;
 
 /**
  * Fetches recent merged PR history for percentile calibration.
@@ -569,21 +583,6 @@ export function routeTier(stats, changedPaths, thresholds) {
 // =============================================================================
 // QUALITY GATE
 // =============================================================================
-
-// Phrases that indicate a vague or generic AI summary.
-const WEAK_PHRASES = [
-  "various improvements",
-  "miscellaneous",
-  "several changes",
-  "some updates",
-  "multiple files",
-  "this pr",
-  "todo",
-  "[insert",
-  "see changes",
-  "no description",
-  "overall improvements",
-];
 
 /**
  * Returns true when the given text is likely a weak or unhelpful AI summary.
