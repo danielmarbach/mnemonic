@@ -11,7 +11,7 @@ tags:
   - recall
 lifecycle: permanent
 createdAt: '2026-04-28T15:58:21.379Z'
-updatedAt: '2026-04-28T15:58:21.379Z'
+updatedAt: '2026-04-28T16:02:26.570Z'
 role: reference
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -61,6 +61,31 @@ Key gap in consolidate strategies: `detect-duplicates` and `suggest-merges` comp
 2. **Compact by default**: Default evidence mode is `"compact"` (opt-in). Follows the established pattern of `mode: "temporal"` and `verbose: true`.
 
 3. **Different evidence for consolidation than recall**: Recall evidence answers "Why was this retrieved?" (channels, rankBand, projectRelevant, freshness). Consolidation evidence answers "Should these merge?" (lifecycle, role, ageDays, supersession chain, relatedCount, merge warnings).
+
+## Consolidation evidence defaults flip rationale
+
+The original opt-in design was correct in principle (token discipline) but wrong for the consolidation domain:
+
+- Consolidation deals with small result sets — evidence is cheap (~2 lines per note)
+- Risk of bad merges without lifecycle/risk context is real and preventable
+- Four concrete scenarios prevented by evidence:
+  1. LLM merges temporary research note into permanent decision → contaminates durable memory
+  2. LLM merges newer note into older summary → replaces fresh content with stale summary
+  3. LLM orphans supersedes chain → lose lineage between old and current content
+  4. LLM merges notes with same role but different lifecycles without verifying intent
+
+Per-note risk accuracy fix: original group-level `buildMergeWarnings` passed identical warnings to every note's `deriveMergeRisk`, causing all notes in non-trivial groups to get `risk:high`. Fixed with per-note `buildNoteWarnings` and `aggregateMergeRisk` (max per-note risk).
+
+### Risk calibration
+
+- Critical warnings (supersedes chain, stale summary) → "high"
+- Single non-critical warning → "medium"
+- 2+ non-critical warnings → "high"
+
+### Warning specificity
+
+- Group warnings prefixed with originating note title for actionability
+- Per-note warnings tell you which specific note is risky
 
 ## Core design shift: explainability as capability layer, not workflow step
 
