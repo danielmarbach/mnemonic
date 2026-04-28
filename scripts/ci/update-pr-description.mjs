@@ -6,8 +6,8 @@
  * Reads `.mnemonic/notes/` files changed in a PR and generates a structured
  * PR title and description from their design decision content.
  *
- * Routing: fetches recent merged PR history at runtime to compute repo-relative
- * percentile thresholds, then routes to one of four tiers:
+ * Routing: uses hardcoded p75/p90 thresholds (computed once from 100 historical
+ * PRs) to route to one of four tiers:
  *   A - trivial (formula bumps, lockfiles): deterministic minimal output
  *   B - normal: standard deterministic description
  *   C - complex (>p75 or medium semantic): deterministic + cheap AI enhancement attempt
@@ -39,11 +39,15 @@ const args = parseArgs(process.argv.slice(2));
 const BUG_TAGS = ["bug", "bugs", "fix", "bugfix", "hotfix"];
 const ENHANCEMENT_TAGS = ["enhancement", "feature"];
 
-// Fallback thresholds used when fewer than 5 historical PRs are available.
-// Tuned conservatively for this repo's typical PR size distribution.
-const CONSERVATIVE_DEFAULTS = {
-  files: { p75: 10, p90: 25 },
-  lines: { p75: 500, p90: 1500 },
+// Hardcoded p75/p90 thresholds computed from the repo's last 100 merged PRs.
+// Values are stable and avoid runtime GraphQL queries that risk node-limit errors.
+// Source: `gh pr list --state merged --limit 100 --json number,changedFiles,additions,deletions`
+//   files p75=9  p90=18
+//   lines p75=534  p90=1388
+// Commits estimated conservatively (not available from the query used above).
+const THRESHOLDS = {
+  files: { p75: 9, p90: 18 },
+  lines: { p75: 534, p90: 1388 },
   commits: { p75: 8, p90: 25 },
 };
 
@@ -60,13 +64,6 @@ const AI_SYSTEM_PROMPT =
   "avoid vague phrases like 'various improvements' or 'several changes'; " +
   "do not list filenames or file extensions; keep it to 2–4 sentences. " +
   "Output ONLY the improved summary paragraph — no headers, no markdown formatting, no preamble.";
-
-// Fields for the primary attempt (includes commits for full calibration).
-const PR_HISTORY_FIELDS_FULL = "number,changedFiles,additions,deletions,commits";
-// Fallback fields used when the primary attempt fails (commits may be unsupported).
-const PR_HISTORY_FIELDS_FALLBACK = "number,changedFiles,additions,deletions";
-// Maximum per-PR rejection messages to emit before switching to a summary line.
-const PR_REJECTION_LOG_LIMIT = 5;
 
 // Phrases that indicate a vague or generic AI summary.
 const WEAK_PHRASES = [
@@ -119,21 +116,8 @@ export async function main() {
     `Found ${noteFiles.length} mnemonic note(s) in PR #${prNumber}: ${noteFiles.join(", ")}\n`,
   );
 
-  // --- Step 2: Fetch PR history for calibration (read-only, in-memory) ---
-  const history = fetchPrHistory(repo, cwd);
-  const rawThresholds = computeThresholds(history);
-  const thresholds = validateThresholds(rawThresholds);
-  process.stdout.write(
-    `Calibrated from ${history.length} historical PR(s): ` +
-      `files p75=${thresholds.files.p75.toFixed(0)}/p90=${thresholds.files.p90.toFixed(0)}, ` +
-      `lines p75=${thresholds.lines.p75.toFixed(0)}/p90=${thresholds.lines.p90.toFixed(0)}, ` +
-      `commits p75=${thresholds.commits.p75.toFixed(0)}/p90=${thresholds.commits.p90.toFixed(0)}\n`,
-  );
-  if (history.length === 0) {
-    process.stderr.write(
-      "[history] 0 historical PRs returned — check the [history] lines above for the gh exit code and stderr.\n",
-    );
-  }
+  // --- Step 2: Hardcoded thresholds (computed once from 100 historical PRs) ---
+  const thresholds = THRESHOLDS;
 
   // --- Step 3: Route to tier A / B / C / D ---
   const tier = routeTier(prStats, changedFiles, thresholds);
@@ -248,227 +232,6 @@ function fetchCurrentPrData(prNumber, repo, cwd) {
     process.stderr.write(`Error parsing PR data: ${result.stdout}\n`);
     return null;
   }
-}
-
-/**
- * Fetches recent merged PR history for percentile calibration.
- *
- * Strategy:
- *   1. Try `gh pr list --json changedFiles,additions,deletions,commits` (preferred).
- *   2. If that fails (e.g. `commits` unsupported in this gh version), retry without
- *      `commits` — commits data will be missing but size percentiles still work.
- *
- * All steps emit diagnostics to stderr so CI logs show exactly what happened.
- * Read-only — no files written. Returns empty array on any unrecoverable failure.
- *
- * @returns {Array<{changedFiles:number|null, additions:number|null, deletions:number|null, commits:number|null}>}
- */
-function fetchPrHistory(repo, cwd) {
-  const baseArgs = ["pr", "list", "--state", "merged", "--limit", "50", "--repo", repo];
-
-  // --- Attempt 1: with commits field ---
-  const fullArgs = [...baseArgs, "--json", PR_HISTORY_FIELDS_FULL];
-  process.stderr.write(
-    `[history] Running: gh ${fullArgs.join(" ")}\n`,
-  );
-  const fullResult = spawnSync("gh", fullArgs, { encoding: "utf-8", cwd });
-  process.stderr.write(`[history] Exit code: ${fullResult.status}\n`);
-  if (fullResult.stderr?.trim()) {
-    process.stderr.write(`[history] stderr: ${fullResult.stderr.trim()}\n`);
-  }
-
-  let rawJson = null;
-  let commitsIncluded = true;
-
-  if (fullResult.status === 0) {
-    rawJson = fullResult.stdout.trim();
-  } else {
-    // --- Attempt 2: without commits field (may not be supported in all gh versions) ---
-    const fallbackArgs = [...baseArgs, "--json", PR_HISTORY_FIELDS_FALLBACK];
-    process.stderr.write(
-      `[history] Retrying without commits: gh ${fallbackArgs.join(" ")}\n`,
-    );
-    const fallbackResult = spawnSync("gh", fallbackArgs, { encoding: "utf-8", cwd });
-    process.stderr.write(`[history] Retry exit code: ${fallbackResult.status}\n`);
-    if (fallbackResult.stderr?.trim()) {
-      process.stderr.write(`[history] Retry stderr: ${fallbackResult.stderr.trim()}\n`);
-    }
-    if (fallbackResult.status !== 0) {
-      process.stderr.write("[history] Both gh pr list attempts failed. Cannot calibrate.\n");
-      return [];
-    }
-    rawJson = fallbackResult.stdout.trim();
-    commitsIncluded = false;
-    process.stderr.write("[history] Using fallback fields (no commits data).\n");
-  }
-
-  let parsed;
-  try {
-    parsed = JSON.parse(rawJson);
-  } catch (err) {
-    process.stderr.write(`[history] JSON parse error: ${err.message}\n`);
-    process.stderr.write(`[history] Raw output (first 500 chars): ${rawJson.slice(0, 500)}\n`);
-    return [];
-  }
-
-  if (!Array.isArray(parsed)) {
-    process.stderr.write(
-      `[history] Unexpected response shape (not an array). Keys: ${Object.keys(parsed ?? {}).join(", ")}\n`,
-    );
-    return [];
-  }
-
-  process.stderr.write(`[history] Raw PRs returned: ${parsed.length}\n`);
-
-  if (parsed.length > 0) {
-    process.stderr.write(
-      `[history] Sample PR[0] keys: ${Object.keys(parsed[0]).join(", ")}\n`,
-    );
-    process.stderr.write(
-      `[history] Sample PR[0] values: ${JSON.stringify(parsed[0])}\n`,
-    );
-  }
-
-  // Map to metrics, logging why each PR is rejected.
-  // Per-PR rejection messages are capped at PR_REJECTION_LOG_LIMIT to keep
-  // logs readable for large histories; a summary line is emitted afterwards.
-  let validCount = 0;
-  let rejectionCount = 0;
-  const mapped = parsed.map((pr, index) => {
-    const changedFiles = typeof pr.changedFiles === "number" ? pr.changedFiles : null;
-    const additions = typeof pr.additions === "number" ? pr.additions : null;
-    const deletions = typeof pr.deletions === "number" ? pr.deletions : null;
-    // GraphQL returns commits as an array of objects; extract the count.
-    const commits = commitsIncluded
-      ? (Array.isArray(pr.commits)
-          ? pr.commits.length
-          : typeof pr.commits === "number"
-            ? pr.commits
-            : null)
-      : null;
-
-    const missing = [];
-    if (changedFiles === null) missing.push("changedFiles");
-    if (additions === null) missing.push("additions");
-    if (deletions === null) missing.push("deletions");
-    if (commits === null && commitsIncluded) missing.push("commits");
-
-    if (missing.length > 0) {
-      rejectionCount += 1;
-      if (rejectionCount <= PR_REJECTION_LOG_LIMIT) {
-        process.stderr.write(
-          `[history] PR[${index}] (#${pr.number ?? "?"}) rejected: missing ${missing.join(", ")}\n`,
-        );
-      }
-    } else {
-      validCount += 1;
-    }
-
-    return { changedFiles, additions, deletions, commits };
-  });
-
-  if (rejectionCount > PR_REJECTION_LOG_LIMIT) {
-    process.stderr.write(
-      `[history] ... and ${rejectionCount - PR_REJECTION_LOG_LIMIT} more rejected PR(s) (suppressed).\n`,
-    );
-  }
-
-  process.stderr.write(`[history] PRs with valid metrics: ${validCount}/${parsed.length}\n`);
-
-  if (validCount === 0 && parsed.length > 0) {
-    process.stderr.write(
-      "[history] WARNING: No PRs had valid metrics despite non-empty response. " +
-        "Field names may not match what the gh CLI returns for this repo.\n",
-    );
-  }
-
-  return mapped;
-}
-
-// =============================================================================
-// CALIBRATION
-// =============================================================================
-
-/**
- * Computes a percentile value from an unsorted array using linear interpolation.
- * Non-finite values (NaN, Infinity) are excluded before sorting.
- * Returns 0 for an empty array.
- */
-function percentile(values, p) {
-  const finite = values.filter((v) => Number.isFinite(v));
-  if (finite.length === 0) return 0;
-  const sorted = [...finite].sort((a, b) => a - b);
-  const idx = (p / 100) * (sorted.length - 1);
-  const lo = Math.floor(idx);
-  const hi = Math.ceil(idx);
-  return sorted[lo] + (sorted[hi] - sorted[lo]) * (idx - lo);
-}
-
-/**
- * Computes p75/p90 thresholds from a history array.
- * Falls back to CONSERVATIVE_DEFAULTS when there are fewer than 5 data points.
- *
- * Missing (null/undefined) values are excluded rather than coerced to zero —
- * treating them as zero would collapse all thresholds and misclassify every PR
- * as oversized.
- *
- * @param {Array<{changedFiles:number|null, additions:number|null, deletions:number|null, commits:number|null}>} history
- * @returns {{ files: {p75:number,p90:number}, lines: {p75:number,p90:number}, commits: {p75:number,p90:number} }}
- */
-export function computeThresholds(history) {
-  if (history.length < 5) return CONSERVATIVE_DEFAULTS;
-
-  const isFiniteNumber = (v) => typeof v === "number" && Number.isFinite(v);
-
-  const files = history.map((p) => p.changedFiles).filter(isFiniteNumber);
-  // Both additions and deletions must be present to produce a meaningful total-lines
-  // figure; entries where only one side is available are excluded to avoid under-counting.
-  const lines = history
-    .filter((p) => isFiniteNumber(p.additions) && isFiniteNumber(p.deletions))
-    .map((p) => p.additions + p.deletions);
-  const commits = history.map((p) => p.commits).filter(isFiniteNumber);
-
-  // Fall back when the primary size dimensions (files and lines) lack enough valid
-  // samples to produce reliable percentiles. Commits uses its own independent fallback
-  // below so that a repo with commit data but missing file counts still works correctly.
-  if (files.length < 5 || lines.length < 5) return CONSERVATIVE_DEFAULTS;
-
-  return {
-    files: { p75: percentile(files, 75), p90: percentile(files, 90) },
-    lines: { p75: percentile(lines, 75), p90: percentile(lines, 90) },
-    commits:
-      commits.length >= 5
-        ? { p75: percentile(commits, 75), p90: percentile(commits, 90) }
-        : CONSERVATIVE_DEFAULTS.commits,
-  };
-}
-
-/**
- * Validates that computed thresholds are realistic (non-zero for at least one
- * dimension). Returns CONSERVATIVE_DEFAULTS when all thresholds are zero,
- * which indicates a data extraction failure rather than a legitimate all-tiny
- * PR history.
- *
- * @param {{ files:{p75:number,p90:number}, lines:{p75:number,p90:number}, commits:{p75:number,p90:number} }} thresholds
- * @returns {{ files:{p75:number,p90:number}, lines:{p75:number,p90:number}, commits:{p75:number,p90:number} }}
- */
-export function validateThresholds(thresholds) {
-  const allZero =
-    thresholds.files.p75 === 0 &&
-    thresholds.files.p90 === 0 &&
-    thresholds.lines.p75 === 0 &&
-    thresholds.lines.p90 === 0 &&
-    thresholds.commits.p75 === 0 &&
-    thresholds.commits.p90 === 0;
-
-  if (allZero) {
-    process.stderr.write(
-      "Warning: all calibration thresholds are zero — data extraction likely failed. " +
-        "Falling back to conservative defaults.\n",
-    );
-    return CONSERVATIVE_DEFAULTS;
-  }
-  return thresholds;
 }
 
 // =============================================================================
