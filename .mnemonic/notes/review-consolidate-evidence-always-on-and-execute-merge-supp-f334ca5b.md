@@ -12,9 +12,6 @@ role: review
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
-relatedTo:
-  - id: plan-make-consolidate-evidence-always-on-and-add-to-execute--24c444e3
-    type: derives-from
 memoryVersion: 1
 ---
 # Review: consolidate evidence always-on and execute-merge support
