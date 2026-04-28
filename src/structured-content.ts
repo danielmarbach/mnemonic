@@ -270,6 +270,7 @@ export interface ConsolidateResult extends Record<string, unknown> {
   relationshipClusters?: Array<{ hub: { id: string; title: string }; notes: { id: string; title: string }[] }>;
   duplicatePairs?: ConsolidateDuplicatePairEvidence[];
   mergeSuggestions?: ConsolidateMergeSuggestionEvidence[];
+  executeMergeEvidence?: ConsolidateExecuteMergeEvidence;
   persistence?: PersistenceStatus;
   retry?: MutationRetryContract;
 }
@@ -302,6 +303,12 @@ export interface ConsolidateMergeSuggestionEvidence {
   targetTitle: string;
   sourceIds: string[];
   mode: "supersedes" | "delete";
+  notes: ConsolidateNoteMergeEvidence[];
+  warnings?: string[];
+  mergeRisk: MergeRisk;
+}
+
+export interface ConsolidateExecuteMergeEvidence {
   notes: ConsolidateNoteMergeEvidence[];
   warnings?: string[];
   mergeRisk: MergeRisk;
@@ -958,6 +965,23 @@ export const ConsolidateResultSchema = z.object({
     warnings: z.array(z.string()).optional(),
     mergeRisk: z.enum(["low", "medium", "high"]),
   })).optional(),
+  executeMergeEvidence: z.object({
+    notes: z.array(z.object({
+      id: z.string(),
+      title: z.string(),
+      lifecycle: _NoteLifecycle,
+      role: _NoteRole.optional(),
+      ageDays: z.number(),
+      superseded: z.boolean(),
+      supersededBy: z.string().optional(),
+      supersededCount: z.number().int().optional(),
+      relatedCount: z.number(),
+      warnings: z.array(z.string()).optional(),
+      mergeRisk: z.enum(["low", "medium", "high"]),
+    })),
+    warnings: z.array(z.string()).optional(),
+    mergeRisk: z.enum(["low", "medium", "high"]),
+  }).optional(),
   persistence: PersistenceStatusSchema.optional(),
   retry: PersistenceStatusSchema.shape.retry,
 });

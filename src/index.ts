@@ -134,6 +134,7 @@ import type {
   AnchorNote,
   RelationshipPreview,
   RetrievalEvidence,
+  ConsolidateExecuteMergeEvidence,
 } from "./structured-content.js";
 import {
   RememberResultSchema,
@@ -6132,6 +6133,7 @@ async function executeMerge(
     }
   }
 
+  let executeMergeEvidence: ConsolidateExecuteMergeEvidence | undefined;
   if (evidence) {
     const allNotes = entries.map((entry) => entry.note);
     const mergeWarnings = buildMergeWarnings(
@@ -6148,7 +6150,13 @@ async function executeMerge(
     if (mergeWarnings.length > 0) {
       lines.push(`  Warnings: ${mergeWarnings.join("; ")}`);
     }
-    lines.push(`  Merge risk: ${deriveMergeRisk(mergeWarnings)}`);
+    const mergeRisk = deriveMergeRisk(mergeWarnings);
+    lines.push(`  Merge risk: ${mergeRisk}`);
+    executeMergeEvidence = {
+      notes: noteEvidence,
+      warnings: mergeWarnings.length > 0 ? mergeWarnings : undefined,
+      mergeRisk,
+    };
   }
 
   const structuredContent: ConsolidateResult = {
@@ -6157,6 +6165,7 @@ async function executeMerge(
     project: toProjectRef(project),
     notesProcessed: entries.length,
     notesModified: vaultChanges.size,
+    executeMergeEvidence,
     persistence,
     retry,
   };
@@ -6388,6 +6397,10 @@ async function dryRunAll(
     project: toProjectRef(project),
     notesProcessed: entries.length,
     notesModified: 0,
+    duplicatePairs: dupes.structuredContent.duplicatePairs,
+    mergeSuggestions: merges.structuredContent.mergeSuggestions,
+    themeGroups: clusters.structuredContent.themeGroups,
+    relationshipClusters: clusters.structuredContent.relationshipClusters,
   };
 
   return { content: [{ type: "text", text: lines.join("\n") }], structuredContent };
