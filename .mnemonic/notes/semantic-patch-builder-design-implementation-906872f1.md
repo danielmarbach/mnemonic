@@ -15,10 +15,6 @@ role: reference
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
-  - id: plan-semanticpatch-lint-error-handling-improvements-2f54b5df
-    type: derives-from
-  - id: review-heading-child-operations-fix-in-semanticpatch-495f1061
-    type: related-to
   - id: theme-semantic-patch-improvements-lint-error-handling-headin-f2c4ced1
     type: explains
 memoryVersion: 1
