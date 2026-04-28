@@ -8,7 +8,7 @@ tags:
   - consolidate
 lifecycle: temporary
 createdAt: '2026-04-26T19:16:53.530Z'
-updatedAt: '2026-04-26T19:20:29.641Z'
+updatedAt: '2026-04-28T10:38:17.351Z'
 role: review
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -82,3 +82,16 @@ Two documented findings, neither blocking:
 
 1. supersededBy not populated in recall -- low severity, schema supports future addition
 2. Consolidate evidence opt-in instead of always-on -- intentional, documented in plan update
+
+## Addendum (2026-04-28): opt-in finding superseded
+
+Finding 2 is superseded. The opt-in design was initially accepted as a reasonable tradeoff, but subsequent review reversed this judgment.
+
+**Rationale for reversal:** token cost of consolidation evidence is negligible (small result sets — typically 5-20 notes). Risk profile of omitting evidence is unacceptable: orphaned supersedes chains, lifecycle contamination (temporary research merged into permanent decision), stale summary replacement (newer note replaced by older summary). Four distinct failure modes all preventable with evidence warnings.
+
+**Changes applied:**
+
+- `evidence = false` → `true` for `detect-duplicates`, `suggest-merges`, `dry-run`
+- `execute-merge` now accepts `evidence` parameter (default `true`) and renders per-note trust signals inline in text output
+- Tool descriptions updated to reflect default-on behavior
+- Recall evidence remains opt-in (token budget matters: up to 20 results × 3 lines = 60+ lines)
