@@ -354,6 +354,84 @@ describe("sync-migrations", () => {
     }
   }, 15000);
 
+  it("renders execute-merge evidence by default and suppresses it when evidence is false", async () => {
+    const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-vault-"));
+    tempDirs.push(vaultDir);
+    const embeddingServer = await startFakeEmbeddingServer();
+
+    try {
+      const noteAText = await callLocalMcp(vaultDir, "remember", {
+        title: "Execute merge evidence A",
+        content: "First note for execute-merge evidence test.",
+        tags: ["evidence", "execute-merge"],
+        lifecycle: "permanent",
+        summary: "Create note A for execute-merge evidence",
+        scope: "global",
+      }, embeddingServer.url);
+      const noteAId = extractRememberedId(noteAText);
+
+      const noteBText = await callLocalMcp(vaultDir, "remember", {
+        title: "Execute merge evidence B",
+        content: "Second note for execute-merge evidence test.",
+        tags: ["evidence", "execute-merge"],
+        lifecycle: "temporary",
+        role: "research",
+        summary: "Create note B for execute-merge evidence",
+        scope: "global",
+      }, embeddingServer.url);
+      const noteBId = extractRememberedId(noteBText);
+
+      const mergeWithEvidence = await callLocalMcp(vaultDir, "consolidate", {
+        strategy: "execute-merge",
+        evidence: true,
+        mergePlan: {
+          sourceIds: [noteAId, noteBId],
+          targetTitle: "Execute merge evidence target",
+        },
+      }, embeddingServer.url);
+
+      expect(mergeWithEvidence).toContain("Evidence:");
+      expect(mergeWithEvidence).toContain("risk:");
+      expect(mergeWithEvidence).toContain("Merge risk:");
+      expect(mergeWithEvidence).toMatch(/temporary, research/);
+      expect(mergeWithEvidence).toMatch(/permanent, untyped/);
+
+      const noteCText = await callLocalMcp(vaultDir, "remember", {
+        title: "Execute merge no-evidence C",
+        content: "Third note for execute-merge without evidence.",
+        tags: ["evidence", "execute-merge-no-evidence"],
+        lifecycle: "permanent",
+        summary: "Create note C for execute-merge no-evidence",
+        scope: "global",
+      }, embeddingServer.url);
+      const noteCId = extractRememberedId(noteCText);
+
+      const noteDText = await callLocalMcp(vaultDir, "remember", {
+        title: "Execute merge no-evidence D",
+        content: "Fourth note for execute-merge without evidence.",
+        tags: ["evidence", "execute-merge-no-evidence"],
+        lifecycle: "permanent",
+        summary: "Create note D for execute-merge no-evidence",
+        scope: "global",
+      }, embeddingServer.url);
+      const noteDId = extractRememberedId(noteDText);
+
+      const mergeWithoutEvidence = await callLocalMcp(vaultDir, "consolidate", {
+        strategy: "execute-merge",
+        evidence: false,
+        mergePlan: {
+          sourceIds: [noteCId, noteDId],
+          targetTitle: "Execute merge no-evidence target",
+        },
+      }, embeddingServer.url);
+
+      expect(mergeWithoutEvidence).not.toContain("Evidence:");
+      expect(mergeWithoutEvidence).not.toContain("Merge risk:");
+    } finally {
+      await embeddingServer.close();
+    }
+  }, 15000);
+
   it("keeps sync structured output aligned with SyncResultSchema", async () => {
     const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-vault-"));
     tempDirs.push(vaultDir);
