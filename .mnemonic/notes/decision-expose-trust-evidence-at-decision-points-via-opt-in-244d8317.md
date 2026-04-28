@@ -8,7 +8,7 @@ tags:
   - workflow
 lifecycle: permanent
 createdAt: '2026-04-26T19:00:03.668Z'
-updatedAt: '2026-04-28T10:39:38.935Z'
+updatedAt: '2026-04-28T10:39:56.951Z'
 role: decision
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -26,32 +26,25 @@ relatedTo:
     type: derives-from
 memoryVersion: 1
 ---
-- `recall` exposes retrieval rationale via `evidence: "compact"` (opt-in).
-- `consolidate` analysis strategies (`detect-duplicates`, `suggest-merges`, `dry-run`) expose trust/risk rationale via `evidence: true` (default on for analysis strategies and execute-merge).
-- Recall evidence stays compact and opt-in. Consolidate evidence defaults on for safety — token cost is negligible for small result sets, and risk of bad merges without evidence (lifecycle contamination, orphaned supersedes, stale summary replacement) is real.
+# Decision: expose trust evidence at decision points via opt-in enrichment
 
 Use capability-level evidence on existing tools instead of introducing a separate explain workflow step.
 
 ## Decision
 
-- `recall` exposes retrieval rationale via `evidence: "compact"`.
+- `recall` exposes retrieval rationale via `evidence: "compact"` (opt-in).
 - `consolidate` analysis strategies (`detect-duplicates`, `suggest-merges`, `dry-run`) expose trust/risk rationale via `evidence: true`.
-- Evidence stays compact and optional, preserving default output behavior and token budget.
+- Consolidate evidence now defaults on for safety (analysis strategies and `execute-merge`). Recall evidence remains opt-in.
+- Token cost of consolidation evidence is negligible. Risk of bad merges without evidence (lifecycle contamination, orphaned supersedes chains, stale summary replacement) outweighs token savings.
 
 ## Rationale
 
 - Ranking and lineage signals already exist in pipeline state and can be serialized safely at the output boundary.
 - Decision quality improves when merge/retrieval context includes freshness, supersession, role/lifecycle mismatch, and coarse merge risk.
-- Opt-in enrichment avoids turning mnemonic into an orchestration runtime while improving confidence at mutation decision points.
+- Consolidation deals with small result sets; recall deals with up to 20 results — different token budgets.
+
+## Consequences
 
 - Structured schemas carry retrieval/consolidation evidence payloads.
-
 - Consolidate analysis and execute-merge default evidence on; recall remains opt-in.
-
-- Future phases can extend this pattern (e.g., targeted `get` enrichment) without breaking callers.
-
-- Structured schemas now carry retrieval/consolidation evidence payloads.
-
-- Tool descriptions and workflow hints document optional evidence usage for uncertainty-driven decisions.
-
 - Future phases can extend this pattern (e.g., targeted `get` enrichment) without breaking callers.
