@@ -14,8 +14,6 @@ alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
-  - id: apply-implement-evidence-enrichment-phases-1-2-and-2-5-f18137eb
-    type: derives-from
   - id: summary-evidence-enrichment-implementation-across-recall-and-10b7ba37
     type: derives-from
 memoryVersion: 1
