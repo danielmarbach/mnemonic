@@ -11,11 +11,16 @@ tags:
   - merge-decisions
 lifecycle: permanent
 createdAt: '2026-04-28T15:58:57.877Z'
-updatedAt: '2026-04-28T15:58:57.877Z'
+updatedAt: '2026-04-28T16:06:00.252Z'
 role: reference
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: dogfood-findings-consolidation-evidence-metadata-alone-insuf-7278ec64
+    type: derives-from
+  - id: decision-expose-trust-evidence-at-decision-points-via-opt-in-244d8317
+    type: explains
 memoryVersion: 1
 ---
 # Theme: Consolidation evidence discriminative power — problem analysis and resolution
