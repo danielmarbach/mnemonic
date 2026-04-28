@@ -116,10 +116,25 @@ export interface RecallResult extends Record<string, unknown> {
       };
       changeCategory?: "create" | "refine" | "expand" | "clarify" | "connect" | "restructure" | "reverse" | "unknown";
       changeDescription?: string;
-    }>;
+    }>; 
     historySummary?: string;
     relationships?: RelationshipPreview;
+    retrievalEvidence?: RetrievalEvidence;
   }>;
+}
+
+export type RetrievalEvidenceChannel = "semantic" | "lexical" | "graph" | "temporal-boost" | "canonical" | "rescue";
+export type RetrievalEvidenceRankBand = "top3" | "top10" | "lower";
+export type RetrievalEvidenceFreshness = "today" | "thisWeek" | "thisMonth" | "older";
+
+export interface RetrievalEvidence {
+  channels: RetrievalEvidenceChannel[];
+  rankBand: RetrievalEvidenceRankBand;
+  projectRelevant: boolean;
+  freshness: RetrievalEvidenceFreshness;
+  superseded: boolean;
+  supersededBy?: string;
+  supersededCount?: number;
 }
 
 export interface ListResult extends Record<string, unknown> {
@@ -253,8 +268,50 @@ export interface ConsolidateResult extends Record<string, unknown> {
   warnings?: string[];
   themeGroups?: Array<{ name: string; count: number; examples: string[] }>;
   relationshipClusters?: Array<{ hub: { id: string; title: string }; notes: { id: string; title: string }[] }>;
+  duplicatePairs?: ConsolidateDuplicatePairEvidence[];
+  mergeSuggestions?: ConsolidateMergeSuggestionEvidence[];
+  executeMergeEvidence?: ConsolidateExecuteMergeEvidence;
   persistence?: PersistenceStatus;
   retry?: MutationRetryContract;
+}
+
+export type MergeRisk = "low" | "medium" | "high";
+
+export interface ConsolidateNoteMergeEvidence {
+  id: string;
+  title: string;
+  lifecycle: NoteLifecycle;
+  role?: NoteRole;
+  ageDays: number;
+  superseded: boolean;
+  supersededBy?: string;
+  supersededCount?: number;
+  relatedCount: number;
+  warnings?: string[];
+  mergeRisk: MergeRisk;
+}
+
+export interface ConsolidateDuplicatePairEvidence {
+  similarity: number;
+  noteA: ConsolidateNoteMergeEvidence;
+  noteB: ConsolidateNoteMergeEvidence;
+  warnings?: string[];
+  mergeRisk: MergeRisk;
+}
+
+export interface ConsolidateMergeSuggestionEvidence {
+  targetTitle: string;
+  sourceIds: string[];
+  mode: "supersedes" | "delete";
+  notes: ConsolidateNoteMergeEvidence[];
+  warnings?: string[];
+  mergeRisk: MergeRisk;
+}
+
+export interface ConsolidateExecuteMergeEvidence {
+  notes: ConsolidateNoteMergeEvidence[];
+  warnings?: string[];
+  mergeRisk: MergeRisk;
 }
 
 export interface ProjectIdentityResult extends Record<string, unknown> {
@@ -578,6 +635,15 @@ export const RecallResultSchema = z.object({
     })).optional(),
     historySummary: z.string().optional(),
     relationships: RelationshipPreviewSchema.optional(),
+    retrievalEvidence: z.object({
+      channels: z.array(z.enum(["semantic", "lexical", "graph", "temporal-boost", "canonical", "rescue"])),
+      rankBand: z.enum(["top3", "top10", "lower"]),
+      projectRelevant: z.boolean(),
+      freshness: z.enum(["today", "thisWeek", "thisMonth", "older"]),
+      superseded: z.boolean(),
+      supersededBy: z.string().optional(),
+      supersededCount: z.number().int().optional(),
+    }).optional(),
   })),
 });
 
@@ -848,6 +914,74 @@ export const ConsolidateResultSchema = z.object({
       title: z.string(),
     })),
   })).optional(),
+  duplicatePairs: z.array(z.object({
+    similarity: z.number(),
+    noteA: z.object({
+      id: z.string(),
+      title: z.string(),
+      lifecycle: _NoteLifecycle,
+      role: _NoteRole.optional(),
+      ageDays: z.number(),
+      superseded: z.boolean(),
+      supersededBy: z.string().optional(),
+      supersededCount: z.number().int().optional(),
+      relatedCount: z.number(),
+      warnings: z.array(z.string()).optional(),
+      mergeRisk: z.enum(["low", "medium", "high"]),
+    }),
+    noteB: z.object({
+      id: z.string(),
+      title: z.string(),
+      lifecycle: _NoteLifecycle,
+      role: _NoteRole.optional(),
+      ageDays: z.number(),
+      superseded: z.boolean(),
+      supersededBy: z.string().optional(),
+      supersededCount: z.number().int().optional(),
+      relatedCount: z.number(),
+      warnings: z.array(z.string()).optional(),
+      mergeRisk: z.enum(["low", "medium", "high"]),
+    }),
+    warnings: z.array(z.string()).optional(),
+    mergeRisk: z.enum(["low", "medium", "high"]),
+  })).optional(),
+  mergeSuggestions: z.array(z.object({
+    targetTitle: z.string(),
+    sourceIds: z.array(z.string()),
+    mode: z.enum(["supersedes", "delete"]),
+    notes: z.array(z.object({
+      id: z.string(),
+      title: z.string(),
+      lifecycle: _NoteLifecycle,
+      role: _NoteRole.optional(),
+      ageDays: z.number(),
+      superseded: z.boolean(),
+      supersededBy: z.string().optional(),
+      supersededCount: z.number().int().optional(),
+      relatedCount: z.number(),
+      warnings: z.array(z.string()).optional(),
+      mergeRisk: z.enum(["low", "medium", "high"]),
+    })),
+    warnings: z.array(z.string()).optional(),
+    mergeRisk: z.enum(["low", "medium", "high"]),
+  })).optional(),
+  executeMergeEvidence: z.object({
+    notes: z.array(z.object({
+      id: z.string(),
+      title: z.string(),
+      lifecycle: _NoteLifecycle,
+      role: _NoteRole.optional(),
+      ageDays: z.number(),
+      superseded: z.boolean(),
+      supersededBy: z.string().optional(),
+      supersededCount: z.number().int().optional(),
+      relatedCount: z.number(),
+      warnings: z.array(z.string()).optional(),
+      mergeRisk: z.enum(["low", "medium", "high"]),
+    })),
+    warnings: z.array(z.string()).optional(),
+    mergeRisk: z.enum(["low", "medium", "high"]),
+  }).optional(),
   persistence: PersistenceStatusSchema.optional(),
   retry: PersistenceStatusSchema.shape.retry,
 });

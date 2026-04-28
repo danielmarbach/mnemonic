@@ -7,7 +7,7 @@ tags:
   - decision
 lifecycle: permanent
 createdAt: '2026-03-24T10:54:19.723Z'
-updatedAt: '2026-03-24T10:54:19.723Z'
+updatedAt: '2026-04-26T10:08:01.283Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
@@ -17,6 +17,8 @@ relatedTo:
     type: explains
   - id: agent-instruction-improvements-session-start-recall-first-an-ecd402c3
     type: example-of
+  - id: research-explain-before-consolidate-value-assessment-and-des-f1b237dc
+    type: derives-from
 memoryVersion: 1
 ---
 ## Tool design

@@ -880,6 +880,71 @@ This note has no embedding.`,
     }
   }, 15000);
 
+  it("keeps retrievalEvidence off by default and includes compact evidence when requested", async () => {
+    const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-recall-evidence-"));
+    tempDirs.push(vaultDir);
+    const embeddingServer = await startFakeEmbeddingServer();
+
+    try {
+      const sourceText = await callLocalMcp(vaultDir, "remember", {
+        title: "Recall evidence source",
+        content: "This note explains recall evidence ranking and supersession lineage.",
+        tags: ["evidence", "recall"],
+        lifecycle: "permanent",
+        scope: "global",
+        summary: "Create source note for recall evidence",
+      }, embeddingServer.url);
+      const sourceId = extractRememberedId(sourceText);
+
+      const childText = await callLocalMcp(vaultDir, "remember", {
+        title: "Recall evidence child",
+        content: "Older fragment superseded by the recall evidence source note.",
+        tags: ["evidence", "recall"],
+        lifecycle: "temporary",
+        scope: "global",
+        summary: "Create child note for recall evidence",
+      }, embeddingServer.url);
+      const childId = extractRememberedId(childText);
+
+      await callLocalMcp(vaultDir, "relate", {
+        fromId: sourceId,
+        toId: childId,
+        type: "supersedes",
+        bidirectional: false,
+      }, embeddingServer.url);
+
+      const defaultResponse = await callLocalMcpResponse(vaultDir, "recall", {
+        query: "Recall evidence source",
+        scope: "global",
+      }, embeddingServer.url);
+      const defaultParsed = RecallResultSchema.parse(defaultResponse.structuredContent);
+      const defaultMatch = defaultParsed.results.find((result) => result.id === sourceId);
+      expect(defaultMatch).toBeDefined();
+      expect(defaultMatch?.retrievalEvidence).toBeUndefined();
+      expect(defaultResponse.text).not.toContain("channels:");
+
+      const evidenceResponse = await callLocalMcpResponse(vaultDir, "recall", {
+        query: "Recall evidence source",
+        scope: "global",
+        evidence: "compact",
+      }, embeddingServer.url);
+      const evidenceParsed = RecallResultSchema.parse(evidenceResponse.structuredContent);
+      const evidenceMatch = evidenceParsed.results.find((result) => result.id === sourceId);
+      expect(evidenceMatch?.retrievalEvidence).toBeDefined();
+      expect(evidenceMatch?.retrievalEvidence?.channels.length).toBeGreaterThan(0);
+      expect(["top3", "top10", "lower"]).toContain(evidenceMatch?.retrievalEvidence?.rankBand);
+      expect(["today", "thisWeek", "thisMonth", "older"]).toContain(evidenceMatch?.retrievalEvidence?.freshness);
+      expect(evidenceMatch?.retrievalEvidence?.projectRelevant).toBe(false);
+      expect(evidenceMatch?.retrievalEvidence?.superseded).toBe(true);
+      expect(evidenceMatch?.retrievalEvidence?.supersededBy).toBe(childId);
+      expect(evidenceMatch?.retrievalEvidence?.supersededCount).toBeGreaterThan(0);
+      expect(evidenceResponse.text).toContain("channels:");
+      expect(evidenceResponse.text).toContain("supersedes");
+    } finally {
+      await embeddingServer.close();
+    }
+  }, 15000);
+
   it("includes confidence in recall text output for non-temporal queries", async () => {
     const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-confidence-text-"));
     tempDirs.push(vaultDir);

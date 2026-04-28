@@ -15,7 +15,6 @@ import {
 } from "./helpers/mcp.js";
 
 import {
-  ConsolidateResultSchema,
   GetResultSchema,
   ListResultSchema,
   MemoryGraphResultSchema,

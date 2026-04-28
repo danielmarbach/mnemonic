@@ -8,7 +8,7 @@ tags:
   - decision
 lifecycle: permanent
 createdAt: '2026-04-20T21:36:57.480Z'
-updatedAt: '2026-04-25T07:47:56.352Z'
+updatedAt: '2026-04-26T10:11:07.464Z'
 role: decision
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -22,6 +22,8 @@ relatedTo:
     type: related-to
   - id: reference-mnemonic-rpi-workflow-skill-improvement-opportunit-1b944a63
     type: related-to
+  - id: plan-enrich-decision-points-with-retrieval-rationale-and-tru-0dd24e70
+    type: follows
 memoryVersion: 1
 ---
 Approved design for evolving mnemonic into a canonical workflow artifact store with first-class research/plan/review support.

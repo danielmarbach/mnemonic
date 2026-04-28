@@ -6,6 +6,18 @@ The format is loosely based on Keep a Changelog and uses semver-style version he
 
 ## [Unreleased]
 
+## [0.27.0] - 2026-04-28
+
+### Added
+
+- `recall` supports optional `evidence: "compact"` for per-result retrieval rationale (channels, rank band, freshness, supersession signals).
+- Consolidation strategies support optional `evidence: true` for per-note merge evidence, warnings, and risk classification.
+
+### Changed
+
+- Consolidation evidence defaults on for safety — `detect-duplicates`, `suggest-merges`, `dry-run`, and `execute-merge` surface trust signals by default.
+- Warnings identify which note they apply to; risk reflects each note's own signals rather than group heuristics.
+
 ## [0.26.2] - 2026-04-26
 
 ### Fixed

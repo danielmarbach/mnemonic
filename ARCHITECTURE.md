@@ -99,7 +99,9 @@ sequenceDiagram
 
 ### Recall flow
 
-Recall searches embeddings from the project vault first when `cwd` is present, then widens to the main vault. Project matches receive a score boost, and the lightweight heuristic in `src/recall.ts` prefers current-project hits before filling remaining slots with global matches.
+Recall searches embeddings from the project vault first when `cwd` is present, then widens to the main vault. Project matches receive a small tiebreaker boost (+0.03), and the lightweight heuristic in `src/recall.ts` prefers current-project hits before filling remaining slots with global matches.
+
+The ranking pipeline has expanded with the hindsight-driven phases while staying additive and fail-soft: graph spreading activation, RRF-based fusion of semantic and lexical channels, session-scoped lexical rescue precomputation, temporal recency boosts, and confidence-gated strict temporal filtering for explicit high-confidence windows.
 
 ```mermaid
 flowchart TD
@@ -107,12 +109,22 @@ flowchart TD
     Embed --> Search[VaultManager.searchOrder#40;cwd#41;]
     Search --> ProjectEmbeddings[Project vault embeddings]
     Search --> MainEmbeddings[Main vault embeddings]
-    ProjectEmbeddings --> Score[cosine similarity + project boost]
+    ProjectEmbeddings --> Score[cosine similarity + project tiebreaker]
     MainEmbeddings --> Score
-    Score --> Filter[scope / tags / minSimilarity]
+    Score --> Rank[semantic + lexical RRF\ngraph spread + temporal boosts]
+    Rank --> Filter[scope / tags / minSimilarity\n+ optional temporal strict filter]
     Filter --> Select[src/recall.ts\nselectRecallResults]
-    Select --> Format[format notes for MCP output]
+    Select --> Enrich[optional evidence and temporal enrichment]
+    Enrich --> Format[format notes for MCP output]
 ```
+
+#### Evidence enrichment
+
+- `recall` supports optional `evidence: "compact"` output (default off).
+- Consolidation strategies and `execute-merge` default `evidence: true` for safety.
+- Evidence is serialized at the output boundary, not as a separate pipeline stage.
+- Per-result `retrievalEvidence` includes compact rationale fields such as channels, rank band, project relevance, freshness, and supersession hints.
+- Consolidation evidence includes lifecycle, role, age, risk, and merge warnings.
 
 ### Sync and migration flow
 
@@ -142,7 +154,10 @@ flowchart TD
 | `src/markdown.ts` | Markdown linting and normalization before persistence |
 | `src/migration.ts` | Schema migration registry and execution |
 | `src/consolidate.ts` | Consolidation helper logic for merge plans and relationship cleanup |
-| `src/recall.ts` | Recall result selection heuristic |
+| `src/recall.ts` | Recall ranking and selection pipeline (RRF, graph spread, temporal gating helpers) |
+| `src/lexical.ts` | Lexical scoring and TF-IDF rescue helpers used by recall |
+| `src/cache.ts` | Session-scoped project cache including prepared lexical rescue corpus |
+| `src/structured-content.ts` | MCP structured output schemas, including recall/consolidate evidence shapes |
 | `src/relationships.ts` | Bounded 1-hop relationship expansion: scoring, preview construction, and fail-soft enrichment |
 | `src/config.ts` | Main-vault runtime config and per-project policy storage |
 | `tests/` | Vitest unit and integration coverage, including MCP smoke tests |
@@ -155,7 +170,7 @@ flowchart TD
 - `title`, `content`, `tags`: user-facing memory content.
 - `lifecycle`: `temporary` for working-state scaffolding, `permanent` for durable knowledge.
 - `project`, `projectName`: project association without forcing storage into the project vault.
-- `relatedTo`: typed edges (`related-to`, `explains`, `example-of`, `supersedes`).
+- `relatedTo`: typed edges (`related-to`, `explains`, `example-of`, `supersedes`, `derives-from`, `follows`).
 - `createdAt`, `updatedAt`: ISO timestamps.
 - `memoryVersion`: note schema version for migration compatibility.
 
@@ -177,6 +192,7 @@ Main-vault `config.json` stores machine-local operational settings rather than m
 - **Lifecycle is retention semantics, not taxonomy**: tags like `plan` or `wip` stay descriptive, while `lifecycle` controls temporary-vs-permanent behavior.
 - **Git is part of the product behavior**: mutating operations commit immediately; pushing is explicit via `sync` or controlled by `mutationPushMode`.
 - **Project recall is biased, not exclusive**: project memory should be preferred without making global memory disappear.
+- **Recall enrichment is opt-in**: evidence and temporal details are available when needed, while default recall stays compact.
 - **Migrations are explicit**: schema changes should go through `src/migration.ts`, tests, and dry-run-first workflows.
 - **Temporary-only consolidation defaults to cleanup**: when every source note is `temporary`, consolidation prefers `delete`, and the merged note becomes `permanent`.
 

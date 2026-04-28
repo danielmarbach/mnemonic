@@ -7,7 +7,7 @@ tags:
   - decision
 lifecycle: permanent
 createdAt: '2026-03-24T10:55:20.655Z'
-updatedAt: '2026-04-20T21:37:09.165Z'
+updatedAt: '2026-04-26T10:08:02.412Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
@@ -23,6 +23,8 @@ relatedTo:
     type: related-to
   - id: rpir-workflow-design-for-mnemonic-research-plan-implement-re-80b00851
     type: related-to
+  - id: research-explain-before-consolidate-value-assessment-and-des-f1b237dc
+    type: derives-from
 memoryVersion: 1
 ---
 ## Decision: MCP prompt over system prompt injection
