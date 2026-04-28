@@ -6,11 +6,14 @@ tags:
   - execute-merge
 lifecycle: temporary
 createdAt: '2026-04-28T10:32:34.495Z'
-updatedAt: '2026-04-28T10:32:34.495Z'
+updatedAt: '2026-04-28T10:38:47.376Z'
 role: plan
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: review-consolidate-evidence-always-on-and-execute-merge-supp-f334ca5b
+    type: derives-from
 memoryVersion: 1
 ---
 # Plan: make consolidate evidence always-on and add to execute-merge
