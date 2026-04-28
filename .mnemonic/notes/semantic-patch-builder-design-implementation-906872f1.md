@@ -10,7 +10,7 @@ tags:
   - implementation
 lifecycle: permanent
 createdAt: '2026-04-24T11:09:39.750Z'
-updatedAt: '2026-04-24T21:56:57.407Z'
+updatedAt: '2026-04-28T16:06:00.250Z'
 role: reference
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
@@ -19,6 +19,8 @@ relatedTo:
     type: derives-from
   - id: review-heading-child-operations-fix-in-semanticpatch-495f1061
     type: related-to
+  - id: theme-semantic-patch-improvements-lint-error-handling-headin-f2c4ced1
+    type: explains
 memoryVersion: 1
 ---
 # Semantic Patch Builder: Design & Implementation
