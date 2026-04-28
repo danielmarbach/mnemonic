@@ -14,12 +14,8 @@ alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
-  - id: review-evidence-enrichment-phases-1-2-and-2-5-verification-5501cdf6
-    type: derives-from
   - id: decision-expose-trust-evidence-at-decision-points-via-opt-in-244d8317
     type: follows
-  - id: request-implement-evidence-enrichment-phases-from-explainabi-abe55a21
-    type: derives-from
   - id: reference-rpir-evidence-enrichment-delivery-pattern-for-mnem-4a852278
     type: follows
   - id: theme-evidence-enrichment-design-research-signal-inventory-d-294ccd73
