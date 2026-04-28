@@ -9,11 +9,14 @@ tags:
   - merge-decisions
 lifecycle: permanent
 createdAt: '2026-04-28T13:09:46.833Z'
-updatedAt: '2026-04-28T13:09:46.833Z'
+updatedAt: '2026-04-28T13:10:10.915Z'
 role: research
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: decision-expose-trust-evidence-at-decision-points-via-opt-in-244d8317
+    type: derives-from
 memoryVersion: 1
 ---
 # Dogfood findings: consolidation evidence metadata alone insufficient for merge decisions
