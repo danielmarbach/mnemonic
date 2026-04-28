@@ -7,11 +7,14 @@ tags:
   - discriminative-power
 lifecycle: temporary
 createdAt: '2026-04-28T11:51:19.221Z'
-updatedAt: '2026-04-28T11:51:19.221Z'
+updatedAt: '2026-04-28T11:51:22.737Z'
 role: plan
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: research-consolidation-evidence-lacks-discriminative-power-f-0fffb081
+    type: derives-from
 memoryVersion: 1
 ---
 # Plan: fix consolidation evidence discriminative power

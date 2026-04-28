@@ -8,11 +8,14 @@ tags:
   - research
 lifecycle: temporary
 createdAt: '2026-04-28T11:41:31.788Z'
-updatedAt: '2026-04-28T11:41:31.788Z'
+updatedAt: '2026-04-28T11:51:22.737Z'
 role: research
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: plan-fix-consolidation-evidence-discriminative-power-2c34bb7b
+    type: derives-from
 memoryVersion: 1
 ---
 # Research: consolidation evidence lacks discriminative power for merge decisions
