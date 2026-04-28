@@ -8,7 +8,7 @@ tags:
   - workflow
 lifecycle: permanent
 createdAt: '2026-04-26T19:00:03.668Z'
-updatedAt: '2026-04-28T10:32:22.718Z'
+updatedAt: '2026-04-28T10:39:27.916Z'
 role: decision
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -26,7 +26,11 @@ relatedTo:
     type: derives-from
 memoryVersion: 1
 ---
-# Decision: expose trust evidence at decision points via opt-in enrichment
+## Decision
+
+- `recall` exposes retrieval rationale via `evidence: "compact"` (opt-in).
+- `consolidate` analysis strategies (`detect-duplicates`, `suggest-merges`, `dry-run`) expose trust/risk rationale via `evidence: true` (default on for analysis strategies and execute-merge).
+- Recall evidence stays compact and opt-in. Consolidate evidence defaults on for safety — token cost is negligible for small result sets, and risk of bad merges without evidence (lifecycle contamination, orphaned supersedes, stale summary replacement) is real.
 
 Use capability-level evidence on existing tools instead of introducing a separate explain workflow step.
 
@@ -43,6 +47,10 @@ Use capability-level evidence on existing tools instead of introducing a separat
 - Opt-in enrichment avoids turning mnemonic into an orchestration runtime while improving confidence at mutation decision points.
 
 ## Consequences
+
+- Structured schemas carry retrieval/consolidation evidence payloads.
+- Consolidate analysis and execute-merge default evidence on; recall remains opt-in.
+- Future phases can extend this pattern (e.g., targeted `get` enrichment) without breaking callers.
 
 - Structured schemas now carry retrieval/consolidation evidence payloads.
 - Tool descriptions and workflow hints document optional evidence usage for uncertainty-driven decisions.
