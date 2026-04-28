@@ -15,7 +15,9 @@ The format is loosely based on Keep a Changelog and uses semver-style version he
 
 ### Changed
 
-- `mnemonic-workflow-hint` and tool descriptions now document evidence enrichment as an optional confidence aid at decision points, not a mandatory workflow step.
+- Consolidation analysis strategies (`detect-duplicates`, `suggest-merges`, `dry-run`) now default `evidence: true` — trust signals (lifecycle, risk, warnings) always shown by default.
+- `execute-merge` now accepts optional `evidence` parameter (default `true`) and renders per-note trust signals inline in text output before execution.
+- `mnemonic-workflow-hint` and tool descriptions updated to reflect that consolidate evidence defaults on for safety.
 
 ## [0.26.2] - 2026-04-26
 

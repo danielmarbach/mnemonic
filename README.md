@@ -364,9 +364,9 @@ Recall modes:
 
 Recall evidence:
 
-- `evidence: "compact"` (optional): add compact retrieval rationale per result in text and structured output.
+- `evidence: "compact"` (optional recall): add compact retrieval rationale per result in text and structured output.
 - `retrievalEvidence` includes stable abstractions such as `channels`, `rankBand`, `projectRelevant`, `freshness`, and optional supersession hints (`supersededBy`, `supersededCount`).
-- Default behavior is unchanged when `evidence` is omitted.
+- Recall evidence defaults off; consolidate evidence defaults `true` for safety.
 
 **What temporal mode shows:**
 
@@ -509,13 +509,13 @@ Imported notes are written to the main vault with `lifecycle: permanent` and `sc
 | Prompt | Description |
 |--------|-------------|
 | `mnemonic-rpi-workflow` | Optional. Returns RPIR stage protocol and conventions: request root note pattern, stage checklists, apply/task split, sparse relationships, subagent handoff contract, and commit discipline. |
-| `mnemonic-workflow-hint` | Optional. Returns a compact decision protocol: use `recall` or `list` first, inspect with `get`, update existing memories, remember only when nothing matches, then organize with `relate`, `consolidate`, or `move_memory`. It also reinforces summary-first orientation via `project_memory_summary`, temporary-note recovery only after orientation, optional evidence enrichment when decision confidence is low, and that roles are optional prioritization hints while lifecycle stays separate. |
+| `mnemonic-workflow-hint` | Optional. Returns a compact decision protocol: use `recall` or `list` first, inspect with `get`, update existing memories, remember only when nothing matches, then organize with `relate`, `consolidate`, or `move_memory`. It also reinforces summary-first orientation via `project_memory_summary`, temporary-note recovery only after orientation, evidence on for safety during consolidation (lifecycle, risk, warnings), and that roles are optional prioritization hints while lifecycle stays separate. |
 
 ## Tools
 
 | Tool                        | Description                                                              |
 |-----------------------------|--------------------------------------------------------------------------|
-| `consolidate`               | Merge and analyze overlapping notes; `evidence: true` enriches analysis previews with merge warnings and risk |
+| `consolidate`               | Merge and analyze overlapping notes; evidence defaults `true` for analysis strategies and execute-merge (lifecycle, risk, warnings) |
 | `detect_project`            | Resolve `cwd` to stable project id via git remote URL                   |
 | `discover_tags`            | Suggest canonical tags for a note using title/content/query context; `mode: "browse"` opts into broader inventory output |
 | `execute_migration`         | Execute a named migration (supports dry-run)                             |

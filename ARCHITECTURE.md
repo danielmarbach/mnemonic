@@ -118,12 +118,13 @@ flowchart TD
     Enrich --> Format[format notes for MCP output]
 ```
 
-#### Recall evidence enrichment
+#### Evidence enrichment
 
-- `recall` supports optional `evidence: "compact"` output.
+- `recall` supports optional `evidence: "compact"` output (default off).
+- Consolidation strategies and `execute-merge` default `evidence: true` for safety.
 - Evidence is serialized at the output boundary, not as a separate pipeline stage.
 - Per-result `retrievalEvidence` includes compact rationale fields such as channels, rank band, project relevance, freshness, and supersession hints.
-- Default recall output remains unchanged when `evidence` is omitted.
+- Consolidation evidence includes lifecycle, role, age, risk, and merge warnings.
 
 ### Sync and migration flow
 

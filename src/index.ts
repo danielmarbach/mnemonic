@@ -5355,7 +5355,7 @@ server.registerTool(
       "Side effects: creates or updates the canonical note, modifies or removes source notes according to mode, git commits, and may push.\n\n" +
       "Typical next step:\n" +
       "- Use `get` to inspect the canonical note and `recall` to confirm duplication is reduced.\n" +
-      "- Use optional `evidence: true` on analysis strategies when you need trust signals before deciding.",
+      "- Evidence defaults on for consolidate analysis strategies and execute-merge (lifecycle, risk, warnings).",
     annotations: {
       readOnlyHint: false,
       destructiveHint: true,
@@ -5393,7 +5393,7 @@ server.registerTool(
       evidence: z
         .boolean()
         .optional()
-        .describe("Optional confidence signals for analysis strategies (duplicate/merge evidence, warnings, risk)."),
+        .describe("Confidence signals for analysis strategies and execute-merge (lifecycle, risk, warnings). Default true for safety."),
       mergePlan: z
         .object({
           sourceIds: z.array(z.string()).min(2).describe("Ids of notes to merge into one consolidated note"),
@@ -5415,7 +5415,7 @@ server.registerTool(
     }),
     outputSchema: ConsolidateResultSchema,
   },
-  async ({ cwd, strategy, mode, threshold, evidence = false, mergePlan, allowProtectedBranch = false }) => {
+  async ({ cwd, strategy, mode, threshold, evidence = true, mergePlan, allowProtectedBranch = false }) => {
     await ensureBranchSynced(cwd);
 
     const project = await resolveProject(cwd);
@@ -5452,7 +5452,7 @@ server.registerTool(
         if (!mergePlan) {
           return { content: [{ type: "text", text: "execute-merge strategy requires a mergePlan with sourceIds and targetTitle." }], isError: true };
         }
-        const mergeResult = await executeMerge(entries, mergePlan, defaultConsolidationMode, project, cwd, mode, policy, allowProtectedBranch);
+        const mergeResult = await executeMerge(entries, mergePlan, defaultConsolidationMode, project, cwd, mode, policy, allowProtectedBranch, evidence);
         invalidateActiveProjectCache();
         return mergeResult;
       }
@@ -5825,6 +5825,7 @@ async function executeMerge(
   explicitMode?: ConsolidationMode,
   policy?: ProjectMemoryPolicy,
   allowProtectedBranch: boolean = false,
+  evidence: boolean = true,
 ): Promise<{ content: Array<{ type: "text"; text: string }>; structuredContent: ConsolidateResult }> {
   const sourceIds = normalizeMergePlanSourceIds(mergePlan.sourceIds);
   const targetTitle = mergePlan.targetTitle.trim();
@@ -6129,6 +6130,25 @@ async function executeMerge(
       const _exhaustive: never = consolidationMode;
       throw new Error(`Unknown consolidation mode: ${_exhaustive}`);
     }
+  }
+
+  if (evidence) {
+    const allNotes = entries.map((entry) => entry.note);
+    const mergeWarnings = buildMergeWarnings(
+      sourceEntries.map((entry) => entry.note),
+      sourceEntries[0]?.note,
+    );
+    const noteEvidence = sourceEntries.map((entry) =>
+      buildConsolidateNoteEvidence(entry.note, allNotes, mergeWarnings),
+    );
+    lines.push("  Evidence:");
+    for (const note of noteEvidence) {
+      lines.push(`    ${note.title} | ${note.lifecycle}, ${note.role ?? "untyped"} | ${Math.round(note.ageDays)}d | rel:${note.relatedCount} | risk:${note.mergeRisk}`);
+    }
+    if (mergeWarnings.length > 0) {
+      lines.push(`  Warnings: ${mergeWarnings.join("; ")}`);
+    }
+    lines.push(`  Merge risk: ${deriveMergeRisk(mergeWarnings)}`);
   }
 
   const structuredContent: ConsolidateResult = {
