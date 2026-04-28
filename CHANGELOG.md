@@ -6,18 +6,17 @@ The format is loosely based on Keep a Changelog and uses semver-style version he
 
 ## [Unreleased]
 
-## [0.27.0] - Unreleased
+## [0.27.0] - 2026-04-28
 
 ### Added
 
-- `recall` now supports optional `evidence: "compact"` output to explain why each result ranked, including channels, rank band, project relevance, freshness, and supersession signals (`supersededBy` and `supersededCount` when available).
-- Consolidation analysis previews (`detect-duplicates`, `suggest-merges`, and `consolidate` dry-run) now support optional `evidence: true` output with per-note merge evidence, warnings, and `mergeRisk` classification.
+- `recall` supports optional `evidence: "compact"` for per-result retrieval rationale (channels, rank band, freshness, supersession signals).
+- Consolidation strategies support optional `evidence: true` for per-note merge evidence, warnings, and risk classification.
 
 ### Changed
 
-- Consolidation analysis strategies (`detect-duplicates`, `suggest-merges`, `dry-run`) now default `evidence: true` — trust signals (lifecycle, risk, warnings) always shown by default.
-- `execute-merge` now accepts optional `evidence` parameter (default `true`) and renders per-note trust signals inline in text output before execution.
-- `mnemonic-workflow-hint` and tool descriptions updated to reflect that consolidate evidence defaults on for safety.
+- Consolidation evidence defaults on for safety — `detect-duplicates`, `suggest-merges`, `dry-run`, and `execute-merge` surface trust signals by default.
+- Warnings identify which note they apply to; risk reflects each note's own signals rather than group heuristics.
 
 ## [0.26.2] - 2026-04-26
 
