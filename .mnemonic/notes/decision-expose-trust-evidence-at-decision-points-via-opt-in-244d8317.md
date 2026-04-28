@@ -8,7 +8,7 @@ tags:
   - workflow
 lifecycle: permanent
 createdAt: '2026-04-26T19:00:03.668Z'
-updatedAt: '2026-04-26T19:01:43.773Z'
+updatedAt: '2026-04-28T10:32:22.718Z'
 role: decision
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -21,6 +21,8 @@ relatedTo:
   - id: request-implement-evidence-enrichment-phases-from-explainabi-abe55a21
     type: derives-from
   - id: reference-rpir-evidence-enrichment-delivery-pattern-for-mnem-4a852278
+    type: derives-from
+  - id: research-consolidate-evidence-defaults-and-execute-merge-saf-8560d01e
     type: derives-from
 memoryVersion: 1
 ---

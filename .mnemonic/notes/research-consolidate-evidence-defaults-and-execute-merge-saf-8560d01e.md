@@ -6,13 +6,15 @@ tags:
   - execute-merge
 lifecycle: temporary
 createdAt: '2026-04-28T10:32:15.261Z'
-updatedAt: '2026-04-28T10:32:18.795Z'
+updatedAt: '2026-04-28T10:32:22.718Z'
 role: research
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
   - id: request-make-consolidate-evidence-always-on-and-add-to-execu-37ae2225
+    type: derives-from
+  - id: decision-expose-trust-evidence-at-decision-points-via-opt-in-244d8317
     type: derives-from
 memoryVersion: 1
 ---
