@@ -6,6 +6,12 @@ The format is loosely based on Keep a Changelog and uses semver-style version he
 
 ## [Unreleased]
 
+## [0.27.1] - 2026-04-28
+
+### Changed
+
+- `mnemonic-rpi-workflow` skill: Review phase now retrieves research and plan context before evaluating implementation, with comparison guardrails against original requirements and deliverables. Plan phase includes a self-check after drafting to catch placeholders and coverage gaps. Review evidence must be gathered fresh rather than reused from implementation. Added review handoff variant for subagent-driven review with full artifact chain.
+
 ## [0.27.0] - 2026-04-28
 
 ### Added
