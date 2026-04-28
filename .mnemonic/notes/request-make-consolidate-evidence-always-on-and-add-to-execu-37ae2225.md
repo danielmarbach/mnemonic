@@ -7,7 +7,7 @@ tags:
   - evidence
 lifecycle: temporary
 createdAt: '2026-04-28T10:31:57.558Z'
-updatedAt: '2026-04-28T10:32:18.795Z'
+updatedAt: '2026-04-28T11:25:50.753Z'
 role: context
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -33,5 +33,6 @@ Additionally, `execute-merge` has zero evidence support. Even if analysis runs w
 ## Constraints
 
 - Maintain backwards compatibility (parameter stays boolean, just default flips).
-- execute-merge evidence is inline in text output (no structured changes) — minimal surface area.
+- execute-merge evidence now appears in both text and structured output (executeMergeEvidence field).
+- dryRunAll now merges duplicatePairs, mergeSuggestions, themeGroups, relationshipClusters from delegated strategies into its structured output.
 - Token overhead negligible for consolidation (small result sets).
