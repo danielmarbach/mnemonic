@@ -11,7 +11,7 @@ tags:
   - recall
 lifecycle: permanent
 createdAt: '2026-04-28T15:58:21.379Z'
-updatedAt: '2026-04-28T16:02:26.570Z'
+updatedAt: '2026-04-28T16:05:07.782Z'
 role: reference
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -61,8 +61,6 @@ Key gap in consolidate strategies: `detect-duplicates` and `suggest-merges` comp
 2. **Compact by default**: Default evidence mode is `"compact"` (opt-in). Follows the established pattern of `mode: "temporal"` and `verbose: true`.
 
 3. **Different evidence for consolidation than recall**: Recall evidence answers "Why was this retrieved?" (channels, rankBand, projectRelevant, freshness). Consolidation evidence answers "Should these merge?" (lifecycle, role, ageDays, supersession chain, relatedCount, merge warnings).
-
-## Consolidation evidence defaults flip rationale
 
 The original opt-in design was correct in principle (token discipline) but wrong for the consolidation domain:
 
