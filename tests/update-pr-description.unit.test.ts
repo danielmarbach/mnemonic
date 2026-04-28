@@ -3,7 +3,6 @@ import { describe, expect, it } from "vitest";
 import {
   buildSummaryIntro,
   classifyNote,
-  computeThresholds,
   generateDescription,
   generateTitle,
   isWeakSummary,
@@ -11,7 +10,6 @@ import {
   routeTier,
   scoreSemanticPaths,
   sortNotesByPriority,
-  validateThresholds,
 } from "../scripts/ci/update-pr-description.mjs";
 
 // ---------------------------------------------------------------------------
@@ -468,68 +466,6 @@ Body text.
 });
 
 // ---------------------------------------------------------------------------
-// computeThresholds
-// ---------------------------------------------------------------------------
-
-describe("computeThresholds", () => {
-  it("returns conservative defaults when history has fewer than 5 entries", () => {
-    const t = computeThresholds([]);
-    expect(t.files.p75).toBeGreaterThan(0);
-    expect(t.lines.p75).toBeGreaterThan(0);
-    expect(t.commits.p75).toBeGreaterThan(0);
-  });
-
-  it("returns conservative defaults for a 4-entry history", () => {
-    const small = [
-      { changedFiles: 1, additions: 2, deletions: 0, commits: 1 },
-      { changedFiles: 2, additions: 5, deletions: 1, commits: 2 },
-      { changedFiles: 3, additions: 10, deletions: 0, commits: 1 },
-      { changedFiles: 4, additions: 20, deletions: 5, commits: 3 },
-    ];
-    const t = computeThresholds(small);
-    // Falls back to CONSERVATIVE_DEFAULTS
-    expect(t.files.p75).toBe(10);
-  });
-
-  it("computes thresholds from a real history sample", () => {
-    // 10 PRs: 5 trivial formula bumps + 5 moderate feature PRs
-    const history = [
-      { changedFiles: 1, additions: 2, deletions: 2, commits: 1 },
-      { changedFiles: 1, additions: 2, deletions: 2, commits: 1 },
-      { changedFiles: 1, additions: 2, deletions: 2, commits: 1 },
-      { changedFiles: 1, additions: 2, deletions: 2, commits: 1 },
-      { changedFiles: 1, additions: 2, deletions: 2, commits: 1 },
-      { changedFiles: 5, additions: 80, deletions: 20, commits: 3 },
-      { changedFiles: 8, additions: 200, deletions: 50, commits: 6 },
-      { changedFiles: 12, additions: 400, deletions: 80, commits: 10 },
-      { changedFiles: 20, additions: 900, deletions: 200, commits: 18 },
-      { changedFiles: 35, additions: 1800, deletions: 600, commits: 40 },
-    ];
-    const t = computeThresholds(history);
-    // p75 should be between the mid-range and high-range PRs
-    expect(t.files.p75).toBeGreaterThan(1);
-    expect(t.files.p75).toBeLessThan(35);
-    expect(t.files.p90).toBeGreaterThan(t.files.p75);
-    expect(t.lines.p75).toBeGreaterThan(0);
-    expect(t.lines.p75).toBeLessThan(2000);
-    expect(t.commits.p90).toBeGreaterThan(t.commits.p75);
-  });
-
-  it("p90 is always >= p75", () => {
-    const history = Array.from({ length: 20 }, (_, i) => ({
-      changedFiles: i + 1,
-      additions: (i + 1) * 10,
-      deletions: i * 5,
-      commits: i + 1,
-    }));
-    const t = computeThresholds(history);
-    expect(t.files.p90).toBeGreaterThanOrEqual(t.files.p75);
-    expect(t.lines.p90).toBeGreaterThanOrEqual(t.lines.p75);
-    expect(t.commits.p90).toBeGreaterThanOrEqual(t.commits.p75);
-  });
-});
-
-// ---------------------------------------------------------------------------
 // scoreSemanticPaths
 // ---------------------------------------------------------------------------
 
@@ -728,104 +664,4 @@ describe("isWeakSummary", () => {
 });
 
 // ---------------------------------------------------------------------------
-// computeThresholds — null / missing value handling
-// ---------------------------------------------------------------------------
-
-describe("computeThresholds — null value handling", () => {
-  it("returns conservative defaults when all entries have null changedFiles and additions", () => {
-    // Simulates what the old REST API list endpoint returned (no size fields)
-    const history = Array.from({ length: 10 }, () => ({
-      changedFiles: null,
-      additions: null,
-      deletions: null,
-      commits: null,
-    }));
-    const t = computeThresholds(history);
-    expect(t).toEqual({ files: { p75: 10, p90: 25 }, lines: { p75: 500, p90: 1500 }, commits: { p75: 8, p90: 25 } });
-  });
-
-  it("returns conservative defaults when too few entries have valid changedFiles", () => {
-    // Only 3 valid changedFiles values (< 5) — not enough to calibrate
-    const history = [
-      { changedFiles: 5, additions: 50, deletions: 10, commits: 2 },
-      { changedFiles: 10, additions: 100, deletions: 20, commits: 4 },
-      { changedFiles: 20, additions: 200, deletions: 40, commits: 8 },
-      { changedFiles: null, additions: null, deletions: null, commits: null },
-      { changedFiles: null, additions: null, deletions: null, commits: null },
-      { changedFiles: null, additions: null, deletions: null, commits: null },
-      { changedFiles: null, additions: null, deletions: null, commits: null },
-    ];
-    const t = computeThresholds(history);
-    expect(t.files.p75).toBe(10); // conservative default
-  });
-
-  it("computes thresholds from entries that have valid values, ignoring null entries", () => {
-    // Mix of valid entries and null entries — nulls should be excluded, not treated as 0
-    const valid = [
-      { changedFiles: 2, additions: 20, deletions: 5, commits: 1 },
-      { changedFiles: 5, additions: 80, deletions: 10, commits: 3 },
-      { changedFiles: 10, additions: 200, deletions: 30, commits: 6 },
-      { changedFiles: 20, additions: 500, deletions: 80, commits: 12 },
-      { changedFiles: 35, additions: 1200, deletions: 200, commits: 30 },
-    ];
-    const nullEntries = Array.from({ length: 5 }, () => ({
-      changedFiles: null,
-      additions: null,
-      deletions: null,
-      commits: null,
-    }));
-    const t = computeThresholds([...valid, ...nullEntries]);
-    // Thresholds should reflect only the 5 valid entries, not be dragged toward 0
-    expect(t.files.p75).toBeGreaterThan(0);
-    expect(t.lines.p75).toBeGreaterThan(0);
-    // p75 of changedFiles [2,5,10,20,35] = 20; p90 ≈ 30.2
-    expect(t.files.p75).toBeGreaterThanOrEqual(10);
-    expect(t.files.p90).toBeGreaterThan(t.files.p75);
-  });
-
-  it("uses conservative defaults for commits dimension when fewer than 5 commits values are valid", () => {
-    // Valid files/lines but no valid commits — commits dimension falls back
-    const history = Array.from({ length: 8 }, (_, i) => ({
-      changedFiles: i + 1,
-      additions: (i + 1) * 20,
-      deletions: i * 5,
-      commits: null, // no commits data
-    }));
-    const t = computeThresholds(history);
-    expect(t.files.p75).toBeGreaterThan(0); // computed from valid data
-    expect(t.commits.p75).toBe(8); // conservative default
-  });
-});
-
-// ---------------------------------------------------------------------------
-// validateThresholds
-// ---------------------------------------------------------------------------
-
-describe("validateThresholds", () => {
-  it("returns thresholds unchanged when at least one value is non-zero", () => {
-    const t = { files: { p75: 9, p90: 22 }, lines: { p75: 400, p90: 1400 }, commits: { p75: 7, p90: 20 } };
-    expect(validateThresholds(t)).toEqual(t);
-  });
-
-  it("falls back to conservative defaults when all thresholds are zero", () => {
-    const allZero = {
-      files: { p75: 0, p90: 0 },
-      lines: { p75: 0, p90: 0 },
-      commits: { p75: 0, p90: 0 },
-    };
-    const t = validateThresholds(allZero);
-    expect(t.files.p75).toBeGreaterThan(0);
-    expect(t.lines.p75).toBeGreaterThan(0);
-    expect(t.commits.p75).toBeGreaterThan(0);
-  });
-
-  it("returns thresholds unchanged even when some (but not all) are zero", () => {
-    // Only commits are zero — files and lines are valid; do not replace the whole set
-    const mixed = {
-      files: { p75: 9, p90: 22 },
-      lines: { p75: 400, p90: 1400 },
-      commits: { p75: 0, p90: 0 },
-    };
-    expect(validateThresholds(mixed)).toEqual(mixed);
-  });
-});
+// parseFrontmatter
