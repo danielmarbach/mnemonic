@@ -6,6 +6,14 @@ The format is loosely based on Keep a Changelog and uses semver-style version he
 
 ## [Unreleased]
 
+## [0.27.2] - 2026-05-01
+
+### Fixed
+
+- `semanticPatch` schema example and guidance now use `insertAfter` instead of the rejected `appendChild`/`replaceChildren` on `heading` selectors.
+- `semanticPatch` workflow hint corrected: recommends `insertAfter` for adding content under headings instead of `appendChild`, which the code rejects.
+- `semanticPatch` parameter now auto-parses string-wrapped JSON arrays, recovering gracefully when LLMs serialize the array as a string instead of a proper JSON array.
+
 ## [0.27.1] - 2026-04-28
 
 ### Changed
