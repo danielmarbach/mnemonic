@@ -1,3 +1,4 @@
+import { getErrorMessage } from "./error-utils.js";
 import { access } from "fs/promises";
 import path from "path";
 import { simpleGit, SimpleGit } from "simple-git";
@@ -140,7 +141,7 @@ export class GitOps {
         console.error(`[git] Committed: ${displayMessage}`);
         return { status: "committed" };
       } catch (err) {
-        const errMessage = err instanceof Error ? err.message : String(err);
+        const errMessage = getErrorMessage(err);
         console.error(`[git] Commit failed: ${errMessage}`);
         return { status: "failed", reason: "error", operation: "commit", error: errMessage };
       }
@@ -156,7 +157,7 @@ export class GitOps {
       await this.retryLockErrors("add", () => this.git.add(files));
       return { status: "committed" };
     } catch (err) {
-      const errMessage = err instanceof Error ? err.message : String(err);
+      const errMessage = getErrorMessage(err);
       console.error(`[git] add() failed: ${errMessage}`);
       return { status: "failed", reason: "error", operation: "add", error: errMessage };
     }
@@ -208,7 +209,7 @@ export class GitOps {
       try {
         await this.retryLockErrors("fetch", () => this.git.fetch());
       } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
+        const message = getErrorMessage(err);
         console.error(`[git] Sync fetch failed: ${message}`);
         return { ...withRemote, gitError: { phase: "fetch", message, isConflict: false } };
       }
@@ -220,7 +221,7 @@ export class GitOps {
         await this.retryLockErrors("pull", () => this.git.pull(["--rebase"]));
         console.error("[git] Pulled (rebase)");
       } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
+        const message = getErrorMessage(err);
         console.error(`[git] Sync pull failed: ${message}`);
         const conflictFiles = await this.getConflictFiles();
         const isConflict = conflictFiles.length > 0 || await this.isConflictInProgress();
@@ -241,7 +242,7 @@ export class GitOps {
         await this.retryLockErrors("push", () => this.git.push());
         console.error(`[git] Pushed ${unpushed} local commit(s)`);
       } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
+        const message = getErrorMessage(err);
         console.error(`[git] Sync push failed: ${message}`);
         return {
           hasRemote: true,
@@ -302,7 +303,7 @@ export class GitOps {
         console.error("[git] Pushed");
         return { status: "pushed" };
       } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
+        const message = getErrorMessage(err);
         console.error(`[git] Push failed: ${message}`);
         return { status: "failed", error: message };
       }
@@ -338,7 +339,7 @@ export class GitOps {
       try {
         return await operation();
       } catch (err) {
-        const errMessage = err instanceof Error ? err.message : String(err);
+        const errMessage = getErrorMessage(err);
         if (this.isLockError(errMessage) && attempt < maxRetries - 1) {
           const delayMs = baseDelayMs * Math.pow(2, attempt);
           console.error(`[git] ${operationName}() lock contention, retrying in ${delayMs}ms (attempt ${attempt + 1}/${maxRetries})`);

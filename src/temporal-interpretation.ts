@@ -1,4 +1,5 @@
 import type { CommitStats, LastCommit } from "./git.js";
+import { metadataPrefixes } from "./git-constants.js";
 
 export type ChangeCategory =
   | "create"
@@ -62,7 +63,6 @@ export function classifyChange(
     message: entry.message,
   };
 
-  const metadataPrefixes = ["relate:", "unrelate:", "move:", "migrate:", "forget:"];
   if (metadataPrefixes.some((prefix) => commit.message.toLowerCase().startsWith(prefix))) {
     return "connect";
   }

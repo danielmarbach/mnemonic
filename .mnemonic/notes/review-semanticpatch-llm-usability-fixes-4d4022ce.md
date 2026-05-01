@@ -14,8 +14,6 @@ projectName: mnemonic
 relatedTo:
   - id: research-semanticpatch-failure-patterns-analysis-43e810a6
     type: derives-from
-  - id: plan-fix-semanticpatch-failure-patterns-5d3771af
-    type: derives-from
 memoryVersion: 1
 ---
 ## Review: semanticPatch LLM usability fixes

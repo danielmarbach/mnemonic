@@ -1,5 +1,6 @@
 import type { Note } from "./storage.js";
 import type { EffectiveNoteMetadata } from "./role-suggestions.js";
+import { MS_PER_DAY } from "./date-utils.js";
 
 type ScoringMetadata = Pick<EffectiveNoteMetadata, "role" | "roleSource" | "importance" | "importanceSource" | "alwaysLoad" | "alwaysLoadSource">;
 
@@ -120,11 +121,13 @@ export function titleCaseTheme(theme: string): string {
   return `${theme[0]?.toUpperCase() ?? ""}${theme.slice(1)}`;
 }
 
-export function daysSinceUpdate(updatedAt: string): number {
+export function daysSinceUpdate(updatedAt: string, now: Date = new Date()): number {
   const updated = new Date(updatedAt);
-  const now = new Date();
+  if (Number.isNaN(updated.getTime())) {
+    return 0;
+  }
   const diffMs = now.getTime() - updated.getTime();
-  return Math.max(0, diffMs / (1000 * 60 * 60 * 24));
+  return Math.max(0, diffMs / MS_PER_DAY);
 }
 
 export function recencyScore(daysSince: number): number {
@@ -152,8 +155,8 @@ function summaryMetadataBonus(metadata?: ScoringMetadata): number {
   );
 }
 
-export function withinThemeScore(note: Note, metadata?: ScoringMetadata): number {
-  const days = daysSinceUpdate(note.updatedAt);
+export function withinThemeScore(note: Note, metadata?: ScoringMetadata, now?: Date): number {
+  const days = daysSinceUpdate(note.updatedAt, now ?? new Date());
   const recency = recencyScore(days);
   const centrality = centralityBonus(note.relatedTo?.length ?? 0);
   return recency + centrality + summaryMetadataBonus(metadata);
@@ -177,10 +180,11 @@ export function anchorScore(
   note: Note,
   themeCache: Map<string, string>,
   metadata?: ScoringMetadata,
+  now?: Date
 ): number {
   if (note.lifecycle !== "permanent") return -Infinity;
 
-  const days = daysSinceUpdate(note.updatedAt);
+  const days = daysSinceUpdate(note.updatedAt, now ?? new Date());
   const recency = 1.0 / (1 + days / 7);
 
   const centrality = Math.log((note.relatedTo?.length ?? 0) + 1);
@@ -245,10 +249,10 @@ function workingStateStructureBonus(note: Note): number {
   );
 }
 
-export function workingStateScore(note: Note, metadata?: ScoringMetadata): number {
+export function workingStateScore(note: Note, metadata?: ScoringMetadata, now?: Date): number {
   if (note.lifecycle !== "temporary") return -Infinity;
 
-  const days = daysSinceUpdate(note.updatedAt);
+  const days = daysSinceUpdate(note.updatedAt, now ?? new Date());
   const recency = Math.min(1.2, 1.2 / (1 + days / 3));
   const connectivity = Math.min(0.3, Math.log((note.relatedTo?.length ?? 0) + 1) * 0.12);
   const structureBonus = workingStateStructureBonus(note);

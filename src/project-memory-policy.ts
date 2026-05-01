@@ -47,9 +47,32 @@ export function resolveProtectedBranchPatterns(policy: ProjectMemoryPolicy | und
 }
 
 export function branchMatchesProtectedPattern(branch: string, pattern: string): boolean {
-  const escaped = pattern.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*");
-  const regex = new RegExp(`^${escaped}$`);
-  return regex.test(branch);
+  if (!pattern.includes("*")) {
+    return branch === pattern;
+  }
+  const parts = pattern.split("*");
+  if (parts.length === 0) return false;
+  if (parts.length > 11) return false;
+  let remaining = branch;
+  for (let i = 0; i < parts.length; i++) {
+    const part = parts[i];
+    if (i === 0) {
+      if (pattern.startsWith("*")) {
+        if (!remaining.includes(part)) return false;
+        remaining = remaining.slice(remaining.indexOf(part) + part.length);
+      } else {
+        if (!remaining.startsWith(part)) return false;
+        remaining = remaining.slice(part.length);
+      }
+    } else if (i === parts.length - 1 && !pattern.endsWith("*")) {
+      if (!remaining.endsWith(part)) return false;
+    } else {
+      const idx = remaining.indexOf(part);
+      if (idx === -1) return false;
+      remaining = remaining.slice(idx + part.length);
+    }
+  }
+  return true;
 }
 
 export function isProtectedBranch(branch: string, patterns: string[]): boolean {
