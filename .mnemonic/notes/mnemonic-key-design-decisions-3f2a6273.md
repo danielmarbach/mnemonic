@@ -13,8 +13,6 @@ projectName: mnemonic
 relatedTo:
   - id: mnemonic-project-overview-and-purpose-763b7a51
     type: explains
-  - id: markdown-linting-for-memory-content-259a1c85
-    type: related-to
   - id: project-memory-policy-defaults-storage-location-f563f634
     type: related-to
   - id: dynamic-project-context-loading-plan-9f2ed29c

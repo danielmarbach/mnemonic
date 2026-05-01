@@ -19,8 +19,6 @@ relatedTo:
     type: explains
   - id: fix-semanticpatch-llm-usability-example-guidance-and-string--e7686b14
     type: derives-from
-  - id: plan-add-actionable-lint-error-guidance-to-remember-and-upda-86542d51
-    type: derives-from
 memoryVersion: 1
 ---
 # Semantic Patch Builder: Design & Implementation
