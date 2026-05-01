@@ -7,7 +7,7 @@ tags:
   - error-handling
 lifecycle: temporary
 createdAt: '2026-05-01T12:13:34.565Z'
-updatedAt: '2026-05-01T12:13:34.565Z'
+updatedAt: '2026-05-01T12:14:40.977Z'
 role: research
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -15,6 +15,8 @@ projectName: mnemonic
 relatedTo:
   - id: markdown-linting-for-memory-content-259a1c85
     type: related-to
+  - id: plan-add-actionable-lint-error-guidance-to-remember-and-upda-86542d51
+    type: derives-from
 memoryVersion: 1
 ---
 ## Problem

@@ -7,7 +7,7 @@ tags:
   - error-handling
 lifecycle: temporary
 createdAt: '2026-05-01T12:14:25.947Z'
-updatedAt: '2026-05-01T12:14:25.947Z'
+updatedAt: '2026-05-01T12:14:40.977Z'
 role: plan
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -17,6 +17,8 @@ relatedTo:
     type: related-to
   - id: semantic-patch-builder-design-implementation-906872f1
     type: related-to
+  - id: research-remember-update-lint-error-lacking-llm-retry-guidan-505523cc
+    type: derives-from
 memoryVersion: 1
 ---
 ## Context
