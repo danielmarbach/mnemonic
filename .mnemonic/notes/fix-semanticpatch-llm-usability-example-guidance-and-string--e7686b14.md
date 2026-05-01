@@ -6,11 +6,14 @@ tags:
   - llm-usability
 lifecycle: permanent
 createdAt: '2026-05-01T11:48:36.821Z'
-updatedAt: '2026-05-01T11:48:36.821Z'
+updatedAt: '2026-05-01T11:48:52.890Z'
 role: decision
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: semantic-patch-builder-design-implementation-906872f1
+    type: derives-from
 memoryVersion: 1
 ---
 ## Fix: semanticPatch LLM usability — three root causes
