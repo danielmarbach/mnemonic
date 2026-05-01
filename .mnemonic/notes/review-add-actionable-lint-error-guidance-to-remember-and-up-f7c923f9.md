@@ -7,11 +7,14 @@ tags:
   - error-handling
 lifecycle: temporary
 createdAt: '2026-05-01T12:56:17.051Z'
-updatedAt: '2026-05-01T12:56:17.051Z'
+updatedAt: '2026-05-01T12:56:21.212Z'
 role: review
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: plan-add-actionable-lint-error-guidance-to-remember-and-upda-86542d51
+    type: derives-from
 memoryVersion: 1
 ---
 ## Implementation Summary
