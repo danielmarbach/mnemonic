@@ -15,9 +15,6 @@ role: reference
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
-relatedTo:
-  - id: semantic-patch-builder-design-implementation-906872f1
-    type: related-to
 memoryVersion: 1
 ---
 # Theme: Semantic patch improvements — lint error handling, heading operations, and LLM usability

@@ -11,8 +11,6 @@ updatedAt: '2026-05-01T19:56:54.769Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
-  - id: semantic-patch-builder-design-implementation-906872f1
-    type: related-to
   - id: mnemonic-key-design-decisions-3f2a6273
     type: related-to
 memoryVersion: 1

@@ -15,8 +15,6 @@ projectName: mnemonic
 relatedTo:
   - id: review-semanticpatch-llm-usability-fixes-4d4022ce
     type: derives-from
-  - id: plan-fix-semanticpatch-failure-patterns-5d3771af
-    type: derives-from
 memoryVersion: 1
 ---
 ## Failure pattern 1: JSON parsing error — string instead of array
