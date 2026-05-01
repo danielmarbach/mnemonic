@@ -2,6 +2,8 @@ import fs from "fs/promises";
 import path from "path";
 import matter from "gray-matter";
 
+import { getErrorMessage } from "./error-utils.js";
+
 import type { Vault, VaultManager } from "./vault.js";
 import type { Note } from "./storage.js";
 import { readVaultSchemaVersion, writeVaultSchemaVersion } from "./config.js";
@@ -147,7 +149,7 @@ export class Migrator {
               await vault.git.push();
             } catch (err) {
               console.error(`[migration] Failed to commit for ${vault.storage.vaultPath}: ${err}`);
-              migrationResult.warnings.push(`Auto-commit failed: ${err instanceof Error ? err.message : String(err)}`);
+              migrationResult.warnings.push(`Auto-commit failed: ${getErrorMessage(err)}`);
             }
           }
         }
@@ -237,7 +239,7 @@ export class Migrator {
                 await vault.git.commit(commitMessage, [...filesToCommit]);
                 await vault.git.push();
               } catch (err) {
-                const message = `Auto-commit failed: ${err instanceof Error ? err.message : String(err)}`;
+                const message = `Auto-commit failed: ${getErrorMessage(err)}`;
                 console.error(`[migration] Failed to commit for ${vault.storage.vaultPath}: ${err}`);
                 for (const { result } of lockedVaultResults) {
                   result.warnings.push(message);
@@ -389,7 +391,7 @@ function createV010BackfillMemoryVersionMigration(): Migration {
         } catch (err) {
           result.errors.push({
             noteId: note.id,
-            error: err instanceof Error ? err.message : String(err),
+            error: getErrorMessage(err),
           });
         }
       }
@@ -438,7 +440,7 @@ function createV011BackfillLifecycleMigration(): Migration {
         } catch (err) {
           result.errors.push({
             noteId: note.id,
-            error: err instanceof Error ? err.message : String(err),
+            error: getErrorMessage(err),
           });
         }
       }

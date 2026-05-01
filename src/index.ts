@@ -6027,7 +6027,7 @@ async function executeMerge(
       updatedAt: now,
     });
   } catch (err) {
-    embeddingStatus = { status: "skipped", reason: err instanceof Error ? err.message : String(err) };
+    embeddingStatus = { status: "skipped", reason: getErrorMessage(err) };
     console.error(`[embedding] Failed for consolidated note '${targetId}': ${err}`);
   }
 
