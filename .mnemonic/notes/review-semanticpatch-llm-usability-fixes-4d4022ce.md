@@ -6,13 +6,15 @@ tags:
   - semantic-patch
 lifecycle: temporary
 createdAt: '2026-05-01T12:02:05.224Z'
-updatedAt: '2026-05-01T12:02:56.881Z'
+updatedAt: '2026-05-01T12:02:58.190Z'
 role: review
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
   - id: research-semanticpatch-failure-patterns-analysis-43e810a6
+    type: derives-from
+  - id: plan-fix-semanticpatch-failure-patterns-5d3771af
     type: derives-from
 memoryVersion: 1
 ---
