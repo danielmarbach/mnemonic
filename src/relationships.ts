@@ -164,31 +164,35 @@ export async function getDirectRelatedNotes(
   }
 
   const scored: ScoredRelatedNote[] = [];
-  const notesByVault = new Map<Vault, Note[]>();
+  const noteById = new Map<string, { note: Note; vault: Vault }>();
 
   for (const vault of allVaults) {
-    notesByVault.set(vault, await vault.storage.listNotes());
+    const notes = await vault.storage.listNotes();
+    for (const n of notes) {
+      if (!noteById.has(n.id)) {
+        noteById.set(n.id, { note: n, vault });
+      }
+    }
   }
 
-  const visibleNotes = [...notesByVault.values()].flat();
+  const visibleNotes = [...noteById.values()].map(v => v.note);
 
-  for (const vault of allVaults) {
-    for (const relatedId of relatedIds) {
-      const relatedNote = await vault.storage.readNote(relatedId);
-      if (!relatedNote) continue;
+  for (const relatedId of relatedIds) {
+    const entry = noteById.get(relatedId);
+    if (!entry) continue;
 
-      const relationship = note.relatedTo!.find(r => r.id === relatedId);
-      if (!relationship) continue;
+    const { note: relatedNote, vault } = entry;
+    const relationship = note.relatedTo!.find(r => r.id === relatedId);
+    if (!relationship) continue;
 
-      const metadata = getEffectiveMetadata(relatedNote, buildRoleSuggestionContext(relatedNote, visibleNotes));
-      const score = scoreRelatedNote(relatedNote, activeProjectId, metadata);
-      scored.push({
-        note: relatedNote,
-        vault,
-        relationType: relationship.type,
-        score,
-      });
-    }
+    const metadata = getEffectiveMetadata(relatedNote, buildRoleSuggestionContext(relatedNote, visibleNotes));
+    const score = scoreRelatedNote(relatedNote, activeProjectId, metadata);
+    scored.push({
+      note: relatedNote,
+      vault,
+      relationType: relationship.type,
+      score,
+    });
   }
 
   // Sort by score descending, then by title for determinism
