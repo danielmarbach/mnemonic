@@ -9,7 +9,7 @@ tags:
   - type-safety
 lifecycle: permanent
 createdAt: '2026-05-01T21:28:11.234Z'
-updatedAt: '2026-05-01T21:28:11.234Z'
+updatedAt: '2026-05-01T21:54:27.167Z'
 role: review
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -22,6 +22,24 @@ Review scope: Full TypeScript codebase (29 source files, ~15k lines) assessed fo
 
 ## Critical Issues
 
+### 1. Path Traversal via Unvalidated Note IDs — FIXED (commit ff82ec0)
+
+- Added `validateNoteId()` with `/^[a-zA-Z0-9_-]+$/` regex check in `notePath`, `embeddingPath`, `projectionPath`, and `stagedNotePath`
+
+### 2. SSRF via Unchecked OLLAMA\_URL — FIXED (commit 6fa9526)
+
+- Added `validateOllamaUrl()` restricting scheme to `http://`/`https://` and hostname to localhost/private IPs
+
+### 3. ReDoS in Branch Pattern Matching — FIXED (commit 932eff7)
+
+- Replaced regex-based glob matching with safe string-splitting approach; rejects patterns with >10 wildcards
+
+### 4. No Runtime Validation of JSON.parse Results — OPEN
+
+- **Files:** `src/storage.ts:247,281`, `src/config.ts:72,98-106`, `src/index.ts:467`
+- All `JSON.parse` results cast with `as` and trusted without validation
+- **Fix:** Use Zod schemas (already a dependency) to validate persisted data
+
 ### 1. Path Traversal via Unvalidated Note IDs
 
 - **File:** `src/storage.ts:289-299`
@@ -30,7 +48,7 @@ Review scope: Full TypeScript codebase (29 source files, ~15k lines) assessed fo
 - Crafted ID like `../../etc/passwd` traverses out of vault
 - **Fix:** Validate IDs with regex `/^[a-zA-Z0-9_-]+$/` or explicit `..` check
 
-### 2. SSRF via Unchecked OLLAMA_URL
+### 2. SSRF via Unchecked OLLAMA\_URL
 
 - **File:** `src/embeddings.ts:1-5`
 - `process.env["OLLAMA_URL"]` used directly in `fetch()` with no validation
@@ -53,6 +71,36 @@ Review scope: Full TypeScript codebase (29 source files, ~15k lines) assessed fo
 
 ## Important Improvements
 
+### 5. 6640-Line Monolith: src/index.ts — OPEN
+
+### 6. Duplicated Error Response Patterns — FIXED (commit c2c7c71)
+
+- Extracted `projectNotFoundResponse(cwd)` helper, replaced all 8 duplicate instances
+
+### 7. Duplicated Protected Branch Check — OPEN
+
+### 8. Duplicated Date Arithmetic — FIXED (commit 77f884b)
+
+- Extracted `src/date-utils.ts` with `MS_PER_DAY = 86_400_000` and `daysSince()` helper; all 5 files updated
+
+### 9. Duplicated Content Shape Analysis — OPEN
+
+### 10. Duplicated metadataPrefixes Constant — FIXED (commit a41d2a0)
+
+- Extracted to `src/git-constants.ts`, standardized both consumers to case-insensitive matching
+
+### 11. O(N²) Duplicate Detection — OPEN
+
+### 12. embedMissingNotes Called on Every Recall — OPEN
+
+### 13. Duplicated Cache Helper Functions — OPEN
+
+### 14. structured-content.ts Interface/Schema Duplication — OPEN
+
+### 15. Inconsistent new Date() Injectability — FIXED (commits 0f99658 + 77f884b)
+
+- Added `now?: Date` parameter to provenance, project-introspection, and relationships functions
+
 ### 5. 6640-Line Monolith: src/index.ts
 
 - 23 MCP tool registrations, CLI code, all handler implementations in one file
@@ -65,7 +113,7 @@ Review scope: Full TypeScript codebase (29 source files, ~15k lines) assessed fo
 
 ### 7. Duplicated Protected Branch Check (6 handlers)
 
-- Same `shouldBlockProtectedBranchCommit` + error return across remember, update, forget, consolidate, pruneSuperseded, move_memory
+- Same `shouldBlockProtectedBranchCommit` + error return across remember, update, forget, consolidate, pruneSuperseded, move\_memory
 - **Fix:** Extract `withBranchProtection(tool, cwd, fn)` wrapper
 
 ### 8. Duplicated Date Arithmetic Across 5 Files
@@ -125,7 +173,7 @@ Review scope: Full TypeScript codebase (29 source files, ~15k lines) assessed fo
 ### 18. Extract Named Constants for Magic Numbers
 
 - Scoring weights: 0.4, 0.35, 0.25, 0.32, 0.02, 0.01, 0.04
-- ms/day: 1000 *60* 60 * 24
+- ms/day: 1000 *60* 60 \* 24
 - Thresholds: 0.35, 0.5, 60 (slug max), 100 (summary max), 400 (content length)
 - Relationship limits: 3 (preview, theme diversity)
 
@@ -167,7 +215,7 @@ Review scope: Full TypeScript codebase (29 source files, ~15k lines) assessed fo
 - index.ts:300,494: `randomUUID().split("-")[0]!`
 - index.ts:338,340: CLI option `.split("=")[1]!` with no malformed input guard
 - storage.ts:247,281: JSON.parse casts
-- index.ts:4170: `any[]` type in memory_graph structured content
+- index.ts:4170: `any[]` type in memory\_graph structured content
 
 ### 26. Config File Path Hack
 
@@ -201,7 +249,7 @@ Review scope: Full TypeScript codebase (29 source files, ~15k lines) assessed fo
 ## Positive Observations
 
 - Zod used for all MCP input validation
-- Good `as const satisfies` pattern (e.g., NOTE_LIFECECYCLES)
+- Good `as const satisfies` pattern (e.g., NOTE\_LIFECECYCLES)
 - 827+ unit and integration tests with good isolation
 - Session-scoped caching avoids re-reading files
 - Fail-soft by design throughout recall pipeline
