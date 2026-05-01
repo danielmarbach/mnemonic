@@ -135,7 +135,8 @@ import type {
   AnchorNote,
   RelationshipPreview,
   RetrievalEvidence,
-  ConsolidateExecuteMergeEvidence,
+   ConsolidateExecuteMergeEvidence,
+   LintErrorResult,
 } from "./structured-content.js";
 import {
   RememberResultSchema,
@@ -157,6 +158,7 @@ import {
   MigrationExecuteResultSchema,
   PolicyResultSchema,
   DiscoverTagsResultSchema,
+  LintErrorResultSchema,
 } from "./structured-content.js";
 
 // ── CLI Migration Command ─────────────────────────────────────────────────────
@@ -1898,7 +1900,9 @@ server.registerTool(
     inputSchema: z.object({
       title: z.string().describe("Specific, retrieval-friendly title. Prefer the concrete topic or decision, not a vague label."),
       content: z.string().describe(
-        "Markdown note body. Put the key fact, decision, or outcome in the opening lines, then supporting detail. Embeddings weight early content more heavily."
+        "Markdown note body. Put the key fact, decision, or outcome in the opening lines, then supporting detail. Embeddings weight early content more heavily. " +
+        "Content must pass markdown lint. Auto-fixable issues are fixed automatically. Common unfixable issues: fenced code blocks need a language tag (e.g. use ```text not bare ```), and broken links are rejected. " +
+        "If lint fails, fix the specific issues listed in the error and retry the same call."
       ),
       tags: z.array(z.string()).optional().default([]).describe("Optional tags for later filtering. Use a small number of stable, meaningful tags."),
       lifecycle: z
@@ -1960,7 +1964,20 @@ server.registerTool(
     await ensureBranchSynced(cwd);
 
     const project = await resolveProject(cwd);
-    const cleanedContent = await cleanMarkdown(content);
+    let cleanedContent: string;
+    try {
+      cleanedContent = await cleanMarkdown(content);
+    } catch (err) {
+      if (err instanceof MarkdownLintError) {
+        const message = `Markdown lint issues prevented this note from being stored. Fix the specific lint errors listed below in your content and retry the remember call — the note was NOT stored.\n\n${err.message}`;
+        return {
+          content: [{ type: "text" as const, text: message }],
+          structuredContent: { action: "lint_error", tool: "remember", issues: err.issues } as LintErrorResult,
+          isError: true,
+        };
+      }
+      throw err;
+    }
     const policy = project ? await configStore.getProjectPolicy(project.id) : undefined;
     const policyScope = policy?.defaultScope;
     const projectVaultExists = cwd ? Boolean(await vaultManager.getProjectVaultIfExists(cwd)) : true;
@@ -2971,7 +2988,7 @@ server.registerTool(
           "]\n\n" +
           "IMPORTANT: `appendChild`, `prependChild`, and `replaceChildren` do NOT work with `heading` selectors (headings only contain inline text, not block content). To add or replace content under a heading, use `insertAfter`. To replace a heading entirely, use `replace`."
         ),
-      content: z.string().optional().describe("Full note body replacement. Use only for complete rewrites or when the note is small. Mutually exclusive with semanticPatch."),
+      content: z.string().optional().describe("Full note body replacement. Use only for complete rewrites or when the note is small. Mutually exclusive with semanticPatch. Content must pass markdown lint. Auto-fixable issues are fixed automatically. Common unfixable issues: fenced code blocks need a language tag (e.g. use ```text not bare ```), and broken links are rejected. If lint fails, fix the specific issues and retry — do NOT fall back to semanticPatch for this."),
       title: z.string().optional().describe("Specific, retrieval-friendly title. Prefer the concrete topic or decision, not a vague label."),
       tags: z.array(z.string()).optional().describe("Optional tags for later filtering. Use a small number of stable, meaningful tags."),
       lifecycle: z
@@ -3058,7 +3075,22 @@ server.registerTool(
         return { content: [{ type: "text", text: `Semantic patch failed: ${message}` }], isError: true };
       }
     }
-    const cleanedContent = content === undefined ? undefined : await cleanMarkdown(content);
+    let cleanedContent: string | undefined;
+    if (content !== undefined) {
+      try {
+        cleanedContent = await cleanMarkdown(content);
+      } catch (err) {
+        if (err instanceof MarkdownLintError) {
+          const message = `Markdown lint issues prevented the update. Fix the specific lint errors in your content and retry — do NOT fall back to semanticPatch for this.\n\n${err.message}`;
+          return {
+            content: [{ type: "text" as const, text: message }],
+            structuredContent: { action: "lint_error", tool: "update", issues: err.issues } as LintErrorResult,
+            isError: true,
+          };
+        }
+        throw err;
+      }
+    }
 
     const resolvedTitle = title ?? note.title;
     const resolvedContent = patchedContent ?? cleanedContent ?? note.content;
