@@ -2,6 +2,7 @@ import type { CommitStats, GitOps, LastCommit } from "./git.js";
 import type { NoteLifecycle } from "./storage.js";
 import type { Confidence, Provenance } from "./structured-content.js";
 export type { InterpretedHistoryEntry } from "./temporal-interpretation.js";
+import { metadataPrefixes } from "./git-constants.js";
 
 const RECENTLY_CHANGED_DAYS = 5;
 const HIGH_CONFIDENCE_DAYS = 30;
@@ -12,12 +13,11 @@ function classifyTemporalChange(
   commit: LastCommit,
   stats: CommitStats
 ): "metadata-only change" | "minor edit" | "substantial update" {
-  const metadataPrefixes = ["relate:", "unrelate:", "move:", "migrate:", "forget:"];
   if (stats.additions === 0 && stats.deletions === 0) {
     return "metadata-only change";
   }
 
-  if (metadataPrefixes.some((prefix) => commit.message.startsWith(prefix))) {
+  if (metadataPrefixes.some((prefix) => commit.message.toLowerCase().startsWith(prefix))) {
     return "metadata-only change";
   }
 
