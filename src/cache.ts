@@ -235,7 +235,7 @@ export function setSessionCachedNote(
   const existing = cache.vaultCaches.get(vaultPath);
   if (existing) {
     existing.notesById.set(note.id, note);
-    if (!existing.noteList.some((entry) => entry.id === note.id)) {
+    if (!existing.notesById.has(note.id)) {
       existing.noteList.push(note);
     }
     return;

@@ -351,7 +351,7 @@ export class Migrator {
 }
 
 function getConfigPathForVault(vault: Vault): string {
-  return vault.notesRelDir.replace(/notes$/, "config.json");
+  return path.join(path.dirname(vault.notesRelDir), "config.json");
 }
 
 function createV010BackfillMemoryVersionMigration(): Migration {
