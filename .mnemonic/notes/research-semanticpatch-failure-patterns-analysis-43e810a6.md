@@ -7,11 +7,14 @@ tags:
   - bug
 lifecycle: temporary
 createdAt: '2026-05-01T11:27:01.925Z'
-updatedAt: '2026-05-01T11:27:01.925Z'
+updatedAt: '2026-05-01T12:02:56.881Z'
 role: research
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: review-semanticpatch-llm-usability-fixes-4d4022ce
+    type: derives-from
 memoryVersion: 1
 ---
 ## Failure pattern 1: JSON parsing error — string instead of array
