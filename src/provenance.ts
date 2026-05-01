@@ -2,6 +2,7 @@ import type { CommitStats, GitOps, LastCommit } from "./git.js";
 import type { NoteLifecycle } from "./storage.js";
 import type { Confidence, Provenance } from "./structured-content.js";
 export type { InterpretedHistoryEntry } from "./temporal-interpretation.js";
+import { daysSince } from "./date-utils.js";
 import { metadataPrefixes } from "./git-constants.js";
 
 const RECENTLY_CHANGED_DAYS = 5;
@@ -84,14 +85,14 @@ export function buildTemporalHistoryEntry(
 
 export async function getNoteProvenance(
   git: GitOps,
-  filePath: string
+  filePath: string,
+  now: Date = new Date()
 ): Promise<Provenance | undefined> {
   const commit = await git.getLastCommit(filePath);
   if (!commit) return undefined;
 
   const commitDate = new Date(commit.timestamp);
-  const now = new Date();
-  const daysSinceUpdate = Math.floor((now.getTime() - commitDate.getTime()) / (1000 * 60 * 60 * 24));
+  const daysSinceUpdate = Math.floor(daysSince(commit.timestamp));
 
   return {
     lastUpdatedAt: commit.timestamp,
@@ -106,15 +107,13 @@ export function computeConfidence(
   updatedAt: string,
   centrality: number
 ): Confidence {
-  const now = new Date();
-  const updatedDate = new Date(updatedAt);
-  const daysSinceUpdate = Math.floor((now.getTime() - updatedDate.getTime()) / (1000 * 60 * 60 * 24));
+  const daysSinceUpdateNum = Math.floor(daysSince(updatedAt));
 
-  if (lifecycle === "permanent" && centrality >= HIGH_CONFIDENCE_CENTRALITY && daysSinceUpdate < HIGH_CONFIDENCE_DAYS) {
+  if (lifecycle === "permanent" && centrality >= HIGH_CONFIDENCE_CENTRALITY && daysSinceUpdateNum < HIGH_CONFIDENCE_DAYS) {
     return "high";
   }
 
-  if (daysSinceUpdate < MEDIUM_CONFIDENCE_DAYS) {
+  if (daysSinceUpdateNum < MEDIUM_CONFIDENCE_DAYS) {
     return "medium";
   }
 

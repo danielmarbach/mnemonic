@@ -3,6 +3,7 @@ import type { Vault } from "./vault.js";
 import type { RelatedNotePreview, RelationshipPreview } from "./structured-content.js";
 import { classifyTheme } from "./project-introspection.js";
 import { getEffectiveMetadata, type EffectiveNoteMetadata, type RoleSuggestionContext } from "./role-suggestions.js";
+import { daysSince } from "./date-utils.js";
 
 const RECENTLY_CHANGED_DAYS = 5;
 const HIGH_CONFIDENCE_CENTRALITY = 5;
@@ -62,10 +63,8 @@ function buildRoleSuggestionContext(note: Note, allNotes: Note[]): RoleSuggestio
 /**
  * Compute confidence for a related note (same logic as provenance.ts).
  */
-function computeRelatedNoteConfidence(note: Note): "high" | "medium" | "low" {
-  const now = new Date();
-  const updatedDate = new Date(note.updatedAt);
-  const daysSinceUpdate = Math.floor((now.getTime() - updatedDate.getTime()) / (1000 * 60 * 60 * 24));
+function computeRelatedNoteConfidence(note: Note, now?: Date): "high" | "medium" | "low" {
+  const daysSinceUpdate = Math.floor(daysSince(note.updatedAt, now ?? new Date()));
   const centrality = note.relatedTo?.length ?? 0;
 
   if (note.lifecycle === "permanent" && centrality >= HIGH_CONFIDENCE_CENTRALITY && daysSinceUpdate < HIGH_CONFIDENCE_DAYS) {
@@ -89,11 +88,8 @@ export function isAnchor(note: Note): boolean {
 /**
  * Check if note was recently updated.
  */
-export function isRecentlyUpdated(note: Note): boolean {
-  const now = new Date();
-  const updatedDate = new Date(note.updatedAt);
-  const daysSinceUpdate = Math.floor((now.getTime() - updatedDate.getTime()) / (1000 * 60 * 60 * 24));
-  return daysSinceUpdate < RECENTLY_CHANGED_DAYS;
+export function isRecentlyUpdated(note: Note, now?: Date): boolean {
+  return Math.floor(daysSince(note.updatedAt, now ?? new Date())) < RECENTLY_CHANGED_DAYS;
 }
 
 /**
@@ -103,27 +99,24 @@ export function isRecentlyUpdated(note: Note): boolean {
 export function scoreRelatedNote(
   note: Note,
   activeProjectId?: string,
-  metadata: EffectiveNoteMetadata = getEffectiveMetadata(note)
+  metadata: EffectiveNoteMetadata = getEffectiveMetadata(note),
+  now?: Date
 ): number {
   let score = 0;
 
-  // Same project: strong boost (100 points)
   if (activeProjectId && note.project === activeProjectId) {
     score += 100;
   }
 
-  // Anchor: medium boost (50 points)
   if (isAnchor(note)) {
     score += 50;
   }
 
-  // Recently updated: small boost (20 points)
-  if (isRecentlyUpdated(note)) {
+  if (isRecentlyUpdated(note, now)) {
     score += 20;
   }
 
-  // High confidence: small boost (10 points)
-  const confidence = computeRelatedNoteConfidence(note);
+  const confidence = computeRelatedNoteConfidence(note, now);
   if (confidence === "high") {
     score += 10;
   } else if (confidence === "medium") {
@@ -211,7 +204,8 @@ export async function getDirectRelatedNotes(
  */
 function buildRelatedNotePreview(
   scored: ScoredRelatedNote,
-  activeProjectId?: string
+  activeProjectId?: string,
+  now?: Date
 ): RelatedNotePreview {
   const { note, relationType } = scored;
   const theme = classifyTheme(note);
@@ -223,7 +217,7 @@ function buildRelatedNotePreview(
     theme: theme !== "other" ? theme : undefined,
     relationType,
     updatedAt: note.updatedAt,
-    confidence: computeRelatedNoteConfidence(note),
+    confidence: computeRelatedNoteConfidence(note, now),
   };
 }
 
