@@ -7,7 +7,7 @@ tags:
   - dogfooding
 lifecycle: permanent
 createdAt: '2026-03-07T18:37:11.013Z'
-updatedAt: '2026-03-07T18:42:51.656Z'
+updatedAt: '2026-05-01T12:53:00.975Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
@@ -24,5 +24,17 @@ Implementation details:
 - Reject non-fixable issues after auto-fix so low-quality markdown does not get stored.
 - Disable `MD013` (line length) and `MD041` (first line must be an H1) because note bodies are content fragments, not standalone documents.
 - `get`, `relate`, `unrelate`, and `forget` now accept `cwd` so a fresh project-scoped server can resolve project-vault notes reliably.
+
+### Error handling for `remember` and `update(content)`
+
+When `remember` or `update(content)` fails lint validation, the tool catches `MarkdownLintError` and returns a structured error response with:
+
+- `content`: actionable text telling the LLM to fix the specific lint issues and retry, with explicit "note was NOT stored" messaging
+- `structuredContent`: `LintErrorResult` with `action: "lint_error"`, `tool: "remember" | "update"`, and `issues: string[]`
+- `isError: true`
+
+This mirrors the pattern already used for `semanticPatch` lint errors, which returns advisory guidance instead of a raw exception.
+
+The `content` parameter description for both `remember` and `update` also includes proactive schema-level guidance about markdown lint requirements (auto-fixable vs. unfixable issues, common gotchas like MD040 fenced code blocks needing language tags).
 
 Dogfooding note: the repo MCP server was rebuilt locally and this note was created and related through the local `mnemonic` MCP server, not by writing the vault files directly.
