@@ -519,7 +519,7 @@ const _RelationshipType = z.enum(["related-to", "explains", "example-of", "super
  * - "project-vault" for the primary project vault (.mnemonic/).
  * - "sub-vault:.mnemonic-<name>" for submodule-specific project vaults.
  */
-const _VaultLabel = z.string();
+const _VaultLabel = z.string().regex(/^main-vault$|^project-vault$|^sub-vault:\.mnemonic-.+$/);
 const ProjectRefSchema = z.object({ id: z.string(), name: z.string() });
 
 export const RelatedNotePreviewSchema = z.object({
