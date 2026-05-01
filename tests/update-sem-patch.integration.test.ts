@@ -153,4 +153,59 @@ describe("update with semanticPatch", () => {
 
     await session.close();
   }, 15000);
+
+  it("accepts string-wrapped JSON array for semanticPatch", async () => {
+    const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-update-test-"));
+    tempDirs.push(vaultDir);
+    await initTestRepo(vaultDir, "main");
+
+    const session = await createPersistentMcpSession(vaultDir, { disableGit: true });
+
+    const rememberResult = await session.callTool("remember", {
+      title: "String Patch Test",
+      content: "# String Patch Test\n\n## Findings\n\nOriginal finding.\n",
+      lifecycle: "temporary",
+    });
+    const idMatch = rememberResult.text.match(/`([^`]+)`/);
+    expect(idMatch).not.toBeNull();
+    const noteId = idMatch![1];
+
+    const updateResult = await session.callTool("update", {
+      id: noteId,
+      semanticPatch: JSON.stringify([{ selector: { heading: "Findings" }, operation: { op: "insertAfter", value: "Patched via string." } }]) as any,
+    });
+
+    expect(updateResult.text).toContain("Updated memory");
+
+    const getResult = await session.callTool("get", { ids: [noteId] });
+    expect(getResult.text).toContain("Patched via string.");
+
+    await session.close();
+  }, 15000);
+
+  it("rejects malformed string for semanticPatch", async () => {
+    const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-update-test-"));
+    tempDirs.push(vaultDir);
+    await initTestRepo(vaultDir, "main");
+
+    const session = await createPersistentMcpSession(vaultDir, { disableGit: true });
+
+    const rememberResult = await session.callTool("remember", {
+      title: "Bad String Test",
+      content: "# Bad String Test\n\nContent.\n",
+      lifecycle: "temporary",
+    });
+    const idMatch = rememberResult.text.match(/`([^`]+)`/);
+    expect(idMatch).not.toBeNull();
+    const noteId = idMatch![1];
+
+    const updateResult = await session.callTool("update", {
+      id: noteId,
+      semanticPatch: "not valid json" as any,
+    });
+
+    expect(updateResult.text).toContain("error");
+
+    await session.close();
+  }, 15000);
 });

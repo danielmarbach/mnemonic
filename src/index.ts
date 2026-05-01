@@ -2927,7 +2927,14 @@ server.registerTool(
     inputSchema: z.object({
       id: z.string().describe("Exact memory id. Use an id returned by `recall`, `list`, `recent_memories`, or `where_is`."),
       semanticPatch: z
-        .array(z.object({
+        .preprocess(
+          (val) => {
+            if (typeof val === "string") {
+              try { return JSON.parse(val); } catch { return val; }
+            }
+            return val;
+          },
+          z.array(z.object({
           selector: z.object({
             heading: z.string().optional(),
             headingStartsWith: z.string().optional(),
@@ -2949,20 +2956,20 @@ server.registerTool(
             z.object({ op: z.literal("insertBefore"), value: z.string() }),
             z.object({ op: z.literal("remove") }),
           ]),
-        }))
+        })))
         .optional()
         .describe(
           "Targeted edits to note sections. Array of {selector, operation} objects. Mutually exclusive with content. " +
           "If this fails, fix the issue in your patch values and retry — do NOT fall back to full content rewrite.\n\n" +
           "selector: exactly one of { heading: \"exact heading text\" } | { headingStartsWith: \"prefix\" } | { lastChild: true } | { nthChild: 0-based-index }\n" +
           "operation: { op: \"appendChild\", value: \"content\" } | { op: \"prependChild\", value: \"content\" } | { op: \"replace\", value: \"new content\" } | { op: \"replaceChildren\", value: \"new children\" } | { op: \"insertAfter\", value: \"content\" } | { op: \"insertBefore\", value: \"content\" } | { op: \"remove\" }\n\n" +
-          "Example — append a paragraph under ## Findings, replace ## Recommendation body, remove ## Old Section:\n" +
+          "Example — add a paragraph under ## Findings, replace body under ## Recommendation, remove ## Old Section:\n" +
           "[\n" +
-          "  { \"selector\": { \"heading\": \"Findings\" }, \"operation\": { \"op\": \"appendChild\", \"value\": \"A new paragraph.\" } },\n" +
-          "  { \"selector\": { \"heading\": \"Recommendation\" }, \"operation\": { \"op\": \"replaceChildren\", \"value\": \"Updated recommendation.\" } },\n" +
+          "  { \"selector\": { \"heading\": \"Findings\" }, \"operation\": { \"op\": \"insertAfter\", \"value\": \"A new paragraph.\" } },\n" +
+          "  { \"selector\": { \"heading\": \"Recommendation\" }, \"operation\": { \"op\": \"replace\", \"value\": \"## Recommendation\\n\\nUpdated recommendation.\" } },\n" +
           "  { \"selector\": { \"heading\": \"Old Section\" }, \"operation\": { \"op\": \"remove\" } }\n" +
           "]\n\n" +
-          "`replaceChildren` on a `heading` selector targets the heading itself, not the body below it. Use `appendChild` or `replace` instead."
+          "IMPORTANT: `appendChild`, `prependChild`, and `replaceChildren` do NOT work with `heading` selectors (headings only contain inline text, not block content). To add or replace content under a heading, use `insertAfter`. To replace a heading entirely, use `replace`."
         ),
       content: z.string().optional().describe("Full note body replacement. Use only for complete rewrites or when the note is small. Mutually exclusive with semanticPatch."),
       title: z.string().optional().describe("Specific, retrieval-friendly title. Prefer the concrete topic or decision, not a vague label."),
@@ -6510,8 +6517,8 @@ server.registerPrompt(
             "- `operation` has an `op` key plus `value` (except `remove` which has no value).\n" +
             "- The parameter must be a JSON array, NOT a string.\n" +
             "- Use `get` first to read exact heading text, then use those headings (without `##` prefix) as selector values.\n" +
-            "- Common mistake: writing `{ \"op\": \"appendChild\", \"value\": \"...\" }` at the top level instead of nesting inside `operation`. Correct shape: `{ \"selector\": { \"heading\": \"Findings\" }, \"operation\": { \"op\": \"appendChild\", \"value\": \"text\" } }`\n" +
-            "- `replaceChildren` on a `heading` selector targets the heading itself, not the body below it. Use `appendChild` or `replace` instead.",
+            "- Common mistake: writing `{ \"op\": \"appendChild\", \"value\": \"...\" }` at the top level instead of nesting inside `operation`. Correct shape: `{ \"selector\": { \"heading\": \"Findings\" }, \"operation\": { \"op\": \"insertAfter\", \"value\": \"text\" } }`\n" +
+            "- `appendChild`, `prependChild`, and `replaceChildren` do NOT work with `heading` selectors. To add content under a heading, use `insertAfter`. To replace a heading, use `replace`.",
         },
       },
     ],
