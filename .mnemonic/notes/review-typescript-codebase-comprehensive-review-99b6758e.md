@@ -9,7 +9,7 @@ tags:
   - type-safety
 lifecycle: permanent
 createdAt: '2026-05-01T21:28:11.234Z'
-updatedAt: '2026-05-01T21:54:27.167Z'
+updatedAt: '2026-05-01T21:55:02.755Z'
 role: review
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -161,6 +161,52 @@ Review scope: Full TypeScript codebase (29 source files, ~15k lines) assessed fo
 - **Fix:** Consistently accept `now?: Date` parameter
 
 ## Suggestions
+
+### 16. Replace filter(Boolean) as Type with Type Predicates — FIXED (commit 5c7ea37)
+
+- Replaced `.filter(Boolean) as Note[]` with type predicate `.filter((n): n is Note => n !== null)`
+
+### 17. Use satisfies Instead of as for Structured Content — OPEN
+
+### 18. Extract Named Constants for Magic Numbers — OPEN
+
+### 19. Unified Error Message Helper — FIXED (commit 5c7ea37)
+
+- Created `src/error-utils.ts` with `getErrorMessage(err: unknown): string`; replaced 16 instances across index.ts, git.ts, migration.ts
+
+### 20. Cache Unified Processor in markdown-ast.ts — FIXED (commit 156a6ff)
+
+- Parser and serializer now created once at module level instead of per-call
+
+### 21. Redundant listNotes + readNote in relationships.ts — FIXED (commit a1decf3)
+
+- Replaced redundant pattern with single `Map<id, {note, vault}>` built from already-loaded notes
+
+### 22. O(n) Array Scan Where Map Lookup Exists — FIXED (commit 0b08a2d)
+
+- `cache.ts:238`: `.some()` scan replaced with `notesById.has()` for O(1) lookup
+
+### 23. CLI Code Mixed with Server Entry Point — OPEN
+
+### 24. Unsafe Type Assertions Throughout — OPEN
+
+### 25. Non-null Assertions That Could Be Safer — OPEN
+
+### 26. Config File Path Hack — FIXED (commit 0b08a2d)
+
+- `migration.ts`: replaced fragile `.replace(/notes$/, "config.json")` with `path.join(path.dirname(...), "config.json")`
+
+### 27. Console.error as Logging — OPEN
+
+### 28. Sequential I/O in Parallelizable Contexts — OPEN
+
+### 29. Inconsistent Case Sensitivity in metadataPrefixes — FIXED (commit a41d2a0)
+
+- Both consumers now use case-insensitive matching via `.toLowerCase().startsWith()`
+
+### 30. structured-content.ts VaultLabel Unvalidated — FIXED (commit b53a311)
+
+- Changed from `z.string()` to `z.string().regex(/^main-vault$|^project-vault$|^sub-vault:\.mnemonic-.+$/)` enforcing the three documented formats
 
 ### 16. Replace filter(Boolean) as Type with Type Predicates
 
