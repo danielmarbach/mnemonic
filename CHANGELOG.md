@@ -10,6 +10,11 @@ The format is loosely based on Keep a Changelog and uses semver-style version he
 
 ### Fixed
 
+- `remember` and `update(content)` now return structured error responses with actionable retry guidance when markdown lint fails, instead of propagating raw errors that LLMs sometimes ignore.
+- `remember` and `update` `content` parameter descriptions include proactive lint guidance (auto-fixable vs. unfixable issues, common MD040 fenced-code-language gotcha).
+
+### Changed
+
 - `semanticPatch` schema example and guidance now use `insertAfter` instead of the rejected `appendChild`/`replaceChildren` on `heading` selectors.
 - `semanticPatch` workflow hint corrected: recommends `insertAfter` for adding content under headings instead of `appendChild`, which the code rejects.
 - `semanticPatch` parameter now auto-parses string-wrapped JSON arrays, recovering gracefully when LLMs serialize the array as a string instead of a proper JSON array.

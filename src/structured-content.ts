@@ -73,6 +73,12 @@ export interface ProjectRef {
   name: string;
 }
 
+export interface LintErrorResult extends Record<string, unknown> {
+  action: "lint_error";
+  tool: "remember" | "update";
+  issues: string[];
+}
+
 export interface RememberResult extends Record<string, unknown> {
   action: "remembered";
   id: string;
@@ -582,6 +588,12 @@ export const PersistenceStatusSchema = z.object({
     }),
   }).optional(),
   durability: z.enum(["local-only", "committed", "pushed"]),
+});
+
+export const LintErrorResultSchema = z.object({
+  action: z.literal("lint_error"),
+  tool: z.enum(["remember", "update"]),
+  issues: z.array(z.string()),
 });
 
 export const RememberResultSchema = z.object({
