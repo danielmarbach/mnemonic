@@ -1,5 +1,6 @@
 import type { Note, Relationship } from "./storage.js";
 import type { ConsolidationMode } from "./project-memory-policy.js";
+import { daysSince } from "./date-utils.js";
 
 export type MergeRisk = "low" | "medium" | "high";
 
@@ -18,13 +19,7 @@ export interface ConsolidateNoteEvidence {
 }
 
 function noteAgeDays(updatedAt: string, now: Date = new Date()): number {
-  const updated = new Date(updatedAt);
-  if (Number.isNaN(updated.getTime())) {
-    return 0;
-  }
-
-  const diffMs = now.getTime() - updated.getTime();
-  return Math.max(0, diffMs / (1000 * 60 * 60 * 24));
+  return daysSince(updatedAt, now);
 }
 
 function buildSupersededByMap(notes: Array<Pick<Note, "id" | "relatedTo">>): Map<string, string> {

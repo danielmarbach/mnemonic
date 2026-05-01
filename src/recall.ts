@@ -1,6 +1,7 @@
 import type { Vault } from "./vault.js";
 import type { EffectiveNoteMetadata } from "./role-suggestions.js";
 import { computeLexicalScore, tokenize } from "./lexical.js";
+import { MS_PER_DAY } from "./date-utils.js";
 
 import type { RelationshipType } from "./storage.js";
 
@@ -144,7 +145,7 @@ export function computeTemporalRecencyBoost(
     return 0;
   }
 
-  const ageDays = Math.max(0, (now.getTime() - updated.getTime()) / (1000 * 60 * 60 * 24));
+  const ageDays = Math.max(0, (now.getTime() - updated.getTime()) / MS_PER_DAY);
   if (ageDays > hint.windowDays) {
     return 0;
   }
@@ -167,7 +168,7 @@ export function isWithinTemporalFilterWindow(
     return true;
   }
 
-  const ageDays = Math.max(0, (now.getTime() - updated.getTime()) / (1000 * 60 * 60 * 24));
+  const ageDays = Math.max(0, (now.getTime() - updated.getTime()) / MS_PER_DAY);
   return ageDays <= windowDays;
 }
 
