@@ -7,6 +7,7 @@ import path from "path";
 import { promises as fs } from "fs";
 
 import { NOTE_LIFECYCLES, NOTE_ROLES, Storage, type Note, type NoteLifecycle, type NoteRole, type Relationship, type RelationshipType } from "./storage.js";
+import { getErrorMessage } from "./error-utils.js";
 import { embed, cosineSimilarity, embedModel } from "./embeddings.js";
 import { type CommitResult, type PushResult, type SyncResult } from "./git.js";
 import { buildTemporalHistoryEntry, computeConfidence, getNoteProvenance } from "./provenance.js";
@@ -901,7 +902,7 @@ async function embedMissingNotes(
   force = false
 ): Promise<{ rebuilt: number; failed: string[] }> {
   const notes = noteIds
-    ? (await Promise.all(noteIds.map((id) => storage.readNote(id)))).filter(Boolean) as Note[]
+    ? (await Promise.all(noteIds.map((id) => storage.readNote(id)))).filter((n): n is Note => n !== null)
     : await storage.listNotes();
 
   let rebuilt = 0;
@@ -1445,6 +1446,10 @@ const ROLE_LIFECYCLE_DEFAULTS: Record<string, NoteLifecycle> = {
   reference: "permanent",
 };
 
+function projectNotFoundResponse(cwd: string) {
+  return { content: [{ type: "text" as const, text: `Could not detect a project for: ${cwd}` }], isError: true as const };
+}
+
 // ── MCP Server ────────────────────────────────────────────────────────────────
 
 const server = new McpServer({
@@ -1484,7 +1489,7 @@ server.registerTool(
     const identity = await resolveProjectIdentityForCwd(cwd);
     const project = identity?.project;
     if (!project || !identity) {
-      return { content: [{ type: "text", text: `Could not detect a project for: ${cwd}` }], isError: true };
+      return projectNotFoundResponse(cwd);
     }
     const policyLine = await formatProjectPolicyLine(project.id);
     
@@ -1547,7 +1552,7 @@ server.registerTool(
   async ({ cwd }) => {
     const identity = await resolveProjectIdentityForCwd(cwd);
     if (!identity) {
-      return { content: [{ type: "text", text: `Could not detect a project for: ${cwd}` }], isError: true };
+      return projectNotFoundResponse(cwd);
     }
 
     const structuredContent: ProjectIdentityResult = {
@@ -1608,7 +1613,7 @@ server.registerTool(
   async ({ cwd, remoteName }) => {
     const defaultIdentity = await resolveProjectIdentity(cwd);
     if (!defaultIdentity) {
-      return { content: [{ type: "text", text: `Could not detect a project for: ${cwd}` }], isError: true };
+      return projectNotFoundResponse(cwd);
     }
 
     const defaultProject = defaultIdentity.project;
@@ -1864,7 +1869,7 @@ server.registerTool(
       return {
         content: [{
           type: "text",
-          text: `Migration failed: ${err instanceof Error ? err.message : String(err)}`,
+          text: `Migration failed: ${getErrorMessage(err)}`,
         }],
       };
     }
@@ -2042,7 +2047,7 @@ server.registerTool(
       const vector = await embed(text);
       await vault.storage.writeEmbedding({ id, model: embedModel, embedding: vector, updatedAt: now });
     } catch (err) {
-      embeddingStatus = { status: "skipped", reason: err instanceof Error ? err.message : String(err) };
+      embeddingStatus = { status: "skipped", reason: getErrorMessage(err) };
       console.error(`[embedding] Skipped for '${id}': ${err}`);
     }
 
@@ -2149,7 +2154,7 @@ server.registerTool(
   async ({ cwd, defaultScope, consolidationMode, protectedBranchBehavior, protectedBranchPatterns }) => {
     const project = await resolveProject(cwd);
     if (!project) {
-      return { content: [{ type: "text", text: `Could not detect a project for: ${cwd}` }], isError: true };
+      return projectNotFoundResponse(cwd);
     }
 
     if (
@@ -2280,7 +2285,7 @@ server.registerTool(
   async ({ cwd }) => {
     const project = await resolveProject(cwd);
     if (!project) {
-      return { content: [{ type: "text", text: `Could not detect a project for: ${cwd}` }], isError: true };
+      return projectNotFoundResponse(cwd);
     }
 
     const policy = await configStore.getProjectPolicy(project.id);
@@ -3071,7 +3076,7 @@ server.registerTool(
           const message = `Semantic patch produced content with markdown lint issues. Fix the lint issues in your patch values and retry — do NOT fall back to full content rewrite.\n\n${err.message}`;
           return { content: [{ type: "text", text: message }], isError: true };
         }
-        const message = err instanceof Error ? err.message : String(err);
+        const message = getErrorMessage(err);
         return { content: [{ type: "text", text: `Semantic patch failed: ${message}` }], isError: true };
       }
     }
@@ -3225,7 +3230,7 @@ server.registerTool(
         await vault.storage.writeEmbedding({ id, model: embedModel, embedding: vector, updatedAt: now });
         embeddingStatus = { status: "written" };
       } catch (err) {
-        embeddingStatus = { status: "skipped", reason: err instanceof Error ? err.message : String(err) };
+        embeddingStatus = { status: "skipped", reason: getErrorMessage(err) };
         console.error(`[embedding] Re-embed failed for '${id}': ${err}`);
       }
     }
@@ -4225,7 +4230,7 @@ server.registerTool(
     const preProject = await resolveProject(cwd);
     const { project, entries } = await collectVisibleNotes(cwd, "all", undefined, "any", preProject?.id);
     if (!project) {
-      return { content: [{ type: "text", text: `Could not detect a project for: ${cwd}` }], isError: true };
+      return projectNotFoundResponse(cwd);
     }
 
     // Separate project-scoped notes (for themes/anchors) from global notes
@@ -4903,7 +4908,7 @@ server.registerTool(
 
       targetProject = await resolveProject(cwd);
       if (!targetProject) {
-        return { content: [{ type: "text", text: `Could not detect a project for: ${cwd}` }], isError: true };
+        return projectNotFoundResponse(cwd);
       }
     }
 
@@ -5461,7 +5466,7 @@ server.registerTool(
 
     const project = await resolveProject(cwd);
     if (!project && cwd) {
-      return { content: [{ type: "text", text: `Could not detect a project for: ${cwd}` }], isError: true };
+      return projectNotFoundResponse(cwd);
     }
 
     // Gather notes from all vaults (project + main) for this project
