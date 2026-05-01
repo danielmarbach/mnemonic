@@ -287,18 +287,22 @@ export class Storage {
   // ── Helpers ────────────────────────────────────────────────────────────────
 
   notePath(id: string): string {
+    validateNoteId(id);
     return path.join(this.notesDir, `${id}.md`);
   }
 
   embeddingPath(id: string): string {
+    validateNoteId(id);
     return path.join(this.embeddingsDir, `${id}.json`);
   }
 
   projectionPath(id: string): string {
+    validateNoteId(id);
     return path.join(this.projectionsDir, `${id}.json`);
   }
 
   private stagedNotePath(id: string): string | undefined {
+    validateNoteId(id);
     return this.stagedNotesDir
       ? path.join(this.stagedNotesDir, `${id}.md`)
       : undefined;
@@ -403,6 +407,12 @@ function isNoteRole(value: unknown): value is NoteRole {
 
 function isNoteImportance(value: unknown): value is NoteImportance {
   return typeof value === "string" && NOTE_IMPORTANCE_LEVELS.includes(value as NoteImportance);
+}
+
+function validateNoteId(id: string): void {
+  if (!/^[a-zA-Z0-9_-]+$/.test(id)) {
+    throw new Error(`Invalid note ID: "${id}" contains characters that are not allowed (only alphanumeric, hyphens, and underscores)`);
+  }
 }
 
 function toIsoString(value: unknown): string {
