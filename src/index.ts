@@ -40,6 +40,11 @@ import {
   resolveEffectiveConsolidationMode,
 } from "./consolidate.js";
 import { detectDuplicates, findClusters, suggestMerges, executeMerge, pruneSuperseded, dryRunAll } from "./tools/consolidate-helpers.js";
+import { registerDetectProjectTool } from "./tools/detect-project.js";
+import { registerGetProjectIdentityTool } from "./tools/get-project-identity.js";
+import { registerSetProjectIdentityTool } from "./tools/set-project-identity.js";
+import { registerListMigrationsTool, registerExecuteMigrationTool } from "./tools/migration.js";
+import { registerSetProjectMemoryPolicyTool, registerGetProjectMemoryPolicyTool } from "./tools/policy.js";
 import { suggestAutoRelationships } from "./auto-relate.js";
 import {
   computeHybridScore,
@@ -79,7 +84,7 @@ import {
   type WriteScope,
 } from "./project-memory-policy.js";
 import type { ServerContext } from "./server-context.js";
-import { resolveProject as resolveProjectFromModule, toProjectRef, noteProjectRef, resolveProjectIdentityForCwd as resolveProjectIdentityForCwdFromModule, resolveWriteVault as resolveWriteVaultFromModule, describeProject as describeProjectFromModule, ensureBranchSynced as ensureBranchSyncedFromModule, projectParam } from "./helpers/project.js";
+import { resolveProject as resolveProjectFromModule, toProjectRef, noteProjectRef, resolveWriteVault as resolveWriteVaultFromModule, describeProject as describeProjectFromModule, ensureBranchSynced as ensureBranchSyncedFromModule, projectParam } from "./helpers/project.js";
 import { extractSummary, formatCommitBody, formatAskForWriteScope, formatAskForProtectedBranch, formatProtectedBranchBlocked, shouldBlockProtectedBranchCommit as shouldBlockProtectedBranchCommitFromModule, wouldRelationshipCleanupTouchProjectVault as wouldRelationshipCleanupTouchProjectVaultFromModule } from "./helpers/git-commit.js";
 import { embedTextForNote as embedTextForNoteFromModule, embedMissingNotes as embedMissingNotesFromModule, backfillEmbeddingsAfterSync as backfillEmbeddingsAfterSyncFromModule, removeStaleEmbeddings as removeStaleEmbeddingsFromModule } from "./helpers/embed.js";
 import { resolveDurability, buildPersistenceStatus, buildMutationRetryContract, formatRetrySummary, formatPersistenceSummary, getMutationPushMode as getMutationPushModeFromModule, pushAfterMutation as pushAfterMutationFromModule } from "./helpers/persistence.js";
@@ -98,7 +103,7 @@ import {
   extractNextAction,
 } from "./project-introspection.js";
 import { getEffectiveMetadata } from "./role-suggestions.js";
-import { detectProject, getCurrentGitBranch, resolveProjectIdentity, type ProjectIdentityResolution } from "./project.js";
+import { detectProject, getCurrentGitBranch } from "./project.js";
 import { VaultManager, type Vault } from "./vault.js";
 import { buildRecallCandidateContext, collectLexicalRescueCandidates, PROJECT_SCOPE_BOOST as PROJECT_SCOPE_BOOST_VALUE, type DiscoverTagStat, tokenizeTagDiscoveryText, countTokenOverlap, escapeRegex, hasExactTagContextMatch } from "./tools/recall-helpers.js";
 import { Migrator } from "./migration.js";
@@ -120,10 +125,6 @@ import type {
   MemoryGraphResult,
   ProjectSummaryResult,
   SyncResult as StructuredSyncResult,
-  PolicyResult,
-  ProjectIdentityResult,
-  MigrationListResult,
-  MigrationExecuteResult,
   PersistenceStatus,
   MutationRetryContract,
   DiscoverTagsResult,
@@ -148,14 +149,9 @@ import {
   SyncResultSchema,
   WhereIsResultSchema,
   ConsolidateResultSchema,
-  ProjectIdentityResultSchema,
-  MigrationListResultSchema,
-  MigrationExecuteResultSchema,
-  PolicyResultSchema,
   DiscoverTagsResultSchema,
   LintErrorResultSchema,
   NoteIdSchema,
-  RemoteNameSchema,
 } from "./structured-content.js";
 
 // ── CLI Migration Command ─────────────────────────────────────────────────────
@@ -498,10 +494,6 @@ async function resolveProject(cwd?: string) {
   return resolveProjectFromModule(ctx, cwd);
 }
 
-async function resolveProjectIdentityForCwd(cwd?: string) {
-  return resolveProjectIdentityForCwdFromModule(ctx, cwd);
-}
-
 async function resolveWriteVault(cwd: string | undefined, scope: WriteScope) {
   return resolveWriteVaultFromModule(ctx, cwd, scope);
 }
@@ -562,28 +554,6 @@ async function removeRelationshipsToNoteIds(noteIds: string[]) {
   return removeRelationshipsToNoteIdsFromModule(ctx, noteIds);
 }
 
-function formatProjectIdentityText(identity: ProjectIdentityResolution): string {
-  const lines = [
-    `Project identity:`,
-    `- **id:** \`${identity.project.id}\``,
-    `- **name:** ${identity.project.name}`,
-    `- **source:** ${identity.project.source}`,
-  ];
-
-  if (identity.project.remoteName) {
-    lines.push(`- **remote:** ${identity.project.remoteName}`);
-  }
-
-  if (identity.identityOverride) {
-    const defaultRemote = identity.defaultProject.remoteName ?? "none";
-    const status = identity.identityOverrideApplied ? "applied" : "configured, remote unavailable";
-    lines.push(`- **identity override:** ${identity.identityOverride.remoteName} (${status}; default remote: ${defaultRemote})`);
-    lines.push(`- **default id:** \`${identity.defaultProject.id}\``);
-  }
-
-  return lines.join("\n");
-}
-
 function formatSyncResult(result: SyncResult, label: string, vaultPath?: string): string[] {
   if (!result.hasRemote) return [`${label}: no remote configured — git sync skipped.`];
   const lines: string[] = [];
@@ -624,424 +594,15 @@ const server = new McpServer({
   version: await readPackageVersion(),
 });
 
-// ── detect_project ────────────────────────────────────────────────────────────
-server.registerTool(
-  "detect_project",
-  {
-    title: "Detect Project",
-    description:
-      "Detect the effective project identity for a working directory.\n\n" +
-      "Use this when:\n" +
-      "- You have a repo path and need the project id/name before storing or searching memories\n" +
-      "- You want project-aware routing and search boosting\n\n" +
-      "Do not use this when:\n" +
-      "- You need to inspect identity override details; use `get_project_identity` instead\n\n" +
-      "Returns:\n" +
-      "- Effective project id, name, source, and any active policy hint\n\n" +
-      "Read-only.\n\n" +
-      "Typical next step:\n" +
-      "- Use `recall` or `project_memory_summary` to orient on existing memory.",
-    annotations: {
-      readOnlyHint: true,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
-    outputSchema: ProjectIdentityResultSchema,
-    inputSchema: z.object({
-      cwd: z.string().describe("Absolute project working directory. Pass this whenever the task is project-related so routing, search boosting, policy, and vault selection work correctly."),
-    }),
-  },
-  async ({ cwd }) => {
-    const identity = await resolveProjectIdentityForCwd(cwd);
-    const project = identity?.project;
-    if (!project || !identity) {
-      return projectNotFoundResponse(cwd);
-    }
-    const policyLine = await formatProjectPolicyLine(project.id);
-    
-    const structuredContent: ProjectIdentityResult = {
-      action: "project_identity_detected",
-      project: {
-        id: project.id,
-        name: project.name,
-        source: project.source,
-        remoteName: project.remoteName,
-      },
-      defaultProject: identity.defaultProject ? {
-        id: identity.defaultProject.id,
-        name: identity.defaultProject.name,
-        remoteName: identity.defaultProject.remoteName,
-      } : undefined,
-      identityOverride: identity.identityOverride,
-    };
-    
-    return {
-      content: [{
-        type: "text",
-        text:
-          `${formatProjectIdentityText(identity)}\n` +
-          `- **${policyLine}**`,
-      }],
-      structuredContent,
-    };
-  }
-);
+registerDetectProjectTool(server, ctx);
 
-// ── get_project_identity ───────────────────────────────────────────────────────
-server.registerTool(
-  "get_project_identity",
-  {
-    title: "Get Project Identity",
-    description:
-      "Show the effective project identity for a working directory, including any configured remote override.\n\n" +
-      "Use this when:\n" +
-      "- You need to verify whether project identity comes from `origin`, `upstream`, or an override\n" +
-      "- You are debugging project scoping issues\n\n" +
-      "Do not use this when:\n" +
-      "- You only need the project id/name to continue; use `detect_project` instead\n\n" +
-      "Returns:\n" +
-      "- Effective project identity, default identity, and any configured override\n\n" +
-      "Read-only.\n\n" +
-      "Typical next step:\n" +
-      "- Use `set_project_identity` only if the wrong remote is defining identity.",
-    annotations: {
-      readOnlyHint: true,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
-    inputSchema: z.object({
-      cwd: z.string().describe("Absolute project working directory. Pass this whenever the task is project-related so routing, search boosting, policy, and vault selection work correctly."),
-    }),
-    outputSchema: ProjectIdentityResultSchema,
-  },
-  async ({ cwd }) => {
-    const identity = await resolveProjectIdentityForCwd(cwd);
-    if (!identity) {
-      return projectNotFoundResponse(cwd);
-    }
+registerGetProjectIdentityTool(server, ctx);
 
-    const structuredContent: ProjectIdentityResult = {
-      action: "project_identity_shown",
-      project: {
-        id: identity.project.id,
-        name: identity.project.name,
-        source: identity.project.source,
-        remoteName: identity.project.remoteName,
-      },
-      defaultProject: identity.defaultProject ? {
-        id: identity.defaultProject.id,
-        name: identity.defaultProject.name,
-        remoteName: identity.defaultProject.remoteName,
-      } : undefined,
-      identityOverride: identity.identityOverride,
-    };
+registerSetProjectIdentityTool(server, ctx);
 
-    return {
-      content: [{
-        type: "text",
-        text: formatProjectIdentityText(identity),
-      }],
-      structuredContent,
-    };
-  }
-);
+registerListMigrationsTool(server, ctx);
 
-// ── set_project_identity ───────────────────────────────────────────────────────
-server.registerTool(
-  "set_project_identity",
-  {
-    title: "Set Project Identity",
-    description:
-      "Override which git remote defines project identity for a repo.\n\n" +
-      "Use this when:\n" +
-      "- A fork should associate memory with the upstream project rather than the fork remote\n" +
-      "- Project detection is resolving to the wrong canonical repo\n\n" +
-      "Do not use this when:\n" +
-      "- The default remote already identifies the correct project\n\n" +
-      "Returns:\n" +
-      "- The new effective project identity after applying the override\n\n" +
-      "Side effects: writes config, git commits, and may push.\n\n" +
-      "Typical next step:\n" +
-      "- Re-run `detect_project` or `get_project_identity` to verify the result.",
-    annotations: {
-      readOnlyHint: false,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
-    inputSchema: z.object({
-      cwd: z.string().describe("Absolute project working directory. Pass this whenever the task is project-related so routing, search boosting, policy, and vault selection work correctly."),
-      remoteName: RemoteNameSchema.describe("Git remote name to use as the canonical project identity, such as `upstream`")
-    }),
-    outputSchema: ProjectIdentityResultSchema,
-  },
-  async ({ cwd, remoteName }) => {
-    const defaultIdentity = await resolveProjectIdentity(cwd);
-    if (!defaultIdentity) {
-      return projectNotFoundResponse(cwd);
-    }
-
-    const defaultProject = defaultIdentity.project;
-    if (defaultProject.source !== "git-remote") {
-      return {
-        content: [{
-          type: "text",
-          text: `Project identity override requires a git remote. Current source: ${defaultProject.source}`,
-        }],
-      };
-    }
-
-    const now = new Date().toISOString();
-    const candidateIdentity = await resolveProjectIdentity(cwd, {
-      getProjectIdentityOverride: async () => ({ remoteName, updatedAt: now }),
-    });
-
-    if (!candidateIdentity || !candidateIdentity.identityOverrideApplied) {
-      return {
-        content: [{
-          type: "text",
-          text: `Could not resolve git remote '${remoteName}' for ${defaultProject.name}.`,
-        }],
-      };
-    }
-
-    await configStore.setProjectIdentityOverride(defaultProject.id, { remoteName, updatedAt: now });
-
-    const commitBody = formatCommitBody({
-      summary: `Use ${remoteName} as canonical project identity`,
-      projectName: defaultProject.name,
-      description:
-        `Default identity: ${defaultProject.id}\n` +
-        `Resolved identity: ${candidateIdentity.project.id}\n` +
-        `Remote: ${remoteName}`,
-    });
-    const commitMessage = `identity: ${defaultProject.name} use remote ${remoteName}`;
-    const commitFiles = ["config.json"];
-    const commitStatus = await vaultManager.main.git.commitWithStatus(commitMessage, commitFiles, commitBody);
-    const pushStatus = commitStatus.status === "committed"
-      ? await pushAfterMutation(vaultManager.main)
-      : { status: "skipped" as const, reason: "commit-failed" as const };
-    const retry = buildMutationRetryContract({
-      commit: commitStatus,
-      commitMessage,
-      commitBody,
-      files: commitFiles,
-      cwd,
-      vault: vaultManager.main,
-      mutationApplied: true,
-    });
-
-    const structuredContent: ProjectIdentityResult = {
-      action: "project_identity_set",
-      project: {
-        id: candidateIdentity.project.id,
-        name: candidateIdentity.project.name,
-        source: candidateIdentity.project.source,
-        remoteName: candidateIdentity.project.remoteName,
-      },
-      defaultProject: {
-        id: defaultProject.id,
-        name: defaultProject.name,
-        remoteName: defaultProject.remoteName,
-      },
-      identityOverride: {
-        remoteName,
-        updatedAt: now,
-      },
-      retry,
-    };
-
-    return {
-      content: [{
-        type: "text",
-        text:
-          `Project identity override set for ${defaultProject.name}: ` +
-          `default=\`${defaultProject.id}\`, effective=\`${candidateIdentity.project.id}\`, remote=${remoteName}` +
-          `${commitStatus.status === "failed"
-            ? `\n${formatRetrySummary(retry) ?? `Commit failed. Push status: ${pushStatus.status}.`}`
-            : ""
-          }`,
-      }],
-      structuredContent,
-    };
-  }
-);
-
-// ── list_migrations ───────────────────────────────────────────────────────────
-server.registerTool(
-  "list_migrations",
-  {
-    title: "List Migrations",
-    description:
-      "List available schema migrations and show which ones are pending for each vault.\n\n" +
-      "Use this when:\n" +
-      "- Checking whether a mnemonic upgrade requires vault changes\n" +
-      "- Preparing to run `execute_migration`\n\n" +
-      "Do not use this when:\n" +
-      "- You already know the exact migration to run and only need to execute it\n\n" +
-      "Returns:\n" +
-      "- Available migrations, vault schema versions, and pending counts\n\n" +
-      "Read-only.\n\n" +
-      "Typical next step:\n" +
-      "- Run `execute_migration` with `dryRun: true` first.",
-    annotations: {
-      readOnlyHint: true,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
-    inputSchema: z.object({}),
-    outputSchema: MigrationListResultSchema,
-  },
-  async () => {
-    const available = migrator.listAvailableMigrations();
-    const lines: string[] = [];
-
-    lines.push("Vault schema versions:");
-    let totalPending = 0;
-    const vaultsInfo: MigrationListResult["vaults"] = [];
-    for (const vault of vaultManager.allKnownVaults()) {
-      const version = await readVaultSchemaVersion(vault.storage.vaultPath);
-      const pending = await migrator.getPendingMigrations(version);
-      totalPending += pending.length;
-      const label = vault.isProject ? "project" : "main";
-      lines.push(`  ${label} (${vault.storage.vaultPath}): ${version} — ${pending.length} pending`);
-      vaultsInfo.push({
-        path: vault.storage.vaultPath,
-        type: vault.isProject ? "project" : "main",
-        version,
-        pending: pending.length,
-      });
-    }
-
-    lines.push("");
-    lines.push("Available migrations:");
-    for (const migration of available) {
-      lines.push(`  ${migration.name}`);
-      lines.push(`   ${migration.description}`);
-    }
-
-    lines.push("");
-    if (totalPending > 0) {
-      lines.push("Run migration with: mnemonic migrate (CLI) or execute_migration (MCP)");
-    }
-
-    const structuredContent: MigrationListResult = {
-      action: "migration_list",
-      vaults: vaultsInfo,
-      available: available.map(m => ({ name: m.name, description: m.description })),
-      totalPending,
-    };
-
-    return { content: [{ type: "text", text: lines.join("\n") }], structuredContent };
-  }
-);
-
-// ── execute_migration ─────────────────────────────────────────────────────────
-server.registerTool(
-  "execute_migration",
-  {
-    title: "Execute Migration",
-    description:
-      "Execute a named schema migration on vault notes.\n\n" +
-      "Use this when:\n" +
-      "- `list_migrations` shows pending migrations that should be applied\n\n" +
-      "Do not use this when:\n" +
-      "- You have not checked pending migrations yet\n" +
-      "- You have not previewed the migration with `dryRun: true`\n\n" +
-      "Returns:\n" +
-      "- Per-vault migration results, counts, warnings, and errors\n\n" +
-      "Side effects: modifies note files, git commits per affected vault, and may push.\n\n" +
-      "Typical next step:\n" +
-      "- Re-run `list_migrations` to confirm nothing is pending.",
-    annotations: {
-      readOnlyHint: false,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
-    inputSchema: z.object({
-      migrationName: z.string().describe("Name of the migration to execute (get names from `list_migrations`)"),
-      dryRun: z.boolean().default(true).describe("If true, show what would change without actually modifying notes. Always try dry-run first."),
-      backup: z.boolean().default(true).describe("If true, warn about backing up before real migration"),
-      cwd: projectParam.optional().describe("Optional: limit migration to a specific project vault"),
-    }),
-    outputSchema: MigrationExecuteResultSchema,
-  },
-  async ({ migrationName, dryRun, backup, cwd }) => {
-    await ensureBranchSynced(cwd);
-
-    try {
-      const { results, vaultsProcessed } = await migrator.runMigration(migrationName, {
-        dryRun,
-        backup,
-        cwd,
-      });
-      
-      const lines: string[] = [];
-      lines.push(`Migration: ${migrationName}`);
-      lines.push(`Mode: ${dryRun ? "DRY-RUN" : "EXECUTE"}`);
-      lines.push(`Vaults processed: ${vaultsProcessed}`);
-      lines.push("")
-      
-      const vaultResults: Array<{ path: string; notesProcessed: number; notesModified: number; errors: Array<{ noteId: string; error: string }>; warnings: string[] }> = [];
-      for (const [vaultPath, result] of results) {
-        lines.push(`Vault: ${vaultPath}`);
-        lines.push(`  Notes processed: ${result.notesProcessed}`);
-        lines.push(`  Notes modified: ${result.notesModified}`);
-        
-        const vaultResultErrors: Array<{ noteId: string; error: string }> = [];
-        const vaultResultWarnings: string[] = [];
-        
-        if (result.errors.length > 0) {
-          lines.push(`  Errors: ${result.errors.length}`);
-          result.errors.forEach(e => lines.push(`    - ${e.noteId}: ${e.error}`));
-          vaultResultErrors.push(...result.errors.map(e => ({ noteId: e.noteId, error: e.error })));
-        }
-        
-        if (result.warnings.length > 0) {
-          lines.push(`  Warnings: ${result.warnings.length}`);
-          result.warnings.forEach(w => lines.push(`    - ${w}`));
-          vaultResultWarnings.push(...result.warnings);
-        }
-        
-        vaultResults.push({
-          path: vaultPath,
-          notesProcessed: result.notesProcessed,
-          notesModified: result.notesModified,
-          errors: vaultResultErrors,
-          warnings: vaultResultWarnings,
-        });
-        lines.push("");
-      }
-      
-      if (!dryRun) {
-        lines.push("Migration executed. Modified vaults were auto-committed and pushed when git was available.");
-      } else {
-        lines.push("✓ Dry-run completed - no changes made");
-      }
-      
-      const structuredContent: MigrationExecuteResult = {
-        action: "migration_executed",
-        migration: migrationName,
-        dryRun,
-        vaultsProcessed,
-        vaultResults,
-      };
-      
-      return { content: [{ type: "text", text: lines.join("\n") }], structuredContent };
-    } catch (err) {
-      return {
-        content: [{
-          type: "text",
-          text: `Migration failed: ${getErrorMessage(err)}`,
-        }],
-      };
-    }
-  }
-);
+registerExecuteMigrationTool(server, ctx);
 
 // ── remember ──────────────────────────────────────────────────────────────────
 server.registerTool(
@@ -1278,226 +839,9 @@ server.registerTool(
   }
 );
 
-// ── set_project_memory_policy ─────────────────────────────────────────────────
-server.registerTool(
-  "set_project_memory_policy",
-  {
-    title: "Set Project Memory Policy",
-    description:
-      "Set the default write scope and memory behavior for a project.\n\n" +
-      "Use this when:\n" +
-      "- A project should default to project or global storage\n" +
-      "- Protected-branch handling or consolidation behavior should be standardized\n\n" +
-      "Do not use this when:\n" +
-      "- You only need a one-off write location for a single `remember` call\n\n" +
-      "Returns:\n" +
-      "- The saved project policy and effective values\n\n" +
-      "Side effects: writes config, git commits, and may push.\n\n" +
-      "Typical next step:\n" +
-      "- Use `get_project_memory_policy` to verify the saved policy.",
-    annotations: {
-      readOnlyHint: false,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
-    inputSchema: z.object({
-      cwd: z.string().describe("Absolute project working directory. Pass this whenever the task is project-related so routing, search boosting, policy, and vault selection work correctly."),
-      defaultScope: z.enum(PROJECT_POLICY_SCOPES).optional().describe(
-        "Default storage: 'project' = shared project vault, 'global' = private main vault, 'ask' = prompt each time"
-      ),
-      consolidationMode: z.enum(CONSOLIDATION_MODES).optional().describe(
-        "Default consolidation mode: 'supersedes' preserves history (default), 'delete' removes sources immediately"
-      ),
-      protectedBranchBehavior: z.enum(PROTECTED_BRANCH_BEHAVIORS).optional().describe(
-        "Behavior for protected-branch matches during project-vault commits by mutating tools: 'ask', 'block', or 'allow'"
-      ),
-      protectedBranchPatterns: z.array(z.string()).optional().describe(
-        "Protected branch glob patterns. Defaults to [\"main\", \"master\", \"release*\"] when not set"
-      ),
-    }),
-    outputSchema: PolicyResultSchema,
-  },
-  async ({ cwd, defaultScope, consolidationMode, protectedBranchBehavior, protectedBranchPatterns }) => {
-    const project = await resolveProject(cwd);
-    if (!project) {
-      return projectNotFoundResponse(cwd);
-    }
+registerSetProjectMemoryPolicyTool(server, ctx);
 
-    if (
-      defaultScope === undefined
-      && consolidationMode === undefined
-      && protectedBranchBehavior === undefined
-      && protectedBranchPatterns === undefined
-    ) {
-      return {
-        content: [{
-          type: "text",
-          text: "No policy fields provided. Set at least one of: defaultScope, consolidationMode, protectedBranchBehavior, protectedBranchPatterns.",
-        }],
-        isError: true,
-      };
-    }
-
-    const existing = await configStore.getProjectPolicy(project.id);
-    const effectiveDefaultScope = defaultScope ?? existing?.defaultScope ?? "project";
-    const effectiveConsolidationMode = consolidationMode ?? existing?.consolidationMode;
-    const effectiveProtectedBranchBehavior = protectedBranchBehavior ?? existing?.protectedBranchBehavior;
-    const effectiveProtectedBranchPatterns = protectedBranchPatterns
-      ? protectedBranchPatterns.map((pattern) => pattern.trim()).filter((pattern) => pattern.length > 0)
-      : existing?.protectedBranchPatterns;
-
-    const now = new Date().toISOString();
-    const policy: ProjectMemoryPolicy = {
-      projectId: project.id,
-      projectName: project.name,
-      defaultScope: effectiveDefaultScope,
-      consolidationMode: effectiveConsolidationMode,
-      protectedBranchBehavior: effectiveProtectedBranchBehavior,
-      protectedBranchPatterns: effectiveProtectedBranchPatterns,
-      updatedAt: now,
-    };
-    await configStore.setProjectPolicy(policy);
-
-    const modeStr = effectiveConsolidationMode ? `, consolidationMode=${effectiveConsolidationMode}` : "";
-    const branchBehaviorStr = effectiveProtectedBranchBehavior
-      ? `, protectedBranchBehavior=${effectiveProtectedBranchBehavior}`
-      : "";
-    const branchPatternsStr = effectiveProtectedBranchPatterns && effectiveProtectedBranchPatterns.length > 0
-      ? `, protectedBranchPatterns=${effectiveProtectedBranchPatterns.join("|")}`
-      : "";
-    const commitBody = formatCommitBody({
-      projectName: project.name,
-      description:
-        `Default scope: ${effectiveDefaultScope}` +
-        `${effectiveConsolidationMode ? `\nConsolidation mode: ${effectiveConsolidationMode}` : ""}` +
-        `${effectiveProtectedBranchBehavior ? `\nProtected branch behavior: ${effectiveProtectedBranchBehavior}` : ""}` +
-        `${effectiveProtectedBranchPatterns && effectiveProtectedBranchPatterns.length > 0
-          ? `\nProtected branch patterns: ${effectiveProtectedBranchPatterns.join(", ")}`
-          : ""
-        }`,
-    });
-    const commitMessage = `policy: ${project.name} default scope ${effectiveDefaultScope}`;
-    const commitFiles = ["config.json"];
-    const commitStatus = await vaultManager.main.git.commitWithStatus(commitMessage, commitFiles, commitBody);
-    const pushStatus = commitStatus.status === "committed"
-      ? await pushAfterMutation(vaultManager.main)
-      : { status: "skipped" as const, reason: "commit-failed" as const };
-    const retry = buildMutationRetryContract({
-      commit: commitStatus,
-      commitMessage,
-      commitBody,
-      files: commitFiles,
-      cwd,
-      vault: vaultManager.main,
-      mutationApplied: true,
-    });
-
-    const structuredContent: PolicyResult = {
-      action: "policy_set",
-      project: { id: project.id, name: project.name },
-      defaultScope: effectiveDefaultScope,
-      consolidationMode: effectiveConsolidationMode,
-      protectedBranchBehavior: effectiveProtectedBranchBehavior,
-      protectedBranchPatterns: effectiveProtectedBranchPatterns,
-      updatedAt: now,
-      retry,
-    };
-
-    return {
-      content: [{
-        type: "text",
-        text:
-          `Project memory policy set for ${project.name}: defaultScope=${effectiveDefaultScope}` +
-          `${modeStr}${branchBehaviorStr}${branchPatternsStr}` +
-          `${commitStatus.status === "failed"
-            ? `\n${formatRetrySummary(retry) ?? `Commit failed. Push status: ${pushStatus.status}.`}`
-            : ""
-          }`,
-      }],
-      structuredContent,
-    };
-  }
-);
-
-// ── get_project_memory_policy ─────────────────────────────────────────────────
-server.registerTool(
-  "get_project_memory_policy",
-  {
-    title: "Get Project Memory Policy",
-    description:
-      "Show the saved memory policy for a project.\n\n" +
-      "Use this when:\n" +
-      "- You want to confirm the default write scope before storing memory\n" +
-      "- You are debugging why notes land in an unexpected vault\n" +
-      "- You need to inspect protected-branch or consolidation defaults\n\n" +
-      "Do not use this when:\n" +
-      "- You want to change the policy; use `set_project_memory_policy`\n\n" +
-      "Returns:\n" +
-      "- Saved policy values or an explanation of the fallback behavior\n\n" +
-      "Read-only.\n\n" +
-      "Typical next step:\n" +
-      "- Call `remember` with explicit `scope` for a one-off override, or `set_project_memory_policy` to change defaults.",
-    annotations: {
-      readOnlyHint: true,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
-    inputSchema: z.object({
-      cwd: z.string().describe("Absolute project working directory. Pass this whenever the task is project-related so routing, search boosting, policy, and vault selection work correctly."),
-    }),
-    outputSchema: PolicyResultSchema,
-  },
-  async ({ cwd }) => {
-    const project = await resolveProject(cwd);
-    if (!project) {
-      return projectNotFoundResponse(cwd);
-    }
-
-    const policy = await configStore.getProjectPolicy(project.id);
-    if (!policy) {
-      const structuredContent: PolicyResult = {
-        action: "policy_shown",
-        project: { id: project.id, name: project.name },
-      };
-      return {
-        content: [{
-          type: "text",
-          text: `No project memory policy set for ${project.name}. Default write behavior remains scope=project when cwd is present.`,
-        }],
-        structuredContent,
-      };
-    }
-
-    const structuredContent: PolicyResult = {
-      action: "policy_shown",
-      project: { id: project.id, name: project.name },
-      defaultScope: policy.defaultScope,
-      consolidationMode: policy.consolidationMode,
-      protectedBranchBehavior: policy.protectedBranchBehavior,
-      protectedBranchPatterns: policy.protectedBranchPatterns,
-      updatedAt: policy.updatedAt,
-    };
-
-    const details = [
-      `defaultScope=${policy.defaultScope}`,
-      policy.consolidationMode ? `consolidationMode=${policy.consolidationMode}` : undefined,
-      policy.protectedBranchBehavior ? `protectedBranchBehavior=${policy.protectedBranchBehavior}` : undefined,
-      policy.protectedBranchPatterns && policy.protectedBranchPatterns.length > 0
-        ? `protectedBranchPatterns=${policy.protectedBranchPatterns.join("|")}`
-        : undefined,
-    ].filter(Boolean).join(", ");
-
-    return {
-      content: [{
-        type: "text",
-        text: `Project memory policy for ${project.name}: ${details} (updated ${policy.updatedAt})`,
-      }],
-      structuredContent,
-    };
-  }
-);
+registerGetProjectMemoryPolicyTool(server, ctx);
 
 // ── recall ────────────────────────────────────────────────────────────────────
 server.registerTool(
