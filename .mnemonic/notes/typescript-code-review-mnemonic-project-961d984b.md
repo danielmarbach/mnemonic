@@ -8,7 +8,7 @@ tags:
   - performance
 lifecycle: permanent
 createdAt: '2026-05-02T04:20:54.784Z'
-updatedAt: '2026-05-02T04:39:49.875Z'
+updatedAt: '2026-05-02T05:34:09.797Z'
 role: review
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -30,6 +30,18 @@ Followed `.agents/skills/typescript-code-review/SKILL.md` workflow (Steps 1-7) w
 
 ## Critical Issues 🔴
 
+### C1: Unsafe `as` casts on `JSON.parse` results — FIXED
+
+Zod validation schemas added at trust boundaries. `storage.ts` uses `validateEmbeddingRecord`, `validateNoteProjection`, `validateRelatedTo`. `config.ts` uses `safeParse` with `MnemonicConfigRawSchema` and `ConfigJsonObjectSchema`.
+
+### C2: `noUncheckedIndexedAccess` not enabled — FIXED
+
+Enabled in `tsconfig.json`. All resulting type errors fixed with proper null checks, default values, or `!== undefined` guards. Tuple destructuring from `split` now validates index access.
+
+### C3: MCP tool `id` and `remoteName` parameter validation — FIXED
+
+`NoteIdSchema` and `RemoteNameSchema` added with regex validation at MCP boundary. `NoteIdSchema` uses `/^[a-zA-Z0-9_-]+$/`, `RemoteNameSchema` uses `/^[a-zA-Z0-9_.-]+$/`, consistent with `validateNoteId` in storage.
+
 ### C1: Unsafe `as` casts on `JSON.parse` results (HIGH)
 
 - `storage.ts:247` — `JSON.parse(raw) as EmbeddingRecord` with no runtime validation
@@ -50,6 +62,28 @@ Followed `.agents/skills/typescript-code-review/SKILL.md` workflow (Steps 1-7) w
 - **Fix**: Add `z.string().regex(/^[a-zA-Z0-9_.-]+$/)` to `remoteName` and `/^[a-zA-Z0-9_-]+$/` to `id`
 
 ## Important Improvements 🟡
+
+### I1: Branded types for domain primitives — DONE
+
+Added `src/brands.ts` with `MemoryId`, `ProjectId`, `EmbeddingModelId`, `ISO8601DateString`. Includes type predicates (`isValidMemoryId`, `isValidIsoDateString`), assertion functions (`assertMemoryId`, `assertIsoDateString`), and smart constructors for trusted internal code.
+
+### I2: Discriminated unions with `never` for mutual exclusion — DEFERRED
+
+### I3: Exhaustive `never` checks — DONE
+
+### I4: Type/runtime value drift — DONE (single-sourced via const arrays)
+
+### I5: Missing `as const` on literals — DONE
+
+### I6: Parallelizable async operations — DONE
+
+### I7: O(n²) algorithms — ACCEPTED (low priority)
+
+### I8: Memory concerns — ACCEPTED (session cache mitigates)
+
+### I9: Bare `catch {}` blocks — PARTIALLY DONE (git.ts, config.ts, vault.ts have debugLog; some acceptable bare catches remain)
+
+### I10: Magic numbers — DONE (named constants extracted)
 
 ### I1: Branded types for domain primitives
 
@@ -176,6 +210,17 @@ Original claim: "loads ALL note contents into memory".
 - `getSessionCachedProjectionTokens` — 5 parameters
 
 ## Suggestions 🔵
+
+### Done
+
+- ✅ Add size limits (`.max()`) to `title` (500) and `content` (100000) Zod schemas
+
+### Deferred
+
+- Split `index.ts` into handler modules
+- Encapsulate module-level singletons
+- Cache parsed config in `MnemonicConfigStore`
+- Streaming/pagination for `listNotes`
 
 - Add `import type` for `Note` in `index.ts:373` (inline `import("./storage.js").Note`)
 - Encapsulate module-level mutable singletons (`sessionCaches`, `mutationLocks`, `branchHistory`) in classes
