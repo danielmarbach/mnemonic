@@ -12,7 +12,7 @@ tags:
   - lessons
 lifecycle: permanent
 createdAt: '2026-03-14T23:38:26.947Z'
-updatedAt: '2026-03-26T21:00:32.043Z'
+updatedAt: '2026-05-02T04:36:39.931Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
@@ -20,6 +20,8 @@ relatedTo:
     type: related-to
   - id: manual-exact-git-recovery-contract-for-partial-mnemonic-pers-ffae4896
     type: explains
+  - id: typescript-code-review-mnemonic-project-961d984b
+    type: related-to
 memoryVersion: 1
 ---
 Observed a gap in the git retry/persistence contract during conservative note consolidation on branch `cleanup`.

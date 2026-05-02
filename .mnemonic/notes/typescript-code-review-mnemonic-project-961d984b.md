@@ -8,13 +8,15 @@ tags:
   - performance
 lifecycle: permanent
 createdAt: '2026-05-02T04:20:54.784Z'
-updatedAt: '2026-05-02T04:36:39.168Z'
+updatedAt: '2026-05-02T04:36:39.931Z'
 role: review
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
   - id: git-mutation-coordination-per-repo-mutex-plus-retry-fallback-56264a36
+    type: related-to
+  - id: parallel-consolidate-operations-can-leave-staged-local-only--e8c33780
     type: related-to
 memoryVersion: 1
 ---
