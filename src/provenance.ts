@@ -91,7 +91,6 @@ export async function getNoteProvenance(
   const commit = await git.getLastCommit(filePath);
   if (!commit) return undefined;
 
-  const commitDate = new Date(commit.timestamp);
   const daysSinceUpdate = Math.floor(daysSince(commit.timestamp));
 
   return {

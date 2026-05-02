@@ -8,13 +8,15 @@ tags:
   - resilience
 lifecycle: permanent
 createdAt: '2026-04-05T12:46:05.045Z'
-updatedAt: '2026-04-05T12:54:17.658Z'
+updatedAt: '2026-05-02T04:36:39.168Z'
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
   - id: git-resilience-retry-contract-concurrency-design-and-languag-351fab47
     type: explains
+  - id: typescript-code-review-mnemonic-project-961d984b
+    type: related-to
 memoryVersion: 1
 ---
 Approved design: serialize all mutating git operations inside mnemonic with an in-process per-repo async mutex, while keeping bounded retry handling for transient git lock failures.

@@ -1,6 +1,8 @@
 import { execFile } from "child_process";
 import { promisify } from "util";
 import path from "path";
+import type { ProjectId } from "./brands.js";
+import { projectId } from "./brands.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -8,7 +10,7 @@ export type ProjectSource = "git-remote" | "git-remote-override" | "git-folder" 
 
 export interface ProjectInfo {
   /** Stable identifier: normalized git remote URL or folder name */
-  id: string;
+  id: ProjectId;
   /** Human-readable name (last path segment of remote, or folder name) */
   name: string;
   /** How the project was detected */
@@ -81,7 +83,7 @@ export async function resolveProjectIdentity(
 
   return {
     project: {
-      id: normalizeRemote(overrideRemote),
+      id: projectId(normalizeRemote(overrideRemote)),
       name: extractRepoName(overrideRemote),
       source: "git-remote-override",
       remoteName: identityOverride.remoteName,
@@ -113,7 +115,7 @@ async function detectDefaultProject(cwd: string): Promise<ProjectInfo | null> {
   const remoteCwd = topLevelRoot ?? cwd;
   const remote = await getGitRemoteUrl(remoteCwd, "origin");
   if (remote) {
-    const id = normalizeRemote(remote);
+    const id = projectId(normalizeRemote(remote));
     const name = extractRepoName(remote);
     return { id, name, source: "git-remote", remoteName: "origin" };
   }
@@ -121,13 +123,13 @@ async function detectDefaultProject(cwd: string): Promise<ProjectInfo | null> {
   // Try git root folder name (repo without remote)
   if (topLevelRoot) {
     const name = path.basename(topLevelRoot);
-    return { id: slugify(name), name, source: "git-folder" };
+    return { id: projectId(slugify(name)), name, source: "git-folder" };
   }
 
   // Fallback: just use the directory name
   const name = path.basename(path.resolve(cwd));
   if (name) {
-    return { id: slugify(name), name, source: "folder" };
+    return { id: projectId(slugify(name)), name, source: "folder" };
   }
 
   return null;

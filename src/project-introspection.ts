@@ -2,6 +2,34 @@ import type { Note } from "./storage.js";
 import type { EffectiveNoteMetadata } from "./role-suggestions.js";
 import { MS_PER_DAY } from "./date-utils.js";
 
+// Recency scoring thresholds
+const RECENCY_CAP_DAYS = 30;           // Maximum days considered for recency decay
+const WITHIN_THEME_CENTRALITY_LOG_FACTOR = 0.1; // log(relatedCount+1) multiplier for centrality bonus
+const WITHIN_THEME_CENTRALITY_MAX = 0.2;        // Maximum centrality bonus within themes
+
+// Anchor scoring weights
+const ANCHOR_RECENCY_HALF_LIFE_DAYS = 7;   // Days for 50% recency decay in anchor scoring
+const ANCHOR_CENTRALITY_WEIGHT = 0.4;      // Weight of centrality in anchor score
+const ANCHOR_DIVERSITY_WEIGHT = 0.4;       // Weight of connection diversity in anchor score
+const ANCHOR_RECENCY_WEIGHT = 0.2;         // Weight of recency in anchor score
+const ANCHOR_ALWAYS_LOAD_BONUS = 0.45;     // Bonus for explicitly always-loaded notes
+
+// Working state scoring thresholds
+const WORKING_STATE_RECENCY_SCALE = 1.2;       // Recency scaling factor for working state notes
+const WORKING_STATE_RECENCY_HALF_LIFE_DAYS = 3; // Days for 50% recency decay in working state
+const WORKING_STATE_MAX_RECENCY = 1.2;         // Cap on recency component for working state
+const WORKING_STATE_CONNECTIVITY_LOG_FACTOR = 0.12; // log(relatedCount+1) multiplier
+const WORKING_STATE_MAX_CONNECTIVITY = 0.3;    // Cap on connectivity bonus
+
+// Structure bonus weights for working state
+const WORKING_STATE_MAX_STRUCTURE_BONUS = 0.22;
+const WORKING_STATE_HEADING_WEIGHT = 0.05;
+const WORKING_STATE_BULLET_WEIGHT = 0.02;
+const WORKING_STATE_NUMBERED_WEIGHT = 0.03;
+const WORKING_STATE_TASK_WEIGHT = 0.03;
+const WORKING_STATE_PARAGRAPH_WEIGHT = 0.01;
+const WORKING_STATE_MAX_PARAGRAPH_BONUS = 0.04;
+
 type ScoringMetadata = Pick<EffectiveNoteMetadata, "role" | "roleSource" | "importance" | "importanceSource" | "alwaysLoad" | "alwaysLoadSource">;
 
 function explicitAlwaysLoad(metadata?: ScoringMetadata) {
@@ -131,13 +159,19 @@ export function daysSinceUpdate(updatedAt: string, now: Date = new Date()): numb
 }
 
 export function recencyScore(daysSince: number): number {
-  const capped = Math.min(daysSince, 30);
-  return 1.0 - capped / 30;
+  const capped = Math.min(daysSince, RECENCY_CAP_DAYS);
+  return 1.0 - capped / RECENCY_CAP_DAYS;
 }
 
 export function centralityBonus(relatedCount: number): number {
-  return Math.min(0.2, Math.log(relatedCount + 1) * 0.1);
+  return Math.min(WITHIN_THEME_CENTRALITY_MAX, Math.log(relatedCount + 1) * WITHIN_THEME_CENTRALITY_LOG_FACTOR);
 }
+
+// Metadata role/importance bonuses for within-theme scoring
+const WITHIN_THEME_ROLE_EXPLICIT: Record<string, number> = { summary: 0.18, decision: 0.12, reference: 0.06, context: 0.03 };
+const WITHIN_THEME_ROLE_SUGGESTED: Record<string, number> = { summary: 0.06, decision: 0.04, reference: 0.02, context: 0.01 };
+const WITHIN_THEME_IMPORTANCE_EXPLICIT: Record<string, number> = { high: 0.12, normal: 0.06 };
+const WITHIN_THEME_IMPORTANCE_SUGGESTED: Record<string, number> = { high: 0.04, normal: 0.02 };
 
 function summaryMetadataBonus(metadata?: ScoringMetadata): number {
   if (!metadata) return 0;
@@ -145,13 +179,13 @@ function summaryMetadataBonus(metadata?: ScoringMetadata): number {
   return roleBonus(
     metadata.role,
     metadata.roleSource,
-    { summary: 0.18, decision: 0.12, reference: 0.06, context: 0.03 },
-    { summary: 0.06, decision: 0.04, reference: 0.02, context: 0.01 },
+    WITHIN_THEME_ROLE_EXPLICIT,
+    WITHIN_THEME_ROLE_SUGGESTED,
   ) + importanceBonus(
     metadata.importance,
     metadata.importanceSource,
-    { high: 0.12, normal: 0.06 },
-    { high: 0.04, normal: 0.02 },
+    WITHIN_THEME_IMPORTANCE_EXPLICIT,
+    WITHIN_THEME_IMPORTANCE_SUGGESTED,
   );
 }
 
@@ -176,6 +210,12 @@ export function computeConnectionDiversity(
   return themes.size;
 }
 
+// Anchor metadata role/importance bonuses
+const ANCHOR_ROLE_EXPLICIT: Record<string, number> = { summary: 0.22, decision: 0.16, reference: 0.08, context: 0.04 };
+const ANCHOR_ROLE_SUGGESTED: Record<string, number> = { summary: 0.08, decision: 0.06, reference: 0.03, context: 0.015 };
+const ANCHOR_IMPORTANCE_EXPLICIT: Record<string, number> = { high: 0.2, normal: 0.1 };
+const ANCHOR_IMPORTANCE_SUGGESTED: Record<string, number> = { high: 0.06, normal: 0.03 };
+
 export function anchorScore(
   note: Note,
   themeCache: Map<string, string>,
@@ -185,7 +225,7 @@ export function anchorScore(
   if (note.lifecycle !== "permanent") return -Infinity;
 
   const days = daysSinceUpdate(note.updatedAt, now ?? new Date());
-  const recency = 1.0 / (1 + days / 7);
+  const recency = 1.0 / (1 + days / ANCHOR_RECENCY_HALF_LIFE_DAYS);
 
   const centrality = Math.log((note.relatedTo?.length ?? 0) + 1);
 
@@ -194,19 +234,25 @@ export function anchorScore(
   const metadataRoleBonus = roleBonus(
     metadata?.role,
     metadata?.roleSource ?? "none",
-    { summary: 0.22, decision: 0.16, reference: 0.08, context: 0.04 },
-    { summary: 0.08, decision: 0.06, reference: 0.03, context: 0.015 },
+    ANCHOR_ROLE_EXPLICIT,
+    ANCHOR_ROLE_SUGGESTED,
   );
   const metadataImportanceBonus = importanceBonus(
     metadata?.importance,
     metadata?.importanceSource ?? "none",
-    { high: 0.2, normal: 0.1 },
-    { high: 0.06, normal: 0.03 },
+    ANCHOR_IMPORTANCE_EXPLICIT,
+    ANCHOR_IMPORTANCE_SUGGESTED,
   );
-  const alwaysLoadBonus = explicitAlwaysLoad(metadata) ? 0.45 : 0;
+  const alwaysLoadBonus = explicitAlwaysLoad(metadata) ? ANCHOR_ALWAYS_LOAD_BONUS : 0;
 
-  return 0.4 * centrality + 0.4 * connectionDiversity + 0.2 * recency + metadataRoleBonus + metadataImportanceBonus + alwaysLoadBonus;
+  return ANCHOR_CENTRALITY_WEIGHT * centrality + ANCHOR_DIVERSITY_WEIGHT * connectionDiversity + ANCHOR_RECENCY_WEIGHT * recency + metadataRoleBonus + metadataImportanceBonus + alwaysLoadBonus;
 }
+
+// Working state metadata role/importance bonuses
+const WORKING_STATE_ROLE_EXPLICIT: Record<string, number> = { plan: 0.18, context: 0.12, summary: 0.08, decision: 0.04, reference: 0.02 };
+const WORKING_STATE_ROLE_SUGGESTED: Record<string, number> = { plan: 0.06, context: 0.04, summary: 0.025, decision: 0.015, reference: 0.01 };
+const WORKING_STATE_IMPORTANCE_EXPLICIT: Record<string, number> = { high: 0.16, normal: 0.08 };
+const WORKING_STATE_IMPORTANCE_SUGGESTED: Record<string, number> = { high: 0.05, normal: 0.025 };
 
 function workingStateMetadataBonus(metadata?: ScoringMetadata): number {
   if (!metadata) return 0;
@@ -214,13 +260,13 @@ function workingStateMetadataBonus(metadata?: ScoringMetadata): number {
   return roleBonus(
     metadata.role,
     metadata.roleSource,
-    { plan: 0.18, context: 0.12, summary: 0.08, decision: 0.04, reference: 0.02 },
-    { plan: 0.06, context: 0.04, summary: 0.025, decision: 0.015, reference: 0.01 },
+    WORKING_STATE_ROLE_EXPLICIT,
+    WORKING_STATE_ROLE_SUGGESTED,
   ) + importanceBonus(
     metadata.importance,
     metadata.importanceSource,
-    { high: 0.16, normal: 0.08 },
-    { high: 0.05, normal: 0.025 },
+    WORKING_STATE_IMPORTANCE_EXPLICIT,
+    WORKING_STATE_IMPORTANCE_SUGGESTED,
   );
 }
 
@@ -240,12 +286,12 @@ function workingStateStructureBonus(note: Note): number {
     .filter(Boolean).length;
 
   return Math.min(
-    0.22,
-    headingCount * 0.05 +
-      bulletCount * 0.02 +
-      numberedCount * 0.03 +
-      taskCount * 0.03 +
-      Math.min(0.04, Math.max(0, paragraphCount - 1) * 0.01),
+    WORKING_STATE_MAX_STRUCTURE_BONUS,
+    headingCount * WORKING_STATE_HEADING_WEIGHT +
+      bulletCount * WORKING_STATE_BULLET_WEIGHT +
+      numberedCount * WORKING_STATE_NUMBERED_WEIGHT +
+      taskCount * WORKING_STATE_TASK_WEIGHT +
+      Math.min(WORKING_STATE_MAX_PARAGRAPH_BONUS, Math.max(0, paragraphCount - 1) * WORKING_STATE_PARAGRAPH_WEIGHT),
   );
 }
 
@@ -253,8 +299,8 @@ export function workingStateScore(note: Note, metadata?: ScoringMetadata, now?: 
   if (note.lifecycle !== "temporary") return -Infinity;
 
   const days = daysSinceUpdate(note.updatedAt, now ?? new Date());
-  const recency = Math.min(1.2, 1.2 / (1 + days / 3));
-  const connectivity = Math.min(0.3, Math.log((note.relatedTo?.length ?? 0) + 1) * 0.12);
+  const recency = Math.min(WORKING_STATE_MAX_RECENCY, WORKING_STATE_RECENCY_SCALE / (1 + days / WORKING_STATE_RECENCY_HALF_LIFE_DAYS));
+  const connectivity = Math.min(WORKING_STATE_MAX_CONNECTIVITY, Math.log((note.relatedTo?.length ?? 0) + 1) * WORKING_STATE_CONNECTIVITY_LOG_FACTOR);
   const structureBonus = workingStateStructureBonus(note);
 
   return recency + connectivity + structureBonus + workingStateMetadataBonus(metadata);

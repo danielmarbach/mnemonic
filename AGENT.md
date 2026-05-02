@@ -281,6 +281,14 @@ Keep these high-level anchors in mind:
 | `mnemonic-rpi-workflow` | Optional. Returns the RPIR stage protocol and conventions: request root note pattern, stage checklists, apply/task split, sparse relationship conventions, subagent handoff contract, and commit discipline. |
 | `mnemonic-workflow-hint` | Optional. Returns a compact decision protocol: use `recall` or `list` first, inspect with `get`, update existing memories, remember only when nothing matches, then organize with `relate`, `consolidate`, or `move_memory`. It also reinforces summary-first orientation via `project_memory_summary`, recovery of temporary working state only after orientation, and that roles are optional hints while lifecycle remains separate. |
 
+## Skills
+
+Skills are loaded via the `skill` tool and extend agent capabilities with specialized knowledge and workflows.
+
+| Skill | Description |
+|-------|-------------|
+| `typescript-code-review` | TypeScript code review with focus on making invalid states unrepresentable (branded types, discriminated unions, `never` exhaustiveness, `satisfies`). Covers type safety, security, performance, and code quality. |
+
 ## Tools
 
 ⚠️ **When adding new tools**: Always document them in both the Tools table below AND in README.md. Keep the tables in sync and sorted alphabetically.

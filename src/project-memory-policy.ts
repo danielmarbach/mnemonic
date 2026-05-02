@@ -55,18 +55,19 @@ export function branchMatchesProtectedPattern(branch: string, pattern: string): 
   if (parts.length > 11) return false;
   let remaining = branch;
   for (let i = 0; i < parts.length; i++) {
-    const part = parts[i];
+    const part = parts[i] ?? "";
     if (i === 0) {
       if (pattern.startsWith("*")) {
-        if (!remaining.includes(part)) return false;
-        remaining = remaining.slice(remaining.indexOf(part) + part.length);
+        if (part !== "" && !remaining.includes(part)) return false;
+        if (part !== "") remaining = remaining.slice(remaining.indexOf(part) + part.length);
       } else {
         if (!remaining.startsWith(part)) return false;
         remaining = remaining.slice(part.length);
       }
     } else if (i === parts.length - 1 && !pattern.endsWith("*")) {
-      if (!remaining.endsWith(part)) return false;
+      if (part !== "" && !remaining.endsWith(part)) return false;
     } else {
+      if (part === "") continue;
       const idx = remaining.indexOf(part);
       if (idx === -1) return false;
       remaining = remaining.slice(idx + part.length);

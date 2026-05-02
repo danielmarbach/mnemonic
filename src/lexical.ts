@@ -133,8 +133,8 @@ export function computeInverseDocumentFrequency(documents: string[][]): Map<stri
 /**
  * Compute cosine similarity between a query and document TF-IDF vectors.
  */
-export function computeTfIdfCosineSimilarity(query: string, document: string, corpus: string[]): number {
-  const corpusTokens = corpus.map((entry) => tokenize(entry));
+export function computeTfIdfCosineSimilarity(query: string, document: string, corpusEntries: string[]): number {
+  const corpusTokens = corpusEntries.map((entry) => tokenize(entry));
   const queryTokens = tokenize(query);
   const documentTokens = tokenize(document);
 
@@ -213,7 +213,6 @@ export function rankDocumentsByTfIdf(
   }
 
   const prepared = preparedCorpus ?? prepareTfIdfCorpus(documents);
-  const corpus = prepared.documents.map((document) => document.text);
   const queryTokens = tokenize(query);
   const idf = prepared.idf;
 

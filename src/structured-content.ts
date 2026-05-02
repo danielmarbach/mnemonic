@@ -1,7 +1,9 @@
 import { z } from "zod";
-import type { Vault } from "./vault.js";
-import { NOTE_ROLES } from "./storage.js";
-import type { Note, NoteLifecycle, NoteRole, RelationshipType } from "./storage.js";
+import { CHANGE_CATEGORIES } from "./temporal-interpretation.js";
+import { NOTE_ROLES, RELATIONSHIP_TYPES } from "./storage.js";
+import type { NoteLifecycle, NoteRole, RelationshipType } from "./storage.js";
+import { MERGE_RISKS } from "./consolidate.js";
+import type { MergeRisk } from "./consolidate.js";
 
 export interface PersistenceStatus {
   notePath: string;
@@ -233,12 +235,9 @@ export interface ForgetResult extends Record<string, unknown> {
   retry?: MutationRetryContract;
 }
 
-export interface SyncVaultGitError {
-  phase: "fetch" | "pull" | "push";
-  message: string;
-  isConflict: boolean;
-  conflictFiles?: string[];
-}
+export type SyncVaultGitError =
+  | { phase: "fetch" | "pull" | "push"; message: string; isConflict: false }
+  | { phase: "pull"; message: string; isConflict: true; conflictFiles: string[] };
 
 export interface SyncResult extends Record<string, unknown> {
   action: "synced";
@@ -281,7 +280,7 @@ export interface ConsolidateResult extends Record<string, unknown> {
   retry?: MutationRetryContract;
 }
 
-export type MergeRisk = "low" | "medium" | "high";
+
 
 export interface ConsolidateNoteMergeEvidence {
   id: string;
@@ -451,7 +450,8 @@ export interface Provenance {
   recentlyChanged: boolean;
 }
 
-export type Confidence = "high" | "medium" | "low";
+export const CONFIDENCE_LEVELS = ["high", "medium", "low"] as const;
+export type Confidence = typeof CONFIDENCE_LEVELS[number];
 
 export interface Orientation {
   primaryEntry: OrientationNote;
@@ -510,9 +510,14 @@ export interface ProjectSummaryResult extends Record<string, unknown> {
 
 // ── Zod output schemas ────────────────────────────────────────────────────────
 
+export const NoteIdSchema = z.string().regex(/^[a-zA-Z0-9_-]+$/, "Invalid note ID format");
+export const RemoteNameSchema = z.string().regex(/^[a-zA-Z0-9_.-]+$/, "Invalid remote name format");
 const _NoteLifecycle = z.enum(["temporary", "permanent"]);
 const _NoteRole = z.enum(NOTE_ROLES);
-const _RelationshipType = z.enum(["related-to", "explains", "example-of", "supersedes", "derives-from", "follows"]);
+const _RelationshipType = z.enum(RELATIONSHIP_TYPES);
+const _MergeRisk = z.enum(MERGE_RISKS);
+const _Confidence = z.enum(CONFIDENCE_LEVELS);
+const _ChangeCategory = z.enum(CHANGE_CATEGORIES);
 /**
  * Vault label used in structured output.
  * - "main-vault" for the main (global) vault.
@@ -529,7 +534,7 @@ export const RelatedNotePreviewSchema = z.object({
   theme: z.string().optional(),
   relationType: _RelationshipType.optional(),
   updatedAt: z.string(),
-  confidence: z.enum(["high", "medium", "low"]).optional(),
+  confidence: _Confidence.optional(),
 });
 
 export const RelationshipPreviewSchema = z.object({
@@ -630,7 +635,7 @@ export const RecallResultSchema = z.object({
       lastCommitMessage: z.string(),
       recentlyChanged: z.boolean(),
     }).optional(),
-    confidence: z.enum(["high", "medium", "low"]).optional(),
+    confidence: _Confidence.optional(),
     history: z.array(z.object({
       commitHash: z.string(),
       timestamp: z.string(),
@@ -642,7 +647,7 @@ export const RecallResultSchema = z.object({
         filesChanged: z.number(),
         changeType: z.enum(["metadata-only change", "minor edit", "substantial update"]),
       }).optional(),
-      changeCategory: z.enum(["create", "refine", "expand", "clarify", "connect", "restructure", "reverse", "unknown"]).optional(),
+      changeCategory: _ChangeCategory.optional(),
       changeDescription: z.string().optional(),
     })).optional(),
     historySummary: z.string().optional(),
@@ -805,7 +810,7 @@ export const OrientationNoteSchema = z.object({
     lastCommitMessage: z.string(),
     recentlyChanged: z.boolean(),
   }).optional(),
-  confidence: z.enum(["high", "medium", "low"]).optional(),
+  confidence: _Confidence.optional(),
   relationships: RelationshipPreviewSchema.optional(),
 });
 
@@ -939,7 +944,7 @@ export const ConsolidateResultSchema = z.object({
       supersededCount: z.number().int().optional(),
       relatedCount: z.number(),
       warnings: z.array(z.string()).optional(),
-      mergeRisk: z.enum(["low", "medium", "high"]),
+      mergeRisk: _MergeRisk,
     }),
     noteB: z.object({
       id: z.string(),
@@ -952,10 +957,10 @@ export const ConsolidateResultSchema = z.object({
       supersededCount: z.number().int().optional(),
       relatedCount: z.number(),
       warnings: z.array(z.string()).optional(),
-      mergeRisk: z.enum(["low", "medium", "high"]),
+      mergeRisk: _MergeRisk,
     }),
     warnings: z.array(z.string()).optional(),
-    mergeRisk: z.enum(["low", "medium", "high"]),
+    mergeRisk: _MergeRisk,
   })).optional(),
   mergeSuggestions: z.array(z.object({
     targetTitle: z.string(),
@@ -972,10 +977,10 @@ export const ConsolidateResultSchema = z.object({
       supersededCount: z.number().int().optional(),
       relatedCount: z.number(),
       warnings: z.array(z.string()).optional(),
-      mergeRisk: z.enum(["low", "medium", "high"]),
+      mergeRisk: _MergeRisk,
     })),
     warnings: z.array(z.string()).optional(),
-    mergeRisk: z.enum(["low", "medium", "high"]),
+    mergeRisk: _MergeRisk,
   })).optional(),
   executeMergeEvidence: z.object({
     notes: z.array(z.object({
@@ -989,10 +994,10 @@ export const ConsolidateResultSchema = z.object({
       supersededCount: z.number().int().optional(),
       relatedCount: z.number(),
       warnings: z.array(z.string()).optional(),
-      mergeRisk: z.enum(["low", "medium", "high"]),
+      mergeRisk: _MergeRisk,
     })),
     warnings: z.array(z.string()).optional(),
-    mergeRisk: z.enum(["low", "medium", "high"]),
+    mergeRisk: _MergeRisk,
   }).optional(),
   persistence: PersistenceStatusSchema.optional(),
   retry: PersistenceStatusSchema.shape.retry,
@@ -1004,16 +1009,16 @@ export const ProjectIdentityResultSchema = z.object({
     id: z.string(),
     name: z.string(),
     source: z.string(),
-    remoteName: z.string().optional(),
+    remoteName: RemoteNameSchema.optional(),
   }).optional(),
   identityOverride: z.object({
-    remoteName: z.string(),
+    remoteName: RemoteNameSchema,
     updatedAt: z.string(),
   }).optional(),
   defaultProject: z.object({
     id: z.string(),
     name: z.string(),
-    remoteName: z.string().optional(),
+    remoteName: RemoteNameSchema.optional(),
   }).optional(),
   retry: PersistenceStatusSchema.shape.retry,
 });
@@ -1062,7 +1067,7 @@ export interface RelatedNotePreview {
   theme?: string;
   relationType?: RelationshipType;
   updatedAt: string;
-  confidence?: "high" | "medium" | "low";
+  confidence?: Confidence;
 }
 
 export interface RelationshipPreview {

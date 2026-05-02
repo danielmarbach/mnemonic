@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeEach, vi } from "vitest";
+import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import type { Note, EmbeddingRecord } from "../src/storage.js";
 import type { NoteProjection } from "../src/structured-content.js";
 import type { Vault } from "../src/vault.js";
@@ -381,6 +381,13 @@ describe("failure handling", () => {
 // ── F. Measurement coverage ────────────────────────────────────────────────────
 
 describe("measurement / instrumentation", () => {
+  beforeEach(() => {
+    process.env.MNEMONIC_DEBUG = "1";
+  });
+  afterEach(() => {
+    delete process.env.MNEMONIC_DEBUG;
+  });
+
   it("emits cache:miss log on first build", async () => {
     const spy = vi.spyOn(console, "error").mockImplementation(() => {});
     const vault = makeVault("/vault/project", [], []);

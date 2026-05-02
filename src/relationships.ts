@@ -1,6 +1,6 @@
 import type { Note, Relationship } from "./storage.js";
 import type { Vault } from "./vault.js";
-import type { RelatedNotePreview, RelationshipPreview } from "./structured-content.js";
+import type { Confidence, RelatedNotePreview, RelationshipPreview } from "./structured-content.js";
 import { classifyTheme } from "./project-introspection.js";
 import { getEffectiveMetadata, type EffectiveNoteMetadata, type RoleSuggestionContext } from "./role-suggestions.js";
 import { daysSince } from "./date-utils.js";
@@ -63,7 +63,7 @@ function buildRoleSuggestionContext(note: Note, allNotes: Note[]): RoleSuggestio
 /**
  * Compute confidence for a related note (same logic as provenance.ts).
  */
-function computeRelatedNoteConfidence(note: Note, now?: Date): "high" | "medium" | "low" {
+function computeRelatedNoteConfidence(note: Note, now?: Date): Confidence {
   const daysSinceUpdate = Math.floor(daysSince(note.updatedAt, now ?? new Date()));
   const centrality = note.relatedTo?.length ?? 0;
 

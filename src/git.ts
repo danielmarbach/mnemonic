@@ -1,4 +1,5 @@
 import { getErrorMessage } from "./error-utils.js";
+import { debugLog } from "./error-utils.js";
 import { access } from "fs/promises";
 import path from "path";
 import { simpleGit, SimpleGit } from "simple-git";
@@ -13,15 +14,9 @@ export class GitOperationError extends Error {
   }
 }
 
-export interface SyncGitError {
-  /** Which git operation failed */
-  phase: "fetch" | "pull" | "push";
-  message: string;
-  /** True when the failure is a merge/rebase conflict requiring manual resolution */
-  isConflict: boolean;
-  /** Files with conflict markers, when detectable */
-  conflictFiles?: string[];
-}
+export type SyncGitError =
+  | { phase: "fetch" | "pull" | "push"; message: string; isConflict: false }
+  | { phase: "pull"; message: string; isConflict: true; conflictFiles: string[] };
 
 export interface LastCommit {
   hash: string;
@@ -47,19 +42,15 @@ export interface SyncResult {
   gitError?: SyncGitError;
 }
 
-export interface CommitResult {
-  status: "committed" | "skipped" | "failed";
-  reason?: "git-disabled" | "no-changes" | "error";
-  /** Which operation failed, when status is "failed" */
-  operation?: "add" | "commit";
-  error?: string;
-}
+export type CommitResult =
+  | { status: "committed" }
+  | { status: "skipped"; reason: "git-disabled" | "no-changes" }
+  | { status: "failed"; reason: "error"; operation?: "add" | "commit"; error: string };
 
-export interface PushResult {
-  status: "pushed" | "skipped" | "failed";
-  reason?: "git-disabled" | "no-remote" | "auto-push-disabled" | "commit-failed";
-  error?: string;
-}
+export type PushResult =
+  | { status: "pushed" }
+  | { status: "skipped"; reason: "git-disabled" | "no-remote" | "auto-push-disabled" | "commit-failed" }
+  | { status: "failed"; error: string };
 
 export class GitOps {
   private git!: SimpleGit;
@@ -175,7 +166,8 @@ export class GitOps {
         staged: status.staged,
         modified: status.modified,
       };
-    } catch {
+    } catch (err) {
+      debugLog("git:status", `failed: ${getErrorMessage(err)}`);
       return { staged: [], modified: [] };
     }
   }
@@ -225,14 +217,20 @@ export class GitOps {
         console.error(`[git] Sync pull failed: ${message}`);
         const conflictFiles = await this.getConflictFiles();
         const isConflict = conflictFiles.length > 0 || await this.isConflictInProgress();
+        if (isConflict) {
+          return {
+            ...withRemote,
+            gitError: {
+              phase: "pull",
+              message,
+              isConflict: true as const,
+              conflictFiles,
+            },
+          };
+        }
         return {
           ...withRemote,
-          gitError: {
-            phase: "pull",
-            message,
-            isConflict,
-            conflictFiles: conflictFiles.length > 0 ? conflictFiles : undefined,
-          },
+          gitError: { phase: "pull", message, isConflict: false as const },
         };
       }
 
@@ -261,7 +259,8 @@ export class GitOps {
     try {
       const status = await this.git.status();
       return status.conflicted;
-    } catch {
+    } catch (err) {
+      debugLog("git:conflict-files", `failed: ${getErrorMessage(err)}`);
       return [];
     }
   }
@@ -282,6 +281,7 @@ export class GitOps {
         await access(p);
         return true;
       } catch {
+        debugLog("git:conflict-check", `state path not found: ${p}`);
         // not present — try next
       }
     }
@@ -416,7 +416,8 @@ export class GitOps {
           };
         })
         .filter((entry) => entry.hash && entry.timestamp && entry.message);
-    } catch {
+    } catch (err) {
+      debugLog("git:log-entries", `failed: ${getErrorMessage(err)}`);
       return [];
     }
   }
@@ -454,7 +455,8 @@ export class GitOps {
       }
 
       return { additions, deletions, filesChanged };
-    } catch {
+    } catch (err) {
+      debugLog("git:commit-stats", `failed: ${getErrorMessage(err)}`);
       return null;
     }
   }
@@ -465,7 +467,8 @@ export class GitOps {
     try {
       const log = await this.git.log({ maxCount: 1 });
       return log.latest?.hash ?? "";
-    } catch {
+    } catch (err) {
+      debugLog("git:head", `failed: ${getErrorMessage(err)}`);
       return "";
     }
   }
@@ -474,7 +477,8 @@ export class GitOps {
     try {
       const result = await this.git.raw(["rev-list", "--count", "@{u}..HEAD"]);
       return parseInt(result.trim(), 10) || 0;
-    } catch {
+    } catch (err) {
+      debugLog("git:unpushed-count", `failed: ${getErrorMessage(err)}`);
       return 0;
     }
   }
@@ -505,8 +509,9 @@ export class GitOps {
       for (const line of diff.split("\n")) {
         const parts = line.trim().split(/\s+/);
         if (parts.length < 2) continue;
-        const [status, filePath] = parts as [string, string];
-        if (!filePath?.endsWith(".md")) continue;
+        const status = parts[0];
+        const filePath = parts[1];
+        if (!status || !filePath || !filePath.endsWith(".md")) continue;
 
         const id = filePath.replace(prefix, "").replace(/\.md$/, "");
 
@@ -518,7 +523,8 @@ export class GitOps {
       }
 
       return { pulledNoteIds, deletedNoteIds };
-    } catch {
+    } catch (err) {
+      debugLog("git:diff-notes", `failed since=${sinceHash}: ${getErrorMessage(err)}`);
       return { pulledNoteIds: [], deletedNoteIds: [] };
     }
   }

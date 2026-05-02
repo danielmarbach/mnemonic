@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Storage, type Note, type EmbeddingRecord } from "../src/storage.js";
+import { validateRelatedTo, validateEmbeddingRecord, validateNoteProjection } from "../src/validation.js";
 import * as fs from "fs/promises";
 import * as path from "path";
 import os from "os";
@@ -569,6 +570,212 @@ Body`;
         // Restore permissions for cleanup
         await fs.chmod(path.join(tempDir, "notes"), 0o755);
       }
+    });
+  });
+
+  describe("JSON.parse validation at trust boundaries", () => {
+    it("should return null for corrupted embedding JSON", async () => {
+      const notesDir = path.join(tempDir, "notes");
+      await fs.mkdir(notesDir, { recursive: true });
+      const embeddingsDir = path.join(tempDir, "embeddings");
+      await fs.mkdir(embeddingsDir, { recursive: true });
+
+      await fs.writeFile(
+        path.join(embeddingsDir, "corrupt-emb.json"),
+        JSON.stringify({ id: 123, model: null, embedding: "not-an-array" }),
+        "utf-8"
+      );
+
+      const read = await storage.readEmbedding("corrupt-emb");
+      expect(read).toBeNull();
+    });
+
+    it("should return null for corrupted projection JSON", async () => {
+      const projectionsDir = path.join(tempDir, "projections");
+      await fs.mkdir(projectionsDir, { recursive: true });
+
+      await fs.writeFile(
+        path.join(projectionsDir, "corrupt-proj.json"),
+        JSON.stringify({ noteId: 42, title: true }),
+        "utf-8"
+      );
+
+      const read = await storage.readProjection("corrupt-proj");
+      expect(read).toBeNull();
+    });
+
+    it("should gracefully handle malformed relatedTo in frontmatter", async () => {
+      const notesDir = path.join(tempDir, "notes");
+      const content = `---
+title: Bad relatedTo
+tags: []
+lifecycle: permanent
+relatedTo: "not-an-array"
+createdAt: 2023-01-01T00:00:00.000Z
+updatedAt: 2023-01-01T00:00:00.000Z
+---
+
+Body`;
+
+      await fs.writeFile(path.join(notesDir, "bad-related-to.md"), content, "utf-8");
+
+      const read = await storage.readNote("bad-related-to");
+      expect(read).toBeTruthy();
+      expect(read!.relatedTo).toBeUndefined();
+    });
+
+    it("should filter out invalid relationship entries in relatedTo", async () => {
+      const notesDir = path.join(tempDir, "notes");
+      const content = `---
+title: Mixed relatedTo
+tags: []
+lifecycle: permanent
+relatedTo:
+  - id: valid-rel
+    type: related-to
+  - id: invalid-rel
+    type: invalid-type
+  - not-an-object
+createdAt: 2023-01-01T00:00:00.000Z
+updatedAt: 2023-01-01T00:00:00.000Z
+---
+
+Body`;
+
+      await fs.writeFile(path.join(notesDir, "mixed-related-to.md"), content, "utf-8");
+
+      const read = await storage.readNote("mixed-related-to");
+      expect(read).toBeTruthy();
+      expect(read!.relatedTo).toHaveLength(1);
+      expect(read!.relatedTo![0].id).toBe("valid-rel");
+      expect(read!.relatedTo![0].type).toBe("related-to");
+    });
+
+    it("should handle non-string project/projectName in frontmatter", async () => {
+      const notesDir = path.join(tempDir, "notes");
+      const content = `---
+title: Bad project
+tags: []
+lifecycle: permanent
+project: 42
+projectName: true
+createdAt: 2023-01-01T00:00:00.000Z
+updatedAt: 2023-01-01T00:00:00.000Z
+---
+
+Body`;
+
+      await fs.writeFile(path.join(notesDir, "bad-project.md"), content, "utf-8");
+
+      const read = await storage.readNote("bad-project");
+      expect(read).toBeTruthy();
+      expect(read!.project).toBeUndefined();
+      expect(read!.projectName).toBeUndefined();
+    });
+  });
+});
+
+describe("Validation functions", () => {
+  describe("validateRelatedTo", () => {
+    it("should return undefined for null", () => {
+      expect(validateRelatedTo(null)).toBeUndefined();
+    });
+
+    it("should return undefined for undefined", () => {
+      expect(validateRelatedTo(undefined)).toBeUndefined();
+    });
+
+    it("should return undefined for non-array", () => {
+      expect(validateRelatedTo("string")).toBeUndefined();
+      expect(validateRelatedTo(42)).toBeUndefined();
+      expect(validateRelatedTo({})).toBeUndefined();
+    });
+
+    it("should validate valid relationship entries", () => {
+      const result = validateRelatedTo([
+        { id: "rel-1", type: "related-to" },
+        { id: "rel-2", type: "explains" },
+      ]);
+      expect(result).toEqual([
+        { id: "rel-1", type: "related-to" },
+        { id: "rel-2", type: "explains" },
+      ]);
+    });
+
+    it("should filter out entries with invalid type", () => {
+      const result = validateRelatedTo([
+        { id: "valid", type: "related-to" },
+        { id: "invalid", type: "not-a-type" },
+      ]);
+      expect(result).toEqual([{ id: "valid", type: "related-to" }]);
+    });
+
+    it("should return undefined when all entries are invalid", () => {
+      const result = validateRelatedTo([
+        { id: "x", type: "bad" },
+        { not: "an object" },
+      ]);
+      expect(result).toBeUndefined();
+    });
+  });
+
+  describe("validateEmbeddingRecord", () => {
+    it("should validate a valid embedding record", () => {
+      const result = validateEmbeddingRecord({
+        id: "note-1",
+        model: "nomic-embed-text",
+        embedding: [0.1, 0.2],
+        updatedAt: "2023-01-01T00:00:00.000Z",
+      });
+      expect(result).toEqual({
+        id: "note-1",
+        model: "nomic-embed-text",
+        embedding: [0.1, 0.2],
+        updatedAt: "2023-01-01T00:00:00.000Z",
+      });
+    });
+
+    it("should return null for invalid embedding record", () => {
+      expect(validateEmbeddingRecord({ id: 42 })).toBeNull();
+      expect(validateEmbeddingRecord(null)).toBeNull();
+      expect(validateEmbeddingRecord({ id: "x", model: "x", embedding: "bad", updatedAt: "x" })).toBeNull();
+    });
+  });
+
+  describe("validateNoteProjection", () => {
+    it("should validate a valid projection", () => {
+      const proj = {
+        noteId: "note-1",
+        title: "Test",
+        summary: "A summary",
+        headings: ["H1"],
+        tags: ["tag1"],
+        projectionText: "full text",
+        generatedAt: "2023-01-01T00:00:00.000Z",
+      };
+      const result = validateNoteProjection(proj);
+      expect(result).toEqual(proj);
+    });
+
+    it("should validate a projection with optional fields", () => {
+      const proj = {
+        noteId: "note-1",
+        title: "Test",
+        summary: "A summary",
+        headings: ["H1"],
+        tags: ["tag1"],
+        lifecycle: "permanent",
+        updatedAt: "2023-01-02T00:00:00.000Z",
+        projectionText: "full text",
+        generatedAt: "2023-01-01T00:00:00.000Z",
+      };
+      const result = validateNoteProjection(proj);
+      expect(result).toEqual(proj);
+    });
+
+    it("should return null for missing required fields", () => {
+      expect(validateNoteProjection({ noteId: "x" })).toBeNull();
+      expect(validateNoteProjection(null)).toBeNull();
     });
   });
 });

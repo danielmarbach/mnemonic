@@ -1,6 +1,8 @@
 import fs from "fs/promises";
 import path from "path";
+import { z } from "zod";
 
+import { debugLog, getErrorMessage } from "./error-utils.js";
 import {
   CONSOLIDATION_MODES,
   PROJECT_POLICY_SCOPES,
@@ -156,8 +158,8 @@ export async function readVaultSchemaVersion(vaultPath: string): Promise<string>
   const filePath = path.join(path.resolve(vaultPath), "config.json");
   try {
     const raw = await fs.readFile(filePath, "utf-8");
-    const parsed = JSON.parse(raw) as { schemaVersion?: unknown };
-    return normalizeSchemaVersion(parsed.schemaVersion);
+    const parsed = VaultSchemaVersionFragmentSchema.safeParse(JSON.parse(raw));
+    return normalizeSchemaVersion(parsed.success ? parsed.data.schemaVersion : undefined);
   } catch {
     return defaultConfig.schemaVersion;
   }
@@ -172,9 +174,10 @@ export async function writeVaultSchemaVersion(vaultPath: string, schemaVersion: 
   let existing: Record<string, unknown> = {};
   try {
     const raw = await fs.readFile(filePath, "utf-8");
-    existing = JSON.parse(raw) as Record<string, unknown>;
-  } catch {
-    // No existing config — start fresh
+    const parsed = ConfigJsonObjectSchema.safeParse(JSON.parse(raw));
+    existing = parsed.success ? parsed.data : {};
+  } catch (err) {
+    debugLog("config:write-schema-version", `no existing config, starting fresh: ${getErrorMessage(err)}`);
   }
   existing.schemaVersion = normalizeSchemaVersion(schemaVersion);
   await fs.writeFile(filePath, JSON.stringify(existing, null, 2) + "\n", "utf-8");
@@ -182,6 +185,7 @@ export async function writeVaultSchemaVersion(vaultPath: string, schemaVersion: 
 
 export class MnemonicConfigStore {
   readonly filePath: string;
+  #cache: MnemonicConfig | null = null;
 
   constructor(mainVaultPath: string) {
     this.filePath = path.join(path.resolve(mainVaultPath), "config.json");
@@ -219,23 +223,52 @@ export class MnemonicConfigStore {
     await this.writeAll(config);
   }
 
+  invalidateCache(): void {
+    this.#cache = null;
+  }
+
   private async readAll(): Promise<MnemonicConfig> {
+    if (this.#cache) {
+      return this.#cache;
+    }
+
+    let config: MnemonicConfig;
     try {
       const raw = await fs.readFile(this.filePath, "utf-8");
-      const parsed = JSON.parse(raw) as Partial<MnemonicConfig>;
-      return {
-        schemaVersion: normalizeSchemaVersion(parsed.schemaVersion),
-        reindexEmbedConcurrency: normalizeConcurrency(parsed.reindexEmbedConcurrency),
-        mutationPushMode: normalizeMutationPushMode(parsed.mutationPushMode),
-        projectMemoryPolicies: normalizeProjectMemoryPolicies(parsed.projectMemoryPolicies),
-        projectIdentityOverrides: normalizeProjectIdentityOverrides(parsed.projectIdentityOverrides),
+      const parsed = MnemonicConfigRawSchema.safeParse(JSON.parse(raw));
+      const data = parsed.success ? parsed.data : {};
+      config = {
+        schemaVersion: normalizeSchemaVersion(data.schemaVersion),
+        reindexEmbedConcurrency: normalizeConcurrency(data.reindexEmbedConcurrency),
+        mutationPushMode: normalizeMutationPushMode(data.mutationPushMode),
+        projectMemoryPolicies: normalizeProjectMemoryPolicies(data.projectMemoryPolicies),
+        projectIdentityOverrides: normalizeProjectIdentityOverrides(data.projectIdentityOverrides),
       };
-    } catch {
-      return { ...defaultConfig };
+    } catch (err) {
+      debugLog("config:read", `failed, returning defaults: ${getErrorMessage(err)}`);
+      config = { ...defaultConfig };
     }
+
+    this.#cache = config;
+    return config;
   }
 
   private async writeAll(config: MnemonicConfig): Promise<void> {
     await fs.writeFile(this.filePath, JSON.stringify(config, null, 2) + "\n", "utf-8");
+    this.#cache = config;
   }
 }
+
+const VaultSchemaVersionFragmentSchema = z.object({
+  schemaVersion: z.unknown().optional(),
+});
+
+const ConfigJsonObjectSchema = z.record(z.string(), z.unknown());
+
+const MnemonicConfigRawSchema = z.object({
+  schemaVersion: z.unknown().optional(),
+  reindexEmbedConcurrency: z.unknown().optional(),
+  mutationPushMode: z.unknown().optional(),
+  projectMemoryPolicies: z.unknown().optional(),
+  projectIdentityOverrides: z.unknown().optional(),
+}).passthrough();

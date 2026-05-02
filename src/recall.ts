@@ -3,10 +3,16 @@ import type { EffectiveNoteMetadata } from "./role-suggestions.js";
 import { computeLexicalScore, tokenize } from "./lexical.js";
 import { MS_PER_DAY } from "./date-utils.js";
 
+import type { Confidence } from "./structured-content.js";
 import type { RelationshipType } from "./storage.js";
 
 const RRF_K = 60;
 const CANONICAL_HYBRID_WEIGHT = 0.05;
+
+// RRF scaling factor: with K=60 and two channels, max RRF ≈ 2/60 ≈ 0.033.
+// Multiplied by 3.5 ≈ 0.115, matching the old additive lexical weight's order-of-magnitude
+// while remaining calibration-free.
+const RRF_SCALING_FACTOR = 3.5;
 
 const RECALL_ALWAYS_LOAD_BOOST = 0.01;
 const RECALL_SUMMARY_BOOST = 0.012;
@@ -20,19 +26,19 @@ const SPREADING_RELATED_TO_MULTIPLIER = 0.8;
 const SPREADING_EXPLAINS_DERIVES_MULTIPLIER = 1.0;
 
 const MIN_CANONICAL_EXPLANATION_SCORE = 0.5;
-const WORKFLOW_ROLE_BOOSTS: Partial<Record<NonNullable<EffectiveNoteMetadata["role"]>, number>> = {
+const WORKFLOW_ROLE_BOOSTS = {
   plan: 0.03,
   review: 0.025,
   research: 0.02,
   context: 0.015,
   decision: 0.012,
   summary: 0.008,
-};
+} as const;
 
 export interface TemporalQueryHint {
   windowDays: number;
   maxBoost: number;
-  confidence: "high" | "medium" | "low";
+  confidence: Confidence;
   filterWindowDays?: number;
 }
 
@@ -86,7 +92,7 @@ export function computeRecallMetadataBoost(metadata?: EffectiveNoteMetadata): nu
   return boost;
 }
 
-const TEMPORAL_QUERY_HINTS: Array<{ pattern: RegExp; hint: TemporalQueryHint }> = [
+const TEMPORAL_QUERY_HINTS = [
   // Ordered by specificity (longer/more specific patterns first) to avoid first-match-wins issues.
   { pattern: /\b(in\s+the\s+past)\b/i, hint: { windowDays: 365, maxBoost: 0.03, confidence: "low" } },
   { pattern: /\b(this\s+year|last\s+year)\b/i, hint: { windowDays: 366, maxBoost: 0.03, confidence: "medium" } },
@@ -97,7 +103,7 @@ const TEMPORAL_QUERY_HINTS: Array<{ pattern: RegExp; hint: TemporalQueryHint }> 
   { pattern: /\b(yesterday)\b/i, hint: { windowDays: 3, maxBoost: 0.08, confidence: "medium" } },
   { pattern: /\b(today|latest)\b/i, hint: { windowDays: 2, maxBoost: 0.08, confidence: "medium" } },
   { pattern: /\b(recent|recently|newest)\b/i, hint: { windowDays: 30, maxBoost: 0.05, confidence: "low" } },
-];
+] as const;
 
 const EXPLICIT_TEMPORAL_WINDOW_PATTERN =
   /\b(?:past|last|the\s+last|in\s+the\s+last)\s+(\d{1,3})\s+(day|days|week|weeks|month|months|year|years)\b/i;
@@ -113,16 +119,19 @@ function toDays(value: number, unit: string): number {
 export function detectTemporalQueryHint(query: string): TemporalQueryHint | undefined {
   const explicitWindow = query.match(EXPLICIT_TEMPORAL_WINDOW_PATTERN);
   if (explicitWindow) {
-    const value = Number.parseInt(explicitWindow[1], 10);
+    const valueStr = explicitWindow[1];
     const unit = explicitWindow[2];
-    if (Number.isFinite(value) && value > 0) {
-      const windowDays = toDays(value, unit);
-      return {
-        windowDays,
-        filterWindowDays: windowDays,
-        maxBoost: Math.min(0.08, 0.03 + Math.log10(value + 1) * 0.02),
-        confidence: "high",
-      };
+    if (valueStr !== undefined && unit !== undefined) {
+      const value = Number.parseInt(valueStr, 10);
+      if (Number.isFinite(value) && value > 0) {
+          const windowDays = toDays(value, unit);
+        return {
+          windowDays,
+          filterWindowDays: windowDays,
+          maxBoost: Math.min(0.08, 0.03 + Math.log10(value + 1) * 0.02),
+          confidence: "high",
+        };
+      }
     }
   }
 
@@ -204,7 +213,7 @@ export function computeHybridScore(candidate: ScoredRecallCandidate): number {
   // old order-of-magnitude while remaining calibration-free.
   const rrf = semanticContribution + lexicalContribution;
 
-  return candidate.boosted + rrf * 3.5 + canonical * CANONICAL_HYBRID_WEIGHT;
+  return candidate.boosted + rrf * RRF_SCALING_FACTOR + canonical * CANONICAL_HYBRID_WEIGHT;
 }
 
 function computeLexicalRankSignal(candidate: ScoredRecallCandidate): number {
@@ -220,12 +229,14 @@ export function assignDenseRanks<T>(items: T[], scoreOf: (item: T) => number, se
   let currentRank = 0;
   let previousScore: number | undefined;
   for (let i = 0; i < items.length; i++) {
-    const score = scoreOf(items[i]);
+    const item = items[i];
+    if (item === undefined) continue;
+    const score = scoreOf(item);
     if (previousScore === undefined || Math.abs(score - previousScore) > RANK_EPSILON) {
       currentRank = i + 1;
       previousScore = score;
     }
-    setRank(items[i], currentRank);
+    setRank(item, currentRank);
   }
 }
 
@@ -408,7 +419,7 @@ export function selectRecallResults(
 }
 
 function computeWorkflowScore(candidate: ScoredRecallCandidate): number {
-  const roleBoost = candidate.metadata?.role ? (WORKFLOW_ROLE_BOOSTS[candidate.metadata.role] ?? 0) : 0;
+  const roleBoost = candidate.metadata?.role ? (WORKFLOW_ROLE_BOOSTS[candidate.metadata.role as keyof typeof WORKFLOW_ROLE_BOOSTS] ?? 0) : 0;
   const temporaryBoost = candidate.lifecycle === "temporary" ? 0.01 : 0;
   const centralityBoost = Math.min(0.015, Math.log((candidate.relatedCount ?? 0) + 1) * 0.006);
   return computeHybridScore(candidate) + roleBoost + temporaryBoost + centralityBoost;
@@ -456,6 +467,10 @@ function getRelationshipMultiplier(type: RelationshipType): number {
     case "supersedes":
     case "follows":
       return SPREADING_RELATED_TO_MULTIPLIER;
+    default: {
+      const _exhaustive: never = type;
+      throw new Error(`Unhandled relationship type: ${_exhaustive}`);
+    }
   }
 }
 

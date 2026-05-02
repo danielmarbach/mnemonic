@@ -1,15 +1,7 @@
-import type { CommitStats, LastCommit } from "./git.js";
 import { metadataPrefixes } from "./git-constants.js";
 
-export type ChangeCategory =
-  | "create"
-  | "refine"
-  | "expand"
-  | "clarify"
-  | "connect"
-  | "restructure"
-  | "reverse"
-  | "unknown";
+export const CHANGE_CATEGORIES = ["create", "refine", "expand", "clarify", "connect", "restructure", "reverse", "unknown"] as const;
+export type ChangeCategory = typeof CHANGE_CATEGORIES[number];
 
 export interface InterpretHistoryContext {
   isFirstCommit?: boolean;
@@ -157,9 +149,13 @@ function generateChangeDescription(
       return "Substantially changed the direction or position of the note.";
 
     case "unknown":
-    default:
       if (isSubstantial) return "Substantially updated the note.";
       return hasContent ? "Minor update to the note." : "Updated the note.";
+
+    default: {
+      const _exhaustive: never = category;
+      throw new Error(`Unhandled change category: ${_exhaustive}`);
+    }
   }
 }
 
@@ -190,13 +186,14 @@ export function summarizeHistory(
 
   if (entries.length === 1) {
     const first = entries[0];
-    if (first.changeCategory === "create") {
+    if (first?.changeCategory === "create") {
       return "This note was created and has not been modified since.";
     }
-    return `This note was ${first.changeCategory === "unknown" ? "updated" : first.changeCategory}d.`;
+    return `This note was ${first?.changeCategory === "unknown" ? "updated" : first?.changeCategory ?? "unknown"}d.`;
   }
 
   const first = entries[entries.length - 1];
+  if (!first) return undefined;
   const categories = entries.map((e) => e.changeCategory);
   const categoryCounts = categories.reduce((acc, cat) => {
     acc[cat] = (acc[cat] || 0) + 1;
@@ -214,13 +211,13 @@ export function summarizeHistory(
 
   if (entries.length === 2 && first.changeCategory === "create") {
     const second = entries[0];
-    if (second.changeCategory === "refine") {
+    if (second?.changeCategory === "refine") {
       return "This note was created and then refined.";
     }
-    if (second.changeCategory === "expand") {
+    if (second?.changeCategory === "expand") {
       return "This note was created and then expanded with additional detail.";
     }
-    if (second.changeCategory === "clarify") {
+    if (second?.changeCategory === "clarify") {
       return "This note was created and then clarified.";
     }
   }

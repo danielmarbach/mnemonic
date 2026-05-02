@@ -28,8 +28,8 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
-      - name: Build
-        run: npm run build
+      - name: Clean and build
+        run: npm run build:clean
 
       - name: Run tests
         shell: bash
