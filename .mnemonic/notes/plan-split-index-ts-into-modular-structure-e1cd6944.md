@@ -6,7 +6,7 @@ tags:
   - refactoring
 lifecycle: temporary
 createdAt: '2026-05-02T06:10:17.697Z'
-updatedAt: '2026-05-02T09:47:50.371Z'
+updatedAt: '2026-05-02T11:28:43.568Z'
 role: plan
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -26,13 +26,13 @@ Phase 1: ServerContext + Extract Helpers — DONE (845 lines extracted, 6 new mo
 
 Batch approach due to subagent size limits. Each batch must pass tsc and tests before proceeding.
 
-#### Batch 1: Helper modules — IN PROGRESS
+#### Batch 1: Helper modules — DONE ✅
 
-Two subagents working in parallel:
+- [x] `src/tools/recall-helpers.ts` — buildRecallCandidateContext, collectLexicalRescueCandidates, DiscoverTagStat, tokenizeTagDiscoveryText, countTokenOverlap, escapeRegex, hasExactTagContextMatch
+- [x] `src/tools/consolidate-helpers.ts` — detectDuplicates, findClusters, suggestMerges, executeMerge, pruneSuperseded, MergeGroup, ClusterResult, SimilarityPair, ConsolidationCandidate, ConsolidateExecuteMergeEvidence
+- [x] Update index.ts call sites to import from new modules
 
-- [ ] `src/tools/recall-helpers.ts` — buildRecallCandidateContext, collectLexicalRescueCandidates, DiscoverTagStat, tokenizeTagDiscoveryText, countTokenOverlap, escapeRegex, hasExactTagContextMatch
-- [ ] `src/tools/consolidate-helpers.ts` — detectDuplicates, findClusters, suggestMerges, executeMerge, pruneSuperseded, MergeGroup, ClusterResult, SimilarityPair, ConsolidationCandidate, ConsolidateExecuteMergeEvidence
-- [ ] Update index.ts call sites to import from new modules
+index.ts down from 5819 → 4682 lines. Both committed.
 
 #### Batch 2: Simple tool handlers
 
