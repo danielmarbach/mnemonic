@@ -6,11 +6,14 @@ tags:
   - refactoring
 lifecycle: temporary
 createdAt: '2026-05-02T06:07:32.434Z'
-updatedAt: '2026-05-02T06:07:32.434Z'
+updatedAt: '2026-05-02T06:07:38.908Z'
 role: research
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: request-split-index-ts-into-modular-structure-cf87b146
+    type: derives-from
 memoryVersion: 1
 ---
 ## Research: index.ts Dependency Analysis for Modular Extraction

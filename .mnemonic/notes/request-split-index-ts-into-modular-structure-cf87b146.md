@@ -6,7 +6,7 @@ tags:
   - refactoring
 lifecycle: temporary
 createdAt: '2026-05-02T06:05:41.932Z'
-updatedAt: '2026-05-02T06:05:41.932Z'
+updatedAt: '2026-05-02T06:07:38.908Z'
 role: context
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -14,6 +14,8 @@ projectName: mnemonic
 relatedTo:
   - id: typescript-code-review-mnemonic-project-961d984b
     type: related-to
+  - id: research-index-ts-dependency-analysis-for-modular-extraction-07f545d4
+    type: derives-from
 memoryVersion: 1
 ---
 ## Request
