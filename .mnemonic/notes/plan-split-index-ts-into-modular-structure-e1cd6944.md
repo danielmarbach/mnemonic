@@ -50,11 +50,13 @@ index.ts down from 4682 → 4012 lines. Committed.
 - \[ ] `src/tools/migration.ts` (list\_migrations + execute\_migration)
 - \[ ] `src/tools/policy.ts` (set/get\_project\_memory\_policy)
 
-#### Batch 3: Core tool handlers
+#### Batch 3: Core tool handlers — DONE ✅
 
-- \[ ] `src/tools/remember.ts`
-- \[ ] `src/tools/recall.ts`
-- \[ ] `src/tools/update.ts`
+- [x] `src/tools/remember.ts`
+- [x] `src/tools/recall.ts`
+- [x] `src/tools/update.ts`
+
+index.ts down from ~4012 → ~2970 lines. Committed.
 
 #### Batch 4: CRUD tool handlers
 
