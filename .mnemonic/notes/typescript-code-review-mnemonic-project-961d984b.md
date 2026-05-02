@@ -8,7 +8,7 @@ tags:
   - performance
 lifecycle: permanent
 createdAt: '2026-05-02T04:20:54.784Z'
-updatedAt: '2026-05-02T04:20:54.784Z'
+updatedAt: '2026-05-02T04:36:31.349Z'
 role: review
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -34,7 +34,7 @@ Followed `.agents/skills/typescript-code-review/SKILL.md` workflow (Steps 1-7) w
 
 ### C2: `noUncheckedIndexedAccess` not enabled (HIGH)
 
-- ~40+ array/map indexing operations assume non-nullable results
+- \~40+ array/map indexing operations assume non-nullable results
 - `git.ts:508` — tuple destructuring from `split` without length validation
 - **Fix**: Enable `noUncheckedIndexedAccess` in tsconfig.json
 
@@ -80,7 +80,20 @@ Followed `.agents/skills/typescript-code-review/SKILL.md` workflow (Steps 1-7) w
 - `recall.ts:23-30` — `WORKFLOW_ROLE_BOOSTS` should preserve literal keys with `as const`
 - `recall.ts:89-100` — `TEMPORAL_QUERY_HINTS` should be `as const`
 
-### I6: Performance — sequential awaits that should be parallelized
+### I6-Revised: Performance — sequential awaits (verified against mutation lock architecture)
+
+**Context**: Mnemonic uses a per-repo async mutex (`mutationLocks` keyed by `gitRoot`) that serializes `commitWithStatus`, `pushWithStatus`, and `sync` within the same repo. Same-vault mutating git operations are already serialized. Cross-vault operations use different lock keys. The memory note `parallel-consolidate-operations-can-leave-staged-local-only--e8c33780` documents that same-vault mutations MUST be serialized by callers.
+
+| Finding | Can Parallelize? | Reason |
+|---------|-------------------|--------|
+| `index.ts:2576` vault embedding backfills | **YES** | Embeddings call Ollama API, not git. Different vaults = independent. Use bounded `Promise.all` (2-3 concurrent) to avoid overwhelming Ollama. |
+| `index.ts:558-583` main+project vault sync | **YES** | Different git roots = different lock keys. `sync()` already acquires `withMutationLock` internally. Safe to `Promise.all` both syncs + both backfills. |
+| `index.ts:1410-1429` relationship removal per vault | **PARTIALLY** | Outer loop across vaults CAN run in parallel (different repos). Inner loop (writeNote per note within same vault) must stay sequential until commit, but file writes to the staging area are independent. |
+| `storage.ts:91-115` staged file renames | **YES** | Independent file renames, no git operations. Safe to `Promise.all`. |
+| `storage.ts:159-181` note/embedding/projection deletions | **YES** | Three independent `fs.unlink` calls. Use `Promise.allSettled`. |
+| `index.ts:419-421` imported notes written sequentially | **YES** | Within atomic write context, individual `writeNote` calls write to staged files — independent operations. Final `commit()` acquires the mutation lock. |
+
+**Key constraint**: The `mutationLocks` mutex serializes git mutations per-repo (different repos parallelize freely). File I/O (staging writes, reads, renames) is NOT covered by the mutex — it only protects git add/commit/push/sync. The documented risk applies to concurrent git mutations on the same vault, not to file writes or API calls.
 
 - `index.ts:2576` — vault embedding backfills run sequentially
 - `index.ts:558-583` — main + project vault sync are sequential
