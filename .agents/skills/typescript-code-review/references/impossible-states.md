@@ -44,47 +44,45 @@ deleteOrder(userId);
 //             ^? Error: UserId is not assignable to OrderId
 ```
 
-### Smart Constructors with Validation
+### Three Creation Strategies (ranked by safety)
 
-Branded types are most powerful when paired with validation — the only way to create a branded value is through a validated constructor:
+**Prefer assertion functions** at trust boundaries (user input, API params, file parsing). They combine validation + type narrowing in a single call, and throw immediately on invalid data.
+
+**Use type predicates** when you need conditional branching (try/recover pattern) rather than immediate throws.
+
+**Use smart constructors (unchecked casts)** only for internal trusted code where values are known to be valid (e.g., generating IDs from known-good components).
 
 ```typescript
 type Email = Branded<string, 'Email'>;
+type MemoryId = Branded<string, 'MemoryId'>;
 
-function parseEmail(input: string): Email | null {
-  const trimmed = input.trim();
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
-    return null;
+// Strategy 1 (preferred at boundaries): Assertion function — validates + narrows + throws
+function assertMemoryId(value: string, label = 'id'): asserts value is MemoryId {
+  if (!/^[a-zA-Z0-9_-]+$/.test(value)) {
+    throw new Error(`Invalid ${label}: ${value}`);
   }
-  return trimmed as Email;
 }
+// After calling assertMemoryId(id), TypeScript narrows id to MemoryId
 
-function sendEmail(to: Email, body: string): void {
-  // Guaranteed valid — only creatable through parseEmail
+// Strategy 2: Type predicate — validates + narrows, returns boolean
+function isValidMemoryId(value: string): value is MemoryId {
+  return /^[a-zA-Z0-9_-]+$/.test(value);
 }
+// Use in conditionals: if (isValidMemoryId(input)) { send(id) }
 
-// Must validate before calling sendEmail
-const maybeEmail = parseEmail(userInput);
-if (maybeEmail) {
-  sendEmail(maybeEmail, 'Hello'); // Type-safe
+// Strategy 3 (internal only): Unchecked smart constructor
+function memoryId(id: string): MemoryId {
+  return id as MemoryId;  // No validation — only use when value is known valid
 }
 ```
 
-### Assertion Variant
+### When to use which strategy
 
-For cases where you'd rather throw than return null:
-
-```typescript
-function assertEmail(input: string): asserts input is Email {
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input.trim())) {
-    throw new Error(`Invalid email: ${input}`);
-  }
-}
-
-let address: string = 'user@example.com';
-assertEmail(address);
-// address is now typed as Email
-```
+| Scenario | Strategy | Example |
+|----------|----------|---------|
+| MCP tool input validation | Assertion function | `assertMemoryId(params.id, 'id')` |
+| File/parsed data validation with graceful handling | Type predicate | `if (isValidMemoryId(raw)) { ... }` |
+| Generating IDs from trusted components | Smart constructor | `memoryId(slug + '-' + uuid())` |
 
 ---
 

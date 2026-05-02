@@ -1,3 +1,6 @@
+import type { EmbeddingModelId } from "./brands.js";
+import { embeddingModelId } from "./brands.js";
+
 function validateOllamaUrl(url: string): string {
   let parsed: URL;
   try {
@@ -59,4 +62,4 @@ export function cosineSimilarity(a: number[], b: number[]): number {
   return dot / (Math.sqrt(normA) * Math.sqrt(normB));
 }
 
-export const embedModel = EMBED_MODEL;
+export const embedModel: EmbeddingModelId = embeddingModelId(EMBED_MODEL);

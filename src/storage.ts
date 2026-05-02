@@ -4,6 +4,8 @@ import { randomUUID } from "crypto";
 import matter from "gray-matter";
 import type { NoteProjection } from "./structured-content.js";
 import { validateEmbeddingRecord, validateNoteProjection, validateRelatedTo } from "./validation.js";
+import type { MemoryId, EmbeddingModelId, ISO8601DateString } from "./brands.js";
+import { memoryId, embeddingModelId, isoDateString, isValidMemoryId } from "./brands.js";
 
 export const RELATIONSHIP_TYPES = ["related-to", "explains", "example-of", "supersedes", "derives-from", "follows"] as const;
 export type RelationshipType = typeof RELATIONSHIP_TYPES[number];
@@ -15,12 +17,12 @@ export const NOTE_ROLES = ["summary", "decision", "plan", "context", "reference"
 export const NOTE_IMPORTANCE_LEVELS = ["high", "normal", "low"] as const satisfies readonly NoteImportance[];
 
 export interface Relationship {
-  id: string;
+  id: MemoryId;
   type: RelationshipType;
 }
 
 export interface Note {
-  id: string;
+  id: MemoryId;
   title: string;
   content: string;
   tags: string[];
@@ -33,17 +35,17 @@ export interface Note {
   /** Human-readable project name for display */
   projectName?: string;
   relatedTo?: Relationship[];
-  createdAt: string;
-  updatedAt: string;
+  createdAt: ISO8601DateString;
+  updatedAt: ISO8601DateString;
   /** Schema version for forward compatibility (0 = pre-v0.2.0) */
   memoryVersion?: number;
 }
 
 export interface EmbeddingRecord {
-  id: string;
-  model: string;
+  id: MemoryId;
+  model: EmbeddingModelId;
   embedding: number[];
-  updatedAt: string;
+  updatedAt: ISO8601DateString;
 }
 
 export class Storage {
@@ -104,7 +106,7 @@ export class Storage {
     );
 
     await Promise.allSettled(
-      [...this.stagedDeletedNoteIds].map((noteId) => fs.unlink(this.notePath(noteId))),
+      [...this.stagedDeletedNoteIds].map((noteId) => fs.unlink(this.notePath(memoryId(noteId)))),
     );
 
     await this.clearAtomicNotesWrite();
@@ -128,7 +130,7 @@ export class Storage {
     await fs.writeFile(filePath, fileContent, "utf-8");
   }
 
-  async readNote(id: string): Promise<Note | null> {
+  async readNote(id: MemoryId): Promise<Note | null> {
     if (this.stagedDeletedNoteIds.has(id)) {
       return null;
     }
@@ -151,7 +153,7 @@ export class Storage {
     }
   }
 
-  async deleteNote(id: string): Promise<boolean> {
+  async deleteNote(id: MemoryId): Promise<boolean> {
     if (this.stagedNotesDir) {
       this.stagedDeletedNoteIds.add(id);
       const stagedPath = this.stagedNotePath(id);
@@ -234,7 +236,7 @@ export class Storage {
     );
   }
 
-  async readEmbedding(id: string): Promise<EmbeddingRecord | null> {
+  async readEmbedding(id: MemoryId): Promise<EmbeddingRecord | null> {
     try {
       const raw = await fs.readFile(this.embeddingPath(id), "utf-8");
       return validateEmbeddingRecord(JSON.parse(raw));
@@ -252,7 +254,7 @@ export class Storage {
     }
     const ids = files
       .filter((file) => file.endsWith(".json"))
-      .map((file) => file.replace(/\.json$/, ""));
+      .map((file) => memoryId(file.replace(/\.json$/, "")));
     const records = await Promise.all(ids.map((id) => this.readEmbedding(id)));
     return records.filter((record): record is EmbeddingRecord => record !== null);
   }
@@ -262,13 +264,13 @@ export class Storage {
   async writeProjection(projection: NoteProjection): Promise<void> {
     await fs.mkdir(this.projectionsDir, { recursive: true });
     await fs.writeFile(
-      this.projectionPath(projection.noteId),
+      this.projectionPath(memoryId(projection.noteId)),
       JSON.stringify(projection, null, 2),
       "utf-8"
     );
   }
 
-  async readProjection(id: string): Promise<NoteProjection | null> {
+  async readProjection(id: MemoryId): Promise<NoteProjection | null> {
     try {
       const raw = await fs.readFile(this.projectionPath(id), "utf-8");
       return validateNoteProjection(JSON.parse(raw));
@@ -279,29 +281,29 @@ export class Storage {
 
   // ── Helpers ────────────────────────────────────────────────────────────────
 
-  notePath(id: string): string {
+  notePath(id: MemoryId): string {
     validateNoteId(id);
     return path.join(this.notesDir, `${id}.md`);
   }
 
-  embeddingPath(id: string): string {
+  embeddingPath(id: MemoryId): string {
     validateNoteId(id);
     return path.join(this.embeddingsDir, `${id}.json`);
   }
 
-  projectionPath(id: string): string {
+  projectionPath(id: MemoryId): string {
     validateNoteId(id);
     return path.join(this.projectionsDir, `${id}.json`);
   }
 
-  private stagedNotePath(id: string): string | undefined {
+  private stagedNotePath(id: MemoryId): string | undefined {
     validateNoteId(id);
     return this.stagedNotesDir
       ? path.join(this.stagedNotesDir, `${id}.md`)
       : undefined;
   }
 
-  private async listNoteIds(): Promise<string[]> {
+  private async listNoteIds(): Promise<MemoryId[]> {
     const ids = new Set<string>();
 
     try {
@@ -332,7 +334,7 @@ export class Storage {
       ids.delete(deletedId);
     }
 
-    return [...ids].sort();
+    return [...ids].sort().map(memoryId);
   }
 
   private async clearAtomicNotesWrite(): Promise<void> {
@@ -345,7 +347,7 @@ export class Storage {
     }
   }
 
-  private parseNote(id: string, raw: string): Note {
+  private parseNote(id: MemoryId, raw: string): Note {
     if (!raw.trimStart().startsWith("---")) {
       throw new Error(`Malformed note '${id}': missing frontmatter`);
     }
@@ -403,13 +405,13 @@ function isNoteImportance(value: unknown): value is NoteImportance {
 }
 
 function validateNoteId(id: string): void {
-  if (!/^[a-zA-Z0-9_-]+$/.test(id)) {
+  if (!isValidMemoryId(id)) {
     throw new Error(`Invalid note ID: "${id}" contains characters that are not allowed (only alphanumeric, hyphens, and underscores)`);
   }
 }
 
-function toIsoString(value: unknown): string {
-  if (value instanceof Date) return value.toISOString();
-  if (typeof value === "string" && value) return value;
-  return new Date().toISOString();
+function toIsoString(value: unknown): ISO8601DateString {
+  if (value instanceof Date) return isoDateString(value.toISOString());
+  if (typeof value === "string" && value) return isoDateString(value);
+  return isoDateString(new Date().toISOString());
 }

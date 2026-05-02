@@ -8,6 +8,8 @@ import { promises as fs } from "fs";
 
 import type { Confidence } from "./structured-content.js";
 import { NOTE_LIFECYCLES, NOTE_ROLES, RELATIONSHIP_TYPES, Storage, type Note, type NoteLifecycle, type NoteRole, type Relationship, type RelationshipType } from "./storage.js";
+import type { MemoryId } from "./brands.js";
+import { memoryId, embeddingModelId, isoDateString, isValidMemoryId } from "./brands.js";
 import { getErrorMessage } from "./error-utils.js";
 import { embed, cosineSimilarity, embedModel } from "./embeddings.js";
 import { type CommitResult, type PushResult, type SyncResult } from "./git.js";
@@ -299,10 +301,10 @@ if (process.argv[2] === "import-claude-memory") {
     ? resolveUserPath(process.env["CLAUDE_HOME"])
     : defaultClaudeHome();
 
-  function makeImportNoteId(title: string): string {
+  function makeImportNoteId(title: string): MemoryId {
     const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60);
     const suffix = randomUUID().split("-")[0]!;
-    return slug ? `${slug}-${suffix}` : suffix;
+    return memoryId(slug ? `${slug}-${suffix}` : suffix);
   }
 
   async function runImportCli() {
@@ -372,7 +374,7 @@ Examples:
     const existingNotes = await vault.storage.listNotes();
     const existingTitles = new Set(existingNotes.map(n => n.title.toLowerCase()));
 
-    const now = new Date().toISOString();
+    const now = isoDateString(new Date().toISOString());
     const notesToWrite: import("./storage.js").Note[] = [];
     const skipped: string[] = [];
 
@@ -495,10 +497,10 @@ function slugify(text: string): string {
     .slice(0, 60);
 }
 
-function makeId(title: string): string {
+function makeId(title: string): MemoryId {
   const slug = slugify(title);
   const suffix = randomUUID().split("-")[0]!;
-  return slug ? `${slug}-${suffix}` : suffix;
+  return memoryId(slug ? `${slug}-${suffix}` : suffix);
 }
 
 const projectParam = z
@@ -916,7 +918,7 @@ async function embedMissingNotes(
   force = false
 ): Promise<{ rebuilt: number; failed: string[] }> {
   const notes = noteIds
-    ? (await Promise.all(noteIds.map((id) => storage.readNote(id)))).filter((n): n is Note => n !== null)
+    ? (await Promise.all(noteIds.map((id) => storage.readNote(memoryId(id))))).filter((n): n is Note => n !== null)
     : await storage.listNotes();
 
   let rebuilt = 0;
@@ -945,7 +947,7 @@ async function embedMissingNotes(
           id: note.id,
           model: embedModel,
           embedding: vector,
-          updatedAt: new Date().toISOString(),
+          updatedAt: isoDateString(new Date().toISOString()),
         });
         rebuilt++;
       } catch {
@@ -980,7 +982,7 @@ async function backfillEmbeddingsAfterSync(
 
 async function removeStaleEmbeddings(storage: Storage, noteIds: string[]): Promise<void> {
   for (const id of noteIds) {
-    try { await fs.unlink(storage.embeddingPath(id)); } catch { /* already gone */ }
+    try { await fs.unlink(storage.embeddingPath(memoryId(id))); } catch { /* already gone */ }
   }
 }
 
@@ -1040,8 +1042,8 @@ function buildPersistenceStatus(args: {
   retry?: MutationRetryContract;
 }): PersistenceStatus {
   return {
-    notePath: args.storage.notePath(args.id),
-    embeddingPath: args.storage.embeddingPath(args.id),
+    notePath: args.storage.notePath(memoryId(args.id)),
+    embeddingPath: args.storage.embeddingPath(memoryId(args.id)),
     embedding: {
       status: args.embedding.status,
       model: embedModel,
@@ -2029,7 +2031,7 @@ server.registerTool(
     const vault = await resolveWriteVault(cwd, writeScope);
 
     const id = makeId(title);
-    const now = new Date().toISOString();
+    const now = isoDateString(new Date().toISOString());
 
     const note: Note = {
       id, title, content: cleanedContent, tags,
@@ -2586,7 +2588,7 @@ server.registerTool(
         return cached;
       }
 
-      const note = await vault.storage.readNote(id);
+      const note = await vault.storage.readNote(memoryId(id));
       if (note) {
         noteCache.set(key, note);
       }
@@ -2718,7 +2720,7 @@ server.registerTool(
     // entry point's vault instead of their own.
     await resolveDiscoveredVaults(withGraphSpread, preSpreadIds, async (id) => {
       for (const v of vaults) {
-        const note = await v.storage.readNote(id).catch(() => null);
+        const note = await v.storage.readNote(memoryId(id)).catch(() => null);
         if (note) {
           const isCurrentProject = project ? note.project === project.id : false;
           return { vault: v, isCurrentProject };
@@ -3048,6 +3050,7 @@ server.registerTool(
   },
   async ({ id, content, semanticPatch, title, tags, lifecycle, role, summary, alwaysLoad, cwd, allowProtectedBranch = false }) => {
     await ensureBranchSynced(cwd);
+    const noteId = memoryId(id);
 
     const found = await vaultManager.findNote(id, cwd);
     if (!found) {
@@ -3085,7 +3088,7 @@ server.registerTool(
       }
     }
 
-    const now = new Date().toISOString();
+    const now = isoDateString(new Date().toISOString());
 
     let patchedContent: string | undefined;
     let lintWarnings: string[] | undefined;
@@ -3202,8 +3205,8 @@ server.registerTool(
 
     if (!hasChanges) {
       const noOpPersistence: PersistenceStatus = {
-        notePath: vault.storage.notePath(id),
-        embeddingPath: vault.storage.embeddingPath(id),
+        notePath: vault.storage.notePath(memoryId(id)),
+        embeddingPath: vault.storage.embeddingPath(memoryId(id)),
         embedding: { status: "skipped", model: embedModel, reason: "no-changes" },
         git: {
           commit: "skipped",
@@ -3250,7 +3253,7 @@ server.registerTool(
       try {
         const text = await embedTextForNote(vault.storage, updated);
         const vector = await embed(text);
-        await vault.storage.writeEmbedding({ id, model: embedModel, embedding: vector, updatedAt: now });
+        await vault.storage.writeEmbedding({ id: noteId, model: embedModel, embedding: vector, updatedAt: now });
         embeddingStatus = { status: "written" };
       } catch (err) {
         embeddingStatus = { status: "skipped", reason: getErrorMessage(err) };
@@ -3386,7 +3389,7 @@ server.registerTool(
       }
     }
 
-    await noteVault.storage.deleteNote(id);
+    await noteVault.storage.deleteNote(memoryId(id));
 
     // Clean up dangling references grouped by vault so we make one commit per vault
     const vaultChanges = await removeRelationshipsToNoteIds([id]);
@@ -4187,8 +4190,8 @@ server.registerTool(
       .slice(0, limit)
       .map((entry: NoteEntry) => {
         const edges = (entry.note.relatedTo ?? [])
-          .filter((rel: { id: string; type: RelationshipType }) => visibleIds.has(rel.id))
-          .map((rel: { id: string; type: RelationshipType }) => ({ toId: rel.id, type: rel.type }));
+          .filter((rel) => visibleIds.has(rel.id))
+          .map((rel) => ({ toId: rel.id, type: rel.type }));
         return {
           id: entry.note.id,
           title: entry.note.title,
@@ -4495,7 +4498,7 @@ server.registerTool(
       const anchorEmbeddings = await Promise.all(
         anchors.slice(0, 5).map(async a => {
           for (const vault of vaultManager.allKnownVaults()) {
-            const emb = await vault.storage.readEmbedding(a.id);
+            const emb = await vault.storage.readEmbedding(memoryId(a.id));
             if (emb) return { id: a.id, embedding: emb.embedding };
           }
           return null;
@@ -4573,7 +4576,7 @@ server.registerTool(
     const enrichOrientationNoteWithRelationships = async (anchor: AnchorNote) => {
       const vault = noteVaultMap.get(anchor.id);
       if (!vault) return {};
-      const note = await vault.storage.readNote(anchor.id);
+      const note = await vault.storage.readNote(memoryId(anchor.id));
       if (!note) return {};
       const relationships = await getRelationshipPreview(
         note,
@@ -4966,7 +4969,7 @@ server.registerTool(
     }
 
     const targetLabel = storageLabel(targetVault);
-    const existing = await targetVault.storage.readNote(id);
+    const existing = await targetVault.storage.readNote(memoryId(id));
     if (existing) {
       return { content: [{ type: "text", text: `Cannot move '${id}' because a note with that id already exists in ${targetLabel}.` }], isError: true };
     }
@@ -4981,7 +4984,7 @@ server.registerTool(
         ...noteToWrite,
         project: rewrittenProject,
         projectName: rewrittenProjectName,
-        updatedAt: new Date().toISOString(),
+        updatedAt: isoDateString(new Date().toISOString()),
       };
     }
 
@@ -5065,7 +5068,7 @@ server.registerTool(
 
     const { note: fromNote, vault: fromVault } = foundFrom;
     const { note: toNote, vault: toVault } = foundTo;
-    const now = new Date().toISOString();
+    const now = isoDateString(new Date().toISOString());
 
     // Group changes by vault so notes in the same vault share one commit
     const vaultChanges = new Map<Vault, string[]>();
@@ -5073,7 +5076,7 @@ server.registerTool(
     const fromRels = fromNote.relatedTo ?? [];
     const fromRelExists = fromRels.some((r) => r.id === toId);
     if (!fromRelExists) {
-      await fromVault.storage.writeNote({ ...fromNote, relatedTo: [...fromRels, { id: toId, type }], updatedAt: now });
+      await fromVault.storage.writeNote({ ...fromNote, relatedTo: [...fromRels, { id: memoryId(toId), type }], updatedAt: now });
       const files = vaultChanges.get(fromVault) ?? [];
       files.push(vaultManager.noteRelPath(fromVault, fromId));
       vaultChanges.set(fromVault, files);
@@ -5082,7 +5085,7 @@ server.registerTool(
     const toRels = toNote.relatedTo ?? [];
     const toRelExists = toRels.some((r) => r.id === fromId);
     if (bidirectional && !toRelExists) {
-      await toVault.storage.writeNote({ ...toNote, relatedTo: [...toRels, { id: fromId, type }], updatedAt: now });
+      await toVault.storage.writeNote({ ...toNote, relatedTo: [...toRels, { id: memoryId(fromId), type }], updatedAt: now });
       const files = vaultChanges.get(toVault) ?? [];
       files.push(vaultManager.noteRelPath(toVault, toId));
       vaultChanges.set(toVault, files);
@@ -5247,7 +5250,7 @@ server.registerTool(
       vaultManager.findNote(toId, cwd),
     ]);
 
-    const now = new Date().toISOString();
+    const now = isoDateString(new Date().toISOString());
     const vaultChanges = new Map<Vault, string[]>();
 
     if (foundFrom) {
@@ -5976,7 +5979,7 @@ async function executeMerge(
     }
   }
 
-  const now = new Date().toISOString();
+  const now = isoDateString(new Date().toISOString());
 
   // Build consolidated content
   const sections: string[] = [];
@@ -6241,14 +6244,14 @@ function findExistingExecuteMergeTarget(
 ): NoteEntry | undefined {
   const normalizedTitle = targetTitle.trim();
   const targetSlug = slugify(normalizedTitle);
-  const sourceIds = new Set(sourceEntries.map((entry) => entry.note.id));
+  const sourceIds: Set<string> = new Set(sourceEntries.map((entry) => entry.note.id));
   let sharedTargetIds: Set<string> | undefined;
 
   for (const entry of sourceEntries) {
-    const supersededTargetIds = new Set(
+    const supersededTargetIds: Set<string> = new Set(
       (entry.note.relatedTo ?? [])
         .filter((rel) => rel.type === "supersedes")
-        .map((rel) => rel.id)
+        .map((rel) => rel.id as string)
         .filter((id) => !sourceIds.has(id)),
     );
 
@@ -6371,7 +6374,7 @@ async function pruneSuperseded(
     const targetId = supersededBy.get(id);
     lines.push(`  - ${entry.note.title} (${id}) -> superseded by ${targetId}`);
 
-    await entry.vault.storage.deleteNote(id);
+    await entry.vault.storage.deleteNote(memoryId(id));
     addVaultChange(vaultChanges, entry.vault, vaultManager.noteRelPath(entry.vault, id));
   }
 

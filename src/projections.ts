@@ -1,6 +1,7 @@
 import type { Note } from "./storage.js";
 import type { Storage } from "./storage.js";
 import type { NoteProjection } from "./structured-content.js";
+import { memoryId } from "./brands.js";
 
 const MAX_SUMMARY_LENGTH = 280;
 const MAX_HEADINGS = 8;
@@ -179,7 +180,7 @@ export function isProjectionStale(note: Note, projection: NoteProjection): boole
  * Read a stored projection, or null if not found.
  */
 export async function getProjection(storage: Storage, noteId: string): Promise<NoteProjection | null> {
-  return storage.readProjection(noteId);
+  return storage.readProjection(memoryId(noteId));
 }
 
 /**

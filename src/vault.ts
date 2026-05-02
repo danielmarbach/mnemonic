@@ -4,6 +4,8 @@ import { simpleGit } from "simple-git";
 
 import { debugLog, getErrorMessage } from "./error-utils.js";
 import { Storage, type Note } from "./storage.js";
+import { memoryId } from "./brands.js";
+import type { MemoryId } from "./brands.js";
 import { GitOps } from "./git.js";
 
 // ── Public types ──────────────────────────────────────────────────────────────
@@ -102,8 +104,9 @@ export class VaultManager {
    * then falling back through all other known vaults and finally the main vault.
    */
   async findNote(id: string, cwd?: string): Promise<{ note: Note; vault: Vault } | null> {
+    const memoryIdArg = memoryId(id);
     for (const vault of await this.searchOrder(cwd)) {
-      const note = await vault.storage.readNote(id);
+      const note = await vault.storage.readNote(memoryIdArg);
       if (note) return { note, vault };
     }
     return null;
