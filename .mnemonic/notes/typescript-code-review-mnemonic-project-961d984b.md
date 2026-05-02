@@ -8,7 +8,7 @@ tags:
   - performance
 lifecycle: permanent
 createdAt: '2026-05-02T04:20:54.784Z'
-updatedAt: '2026-05-02T05:34:09.797Z'
+updatedAt: '2026-05-02T05:53:30.880Z'
 role: review
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -217,19 +217,32 @@ Original claim: "loads ALL note contents into memory".
 
 ### Deferred
 
+- Cache parsed config in `MnemonicConfigStore` — DONE (write-invalidate cache with `#cache` private field, `invalidateCache()` method; commit 0751115)
+
 - Split `index.ts` into handler modules
+
 - Encapsulate module-level singletons
+
 - Cache parsed config in `MnemonicConfigStore`
+
 - Streaming/pagination for `listNotes`
 
 - Add `import type` for `Note` in `index.ts:373` (inline `import("./storage.js").Note`)
+
 - Encapsulate module-level mutable singletons (`sessionCaches`, `mutationLocks`, `branchHistory`) in classes
+
 - Use `#` private fields for `Storage.stagedNotesDir` and `stagedDeletedNoteIds`
+
 - Add size limits (`.max()`) to `title` and `content` Zod schemas for defense in depth
+
 - Sanitize git error messages before including in MCP responses
+
 - Validate `cwd` parameter to ensure it resolves to a real project directory
+
 - Split `index.ts` (4000+ lines) into separate handler modules
+
 - Consider streaming/pagination for `listNotes` and `collectVisibleNotes`
+
 - Cache parsed config in `MnemonicConfigStore`
 
 ## Positive Observations ✅
