@@ -2,6 +2,7 @@ import { performance } from "perf_hooks";
 import type { Note, EmbeddingRecord } from "./storage.js";
 import type { NoteProjection } from "./structured-content.js";
 import type { Vault } from "./vault.js";
+import { debugLog } from "./error-utils.js";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -49,10 +50,6 @@ interface SessionCaches {
 const sessionCaches: SessionCaches = {};
 
 // ── Internal helpers ───────────────────────────────────────────────────────────
-
-function debugLog(event: string, message: string): void {
-  console.error(`[${event}] ${message}`);
-}
 
 function ensureActiveProjectCache(projectId: string): SessionProjectCache {
   const current = sessionCaches.activeProject;

@@ -2,6 +2,7 @@ import fs from "fs/promises";
 import path from "path";
 import { simpleGit } from "simple-git";
 
+import { debugLog, getErrorMessage } from "./error-utils.js";
 import { Storage, type Note } from "./storage.js";
 import { GitOps } from "./git.js";
 
@@ -261,7 +262,8 @@ async function discoverSubmoduleVaultFolders(gitRoot: string): Promise<string[]>
       .filter(e => e.isDirectory() && e.name.startsWith(".mnemonic-"))
       .map(e => e.name)
       .sort();
-  } catch {
+  } catch (err) {
+    debugLog("vault:discover-submodules", `failed: ${getErrorMessage(err)}`);
     return [];
   }
 }
@@ -286,11 +288,12 @@ async function findGitRoot(cwd: string, visited: Set<string> = new Set()): Promi
         return findGitRoot(trimmedSuperproject, visited);
       }
     } catch {
-      // Not inside a submodule or git version does not support the flag; use current root.
+      debugLog("vault:find-git-root", "not inside a submodule or flag unsupported, using current root");
     }
 
     return trimmedRoot;
-  } catch {
+  } catch (err) {
+    debugLog("vault:find-git-root", `failed: ${getErrorMessage(err)}`);
     return null;
   }
 }
@@ -300,7 +303,8 @@ export async function ensureGitignore(ignorePath: string): Promise<void> {
   let existing: string;
   try {
     existing = await fs.readFile(ignorePath, "utf-8");
-  } catch {
+  } catch (err) {
+    debugLog("vault:ensure-gitignore", `no existing gitignore: ${getErrorMessage(err)}`);
     existing = "";
   }
   const missing = requiredLines.filter(line => !existing.includes(line));

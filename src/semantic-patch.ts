@@ -37,7 +37,7 @@ function resolveSelector(tree: Root, selector: SemanticSelector): { parent: Root
   if ("heading" in selector) {
     for (let i = 0; i < tree.children.length; i++) {
       const child = tree.children[i];
-      if (isHeadingNode(child) && getHeadingText(child) === selector.heading) {
+      if (child && isHeadingNode(child) && getHeadingText(child) === selector.heading) {
         return { parent: tree, index: i, target: child };
       }
     }
@@ -47,7 +47,7 @@ function resolveSelector(tree: Root, selector: SemanticSelector): { parent: Root
   if ("headingStartsWith" in selector) {
     for (let i = 0; i < tree.children.length; i++) {
       const child = tree.children[i];
-      if (isHeadingNode(child) && getHeadingText(child).startsWith(selector.headingStartsWith)) {
+      if (child && isHeadingNode(child) && getHeadingText(child).startsWith(selector.headingStartsWith)) {
         return { parent: tree, index: i, target: child };
       }
     }
@@ -59,7 +59,9 @@ function resolveSelector(tree: Root, selector: SemanticSelector): { parent: Root
     if (index < 0 || index >= tree.children.length) {
       return undefined;
     }
-    return { parent: tree, index, target: tree.children[index] };
+    const target = tree.children[index];
+    if (!target) return undefined;
+    return { parent: tree, index, target };
   }
 
   if ("lastChild" in selector) {
@@ -67,7 +69,9 @@ function resolveSelector(tree: Root, selector: SemanticSelector): { parent: Root
       return undefined;
     }
     const index = tree.children.length - 1;
-    return { parent: tree, index, target: tree.children[index] };
+    const target = tree.children[index];
+    if (!target) return undefined;
+    return { parent: tree, index, target };
   }
 
   return undefined;

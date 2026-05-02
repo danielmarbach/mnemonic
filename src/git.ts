@@ -1,4 +1,5 @@
 import { getErrorMessage } from "./error-utils.js";
+import { debugLog } from "./error-utils.js";
 import { access } from "fs/promises";
 import path from "path";
 import { simpleGit, SimpleGit } from "simple-git";
@@ -175,7 +176,8 @@ export class GitOps {
         staged: status.staged,
         modified: status.modified,
       };
-    } catch {
+    } catch (err) {
+      debugLog("git:status", `failed: ${getErrorMessage(err)}`);
       return { staged: [], modified: [] };
     }
   }
@@ -261,7 +263,8 @@ export class GitOps {
     try {
       const status = await this.git.status();
       return status.conflicted;
-    } catch {
+    } catch (err) {
+      debugLog("git:conflict-files", `failed: ${getErrorMessage(err)}`);
       return [];
     }
   }
@@ -282,6 +285,7 @@ export class GitOps {
         await access(p);
         return true;
       } catch {
+        debugLog("git:conflict-check", `state path not found: ${p}`);
         // not present — try next
       }
     }
@@ -416,7 +420,8 @@ export class GitOps {
           };
         })
         .filter((entry) => entry.hash && entry.timestamp && entry.message);
-    } catch {
+    } catch (err) {
+      debugLog("git:log-entries", `failed: ${getErrorMessage(err)}`);
       return [];
     }
   }
@@ -454,7 +459,8 @@ export class GitOps {
       }
 
       return { additions, deletions, filesChanged };
-    } catch {
+    } catch (err) {
+      debugLog("git:commit-stats", `failed: ${getErrorMessage(err)}`);
       return null;
     }
   }
@@ -465,7 +471,8 @@ export class GitOps {
     try {
       const log = await this.git.log({ maxCount: 1 });
       return log.latest?.hash ?? "";
-    } catch {
+    } catch (err) {
+      debugLog("git:head", `failed: ${getErrorMessage(err)}`);
       return "";
     }
   }
@@ -474,7 +481,8 @@ export class GitOps {
     try {
       const result = await this.git.raw(["rev-list", "--count", "@{u}..HEAD"]);
       return parseInt(result.trim(), 10) || 0;
-    } catch {
+    } catch (err) {
+      debugLog("git:unpushed-count", `failed: ${getErrorMessage(err)}`);
       return 0;
     }
   }
@@ -505,8 +513,9 @@ export class GitOps {
       for (const line of diff.split("\n")) {
         const parts = line.trim().split(/\s+/);
         if (parts.length < 2) continue;
-        const [status, filePath] = parts as [string, string];
-        if (!filePath?.endsWith(".md")) continue;
+        const status = parts[0];
+        const filePath = parts[1];
+        if (!status || !filePath || !filePath.endsWith(".md")) continue;
 
         const id = filePath.replace(prefix, "").replace(/\.md$/, "");
 
@@ -518,7 +527,8 @@ export class GitOps {
       }
 
       return { pulledNoteIds, deletedNoteIds };
-    } catch {
+    } catch (err) {
+      debugLog("git:diff-notes", `failed since=${sinceHash}: ${getErrorMessage(err)}`);
       return { pulledNoteIds: [], deletedNoteIds: [] };
     }
   }
