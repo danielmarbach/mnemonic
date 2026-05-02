@@ -6,7 +6,7 @@ tags:
   - refactoring
 lifecycle: temporary
 createdAt: '2026-05-02T06:10:17.697Z'
-updatedAt: '2026-05-02T06:41:03.383Z'
+updatedAt: '2026-05-02T08:02:50.337Z'
 role: plan
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -20,57 +20,68 @@ memoryVersion: 1
 ---
 ## Plan: Split index.ts into Modular Structure
 
-Phase 1: ServerContext + Extract Helpers — DONE (845 lines extracted, 6 new modules created, index.ts down to 5819 lines)
+Phase 1: ServerContext + Extract Helpers — DONE (845 lines extracted, 6 new modules, index.ts down to 5819 lines, committed)
 
-- \[ ] Create `src/server-context.ts` with `ServerContext` interface and `createServerContext()` factory
-- \[ ] Move `slugify`, `makeId`, `projectParam`, `describeLifecycle`, `formatNote`, `formatTemporalHistory`, `formatRelationshipPreview`, `toRecallFreshness`, `toRecallRankBand`, `formatRetrievalEvidenceHint`, `describeProject`, `formatProjectIdentityText` to `src/helpers/index.ts`
-- \[ ] Move `extractSummary`, `CommitBodyOptions`, `formatCommitBody`, `formatAskForWriteScope`, `formatAskForProtectedBranch`, `formatProtectedBranchBlocked`, `shouldBlockProtectedBranchCommit`, `wouldRelationshipCleanupTouchProjectVault` to `src/helpers/git-commit.ts`
-- \[ ] Move `embedTextForNote`, `embedMissingNotes`, `backfillEmbeddingsAfterSync`, `removeStaleEmbeddings` to `src/helpers/embed.ts`
-- \[ ] Move `resolveDurability`, `buildPersistenceStatus`, `buildMutationRetryContract`, `formatRetrySummary`, `formatPersistenceSummary`, `getMutationPushMode`, `pushAfterMutation` to `src/helpers/persistence.ts`
-- \[ ] Move `storageLabel`, `vaultMatchesStorageScope`, `collectVisibleNotes`, `formatListEntry`, `formatProjectPolicyLine`, `moveNoteBetweenVaults`, `removeRelationshipsToNoteIds`, `addVaultChange`, `ROLE_LIFECYCLE_DEFAULTS`, `projectNotFoundResponse` to `src/helpers/vault.ts`
-- \[ ] Move `resolveProject`, `toProjectRef`, `noteProjectRef`, `resolveProjectIdentityForCwd`, `resolveWriteVault`, `ensureBranchSynced` to `src/helpers/project.ts`
-- \[ ] Move `SearchScope`, `StorageScope`, `NoteEntry` types to appropriate location
-- \[ ] Update all imports in `index.ts` to use new modules
-- \[ ] Verify: `tsc --noEmit` passes, all tests pass
+### Phase 2: Extract Tool Handlers — IN PROGRESS
 
-### Phase 2: Extract Tool Handlers
+Batch approach due to subagent size limits. Each batch must pass tsc and tests before proceeding.
 
-- \[ ] Move `buildRecallCandidateContext`, `collectLexicalRescueCandidates` + DiscoverTagStat + tokenize helpers to `src/tools/recall-helpers.ts`
-- \[ ] Move `detectDuplicates`, `findClusters`, `suggestMerges`, `loadEmbeddingsByNoteId`, `executeMerge`, `findExistingExecuteMergeTarget`, `pruneSuperseded`, `dryRunAll` to `src/tools/consolidate-helpers.ts`
-- \[ ] Create `registerDetectProjectTool(server, ctx)` in `src/tools/detect-project.ts`
-- \[ ] Create `registerGetProjectIdentityTool(server, ctx)` in `src/tools/get-project-identity.ts`
-- \[ ] Create `registerSetProjectIdentityTool(server, ctx)` in `src/tools/set-project-identity.ts`
-- \[ ] Create `registerMigrationTools(server, ctx)` in `src/tools/migration.ts`
-- \[ ] Create `registerRememberTool(server, ctx)` in `src/tools/remember.ts`
-- \[ ] Create `registerPolicyTools(server, ctx)` in `src/tools/policy.ts`
-- \[ ] Create `registerRecallTool(server, ctx)` in `src/tools/recall.ts`
-- \[ ] Create `registerUpdateTool(server, ctx)` in `src/tools/update.ts`
-- \[ ] Create `registerForgetTool(server, ctx)` in `src/tools/forget.ts`
-- \[ ] Create `registerGetTool(server, ctx)` in `src/tools/get.ts`
-- \[ ] Create `registerWhereIsMemoryTool(server, ctx)` in `src/tools/where-is-memory.ts`
-- \[ ] Create `registerListTool(server, ctx)` in `src/tools/list.ts`
-- \[ ] Create `registerDiscoverTagsTool(server, ctx)` in `src/tools/discover-tags.ts`
-- \[ ] Create `registerRecentMemoriesTool(server, ctx)` in `src/tools/recent-memories.ts`
-- \[ ] Create `registerMemoryGraphTool(server, ctx)` in `src/tools/memory-graph.ts`
-- \[ ] Create `registerProjectMemorySummaryTool(server, ctx)` in `src/tools/project-memory-summary.ts`
-- \[ ] Create `registerSyncTool(server, ctx)` in `src/tools/sync.ts`
-- \[ ] Create `registerMoveMemoryTool(server, ctx)` in `src/tools/move-memory.ts`
-- \[ ] Create `registerRelateTool(server, ctx)` in `src/tools/relate.ts`
-- \[ ] Create `registerUnrelateTool(server, ctx)` in `src/tools/unrelate.ts`
-- \[ ] Create `registerConsolidateTool(server, ctx)` in `src/tools/consolidate.ts`
-- \[ ] Verify: `tsc --noEmit` passes, all tests pass
+#### Batch 1: Helper modules
+
+- [ ] `src/tools/recall-helpers.ts` — buildRecallCandidateContext, collectLexicalRescueCandidates, DiscoverTagStat, tokenize helpers
+- [ ] `src/tools/consolidate-helpers.ts` — detectDuplicates, findClusters, suggestMerges, executeMerge, etc.
+- [ ] Update index.ts call sites to import from new modules
+
+#### Batch 2: Simple tool handlers
+
+- [ ] `src/tools/detect-project.ts`
+- [ ] `src/tools/get-project-identity.ts`
+- [ ] `src/tools/set-project-identity.ts`
+- [ ] `src/tools/migration.ts` (list_migrations + execute_migration)
+- [ ] `src/tools/policy.ts` (set/get_project_memory_policy)
+
+#### Batch 3: Core tool handlers
+
+- [ ] `src/tools/remember.ts`
+- [ ] `src/tools/recall.ts`
+- [ ] `src/tools/update.ts`
+
+#### Batch 4: CRUD tool handlers
+
+- [ ] `src/tools/forget.ts`
+- [ ] `src/tools/get.ts`
+- [ ] `src/tools/where-is-memory.ts`
+- [ ] `src/tools/list.ts`
+- [ ] `src/tools/discover-tags.ts`
+
+#### Batch 5: Query + mutation tool handlers
+
+- [ ] `src/tools/recent-memories.ts`
+- [ ] `src/tools/memory-graph.ts`
+- [ ] `src/tools/project-memory-summary.ts`
+- [ ] `src/tools/sync.ts`
+- [ ] `src/tools/move-memory.ts`
+- [ ] `src/tools/relate.ts`
+- [ ] `src/tools/unrelate.ts`
+- [ ] `src/tools/consolidate.ts`
+
+#### Batch 6: Wire index.ts
+
+- [ ] Replace all inline tool registrations with registerXxxTool(server, ctx) calls
+- [ ] Remove unused imports from index.ts
+- [ ] Verify tsc and tests
 
 ### Phase 3: Extract CLI Commands, Prompts, Startup
 
-- \[ ] Move CLI migrate command to `src/cli/migrate.ts`
-- \[ ] Move CLI import-claude-memory command to `src/cli/import-claude-memory.ts`
-- \[ ] Move prompt registrations to `src/prompts.ts`
-- \[ ] Move `warnAboutPendingMigrationsOnStartup` and startup logic to `src/startup.ts`
-- \[ ] Verify: `tsc --noEmit` passes, all tests pass
+- [ ] Move CLI migrate command to `src/cli/migrate.ts`
+- [ ] Move CLI import-claude-memory command to `src/cli/import-claude-memory.ts`
+- [ ] Move prompt registrations to `src/prompts.ts`
+- [ ] Move `warnAboutPendingMigrationsOnStartup` and startup logic to `src/startup.ts`
+- [ ] Verify: `tsc --noEmit` passes, all tests pass
 
 ### Phase 4: Slim index.ts to Pure Wiring
 
-- \[ ] Reduce `index.ts` to: imports, ServerContext creation, tool registration calls, server start
-- \[ ] Target: ~100-150 lines
-- \[ ] Verify: `tsc --noEmit` passes, all tests pass
-- \[ ] Final review of module boundaries and naming
+- [ ] Reduce `index.ts` to: imports, ServerContext creation, tool registration calls, server start
+- [ ] Target: ~100-150 lines
+- [ ] Verify: `tsc --noEmit` passes, all tests pass
+- [ ] Final review of module boundaries and naming
