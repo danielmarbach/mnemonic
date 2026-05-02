@@ -20,7 +20,7 @@ import { type NoteEntry, storageLabel, addVaultChange, removeRelationshipsToNote
 import { toProjectRef } from "../helpers/project.js";
 import { embedTextForNote as embedTextForNoteFromModule } from "../helpers/embed.js";
 import type { Note } from "../storage.js";
-import type { Vault, VaultManager } from "../vault.js";
+import type { Vault } from "../vault.js";
 import type { ConsolidationMode, ProjectMemoryPolicy } from "../project-memory-policy.js";
 import type { ConsolidateResult, ConsolidateExecuteMergeEvidence } from "../structured-content.js";
 import type { CommitResult, PushResult } from "../git.js";

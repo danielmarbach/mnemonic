@@ -1,12 +1,12 @@
 import { z } from "zod";
-import { detectProject, getCurrentGitBranch, resolveProjectIdentity, type ProjectIdentityResolution } from "../project.js";
+import { detectProject, resolveProjectIdentity, type ProjectIdentityResolution } from "../project.js";
 import type { ServerContext } from "../server-context.js";
 import type { ProjectRef } from "../structured-content.js";
 import type { Vault } from "../vault.js";
 import type { WriteScope } from "../project-memory-policy.js";
 import { invalidateActiveProjectCache } from "../cache.js";
 import { checkBranchChange } from "../branch-tracker.js";
-import { backfillEmbeddingsAfterSync, removeStaleEmbeddings } from "./embed.js";
+import { backfillEmbeddingsAfterSync } from "./embed.js";
 
 export const projectParam = z
   .string()

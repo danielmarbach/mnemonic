@@ -5,7 +5,6 @@ import { simpleGit } from "simple-git";
 import { debugLog, getErrorMessage } from "./error-utils.js";
 import { Storage, type Note } from "./storage.js";
 import { memoryId } from "./brands.js";
-import type { MemoryId } from "./brands.js";
 import { GitOps } from "./git.js";
 
 // ── Public types ──────────────────────────────────────────────────────────────

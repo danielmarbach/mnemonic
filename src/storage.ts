@@ -5,7 +5,7 @@ import matter from "gray-matter";
 import type { NoteProjection } from "./structured-content.js";
 import { validateEmbeddingRecord, validateNoteProjection, validateRelatedTo } from "./validation.js";
 import type { MemoryId, EmbeddingModelId, ISO8601DateString } from "./brands.js";
-import { memoryId, embeddingModelId, isoDateString, isValidMemoryId } from "./brands.js";
+import { memoryId, isoDateString, isValidMemoryId } from "./brands.js";
 
 export const RELATIONSHIP_TYPES = ["related-to", "explains", "example-of", "supersedes", "derives-from", "follows"] as const;
 export type RelationshipType = typeof RELATIONSHIP_TYPES[number];

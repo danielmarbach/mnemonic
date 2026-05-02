@@ -180,7 +180,7 @@ export function registerUnrelateTool(server: McpServer, ctx: ServerContext): voi
       }
 
       const modifiedNoteIds: string[] = [];
-      for (const [vault, files] of vaultChanges) {
+      for (const [, files] of vaultChanges) {
         modifiedNoteIds.push(...files.map(f => path.basename(f, '.md')));
       }
       

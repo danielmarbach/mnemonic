@@ -1,8 +1,7 @@
 import { z } from "zod";
-import type { Vault } from "./vault.js";
 import { CHANGE_CATEGORIES } from "./temporal-interpretation.js";
 import { NOTE_ROLES, RELATIONSHIP_TYPES } from "./storage.js";
-import type { Note, NoteLifecycle, NoteRole, RelationshipType } from "./storage.js";
+import type { NoteLifecycle, NoteRole, RelationshipType } from "./storage.js";
 import { MERGE_RISKS } from "./consolidate.js";
 import type { MergeRisk } from "./consolidate.js";
 

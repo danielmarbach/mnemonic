@@ -8,7 +8,7 @@ import { cosineSimilarity } from "../embeddings.js";
 import { getNoteProvenance, computeConfidence } from "../provenance.js";
 import { getRelationshipPreview } from "../relationships.js";
 import { formatRelationshipPreview } from "../helpers/index.js";
-import { projectParam, resolveProject, ensureBranchSynced } from "../helpers/project.js";
+import { resolveProject, ensureBranchSynced } from "../helpers/project.js";
 import {
   formatProjectPolicyLine,
   projectNotFoundResponse,

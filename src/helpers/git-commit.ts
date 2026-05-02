@@ -1,7 +1,7 @@
 import { getCurrentGitBranch } from "../project.js";
 import { isProtectedBranch, resolveProtectedBranchBehavior, resolveProtectedBranchPatterns, type WriteScope, type ProjectMemoryPolicy } from "../project-memory-policy.js";
 import type { ServerContext } from "../server-context.js";
-import type { Vault } from "../vault.js";
+
 
 export function extractSummary(content: string, maxLength = 100): string {
   const normalized = content.replace(/\s+/g, " ").trim();
@@ -148,7 +148,7 @@ export async function shouldBlockProtectedBranchCommit(options: {
   allowProtectedBranch: boolean;
   toolName: string;
 }): Promise<{ blocked: boolean; message?: string }> {
-  const { ctx, cwd, writeScope, automaticCommit, projectLabel, policy, allowProtectedBranch, toolName } = options;
+  const { cwd, writeScope, automaticCommit, projectLabel, policy, allowProtectedBranch, toolName } = options;
   if (!cwd || writeScope !== "project" || !automaticCommit) {
     return { blocked: false };
   }

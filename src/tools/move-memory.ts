@@ -1,7 +1,6 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ServerContext } from "../server-context.js";
-import type { Note } from "../storage.js";
 import type { Vault } from "../vault.js";
 import {
   NoteIdSchema,
@@ -17,7 +16,6 @@ import { memoryId, isoDateString } from "../brands.js";
 import { shouldBlockProtectedBranchCommit } from "../helpers/git-commit.js";
 import {
   formatPersistenceSummary,
-  pushAfterMutation,
 } from "../helpers/persistence.js";
 import {
   moveNoteBetweenVaults,

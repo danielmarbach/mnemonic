@@ -1,7 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import type { MnemonicConfig, MnemonicConfigStore, MutationPushMode } from "./config.js";
+import type { MnemonicConfig, MnemonicConfigStore } from "./config.js";
 import type { Migrator } from "./migration.js";
-import type { VaultManager, Vault } from "./vault.js";
+import type { VaultManager } from "./vault.js";
 
 export interface ServerContext {
   readonly server: McpServer;

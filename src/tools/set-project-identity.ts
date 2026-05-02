@@ -5,7 +5,6 @@ import { resolveProjectIdentity } from "../project.js";
 import { projectNotFoundResponse } from "../helpers/vault.js";
 import { formatCommitBody } from "../helpers/git-commit.js";
 import { pushAfterMutation as pushAfterMutationFromModule, buildMutationRetryContract, formatRetrySummary } from "../helpers/persistence.js";
-import { formatProjectIdentityText } from "./detect-project.js";
 import { RemoteNameSchema, ProjectIdentityResultSchema, type ProjectIdentityResult } from "../structured-content.js";
 
 export function registerSetProjectIdentityTool(server: McpServer, ctx: ServerContext): void {

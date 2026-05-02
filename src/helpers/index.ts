@@ -1,5 +1,5 @@
 import { randomUUID } from "crypto";
-import type { Note, NoteLifecycle, NoteRole, Relationship } from "../storage.js";
+import type { Note, NoteLifecycle, NoteRole } from "../storage.js";
 import type { MemoryId } from "../brands.js";
 import { memoryId } from "../brands.js";
 import type { RelationshipPreview, RetrievalEvidence } from "../structured-content.js";

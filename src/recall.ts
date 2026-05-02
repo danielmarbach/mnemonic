@@ -4,7 +4,7 @@ import { computeLexicalScore, tokenize } from "./lexical.js";
 import { MS_PER_DAY } from "./date-utils.js";
 
 import type { Confidence } from "./structured-content.js";
-import type { NoteRole, RelationshipType } from "./storage.js";
+import type { RelationshipType } from "./storage.js";
 
 const RRF_K = 60;
 const CANONICAL_HYBRID_WEIGHT = 0.05;

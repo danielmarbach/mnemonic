@@ -1,4 +1,3 @@
-import type { CommitStats, LastCommit } from "./git.js";
 import { metadataPrefixes } from "./git-constants.js";
 
 export const CHANGE_CATEGORIES = ["create", "refine", "expand", "clarify", "connect", "restructure", "reverse", "unknown"] as const;

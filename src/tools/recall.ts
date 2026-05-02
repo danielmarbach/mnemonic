@@ -28,7 +28,6 @@ import {
   applyCanonicalExplanationPromotion,
   applyGraphSpreadingActivation,
   assignDenseRanks,
-  type TemporalQueryHint,
   type ScoredRecallCandidate,
 } from "../recall.js";
 import { shouldTriggerLexicalRescue } from "../lexical.js";

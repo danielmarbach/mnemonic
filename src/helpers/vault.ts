@@ -1,16 +1,14 @@
 import type { Note, NoteLifecycle, NoteRole } from "../storage.js";
 import type { ServerContext } from "../server-context.js";
 import type { Vault } from "../vault.js";
-import type { ProjectRef } from "../structured-content.js";
-import type { PersistenceStatus, MutationRetryContract } from "../structured-content.js";
-import type { CommitResult } from "../git.js";
+import type { PersistenceStatus } from "../structured-content.js";
 import { getOrBuildVaultNoteList } from "../cache.js";
-import { resolveProject, describeProject } from "./project.js";
+import { resolveProject } from "./project.js";
 import { formatCommitBody } from "./git-commit.js";
 import { pushAfterMutation, buildMutationRetryContract, buildPersistenceStatus } from "./persistence.js";
 import { filterRelationships } from "../consolidate.js";
 import { summarizePreview } from "../project-introspection.js";
-import { embedModel } from "../embeddings.js";
+
 
 export type SearchScope = "project" | "global" | "all";
 export type StorageScope = "project-vault" | "main-vault" | "any";
