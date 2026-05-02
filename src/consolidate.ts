@@ -2,7 +2,8 @@ import type { Note, Relationship } from "./storage.js";
 import type { ConsolidationMode } from "./project-memory-policy.js";
 import { daysSince } from "./date-utils.js";
 
-export type MergeRisk = "low" | "medium" | "high";
+export const MERGE_RISKS = ["low", "medium", "high"] as const;
+export type MergeRisk = typeof MERGE_RISKS[number];
 
 export interface ConsolidateNoteEvidence {
   id: string;

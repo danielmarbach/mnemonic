@@ -1,1 +1,1 @@
-export const metadataPrefixes = ["relate:", "unrelate:", "move:", "migrate:", "forget:"];
+export const metadataPrefixes = ["relate:", "unrelate:", "move:", "migrate:", "forget:"] as const;
