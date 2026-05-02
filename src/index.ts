@@ -9,7 +9,7 @@ import { promises as fs } from "fs";
 import type { Confidence } from "./structured-content.js";
 import { NOTE_LIFECYCLES, NOTE_ROLES, RELATIONSHIP_TYPES, Storage, type Note, type NoteLifecycle, type NoteRole, type Relationship, type RelationshipType } from "./storage.js";
 import type { MemoryId } from "./brands.js";
-import { memoryId, embeddingModelId, isoDateString, isValidMemoryId } from "./brands.js";
+import { memoryId, isoDateString, isValidMemoryId } from "./brands.js";
 import { getErrorMessage } from "./error-utils.js";
 import { embed, cosineSimilarity, embedModel } from "./embeddings.js";
 import { type CommitResult, type PushResult, type SyncResult } from "./git.js";
@@ -37,7 +37,6 @@ import {
   buildConsolidateNoteEvidence,
   buildGroupWarnings,
   deriveMergeRisk,
-  filterRelationships,
   mergeRelationshipsFromNotes,
   normalizeMergePlanSourceIds,
   resolveEffectiveConsolidationMode,
@@ -81,15 +80,19 @@ import {
   PROTECTED_BRANCH_BEHAVIORS,
   PROJECT_POLICY_SCOPES,
   WRITE_SCOPES,
-  isProtectedBranch,
-  resolveProtectedBranchBehavior,
-  resolveProtectedBranchPatterns,
   resolveConsolidationMode,
   resolveWriteScope,
   type ConsolidationMode,
   type ProjectMemoryPolicy,
   type WriteScope,
 } from "./project-memory-policy.js";
+import type { ServerContext } from "./server-context.js";
+import { resolveProject as resolveProjectFromModule, toProjectRef, noteProjectRef, resolveProjectIdentityForCwd as resolveProjectIdentityForCwdFromModule, resolveWriteVault as resolveWriteVaultFromModule, describeProject as describeProjectFromModule, ensureBranchSynced as ensureBranchSyncedFromModule, projectParam } from "./helpers/project.js";
+import { extractSummary, formatCommitBody, formatAskForWriteScope, formatAskForProtectedBranch, formatProtectedBranchBlocked, shouldBlockProtectedBranchCommit as shouldBlockProtectedBranchCommitFromModule, wouldRelationshipCleanupTouchProjectVault as wouldRelationshipCleanupTouchProjectVaultFromModule } from "./helpers/git-commit.js";
+import { embedTextForNote as embedTextForNoteFromModule, embedMissingNotes as embedMissingNotesFromModule, backfillEmbeddingsAfterSync as backfillEmbeddingsAfterSyncFromModule, removeStaleEmbeddings as removeStaleEmbeddingsFromModule } from "./helpers/embed.js";
+import { resolveDurability, buildPersistenceStatus, buildMutationRetryContract, formatRetrySummary, formatPersistenceSummary, getMutationPushMode as getMutationPushModeFromModule, pushAfterMutation as pushAfterMutationFromModule } from "./helpers/persistence.js";
+import { type SearchScope, type StorageScope, type NoteEntry, storageLabel, vaultMatchesStorageScope, collectVisibleNotes as collectVisibleNotesFromModule, formatListEntry, formatProjectPolicyLine as formatProjectPolicyLineFromModule, ROLE_LIFECYCLE_DEFAULTS, projectNotFoundResponse, moveNoteBetweenVaults as moveNoteBetweenVaultsFromModule, removeRelationshipsToNoteIds as removeRelationshipsToNoteIdsFromModule, addVaultChange } from "./helpers/vault.js";
+import { slugify, makeId, describeLifecycle, formatNote, formatTemporalHistory, formatRelationshipPreview, toRecallFreshness, toRecallRankBand, formatRetrievalEvidenceHint } from "./helpers/index.js";
 import {
   classifyTheme,
   classifyThemeWithGraduation,
@@ -107,7 +110,6 @@ import {
 import { getEffectiveMetadata } from "./role-suggestions.js";
 import { detectProject, getCurrentGitBranch, resolveProjectIdentity, type ProjectIdentityResolution } from "./project.js";
 import { VaultManager, type Vault } from "./vault.js";
-import { checkBranchChange } from "./branch-tracker.js";
 import { Migrator } from "./migration.js";
 import { parseMemorySections } from "./import.js";
 import { defaultClaudeHome, defaultVaultPath, resolveUserPath } from "./paths.js";
@@ -487,111 +489,88 @@ const configStore = new MnemonicConfigStore(VAULT_PATH);
 const config = await configStore.load();
 const migrator = new Migrator(vaultManager);
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+const ctx: ServerContext = {
+  server: undefined as never,
+  vaultManager,
+  configStore,
+  config,
+  migrator,
+  vaultPath: VAULT_PATH,
+  defaultRecallLimit: DEFAULT_RECALL_LIMIT,
+  defaultMinSimilarity: DEFAULT_MIN_SIMILARITY,
+  projectScopeBoost: PROJECT_SCOPE_BOOST,
+  temporalHistoryNoteLimit: TEMPORAL_HISTORY_NOTE_LIMIT,
+  temporalHistoryCommitLimit: TEMPORAL_HISTORY_COMMIT_LIMIT,
+};
 
-function slugify(text: string): string {
-  return text
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 60);
-}
-
-function makeId(title: string): MemoryId {
-  const slug = slugify(title);
-  const suffix = randomUUID().split("-")[0]!;
-  return memoryId(slug ? `${slug}-${suffix}` : suffix);
-}
-
-const projectParam = z
-  .string()
-  .optional()
-  .describe(
-    "Absolute project working directory. Pass this whenever the task is project-related so routing, search boosting, policy, and vault selection work correctly."
-  );
+// ── Helper wrappers (delegate to extracted modules with ctx) ─────────────────
 
 async function resolveProject(cwd?: string) {
-  if (!cwd) return undefined;
-  return detectProject(cwd, {
-    getProjectIdentityOverride: async (projectId) => configStore.getProjectIdentityOverride(projectId),
-  });
+  return resolveProjectFromModule(ctx, cwd);
 }
 
-function toProjectRef(project?: { id: string; name: string } | null): ProjectRef | undefined {
-  return project ? { id: project.id, name: project.name } : undefined;
+async function resolveProjectIdentityForCwd(cwd?: string) {
+  return resolveProjectIdentityForCwdFromModule(ctx, cwd);
 }
 
-function noteProjectRef(note: { project?: string; projectName?: string }): ProjectRef | undefined {
-  if (!note.project || !note.projectName) {
-    return undefined;
-  }
-
-  return {
-    id: note.project,
-    name: note.projectName,
-  };
-}
-
-async function resolveProjectIdentityForCwd(cwd?: string): Promise<ProjectIdentityResolution | undefined> {
-  if (!cwd) return undefined;
-  const identity = await resolveProjectIdentity(cwd, {
-    getProjectIdentityOverride: async (projectId) => configStore.getProjectIdentityOverride(projectId),
-  });
-  return identity ?? undefined;
-}
-
-async function resolveWriteVault(cwd: string | undefined, scope: WriteScope): Promise<Vault> {
-  if (scope === "project") {
-    return cwd
-      ? (await vaultManager.getOrCreateProjectVault(cwd)) ?? vaultManager.main
-      : vaultManager.main;
-  }
-
-  return vaultManager.main;
+async function resolveWriteVault(cwd: string | undefined, scope: WriteScope) {
+  return resolveWriteVaultFromModule(ctx, cwd, scope);
 }
 
 function describeProject(project: Awaited<ReturnType<typeof resolveProject>>): string {
-  return project ? `project '${project.name}' (${project.id})` : "global";
+  return describeProjectFromModule(project);
 }
 
-/**
- * Checks if the git branch has changed since the last operation for a directory.
- * If a branch change is detected, automatically triggers sync to rebuild embeddings.
- * Returns true if sync was triggered, false otherwise.
- */
-async function ensureBranchSynced(cwd?: string): Promise<boolean> {
-  if (!cwd) return false;
+async function ensureBranchSynced(cwd?: string) {
+  return ensureBranchSyncedFromModule(ctx, cwd);
+}
 
-  const previousBranch = await checkBranchChange(cwd);
-  if (!previousBranch) return false; // No branch change or not in git repo
+async function shouldBlockProtectedBranchCommit(options: Omit<Parameters<typeof shouldBlockProtectedBranchCommitFromModule>[0], "ctx">) {
+  return shouldBlockProtectedBranchCommitFromModule({ ctx, ...options });
+}
 
-  console.error(`[branch] Detected branch change from '${previousBranch}' — auto-syncing`);
-  
-  // Different git roots = different lock keys. sync() acquires withMutationLock internally.
-  // Safe to parallelize across vaults.
-  const projectVault = await vaultManager.getProjectVaultIfExists(cwd);
+async function wouldRelationshipCleanupTouchProjectVault(noteIds: string[]) {
+  return wouldRelationshipCleanupTouchProjectVaultFromModule(ctx, noteIds);
+}
 
-  const [mainResult, projectSyncResult] = await Promise.all([
-    vaultManager.main.git.sync().then(async (result) => {
-      console.error(`[branch] Main vault sync: ${JSON.stringify(result)}`);
-      const backfill = await backfillEmbeddingsAfterSync(vaultManager.main.storage, "main vault", [], true);
-      console.error(`[branch] Main vault embedded ${backfill.embedded} notes`);
-      return result;
-    }),
-    projectVault
-      ? projectVault.git.sync().then(async (result) => {
-          console.error(`[branch] Project vault sync: ${JSON.stringify(result)}`);
-          const backfill = await backfillEmbeddingsAfterSync(projectVault.storage, "project vault", [], true);
-          console.error(`[branch] Project vault embedded ${backfill.embedded} notes`);
-          return result;
-        })
-      : Promise.resolve(undefined),
-  ]);
+async function embedTextForNote(storage: Storage, note: Note) {
+  return embedTextForNoteFromModule(storage, note);
+}
 
-  // Vault contents changed — discard session cache so next access rebuilds from fresh state
-  invalidateActiveProjectCache();
+async function embedMissingNotes(storage: Storage, noteIds?: string[], force = false) {
+  return embedMissingNotesFromModule(ctx, storage, noteIds, force);
+}
 
-  return true;
+async function backfillEmbeddingsAfterSync(storage: Storage, label: string, lines: string[], force = false) {
+  return backfillEmbeddingsAfterSyncFromModule(ctx, storage, label, lines, force);
+}
+
+async function removeStaleEmbeddings(storage: Storage, noteIds: string[]) {
+  return removeStaleEmbeddingsFromModule(storage, noteIds);
+}
+
+async function getMutationPushMode() {
+  return getMutationPushModeFromModule(ctx);
+}
+
+async function pushAfterMutation(vault: Vault) {
+  return pushAfterMutationFromModule(ctx, vault);
+}
+
+async function collectVisibleNotes(cwd?: string, scope: SearchScope = "all", tags?: string[], storedIn: StorageScope = "any", sessionProjectId?: string) {
+  return collectVisibleNotesFromModule(ctx, cwd, scope, tags, storedIn, sessionProjectId);
+}
+
+async function formatProjectPolicyLine(projectId?: string) {
+  return formatProjectPolicyLineFromModule(ctx, projectId);
+}
+
+async function moveNoteBetweenVaults(found: { note: Note; vault: Vault }, targetVault: Vault, noteToWrite?: Note, cwd?: string) {
+  return moveNoteBetweenVaultsFromModule(ctx, found, targetVault, noteToWrite, cwd);
+}
+
+async function removeRelationshipsToNoteIds(noteIds: string[]) {
+  return removeRelationshipsToNoteIdsFromModule(ctx, noteIds);
 }
 
 function formatProjectIdentityText(identity: ProjectIdentityResolution): string {
@@ -614,376 +593,6 @@ function formatProjectIdentityText(identity: ProjectIdentityResolution): string 
   }
 
   return lines.join("\n");
-}
-
-function describeLifecycle(lifecycle: NoteLifecycle): string {
-  return `lifecycle: ${lifecycle}`;
-}
-
-function formatNote(note: Note, score?: number, showRawRelated = true): string {
-  const scoreStr = score !== undefined ? ` | similarity: ${score.toFixed(3)}` : "";
-  const projectStr = note.project ? ` | project: ${note.projectName ?? note.project}` : " | global";
-  const roleStr = note.role ? ` | **role: ${note.role}**` : "";
-  const relStr = showRawRelated && note.relatedTo && note.relatedTo.length > 0
-    ? `\n**related:** ${note.relatedTo.map((r) => `\`${r.id}\` (${r.type})`).join(", ")}`
-    : "";
-  return (
-    `## ${note.title}\n` +
-    `**id:** \`${note.id}\`${projectStr}${scoreStr}\n` +
-    `**tags:** ${note.tags.join(", ") || "none"} | **${describeLifecycle(note.lifecycle)}**${roleStr} | **updated:** ${note.updatedAt}${relStr}\n\n` +
-    note.content
-  );
-}
-
-function formatTemporalHistory(
-  history: Array<{
-    commitHash: string;
-    timestamp: string;
-    message: string;
-    summary?: string;
-    changeDescription?: string;
-  }>
-): string {
-  if (history.length === 0) {
-    return "**history:** no git history found";
-  }
-
-  const lines = ["**history:**"];
-  for (const entry of history) {
-    const summary = entry.summary ? ` — ${entry.summary}` : "";
-    const changeDesc = entry.changeDescription ? ` (${entry.changeDescription})` : "";
-    lines.push(`- \`${entry.commitHash.slice(0, 7)}\` ${entry.timestamp} — ${entry.message}${summary}${changeDesc}`);
-  }
-  return lines.join("\n");
-}
-
-function formatRelationshipPreview(preview: RelationshipPreview): string {
-  const shown = preview.shown
-    .map(r => `${r.title} (\`${r.id}\`) [${r.relationType ?? "related-to"}]`)
-    .join(", ");
-  const more = preview.truncated
-    ? ` [+${preview.totalDirectRelations - preview.shown.length} more]`
-    : "";
-  return `**related (${preview.totalDirectRelations}):** ${shown}${more}`;
-}
-
-function toRecallFreshness(updatedAt: string): "today" | "thisWeek" | "thisMonth" | "older" {
-  const updated = new Date(updatedAt);
-  if (Number.isNaN(updated.getTime())) {
-    return "older";
-  }
-
-  const DAY_MS = 1000 * 60 * 60 * 24;
-  const FRESHNESS_TODAY_DAYS = 1;
-  const FRESHNESS_THIS_WEEK_DAYS = 7;
-  const FRESHNESS_THIS_MONTH_DAYS = 31;
-
-  const ageDays = Math.max(0, (Date.now() - updated.getTime()) / DAY_MS);
-  if (ageDays <= FRESHNESS_TODAY_DAYS) return "today";
-  if (ageDays <= FRESHNESS_THIS_WEEK_DAYS) return "thisWeek";
-  if (ageDays <= FRESHNESS_THIS_MONTH_DAYS) return "thisMonth";
-  return "older";
-}
-
-function toRecallRankBand(semanticRank?: number): "top3" | "top10" | "lower" {
-  if (semanticRank !== undefined && semanticRank <= 3) return "top3";
-  if (semanticRank !== undefined && semanticRank <= 10) return "top10";
-  return "lower";
-}
-
-function formatRetrievalEvidenceHint(evidence: RetrievalEvidence, role?: NoteRole): string {
-  const rolePart = role ?? "untyped";
-  const supersedesPart = evidence.superseded
-    ? ` | supersedes ${evidence.supersededCount ?? 1} note${(evidence.supersededCount ?? 1) === 1 ? "" : "s"}`
-    : "";
-  return `${evidence.rankBand} | channels: ${evidence.channels.join(", ")} | ${evidence.projectRelevant ? "project-relevant" : "cross-project"}\n${rolePart}, ${evidence.freshness}${supersedesPart}`;
-}
-
-// ── Git commit message helpers ────────────────────────────────────────────────
-
-/**
- * Extract a short human-readable summary from note content.
- * Returns the first sentence or first 100 chars, whichever is shorter.
- */
-function extractSummary(content: string, maxLength = 100): string {
-  // Normalize whitespace
-  const normalized = content.replace(/\s+/g, " ").trim();
-
-  // Try to find first sentence (ending with .!? followed by space or end)
-  const sentenceMatch = normalized.match(/^[^.!?]+[.!?]/);
-  if (sentenceMatch) {
-    const sentence = sentenceMatch[0].trim();
-    if (sentence.length <= maxLength) {
-      return sentence;
-    }
-  }
-
-  // Fallback: first maxLength chars
-  if (normalized.length <= maxLength) {
-    return normalized;
-  }
-
-  return normalized.slice(0, maxLength - 3) + "...";
-}
-
-interface CommitBodyOptions {
-  noteId?: string;
-  noteTitle?: string;
-  noteIds?: string[];
-  projectName?: string;
-  projectId?: string;
-  scope?: "project" | "global";
-  tags?: string[];
-  relationship?: { fromId: string; toId: string; type: string };
-  mode?: string;
-  count?: number;
-  summary?: string;
-  description?: string;
-}
-
-function formatCommitBody(options: CommitBodyOptions): string {
-  const lines: string[] = [];
-
-  // Human-readable summary comes first (like a good commit message)
-  if (options.summary) {
-    lines.push(options.summary);
-    lines.push("");
-  }
-
-  // Structured metadata follows
-  if (options.noteId && options.noteTitle) {
-    lines.push(`- Note: ${options.noteId} (${options.noteTitle})`);
-  }
-
-  if (options.noteIds && options.noteIds.length > 0) {
-    if (options.noteIds.length === 1 && !options.noteId) {
-      lines.push(`- Note: ${options.noteIds[0]}`);
-    } else if (options.noteIds.length > 1) {
-      lines.push(`- Notes: ${options.noteIds.length} notes affected`);
-      options.noteIds.forEach((id) => lines.push(`  - ${id}`));
-    }
-  }
-
-  if (options.count && !options.noteIds) {
-    lines.push(`- Count: ${options.count} items`);
-  }
-
-  if (options.projectName) {
-    lines.push(`- Project: ${options.projectName}`);
-  }
-
-  if (options.scope) {
-    lines.push(`- Scope: ${options.scope}`);
-  }
-
-  if (options.tags && options.tags.length > 0) {
-    lines.push(`- Tags: ${options.tags.join(", ")}`);
-  }
-
-  if (options.relationship) {
-    lines.push(`- Relationship: ${options.relationship.fromId} ${options.relationship.type} ${options.relationship.toId}`);
-  }
-
-  if (options.mode) {
-    lines.push(`- Mode: ${options.mode}`);
-  }
-
-  if (options.description) {
-    lines.push("");
-    lines.push(options.description);
-  }
-
-  return lines.join("\n");
-}
-
-function formatAskForWriteScope(
-  project: Awaited<ReturnType<typeof resolveProject>>,
-  unadopted: boolean = false,
-): string {
-  const projectLabel = project ? `${project.name} (${project.id})` : "this context";
-  const header = unadopted
-    ? `No memory policy set for ${projectLabel} and this project hasn't adopted mnemonic yet.`
-    : `Project memory policy for ${projectLabel} is set to always ask.`;
-  return [
-    header,
-    "Choose where to store this memory and call `remember` again with one of:",
-    "- `scope: \"project\"` — create `.mnemonic/` in this repo and store there (adopts mnemonic)",
-    "- `scope: \"global\"` — private main vault with project association",
-    "",
-    "To avoid being asked again: call `set_project_memory_policy` with your preferred scope.",
-  ].join("\n");
-}
-
-function formatAskForProtectedBranch(
-  projectLabel: string,
-  branch: string,
-  patterns: string[],
-  toolName: string,
-): string {
-  return [
-    `Protected branch check for ${projectLabel}: current branch \`${branch}\` matches ${patterns.join(", ")}.`,
-    "Choose how to proceed:",
-    `- One-time override: call \`${toolName}\` again with \`allowProtectedBranch: true\``,
-    "- Persist policy: call `set_project_memory_policy` with `protectedBranchBehavior: \"block\"`",
-    "- Persist policy: call `set_project_memory_policy` with `protectedBranchBehavior: \"allow\"`",
-    "",
-    "Optional: set `protectedBranchPatterns` to customize which branches are protected.",
-  ].join("\n");
-}
-
-function formatProtectedBranchBlocked(
-  projectLabel: string,
-  branch: string,
-  patterns: string[],
-  toolName: string,
-): string {
-  return [
-    `Auto-commit blocked for ${projectLabel}: current branch \`${branch}\` matches protected patterns ${patterns.join(", ")}.`,
-    "Policy is set to `protectedBranchBehavior: \"block\"`.",
-    `To proceed once, call \`${toolName}\` again with \`allowProtectedBranch: true\`.`,
-    "To change the default, call `set_project_memory_policy` with `protectedBranchBehavior: \"allow\"`.",
-  ].join("\n");
-}
-
-async function shouldBlockProtectedBranchCommit(options: {
-  cwd?: string;
-  writeScope: WriteScope;
-  automaticCommit: boolean;
-  projectLabel: string;
-  policy: ProjectMemoryPolicy | undefined;
-  allowProtectedBranch: boolean;
-  toolName: string;
-}): Promise<{ blocked: boolean; message?: string }> {
-  const { cwd, writeScope, automaticCommit, projectLabel, policy, allowProtectedBranch, toolName } = options;
-  if (!cwd || writeScope !== "project" || !automaticCommit) {
-    return { blocked: false };
-  }
-
-  const branch = await getCurrentGitBranch(cwd);
-  if (!branch) {
-    return { blocked: false };
-  }
-
-  const patterns = resolveProtectedBranchPatterns(policy);
-  if (!isProtectedBranch(branch, patterns) || allowProtectedBranch) {
-    return { blocked: false };
-  }
-
-  const behavior = resolveProtectedBranchBehavior(policy);
-  if (behavior === "allow") {
-    return { blocked: false };
-  }
-
-  const message = behavior === "block"
-    ? formatProtectedBranchBlocked(projectLabel, branch, patterns, toolName)
-    : formatAskForProtectedBranch(projectLabel, branch, patterns, toolName);
-  return { blocked: true, message };
-}
-
-async function wouldRelationshipCleanupTouchProjectVault(noteIds: string[]): Promise<boolean> {
-  const noteIdSet = new Set(noteIds);
-  for (const vault of vaultManager.allKnownVaults()) {
-    if (!vault.isProject) {
-      continue;
-    }
-
-    const notes = await vault.storage.listNotes();
-    for (const note of notes) {
-      if ((note.relatedTo ?? []).some((rel) => noteIdSet.has(rel.id))) {
-        return true;
-      }
-    }
-  }
-
-  return false;
-}
-
-/**
- * Get the text to use for embedding a note.
- * Uses the projection's projectionText when available and fresh;
- * falls back to the raw title+content if projection fails.
- */
-async function embedTextForNote(storage: Storage, note: Note): Promise<string> {
-  try {
-    const projection = await getOrBuildProjection(storage, note);
-    return projection.projectionText;
-  } catch {
-    return `${note.title}\n\n${note.content}`;
-  }
-}
-
-async function embedMissingNotes(
-  storage: Storage,
-  noteIds?: string[],
-  force = false
-): Promise<{ rebuilt: number; failed: string[] }> {
-  const notes = noteIds
-    ? (await Promise.all(noteIds.map((id) => storage.readNote(memoryId(id))))).filter((n): n is Note => n !== null)
-    : await storage.listNotes();
-
-  let rebuilt = 0;
-  const failed: string[] = [];
-  let index = 0;
-
-  const workerCount = Math.min(config.reindexEmbedConcurrency, Math.max(notes.length, 1));
-  const workers = Array.from({ length: workerCount }, async () => {
-    while (true) {
-      const note = notes[index++];
-      if (!note) {
-        return;
-      }
-
-      if (!force) {
-        const existing = await storage.readEmbedding(note.id);
-        if (existing?.model === embedModel && existing.updatedAt >= note.updatedAt) {
-          continue;
-        }
-      }
-
-      try {
-        const text = await embedTextForNote(storage, note);
-        const vector = await embed(text);
-        await storage.writeEmbedding({
-          id: note.id,
-          model: embedModel,
-          embedding: vector,
-          updatedAt: isoDateString(new Date().toISOString()),
-        });
-        rebuilt++;
-      } catch {
-        failed.push(note.id);
-      }
-    }
-  });
-
-  await Promise.all(workers);
-
-  failed.sort();
-
-  return { rebuilt, failed };
-}
-
-async function backfillEmbeddingsAfterSync(
-  storage: Storage,
-  label: string,
-  lines: string[],
-  force = false,
-): Promise<{ embedded: number; failed: string[] }> {
-  const { rebuilt, failed } = await embedMissingNotes(storage, undefined, force);
-  if (rebuilt > 0 || failed.length > 0) {
-    lines.push(
-      `${label}: embedded ${rebuilt} note(s)${force ? " (force rebuild)." : " (including any missing local embeddings)."}` +
-      `${failed.length > 0 ? ` Failed: ${failed.join(", ")}` : ""}`,
-    );
-  }
-
-  return { embedded: rebuilt, failed };
-}
-
-async function removeStaleEmbeddings(storage: Storage, noteIds: string[]): Promise<void> {
-  for (const id of noteIds) {
-    try { await fs.unlink(storage.embeddingPath(memoryId(id))); } catch { /* already gone */ }
-  }
 }
 
 function formatSyncResult(result: SyncResult, label: string, vaultPath?: string): string[] {
@@ -1017,460 +626,6 @@ function formatSyncResult(result: SyncResult, label: string, vaultPath?: string)
     ? `${label}: ↓ ${result.pulledNoteIds.length} note(s) pulled.`
     : `${label}: ↓ no new notes from remote.`);
   return lines;
-}
-
-function resolveDurability(commit: CommitResult, push: PushResult): PersistenceStatus["durability"] {
-  if (push.status === "pushed") {
-    return "pushed";
-  }
-
-  if (commit.status === "committed") {
-    return "committed";
-  }
-
-  return "local-only";
-}
-
-function buildPersistenceStatus(args: {
-  storage: Storage;
-  id: string;
-  embedding: { status: "written" | "skipped"; reason?: string };
-  commit: CommitResult;
-  push: PushResult;
-  commitMessage?: string;
-  commitBody?: string;
-  retry?: MutationRetryContract;
-}): PersistenceStatus {
-  return {
-    notePath: args.storage.notePath(memoryId(args.id)),
-    embeddingPath: args.storage.embeddingPath(memoryId(args.id)),
-    embedding: {
-      status: args.embedding.status,
-      model: embedModel,
-      reason: args.embedding.reason,
-    },
-    git: {
-      commit: args.commit.status,
-      push: args.push.status,
-      commitOperation: args.commit.status === "failed" ? args.commit.operation : undefined,
-      commitMessage: args.commitMessage,
-      commitBody: args.commitBody,
-      commitReason: args.commit.status === "failed" ? args.commit.reason : args.commit.status === "skipped" ? args.commit.reason : undefined,
-      commitError: args.commit.status === "failed" ? args.commit.error : undefined,
-      pushReason: args.push.status === "skipped" ? args.push.reason : undefined,
-      pushError: args.push.status === "failed" ? args.push.error : undefined,
-    },
-    retry: args.retry,
-    durability: resolveDurability(args.commit, args.push),
-  };
-}
-
-function buildMutationRetryContract(args: {
-  commit: CommitResult;
-  commitMessage: string;
-  commitBody?: string;
-  files: string[];
-  cwd?: string;
-  vault: Vault;
-  mutationApplied: boolean;
-  preferredRecovery?: "manual-exact-git-recovery" | "rerun-tool-call-serial" | "no-manual-recovery";
-}): MutationRetryContract | undefined {
-  if (args.commit.status !== "failed") {
-    return undefined;
-  }
-
-  const recoveryKind = args.preferredRecovery ?? (args.mutationApplied
-    ? "manual-exact-git-recovery"
-    : "no-manual-recovery");
-
-  const recoveryReason = recoveryKind === "rerun-tool-call-serial"
-    ? "Tool-level reconciliation exists for this mutation; rerun the same tool call serially for the affected vault."
-    : recoveryKind === "manual-exact-git-recovery"
-      ? "Mutation is already persisted on disk; manual git recovery is allowed only with the exact attemptedCommit values."
-      : "Mutation was not applied deterministically; manual git recovery is not authorized.";
-
-  return {
-    recovery: {
-      kind: recoveryKind,
-      allowed: recoveryKind !== "no-manual-recovery",
-      reason: recoveryReason,
-    },
-    attemptedCommit: {
-      subject: args.commitMessage,
-      body: args.commitBody,
-      files: args.files,
-      cwd: args.cwd,
-      vault: storageLabel(args.vault),
-      error: args.commit.error ?? "Unknown git commit failure",
-      operation: args.commit.operation,
-    },
-    mutationApplied: args.mutationApplied,
-    retrySafe: args.mutationApplied,
-    rationale: args.mutationApplied
-      ? "Mutation is already persisted on disk; commit can be retried deterministically."
-      : "Mutation was not applied; retry may require re-running the operation.",
-    instructions: {
-      sourceOfTruth: recoveryKind === "manual-exact-git-recovery" ? "attemptedCommit" : "tool-response",
-      useExactSubject: recoveryKind === "manual-exact-git-recovery",
-      useExactBody: recoveryKind === "manual-exact-git-recovery",
-      useExactFiles: recoveryKind === "manual-exact-git-recovery",
-      forbidInferenceFromHistory: true,
-      forbidInferenceFromTitleOrSummary: true,
-      forbidParallelSameVaultRetries: true,
-      preferToolReconciliation: recoveryKind === "rerun-tool-call-serial",
-      rerunSameToolCallSerially: recoveryKind === "rerun-tool-call-serial",
-    },
-  };
-}
-
-function formatRetrySummary(retry?: MutationRetryContract): string | undefined {
-  if (!retry) {
-    return undefined;
-  }
-
-  const opLabel = retry.attemptedCommit.operation === "add" ? "add" : "commit";
-  const error = retry.attemptedCommit.error;
-  const lines: string[] = [];
-
-  switch (retry.recovery.kind) {
-    case "rerun-tool-call-serial":
-      lines.push("Recovery: rerun same tool call serially");
-      lines.push(retry.recovery.reason);
-      lines.push("Rerun the same mnemonic tool call one time for the affected vault.");
-      lines.push("Do not replay same-vault mutations in parallel.");
-      lines.push("Manual git recovery is not authorized for this failure.");
-      lines.push("Git failure:");
-      lines.push(`${opLabel}: ${error}`);
-      break;
-    case "manual-exact-git-recovery":
-      lines.push("Recovery: manual exact git recovery allowed");
-      lines.push(retry.recovery.reason);
-      lines.push("Use only the exact values below. Do not infer from git history, note title, summary, or repo state.");
-      lines.push("");
-      lines.push("Commit subject:");
-      lines.push(retry.attemptedCommit.subject);
-      if (retry.attemptedCommit.body) {
-        lines.push("");
-        lines.push("Commit body:");
-        lines.push(retry.attemptedCommit.body);
-      }
-      lines.push("");
-      lines.push("Files:");
-      for (const file of retry.attemptedCommit.files) {
-        lines.push(`- ${file}`);
-      }
-      lines.push("");
-      lines.push("Git failure:");
-      lines.push(`${opLabel}: ${error}`);
-      break;
-    case "no-manual-recovery":
-      lines.push("Recovery: no manual recovery authorized");
-      lines.push(retry.recovery.reason);
-      lines.push("Git failure:");
-      lines.push(`${opLabel}: ${error}`);
-      break;
-    default: {
-      const _exhaustive: never = retry.recovery.kind;
-      throw new Error(`Unknown recovery kind: ${_exhaustive}`);
-    }
-  }
-
-  return lines.join("\n");
-}
-
-function formatPersistenceSummary(persistence: PersistenceStatus): string {
-  const parts = [
-    `Persistence: embedding ${persistence.embedding.status}`,
-    `git ${persistence.durability}`,
-  ];
-
-  const lines = [parts.join(" | ")];
-
-  if (persistence.embedding.reason) {
-    lines[0] += ` | embedding reason=${persistence.embedding.reason}`;
-  }
-
-  const retrySummary = formatRetrySummary(persistence.retry);
-
-  if (!retrySummary && persistence.git.commit === "failed" && persistence.git.commitError) {
-    const opLabel = persistence.git.commitOperation === "add" ? "add" : "commit";
-    lines.push(`Git ${opLabel} error: ${persistence.git.commitError}`);
-  }
-
-  if (persistence.git.push === "failed" && persistence.git.pushError) {
-    lines.push(`Git push error: ${persistence.git.pushError}`);
-  }
-
-  if (retrySummary) {
-    lines.push(retrySummary);
-  }
-
-  return lines.join("\n");
-}
-
-async function getMutationPushMode(): Promise<MutationPushMode> {
-  const latestConfig = await configStore.load();
-  return latestConfig.mutationPushMode;
-}
-
-async function pushAfterMutation(vault: Vault): Promise<PushResult> {
-  const mutationPushMode = await getMutationPushMode();
-
-  switch (mutationPushMode) {
-    case "all":
-      return vault.git.pushWithStatus();
-    case "main-only":
-      return vault.isProject
-        ? { status: "skipped", reason: "auto-push-disabled" }
-        : vault.git.pushWithStatus();
-    case "none":
-      return { status: "skipped", reason: "auto-push-disabled" };
-    default: {
-      const _exhaustive: never = mutationPushMode;
-      throw new Error(`Unknown mutation push mode: ${_exhaustive}`);
-    }
-  }
-}
-
-type SearchScope = "project" | "global" | "all";
-type StorageScope = "project-vault" | "main-vault" | "any";
-
-type NoteEntry = {
-  note: Note;
-  vault: Vault;
-};
-
-function storageLabel(vault: Vault): string {
-  if (!vault.isProject) return "main-vault";
-  // Primary project vault uses the conventional label for backward compatibility.
-  if (vault.vaultFolderName === ".mnemonic") return "project-vault";
-  // Submodule vaults use a "sub-vault:<folder>" label so the type and folder are both clear.
-  return `sub-vault:${vault.vaultFolderName}`;
-}
-
-/**
- * Check whether a vault matches a storage scope filter.
- * "project-vault" matches all project vaults including submodule vaults.
- */
-function vaultMatchesStorageScope(vault: Vault, storedIn: StorageScope): boolean {
-  if (storedIn === "any") return true;
-  if (storedIn === "main-vault") return !vault.isProject;
-  // "project-vault" covers the primary project vault and all submodule vaults.
-  return vault.isProject;
-}
-
-async function collectVisibleNotes(
-  cwd?: string,
-  scope: SearchScope = "all",
-  tags?: string[],
-  storedIn: StorageScope = "any",
-  sessionProjectId?: string,
-): Promise<{ project: Awaited<ReturnType<typeof resolveProject>>; entries: NoteEntry[] }> {
-  const project = await resolveProject(cwd);
-  const vaults = await vaultManager.searchOrder(cwd);
-
-  let filterProject: string | null | undefined = undefined;
-  if (scope === "project" && project) filterProject = project.id;
-  else if (scope === "global") filterProject = null;
-
-  const seen = new Set<string>();
-  const entries: NoteEntry[] = [];
-
-  for (const vault of vaults) {
-    let rawNotes: Note[];
-    if (sessionProjectId) {
-      const cached = await getOrBuildVaultNoteList(sessionProjectId, vault);
-      if (cached !== undefined) {
-        // Apply project filter on the full cached list
-        rawNotes = filterProject !== undefined
-          ? cached.filter((n) => filterProject === null ? !n.project : n.project === filterProject)
-          : cached;
-      } else {
-        rawNotes = await vault.storage.listNotes(
-          filterProject !== undefined ? { project: filterProject } : undefined
-        );
-      }
-    } else {
-      rawNotes = await vault.storage.listNotes(
-        filterProject !== undefined ? { project: filterProject } : undefined
-      );
-    }
-    for (const note of rawNotes) {
-      if (seen.has(note.id)) {
-        continue;
-      }
-      if (tags && tags.length > 0) {
-        const noteTags = new Set(note.tags);
-        if (!tags.every((tag) => noteTags.has(tag))) {
-          continue;
-        }
-      }
-      if (storedIn !== "any" && !vaultMatchesStorageScope(vault, storedIn)) {
-        continue;
-      }
-      seen.add(note.id);
-      entries.push({ note, vault });
-    }
-  }
-
-  entries.sort((a, b) => {
-    const aRank = project && a.note.project === project.id ? 0 : a.note.project ? 1 : 2;
-    const bRank = project && b.note.project === project.id ? 0 : b.note.project ? 1 : 2;
-    return aRank - bRank || a.note.title.localeCompare(b.note.title);
-  });
-
-  return { project, entries };
-}
-
-function formatListEntry(
-  entry: NoteEntry,
-  options: { includeRelations?: boolean; includePreview?: boolean; includeStorage?: boolean; includeUpdated?: boolean } = {}
-): string {
-  const { note, vault } = entry;
-  const proj = note.project ? `[${note.projectName ?? note.project}]` : "[global]";
-  const extras: string[] = [];
-  if (note.tags.length > 0) extras.push(note.tags.join(", "));
-  extras.push(`lifecycle: ${note.lifecycle}`);
-  if (note.role) extras.push(`role: ${note.role}`);
-  if (options.includeStorage) extras.push(`stored: ${storageLabel(vault)}`);
-  if (options.includeUpdated) extras.push(`updated: ${note.updatedAt}`);
-  const lines = [`- **${note.title}** \`${note.id}\` ${proj}${extras.length > 0 ? ` — ${extras.join(" | ")}` : ""}`];
-  if (options.includeRelations && note.relatedTo && note.relatedTo.length > 0) {
-    lines.push(`  related: ${note.relatedTo.map((rel) => `${rel.id} (${rel.type})`).join(", ")}`);
-  }
-  if (options.includePreview) {
-    lines.push(`  preview: ${summarizePreview(note.content)}`);
-  }
-  return lines.join("\n");
-}
-
-async function formatProjectPolicyLine(projectId?: string): Promise<string> {
-  if (!projectId) {
-    return "Policy: none";
-  }
-  const policy = await configStore.getProjectPolicy(projectId);
-  if (!policy) {
-    return "Policy: none (fallback write scope with cwd is project)";
-  }
-  return `Policy: default write scope ${policy.defaultScope} (updated ${policy.updatedAt})`;
-}
-
-async function moveNoteBetweenVaults(
-  found: { note: Note; vault: Vault },
-  targetVault: Vault,
-  noteToWrite?: Note,
-  cwd?: string,
-): Promise<{ note: Note; persistence: PersistenceStatus }> {
-  const { note, vault: sourceVault } = found;
-  const finalNote = noteToWrite ?? note;
-  const embedding = await sourceVault.storage.readEmbedding(note.id);
-
-  await targetVault.storage.writeNote(finalNote);
-  if (embedding) {
-    await targetVault.storage.writeEmbedding(embedding);
-  }
-
-  await sourceVault.storage.deleteNote(note.id);
-
-  const sourceVaultLabel = storageLabel(sourceVault);
-  const targetVaultLabel = storageLabel(targetVault);
-
-  const targetCommitBody = formatCommitBody({
-    summary: `Moved from ${sourceVaultLabel} to ${targetVaultLabel}`,
-    noteId: finalNote.id,
-    noteTitle: finalNote.title,
-    projectName: finalNote.projectName,
-  });
-  const targetCommitMessage = `move: ${finalNote.title}`;
-  const targetCommitFiles = [vaultManager.noteRelPath(targetVault, finalNote.id)];
-  const targetCommit = await targetVault.git.commitWithStatus(targetCommitMessage, targetCommitFiles, targetCommitBody);
-
-  const sourceCommitBody = formatCommitBody({
-    summary: `Moved to ${targetVaultLabel}`,
-    noteId: finalNote.id,
-    noteTitle: finalNote.title,
-    projectName: finalNote.projectName,
-  });
-  await sourceVault.git.commitWithStatus(`move: ${finalNote.title}`, [vaultManager.noteRelPath(sourceVault, finalNote.id)], sourceCommitBody);
-  const targetPush = targetCommit.status === "committed"
-    ? await pushAfterMutation(targetVault)
-    : { status: "skipped" as const, reason: "commit-failed" as const };
-  const retry = buildMutationRetryContract({
-    commit: targetCommit,
-    commitMessage: targetCommitMessage,
-    commitBody: targetCommitBody,
-    files: targetCommitFiles,
-    cwd,
-    vault: targetVault,
-    mutationApplied: true,
-  });
-  if (sourceVault !== targetVault) {
-    await pushAfterMutation(sourceVault);
-  }
-
-  return {
-    note: finalNote,
-    persistence: buildPersistenceStatus({
-      storage: targetVault.storage,
-      id: finalNote.id,
-      embedding: embedding ? { status: "written" } : { status: "skipped", reason: "no-source-embedding" },
-      commit: targetCommit,
-      push: targetPush,
-      commitMessage: targetCommitMessage,
-      commitBody: targetCommitBody,
-      retry,
-    }),
-  };
-}
-
-async function removeRelationshipsToNoteIds(noteIds: string[]): Promise<Map<Vault, string[]>> {
-  const vaultChanges = new Map<Vault, string[]>();
-
-  // Different vaults = different repos = different lock keys. Safe to parallelize across vaults.
-  await Promise.all(
-    vaultManager.allKnownVaults().map(async (vault) => {
-      const notes = await vault.storage.listNotes();
-      // Within a vault, writeNote writes to independent files (staged or direct paths).
-      await Promise.all(
-        notes.map(async (note) => {
-          const filtered = filterRelationships(note.relatedTo, noteIds);
-          if (filtered === note.relatedTo) {
-            return;
-          }
-
-          await vault.storage.writeNote({
-            ...note,
-            relatedTo: filtered,
-          });
-          addVaultChange(vaultChanges, vault, vaultManager.noteRelPath(vault, note.id));
-        }),
-      );
-    }),
-  );
-
-  return vaultChanges;
-}
-
-function addVaultChange(vaultChanges: Map<Vault, string[]>, vault: Vault, file: string): void {
-  const files = vaultChanges.get(vault) ?? [];
-  if (!files.includes(file)) {
-    files.push(file);
-    vaultChanges.set(vault, files);
-  }
-}
-
-const ROLE_LIFECYCLE_DEFAULTS = {
-  research: "temporary",
-  plan: "temporary",
-  review: "temporary",
-  context: "temporary",
-  decision: "permanent",
-  summary: "permanent",
-  reference: "permanent",
-} as const satisfies Record<NoteRole, NoteLifecycle>;
-
-function projectNotFoundResponse(cwd: string) {
-  return { content: [{ type: "text" as const, text: `Could not detect a project for: ${cwd}` }], isError: true as const };
 }
 
 // ── MCP Server ────────────────────────────────────────────────────────────────
