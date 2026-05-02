@@ -3,8 +3,10 @@ import path from "path";
 import { randomUUID } from "crypto";
 import matter from "gray-matter";
 import type { NoteProjection } from "./structured-content.js";
+import { validateEmbeddingRecord, validateNoteProjection, validateRelatedTo } from "./validation.js";
 
-export type RelationshipType = "related-to" | "explains" | "example-of" | "supersedes" | "derives-from" | "follows";
+export const RELATIONSHIP_TYPES = ["related-to", "explains", "example-of", "supersedes", "derives-from", "follows"] as const;
+export type RelationshipType = typeof RELATIONSHIP_TYPES[number];
 export type NoteLifecycle = "temporary" | "permanent";
 export type NoteRole = "summary" | "decision" | "plan" | "context" | "reference" | "research" | "review";
 export type NoteImportance = "high" | "normal" | "low";
@@ -96,21 +98,14 @@ export class Storage {
     const stagedDir = this.stagedNotesDir;
     const stagedFiles = await fs.readdir(stagedDir).catch(() => []);
 
-    for (const file of stagedFiles) {
-      if (!file.endsWith(".md")) {
-        continue;
-      }
+    const mdFiles = stagedFiles.filter((f) => f.endsWith(".md"));
+    await Promise.all(
+      mdFiles.map((file) => fs.rename(path.join(stagedDir, file), path.join(this.notesDir, file))),
+    );
 
-      await fs.rename(path.join(stagedDir, file), path.join(this.notesDir, file));
-    }
-
-    for (const noteId of this.stagedDeletedNoteIds) {
-      try {
-        await fs.unlink(this.notePath(noteId));
-      } catch {
-        // already absent
-      }
-    }
+    await Promise.allSettled(
+      [...this.stagedDeletedNoteIds].map((noteId) => fs.unlink(this.notePath(noteId))),
+    );
 
     await this.clearAtomicNotesWrite();
   }
@@ -170,14 +165,12 @@ export class Storage {
       return true;
     }
 
-    try {
-      await fs.unlink(this.notePath(id));
-      try { await fs.unlink(this.embeddingPath(id)); } catch { /* ok */ }
-      try { await fs.unlink(this.projectionPath(id)); } catch { /* ok */ }
-      return true;
-    } catch {
-      return false;
-    }
+    const [noteResult] = await Promise.allSettled([
+      fs.unlink(this.notePath(id)),
+      fs.unlink(this.embeddingPath(id)),
+      fs.unlink(this.projectionPath(id)),
+    ]);
+    return noteResult.status === "fulfilled";
   }
 
   async listNotes(filter?: { project?: string | null }): Promise<Note[]> {
@@ -244,7 +237,7 @@ export class Storage {
   async readEmbedding(id: string): Promise<EmbeddingRecord | null> {
     try {
       const raw = await fs.readFile(this.embeddingPath(id), "utf-8");
-      return JSON.parse(raw) as EmbeddingRecord;
+      return validateEmbeddingRecord(JSON.parse(raw));
     } catch {
       return null;
     }
@@ -278,7 +271,7 @@ export class Storage {
   async readProjection(id: string): Promise<NoteProjection | null> {
     try {
       const raw = await fs.readFile(this.projectionPath(id), "utf-8");
-      return JSON.parse(raw) as NoteProjection;
+      return validateNoteProjection(JSON.parse(raw));
     } catch {
       return null;
     }
@@ -367,9 +360,9 @@ export class Storage {
       role: normalizeRole(parsed.data["role"]),
       importance: normalizeImportance(parsed.data["importance"]),
       alwaysLoad: normalizeAlwaysLoad(parsed.data["alwaysLoad"]),
-      project: parsed.data["project"] as string | undefined,
-      projectName: parsed.data["projectName"] as string | undefined,
-      relatedTo: parsed.data["relatedTo"] as Relationship[] | undefined,
+      project: typeof parsed.data["project"] === "string" ? parsed.data["project"] : undefined,
+      projectName: typeof parsed.data["projectName"] === "string" ? parsed.data["projectName"] : undefined,
+      relatedTo: validateRelatedTo(parsed.data["relatedTo"]),
       createdAt: toIsoString(parsed.data["createdAt"]),
       updatedAt: toIsoString(parsed.data["updatedAt"]),
       memoryVersion: normalizeMemoryVersion(parsed.data["memoryVersion"]),
