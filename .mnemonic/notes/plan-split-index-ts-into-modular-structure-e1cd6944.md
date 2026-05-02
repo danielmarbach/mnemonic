@@ -6,7 +6,7 @@ tags:
   - refactoring
 lifecycle: temporary
 createdAt: '2026-05-02T06:10:17.697Z'
-updatedAt: '2026-05-02T14:22:45.552Z'
+updatedAt: '2026-05-02T20:14:31.921Z'
 role: plan
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -106,7 +106,15 @@ index.ts: ~822 → ~589 lines. All 845 tests pass. TypeScript compiles with --no
 - \[ ] Remove unused imports from index.ts
 - \[ ] Verify tsc and tests
 
-### Phase 3: Extract CLI Commands, Prompts, Startup
+### Phase 3: Extract CLI Commands, Prompts, Startup — DONE ✅
+
+- \[x] Move CLI migrate command to `src/cli/migrate.ts` — exports `runMigrateCli()`
+- \[x] Move CLI import-claude-memory command to `src/cli/import-claude-memory.ts` — exports `runImportCli()`, `makeImportNoteId()`
+- \[x] Move prompt registrations to `src/prompts.ts` — exports `registerPrompts(server)`
+- \[x] Extend `src/startup.ts` with `startServer(server, ctx)`
+- \[x] Verify: `tsc --noEmit` passes, all tests pass
+
+index.ts: ~589 → ~172 lines after Phase 3 wiring. Committed.
 
 - \[ ] Move CLI migrate command to `src/cli/migrate.ts`
 - \[ ] Move CLI import-claude-memory command to `src/cli/import-claude-memory.ts`
@@ -114,7 +122,26 @@ index.ts: ~822 → ~589 lines. All 845 tests pass. TypeScript compiles with --no
 - \[ ] Move `warnAboutPendingMigrationsOnStartup` and startup logic to `src/startup.ts`
 - \[ ] Verify: `tsc --noEmit` passes, all tests pass
 
-### Phase 4: Slim index.ts to Pure Wiring
+### Phase 4: Slim index.ts to Pure Wiring — DONE ✅
+
+- \[x] Extract `createServerContext()` and `readPackageVersion()` to `src/context.ts`
+- \[x] Create `src/tools/index.ts` barrel — exports `registerAllTools(server, ctx)`
+- \[x] Slim `index.ts` to: imports, CLI guards, context creation, server creation, tool registrations, server start
+- \[x] Target achieved: **41 lines**
+- \[x] Verify: `tsc --noEmit` passes, `tsc --noUnusedLocals` passes, all non-flaky tests pass
+
+Final `src/index.ts` structure:
+
+```
+imports (7 lines)
+CLI guards: migrate (7 lines)
+CLI guards: import-claude-memory (7 lines)
+context + server creation (8 lines)
+registerAllTools + registerPrompts (2 lines)
+startServer (1 line)
+```
+
+All modularization complete. Committed.
 
 - \[ ] Reduce `index.ts` to: imports, ServerContext creation, tool registration calls, server start
 - \[ ] Target: ~100-150 lines
