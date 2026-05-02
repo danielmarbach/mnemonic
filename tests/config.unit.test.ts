@@ -122,6 +122,59 @@ describe("MnemonicConfigStore", () => {
     });
   });
 
+  it("caches reads and invalidates on write", async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "mnemonic-config-"));
+    tempDirs.push(dir);
+    const configPath = path.join(dir, "config.json");
+
+    const store = new MnemonicConfigStore(dir);
+    const first = await store.load();
+    expect(first.mutationPushMode).toBe("main-only");
+    expect(first.projectMemoryPolicies).toEqual({});
+
+    await fs.writeFile(configPath, JSON.stringify({ mutationPushMode: "none" }, null, 2), "utf-8");
+
+    const cached = await store.load();
+    expect(cached.mutationPushMode).toBe("main-only");
+
+    store.invalidateCache();
+
+    const refreshed = await store.load();
+    expect(refreshed.mutationPushMode).toBe("none");
+  });
+
+  it("updates cache after write", async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "mnemonic-config-"));
+    tempDirs.push(dir);
+
+    const store = new MnemonicConfigStore(dir);
+    await store.load();
+
+    await store.setProjectPolicy({
+      projectId: "project-x",
+      projectName: "Project X",
+      defaultScope: "project",
+      consolidationMode: "supersedes",
+      protectedBranchPatterns: undefined,
+      protectedBranchBehavior: undefined,
+      updatedAt: "2026-04-01T00:00:00.000Z",
+    });
+
+    await expect(store.getProjectPolicy("project-x")).resolves.toEqual({
+      projectId: "project-x",
+      projectName: "Project X",
+      defaultScope: "project",
+      consolidationMode: "supersedes",
+      protectedBranchBehavior: undefined,
+      protectedBranchPatterns: undefined,
+      updatedAt: "2026-04-01T00:00:00.000Z",
+    });
+
+    const rawConfig = await fs.readFile(path.join(dir, "config.json"), "utf-8");
+    const parsed = JSON.parse(rawConfig);
+    expect(parsed.projectMemoryPolicies["project-x"].projectId).toBe("project-x");
+  });
+
   it("normalizes project memory policies loaded from config", async () => {
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), "mnemonic-config-"));
     tempDirs.push(dir);

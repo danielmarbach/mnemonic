@@ -185,6 +185,7 @@ export async function writeVaultSchemaVersion(vaultPath: string, schemaVersion: 
 
 export class MnemonicConfigStore {
   readonly filePath: string;
+  #cache: MnemonicConfig | null = null;
 
   constructor(mainVaultPath: string) {
     this.filePath = path.join(path.resolve(mainVaultPath), "config.json");
@@ -222,12 +223,21 @@ export class MnemonicConfigStore {
     await this.writeAll(config);
   }
 
+  invalidateCache(): void {
+    this.#cache = null;
+  }
+
   private async readAll(): Promise<MnemonicConfig> {
+    if (this.#cache) {
+      return this.#cache;
+    }
+
+    let config: MnemonicConfig;
     try {
       const raw = await fs.readFile(this.filePath, "utf-8");
       const parsed = MnemonicConfigRawSchema.safeParse(JSON.parse(raw));
       const data = parsed.success ? parsed.data : {};
-      return {
+      config = {
         schemaVersion: normalizeSchemaVersion(data.schemaVersion),
         reindexEmbedConcurrency: normalizeConcurrency(data.reindexEmbedConcurrency),
         mutationPushMode: normalizeMutationPushMode(data.mutationPushMode),
@@ -236,12 +246,16 @@ export class MnemonicConfigStore {
       };
     } catch (err) {
       debugLog("config:read", `failed, returning defaults: ${getErrorMessage(err)}`);
-      return { ...defaultConfig };
+      config = { ...defaultConfig };
     }
+
+    this.#cache = config;
+    return config;
   }
 
   private async writeAll(config: MnemonicConfig): Promise<void> {
     await fs.writeFile(this.filePath, JSON.stringify(config, null, 2) + "\n", "utf-8");
+    this.#cache = config;
   }
 }
 
