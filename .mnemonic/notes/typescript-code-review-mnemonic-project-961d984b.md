@@ -8,7 +8,7 @@ tags:
   - performance
 lifecycle: permanent
 createdAt: '2026-05-02T04:20:54.784Z'
-updatedAt: '2026-05-02T04:36:39.931Z'
+updatedAt: '2026-05-02T04:39:49.875Z'
 role: review
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -107,12 +107,48 @@ Followed `.agents/skills/typescript-code-review/SKILL.md` workflow (Steps 1-7) w
 - `storage.ts:159-181` — note/embedding/projection deletions are sequential
 - `index.ts:419-421` — imported notes written sequentially
 
-### I7: Performance — O(n²) algorithms
+### I7-Revised: Performance — O(n²) algorithms (validated against design)
+
+**Finding 1: `role-suggestions.ts:40-61` — `buildRoleSuggestionContext`**
+
+Original claim: "scans all notes per note for inbound references".
+
+**Validated: TRUE, but scope-limited.** The function at `relationships.ts:40-61` iterates `allNotes` for each note to count inbound references and permanent-note links. However, it's only called inside `suggestAutoRelationships` → `getDirectRelatedNotes` → scoring loop, which builds `RoleSuggestionContext` for each *related* note (not all notes). The call at `relationships.ts:181` passes `visibleNotes` (already pre-filtered). So the O(n²) is bounded by the number of related notes × total visible notes, not all-notes². For typical vaults (dozens to low hundreds of notes) with small relationship sets, this is acceptable. For very large vaults, pre-computing an `inboundReferences` Map once would eliminate the inner scan.
+
+**Recommendation**: Low priority. Pre-compute an `inboundByNote: Map<string, count>` once before the loop instead of scanning per note. Only needed if vaults grow beyond ~500 notes.
+
+**Finding 2: `recall.ts:297-318` — `computeWeightedQueryCoverage`**
+
+Original claim: "per-candidate IDF recomputation".
+
+**Validated: TRUE.** The function computes `documentFrequency` for each query token by iterating all `corpusTokenSets` (one per candidate) for every candidate. So it's O(candidates × queryTokens × candidates). The `corpusTexts` are already computed once per lexical-rescue pass, but the IDF is recomputed per candidate. For typical recall results (5-20 candidates), this is negligible. For large recall limits with long queries, it could be noticeable.
+
+**Recommendation**: Low priority. Cache IDF computation results from `prepareTfIdfCorpus` or compute once per recall call. Only matters if recall limits increase significantly.
 
 - `role-suggestions.ts:40-61` — `buildRoleSuggestionContext` scans all notes per note for inbound references
 - `recall.ts:297-318` — per-candidate IDF recomputation
 
-### I8: Performance — memory concerns
+### I8-Revised: Performance — memory concerns (validated against design)
+
+**Finding 1: `index.ts:1246-1307` — `collectVisibleNotes` loads ALL note contents**
+
+Original claim: "loads ALL note contents into memory".
+
+**Validated: PARTIALLY MITIGATED.** The `collectVisibleNotes` function now uses `getOrBuildVaultNoteList` (session cache from `cache.ts`) when a `sessionProjectId` is available. This means within a session, repeated calls reuse cached note lists. However, the first call or calls without a session project still load all notes from disk. The design memory `active-session-project-cache-single-in-memory-vault-cache-pe-7463f124` confirms this was an intentional optimization — the session cache avoids redundant reads within the same MCP session.
+
+**Remaining concern**: The session cache still holds ALL notes in memory simultaneously. For a vault with ~500 notes averaging 2KB each, that's ~1MB — acceptable. The `listNotes` -> `Promise.all` pattern loads every note's full content even when only metadata (title, tags, lifecycle) is needed for listing.
+
+**Recommendation**: Consider adding `listNoteMetadata()` to `Storage` that parses only YAML frontmatter without reading the full note body. This would reduce memory for list operations significantly.
+
+**Finding 2: `storage.ts:183-201` — `listNotes` loads all notes via `Promise.all`**
+
+**Validated: ALREADY OPTIMIZED.** The design memory `performance-principles-for-file-first-mcp-and-git-backed-wor-4e7d3bc8` confirms that `Storage.listNotes` was already parallelized ("perf: parallelize Storage.listNotes reads"). The `Promise.all` is the optimization, not the problem. The remaining concern is that it loads full content, not just metadata.
+
+**Finding 3: `config.ts:190-236` — `MnemonicConfigStore.readAll()` reads config on every call**
+
+**Validated: TRUE.** Every call to `getProjectPolicy`, `getProjectIdentityOverride`, `setProjectPolicy`, etc. calls `readAll()` which reads and parses `config.json` from disk. The `configStore` singleton is used across many MCP tool handlers, so a single `remember` call may trigger 1-2 config reads. For small configs this is negligible, but in high-throughput usage it's redundant I/O.
+
+**Recommendation**: Medium priority. Cache the parsed config with invalidation on write. The config file is tiny and rarely changes, so a TTL or write-invalidate cache would eliminate nearly all redundant reads.
 
 - `index.ts:1246-1307` — `collectVisibleNotes` loads ALL note contents into memory
 - `storage.ts:183-201` — `listNotes` loads all notes via `Promise.all`
