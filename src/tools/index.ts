@@ -1,0 +1,50 @@
+import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { ServerContext } from "../server-context.js";
+
+import { registerDetectProjectTool } from "./detect-project.js";
+import { registerGetProjectIdentityTool } from "./get-project-identity.js";
+import { registerSetProjectIdentityTool } from "./set-project-identity.js";
+import { registerListMigrationsTool, registerExecuteMigrationTool } from "./migration.js";
+import { registerSetProjectMemoryPolicyTool, registerGetProjectMemoryPolicyTool } from "./policy.js";
+import { registerRememberTool } from "./remember.js";
+import { registerRecallTool } from "./recall.js";
+import { registerUpdateTool } from "./update.js";
+import { registerForgetTool } from "./forget.js";
+import { registerGetTool } from "./get.js";
+import { registerWhereIsMemoryTool } from "./where-is-memory.js";
+import { registerListTool } from "./list.js";
+import { registerDiscoverTagsTool } from "./discover-tags.js";
+import { registerRecentMemoriesTool } from "./recent-memories.js";
+import { registerMemoryGraphTool } from "./memory-graph.js";
+import { registerProjectMemorySummaryTool } from "./project-memory-summary.js";
+import { registerSyncTool } from "./sync.js";
+import { registerMoveMemoryTool } from "./move-memory.js";
+import { registerRelateTool } from "./relate.js";
+import { registerUnrelateTool } from "./unrelate.js";
+import { registerConsolidateTool } from "./consolidate.js";
+
+export function registerAllTools(server: McpServer, ctx: ServerContext): void {
+  registerDetectProjectTool(server, ctx);
+  registerGetProjectIdentityTool(server, ctx);
+  registerSetProjectIdentityTool(server, ctx);
+  registerListMigrationsTool(server, ctx);
+  registerExecuteMigrationTool(server, ctx);
+  registerSetProjectMemoryPolicyTool(server, ctx);
+  registerGetProjectMemoryPolicyTool(server, ctx);
+  registerRememberTool(server, ctx);
+  registerRecallTool(server, ctx);
+  registerUpdateTool(server, ctx);
+  registerForgetTool(server, ctx);
+  registerGetTool(server, ctx);
+  registerWhereIsMemoryTool(server, ctx);
+  registerListTool(server, ctx);
+  registerDiscoverTagsTool(server, ctx);
+  registerRecentMemoriesTool(server, ctx);
+  registerMemoryGraphTool(server, ctx);
+  registerProjectMemorySummaryTool(server, ctx);
+  registerSyncTool(server, ctx);
+  registerMoveMemoryTool(server, ctx);
+  registerRelateTool(server, ctx);
+  registerUnrelateTool(server, ctx);
+  registerConsolidateTool(server, ctx);
+}
