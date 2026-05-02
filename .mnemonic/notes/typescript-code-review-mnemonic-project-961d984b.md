@@ -17,7 +17,7 @@ memoryVersion: 1
 ---
 ## Review Workflow
 
-Followed `skills/typescript-code-review/SKILL.md` workflow (Steps 1-7) with reference documents for impossible states, antipatterns, security, and performance.
+Followed `.agents/skills/typescript-code-review/SKILL.md` workflow (Steps 1-7) with reference documents for impossible states, antipatterns, security, and performance.
 
 ## tsconfig.json Assessment
 
