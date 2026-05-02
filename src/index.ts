@@ -1,45 +1,20 @@
 #!/usr/bin/env node
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { z } from "zod";
 import { randomUUID } from "crypto";
 import path from "path";
 import { promises as fs } from "fs";
 
-import type { Confidence } from "./structured-content.js";
-import { NOTE_LIFECYCLES, NOTE_ROLES, RELATIONSHIP_TYPES, Storage, type Note, type NoteLifecycle, type NoteRole, type Relationship, type RelationshipType } from "./storage.js";
 import type { MemoryId } from "./brands.js";
-import { memoryId, isoDateString, isValidMemoryId } from "./brands.js";
-import { getErrorMessage } from "./error-utils.js";
-import { embed, cosineSimilarity, embedModel } from "./embeddings.js";
-import { type CommitResult, type PushResult, type SyncResult } from "./git.js";
-import { buildTemporalHistoryEntry, computeConfidence, getNoteProvenance } from "./provenance.js";
-import { enrichTemporalHistory, type InterpretedHistoryEntry } from "./temporal-interpretation.js";
-import { getOrBuildProjection } from "./projections.js";
-import {
-  invalidateActiveProjectCache,
-  getOrBuildVaultEmbeddings,
-  getOrBuildVaultNoteList,
-  getRecentSessionNoteAccesses,
-  getRecentSessionAccessNote,
-  getSessionCachedNote,
-  getSessionCachedProjection,
-  recordSessionNoteAccess,
-  setSessionCachedNote,
-  setSessionCachedProjection,
-} from "./cache.js";
-import { performance } from "perf_hooks";
+import { memoryId, isoDateString } from "./brands.js";
+import { MnemonicConfigStore, readVaultSchemaVersion } from "./config.js";
+import type { ServerContext } from "./server-context.js";
+import { VaultManager } from "./vault.js";
+import { PROJECT_SCOPE_BOOST as PROJECT_SCOPE_BOOST_VALUE } from "./tools/recall-helpers.js";
+import { Migrator } from "./migration.js";
+import { parseMemorySections } from "./import.js";
+import { defaultClaudeHome, defaultVaultPath, resolveUserPath } from "./paths.js";
 
-import {
-  aggregateMergeRisk,
-  buildConsolidateNoteEvidence,
-  buildGroupWarnings,
-  deriveMergeRisk,
-  mergeRelationshipsFromNotes,
-  normalizeMergePlanSourceIds,
-  resolveEffectiveConsolidationMode,
-} from "./consolidate.js";
-import { detectDuplicates, findClusters, suggestMerges, executeMerge, pruneSuperseded, dryRunAll } from "./tools/consolidate-helpers.js";
 import { registerDetectProjectTool } from "./tools/detect-project.js";
 import { registerGetProjectIdentityTool } from "./tools/get-project-identity.js";
 import { registerSetProjectIdentityTool } from "./tools/set-project-identity.js";
@@ -61,114 +36,6 @@ import { registerMoveMemoryTool } from "./tools/move-memory.js";
 import { registerRelateTool } from "./tools/relate.js";
 import { registerUnrelateTool } from "./tools/unrelate.js";
 import { registerConsolidateTool } from "./tools/consolidate.js";
-import { suggestAutoRelationships } from "./auto-relate.js";
-import {
-  computeHybridScore,
-  selectRecallResults,
-  selectWorkflowResults,
-  applyLexicalReranking,
-  enrichRescueCandidateScores,
-  resolveDiscoveredVaults,
-  applyCanonicalExplanationPromotion,
-  applyGraphSpreadingActivation,
-  assignDenseRanks,
-  detectTemporalQueryHint,
-  computeTemporalRecencyBoost,
-  shouldApplyTemporalFiltering,
-  isWithinTemporalFilterWindow,
-  type TemporalQueryHint,
-  type ScoredRecallCandidate,
-} from "./recall.js";
-import {
-  shouldTriggerLexicalRescue,
-  computeLexicalScore,
-} from "./lexical.js";
-import { getRelationshipPreview } from "./relationships.js";
-import { MarkdownLintError, cleanMarkdown } from "./markdown.js";
-import { applySemanticPatches, type SemanticPatch } from "./semantic-patch.js";
-import { hasActualChanges, computeFieldsModified } from "./update-detect-changes.js";
-import { MnemonicConfigStore, readVaultSchemaVersion, type MutationPushMode } from "./config.js";
-import {
-  CONSOLIDATION_MODES,
-  PROTECTED_BRANCH_BEHAVIORS,
-  PROJECT_POLICY_SCOPES,
-  WRITE_SCOPES,
-  resolveConsolidationMode,
-  resolveWriteScope,
-  type ConsolidationMode,
-  type ProjectMemoryPolicy,
-  type WriteScope,
-} from "./project-memory-policy.js";
-import type { ServerContext } from "./server-context.js";
-import { resolveProject as resolveProjectFromModule, toProjectRef, noteProjectRef, resolveWriteVault as resolveWriteVaultFromModule, describeProject as describeProjectFromModule, ensureBranchSynced as ensureBranchSyncedFromModule, projectParam } from "./helpers/project.js";
-import { extractSummary, formatCommitBody, formatAskForWriteScope, formatAskForProtectedBranch, formatProtectedBranchBlocked, shouldBlockProtectedBranchCommit as shouldBlockProtectedBranchCommitFromModule, wouldRelationshipCleanupTouchProjectVault as wouldRelationshipCleanupTouchProjectVaultFromModule } from "./helpers/git-commit.js";
-import { embedTextForNote as embedTextForNoteFromModule, embedMissingNotes as embedMissingNotesFromModule, backfillEmbeddingsAfterSync as backfillEmbeddingsAfterSyncFromModule, removeStaleEmbeddings as removeStaleEmbeddingsFromModule } from "./helpers/embed.js";
-import { resolveDurability, buildPersistenceStatus, buildMutationRetryContract, formatRetrySummary, formatPersistenceSummary, getMutationPushMode as getMutationPushModeFromModule, pushAfterMutation as pushAfterMutationFromModule } from "./helpers/persistence.js";
-import { type SearchScope, type StorageScope, type NoteEntry, storageLabel, vaultMatchesStorageScope, collectVisibleNotes as collectVisibleNotesFromModule, formatListEntry, formatProjectPolicyLine as formatProjectPolicyLineFromModule, ROLE_LIFECYCLE_DEFAULTS, projectNotFoundResponse, moveNoteBetweenVaults as moveNoteBetweenVaultsFromModule, removeRelationshipsToNoteIds as removeRelationshipsToNoteIdsFromModule, addVaultChange } from "./helpers/vault.js";
-import { slugify, makeId, describeLifecycle, formatNote, formatTemporalHistory, formatRelationshipPreview, toRecallFreshness, toRecallRankBand, formatRetrievalEvidenceHint } from "./helpers/index.js";
-import {
-  classifyThemeWithGraduation,
-  computeThemesWithGraduation,
-  summarizePreview,
-  titleCaseTheme,
-  daysSinceUpdate,
-  withinThemeScore,
-  anchorScore,
-  computeConnectionDiversity,
-  workingStateScore,
-  extractNextAction,
-} from "./project-introspection.js";
-import { getEffectiveMetadata } from "./role-suggestions.js";
-import { detectProject, getCurrentGitBranch } from "./project.js";
-import { VaultManager, type Vault } from "./vault.js";
-import { buildRecallCandidateContext, collectLexicalRescueCandidates, PROJECT_SCOPE_BOOST as PROJECT_SCOPE_BOOST_VALUE, type DiscoverTagStat, tokenizeTagDiscoveryText, countTokenOverlap, escapeRegex, hasExactTagContextMatch } from "./tools/recall-helpers.js";
-import { Migrator } from "./migration.js";
-import { parseMemorySections } from "./import.js";
-import { defaultClaudeHome, defaultVaultPath, resolveUserPath } from "./paths.js";
-import type {
-  ProjectRef,
-  StructuredResponse,
-  RememberResult,
-  RecallResult,
-  ListResult,
-  GetResult,
-  UpdateResult,
-  ForgetResult,
-  MoveResult,
-  RelateResult,
-  RecentResult,
-  WhereIsResult,
-  MemoryGraphResult,
-  ProjectSummaryResult,
-  SyncResult as StructuredSyncResult,
-  PersistenceStatus,
-  MutationRetryContract,
-  DiscoverTagsResult,
-  ThemeSection,
-  AnchorNote,
-  RelationshipPreview,
-  RetrievalEvidence,
-  LintErrorResult,
-} from "./structured-content.js";
-import {
-  RememberResultSchema,
-  RecallResultSchema,
-  ListResultSchema,
-  GetResultSchema,
-  UpdateResultSchema,
-  ForgetResultSchema,
-  MoveResultSchema,
-  RelateResultSchema,
-  RecentResultSchema,
-  MemoryGraphResultSchema,
-  ProjectSummaryResultSchema,
-  SyncResultSchema,
-  WhereIsResultSchema,
-  ConsolidateResultSchema,
-  DiscoverTagsResultSchema,
-  LintErrorResultSchema,
-  NoteIdSchema,
-} from "./structured-content.js";
 
 // ── CLI Migration Command ─────────────────────────────────────────────────────
 
@@ -178,7 +45,6 @@ if (process.argv[2] === "migrate") {
     : defaultVaultPath();
 
   async function runMigrationCli() {
-    const cwd = process.cwd();
     const argv = process.argv.slice(3);
     
     if (argv.includes("--help") || argv.includes("-h")) {
@@ -503,105 +369,6 @@ const ctx: ServerContext = {
   temporalHistoryNoteLimit: TEMPORAL_HISTORY_NOTE_LIMIT,
   temporalHistoryCommitLimit: TEMPORAL_HISTORY_COMMIT_LIMIT,
 };
-
-// ── Helper wrappers (delegate to extracted modules with ctx) ─────────────────
-
-async function resolveProject(cwd?: string) {
-  return resolveProjectFromModule(ctx, cwd);
-}
-
-async function resolveWriteVault(cwd: string | undefined, scope: WriteScope) {
-  return resolveWriteVaultFromModule(ctx, cwd, scope);
-}
-
-function describeProject(project: Awaited<ReturnType<typeof resolveProject>>): string {
-  return describeProjectFromModule(project);
-}
-
-async function ensureBranchSynced(cwd?: string) {
-  return ensureBranchSyncedFromModule(ctx, cwd);
-}
-
-async function shouldBlockProtectedBranchCommit(options: Omit<Parameters<typeof shouldBlockProtectedBranchCommitFromModule>[0], "ctx">) {
-  return shouldBlockProtectedBranchCommitFromModule({ ctx, ...options });
-}
-
-async function wouldRelationshipCleanupTouchProjectVault(noteIds: string[]) {
-  return wouldRelationshipCleanupTouchProjectVaultFromModule(ctx, noteIds);
-}
-
-async function embedTextForNote(storage: Storage, note: Note) {
-  return embedTextForNoteFromModule(storage, note);
-}
-
-async function embedMissingNotes(storage: Storage, noteIds?: string[], force = false) {
-  return embedMissingNotesFromModule(ctx, storage, noteIds, force);
-}
-
-async function backfillEmbeddingsAfterSync(storage: Storage, label: string, lines: string[], force = false) {
-  return backfillEmbeddingsAfterSyncFromModule(ctx, storage, label, lines, force);
-}
-
-async function removeStaleEmbeddings(storage: Storage, noteIds: string[]) {
-  return removeStaleEmbeddingsFromModule(storage, noteIds);
-}
-
-async function getMutationPushMode() {
-  return getMutationPushModeFromModule(ctx);
-}
-
-async function pushAfterMutation(vault: Vault) {
-  return pushAfterMutationFromModule(ctx, vault);
-}
-
-async function collectVisibleNotes(cwd?: string, scope: SearchScope = "all", tags?: string[], storedIn: StorageScope = "any", sessionProjectId?: string) {
-  return collectVisibleNotesFromModule(ctx, cwd, scope, tags, storedIn, sessionProjectId);
-}
-
-async function formatProjectPolicyLine(projectId?: string) {
-  return formatProjectPolicyLineFromModule(ctx, projectId);
-}
-
-async function moveNoteBetweenVaults(found: { note: Note; vault: Vault }, targetVault: Vault, noteToWrite?: Note, cwd?: string) {
-  return moveNoteBetweenVaultsFromModule(ctx, found, targetVault, noteToWrite, cwd);
-}
-
-async function removeRelationshipsToNoteIds(noteIds: string[]) {
-  return removeRelationshipsToNoteIdsFromModule(ctx, noteIds);
-}
-
-function formatSyncResult(result: SyncResult, label: string, vaultPath?: string): string[] {
-  if (!result.hasRemote) return [`${label}: no remote configured — git sync skipped.`];
-  const lines: string[] = [];
-
-  if (result.gitError) {
-    const { phase, message, isConflict } = result.gitError;
-    if (isConflict) {
-      lines.push(`${label}: ✗ merge conflict during ${phase}.`);
-      if (result.gitError.conflictFiles.length > 0) {
-        lines.push(`${label}: conflicted files: ${result.gitError.conflictFiles.join(", ")}`);
-      }
-      const where = vaultPath ?? label;
-      lines.push(`${label}: resolve conflicts in ${where}, then run sync again.`);
-    } else {
-      lines.push(`${label}: ✗ git ${phase} failed: ${message}`);
-    }
-    // Still report any partial pull results that came through before the failure
-    if (result.pulledNoteIds.length > 0)
-      lines.push(`${label}: ↓ ${result.pulledNoteIds.length} note(s) pulled before failure.`);
-    return lines;
-  }
-
-  lines.push(result.pushedCommits > 0
-    ? `${label}: ↑ pushed ${result.pushedCommits} commit(s).`
-    : `${label}: ↑ nothing to push.`);
-  if (result.deletedNoteIds.length > 0)
-    lines.push(`${label}: ✕ ${result.deletedNoteIds.length} note(s) deleted on remote.`);
-  lines.push(result.pulledNoteIds.length > 0
-    ? `${label}: ↓ ${result.pulledNoteIds.length} note(s) pulled.`
-    : `${label}: ↓ no new notes from remote.`);
-  return lines;
-}
 
 // ── MCP Server ────────────────────────────────────────────────────────────────
 
