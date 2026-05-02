@@ -14,15 +14,9 @@ export class GitOperationError extends Error {
   }
 }
 
-export interface SyncGitError {
-  /** Which git operation failed */
-  phase: "fetch" | "pull" | "push";
-  message: string;
-  /** True when the failure is a merge/rebase conflict requiring manual resolution */
-  isConflict: boolean;
-  /** Files with conflict markers, when detectable */
-  conflictFiles?: string[];
-}
+export type SyncGitError =
+  | { phase: "fetch" | "pull" | "push"; message: string; isConflict: false }
+  | { phase: "pull"; message: string; isConflict: true; conflictFiles: string[] };
 
 export interface LastCommit {
   hash: string;
@@ -48,19 +42,15 @@ export interface SyncResult {
   gitError?: SyncGitError;
 }
 
-export interface CommitResult {
-  status: "committed" | "skipped" | "failed";
-  reason?: "git-disabled" | "no-changes" | "error";
-  /** Which operation failed, when status is "failed" */
-  operation?: "add" | "commit";
-  error?: string;
-}
+export type CommitResult =
+  | { status: "committed" }
+  | { status: "skipped"; reason: "git-disabled" | "no-changes" }
+  | { status: "failed"; reason: "error"; operation?: "add" | "commit"; error: string };
 
-export interface PushResult {
-  status: "pushed" | "skipped" | "failed";
-  reason?: "git-disabled" | "no-remote" | "auto-push-disabled" | "commit-failed";
-  error?: string;
-}
+export type PushResult =
+  | { status: "pushed" }
+  | { status: "skipped"; reason: "git-disabled" | "no-remote" | "auto-push-disabled" | "commit-failed" }
+  | { status: "failed"; error: string };
 
 export class GitOps {
   private git!: SimpleGit;
@@ -227,14 +217,20 @@ export class GitOps {
         console.error(`[git] Sync pull failed: ${message}`);
         const conflictFiles = await this.getConflictFiles();
         const isConflict = conflictFiles.length > 0 || await this.isConflictInProgress();
+        if (isConflict) {
+          return {
+            ...withRemote,
+            gitError: {
+              phase: "pull",
+              message,
+              isConflict: true as const,
+              conflictFiles,
+            },
+          };
+        }
         return {
           ...withRemote,
-          gitError: {
-            phase: "pull",
-            message,
-            isConflict,
-            conflictFiles: conflictFiles.length > 0 ? conflictFiles : undefined,
-          },
+          gitError: { phase: "pull", message, isConflict: false as const },
         };
       }
 

@@ -236,12 +236,9 @@ export interface ForgetResult extends Record<string, unknown> {
   retry?: MutationRetryContract;
 }
 
-export interface SyncVaultGitError {
-  phase: "fetch" | "pull" | "push";
-  message: string;
-  isConflict: boolean;
-  conflictFiles?: string[];
-}
+export type SyncVaultGitError =
+  | { phase: "fetch" | "pull" | "push"; message: string; isConflict: false }
+  | { phase: "pull"; message: string; isConflict: true; conflictFiles: string[] };
 
 export interface SyncResult extends Record<string, unknown> {
   action: "synced";

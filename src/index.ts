@@ -991,11 +991,11 @@ function formatSyncResult(result: SyncResult, label: string, vaultPath?: string)
   const lines: string[] = [];
 
   if (result.gitError) {
-    const { phase, message, isConflict, conflictFiles } = result.gitError;
+    const { phase, message, isConflict } = result.gitError;
     if (isConflict) {
       lines.push(`${label}: ✗ merge conflict during ${phase}.`);
-      if (conflictFiles && conflictFiles.length > 0) {
-        lines.push(`${label}: conflicted files: ${conflictFiles.join(", ")}`);
+      if (result.gitError.conflictFiles.length > 0) {
+        lines.push(`${label}: conflicted files: ${result.gitError.conflictFiles.join(", ")}`);
       }
       const where = vaultPath ?? label;
       lines.push(`${label}: resolve conflicts in ${where}, then run sync again.`);
@@ -1052,13 +1052,13 @@ function buildPersistenceStatus(args: {
     git: {
       commit: args.commit.status,
       push: args.push.status,
-      commitOperation: args.commit.operation,
+      commitOperation: args.commit.status === "failed" ? args.commit.operation : undefined,
       commitMessage: args.commitMessage,
       commitBody: args.commitBody,
-      commitReason: args.commit.reason,
-      commitError: args.commit.error,
-      pushReason: args.push.reason,
-      pushError: args.push.error,
+      commitReason: args.commit.status === "failed" ? args.commit.reason : args.commit.status === "skipped" ? args.commit.reason : undefined,
+      commitError: args.commit.status === "failed" ? args.commit.error : undefined,
+      pushReason: args.push.status === "skipped" ? args.push.reason : undefined,
+      pushError: args.push.status === "failed" ? args.push.error : undefined,
     },
     retry: args.retry,
     durability: resolveDurability(args.commit, args.push),
