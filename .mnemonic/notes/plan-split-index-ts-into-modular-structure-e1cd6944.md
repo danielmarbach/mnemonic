@@ -6,7 +6,7 @@ tags:
   - refactoring
 lifecycle: temporary
 createdAt: '2026-05-02T06:10:17.697Z'
-updatedAt: '2026-05-02T12:23:14.908Z'
+updatedAt: '2026-05-02T14:22:45.552Z'
 role: plan
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -52,23 +52,36 @@ index.ts down from 4682 → 4012 lines. Committed.
 
 #### Batch 3: Core tool handlers — DONE ✅
 
-- [x] `src/tools/remember.ts`
-- [x] `src/tools/recall.ts`
-- [x] `src/tools/update.ts`
+- \[x] `src/tools/remember.ts`
+- \[x] `src/tools/recall.ts`
+- \[x] `src/tools/update.ts`
 
 index.ts down from ~4012 → ~2970 lines. Committed.
 
 #### Batch 4: CRUD tool handlers — DONE ✅
 
-- [x] `src/tools/forget.ts`
-- [x] `src/tools/get.ts`
-- [x] `src/tools/where-is-memory.ts`
-- [x] `src/tools/list.ts`
-- [x] `src/tools/discover-tags.ts`
+- \[x] `src/tools/forget.ts`
+- \[x] `src/tools/get.ts`
+- \[x] `src/tools/where-is-memory.ts`
+- \[x] `src/tools/list.ts`
+- \[x] `src/tools/discover-tags.ts`
 
 index.ts down from ~2970 → ~2330 lines. Committed.
 
-#### Batch 5: Query + mutation tool handlers
+#### Batch 5: Query + mutation tool handlers — DONE ✅
+
+- \[x] `src/tools/recent-memories.ts`
+- \[x] `src/tools/memory-graph.ts`
+- \[x] `src/tools/project-memory-summary.ts`
+- \[x] `src/tools/sync.ts`
+- \[x] `src/tools/move-memory.ts`
+- \[x] `src/tools/relate.ts`
+- \[x] `src/tools/unrelate.ts`
+- \[x] `src/tools/consolidate.ts`
+
+Also extracted `warnAboutPendingMigrationsOnStartup` to `src/startup.ts`.
+
+index.ts down from ~2330 → ~822 lines. Committed.
 
 - \[ ] `src/tools/recent-memories.ts`
 - \[ ] `src/tools/memory-graph.ts`
@@ -79,7 +92,15 @@ index.ts down from ~2970 → ~2330 lines. Committed.
 - \[ ] `src/tools/unrelate.ts`
 - \[ ] `src/tools/consolidate.ts`
 
-#### Batch 6: Wire index.ts
+#### Batch 6: Cleanup unused imports and wrappers — DONE ✅
+
+- \[x] Replace all inline tool registrations with registerXxxTool(server, ctx) calls
+- \[x] Remove all unused wrapper functions (18 functions)
+- \[x] Remove all unused imports (~90 symbols from 25+ modules)
+- \[x] Remove unused local variable 'cwd' in migration CLI
+- \[x] Verify tsc and tests
+
+index.ts: ~822 → ~589 lines. All 845 tests pass. TypeScript compiles with --noUnusedLocals. Committed.
 
 - \[ ] Replace all inline tool registrations with registerXxxTool(server, ctx) calls
 - \[ ] Remove unused imports from index.ts
