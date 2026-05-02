@@ -58,13 +58,15 @@ index.ts down from 4682 → 4012 lines. Committed.
 
 index.ts down from ~4012 → ~2970 lines. Committed.
 
-#### Batch 4: CRUD tool handlers
+#### Batch 4: CRUD tool handlers — DONE ✅
 
-- \[ ] `src/tools/forget.ts`
-- \[ ] `src/tools/get.ts`
-- \[ ] `src/tools/where-is-memory.ts`
-- \[ ] `src/tools/list.ts`
-- \[ ] `src/tools/discover-tags.ts`
+- [x] `src/tools/forget.ts`
+- [x] `src/tools/get.ts`
+- [x] `src/tools/where-is-memory.ts`
+- [x] `src/tools/list.ts`
+- [x] `src/tools/discover-tags.ts`
+
+index.ts down from ~2970 → ~2330 lines. Committed.
 
 #### Batch 5: Query + mutation tool handlers
 
