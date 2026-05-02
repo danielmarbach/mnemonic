@@ -6,13 +6,15 @@ tags:
   - refactoring
 lifecycle: temporary
 createdAt: '2026-05-02T06:07:32.434Z'
-updatedAt: '2026-05-02T06:07:38.908Z'
+updatedAt: '2026-05-02T06:10:25.435Z'
 role: research
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
   - id: request-split-index-ts-into-modular-structure-cf87b146
+    type: derives-from
+  - id: plan-split-index-ts-into-modular-structure-e1cd6944
     type: derives-from
 memoryVersion: 1
 ---
