@@ -6,7 +6,8 @@ import { randomUUID } from "crypto";
 import path from "path";
 import { promises as fs } from "fs";
 
-import { NOTE_LIFECYCLES, NOTE_ROLES, Storage, type Note, type NoteLifecycle, type NoteRole, type Relationship, type RelationshipType } from "./storage.js";
+import type { Confidence } from "./structured-content.js";
+import { NOTE_LIFECYCLES, NOTE_ROLES, RELATIONSHIP_TYPES, Storage, type Note, type NoteLifecycle, type NoteRole, type Relationship, type RelationshipType } from "./storage.js";
 import { getErrorMessage } from "./error-utils.js";
 import { embed, cosineSimilarity, embedModel } from "./embeddings.js";
 import { type CommitResult, type PushResult, type SyncResult } from "./git.js";
@@ -160,6 +161,8 @@ import {
   PolicyResultSchema,
   DiscoverTagsResultSchema,
   LintErrorResultSchema,
+  NoteIdSchema,
+  RemoteNameSchema,
 } from "./structured-content.js";
 
 // ── CLI Migration Command ─────────────────────────────────────────────────────
@@ -416,10 +419,12 @@ Examples:
     }
 
     const filesToCommit: string[] = [];
-    for (const note of notesToWrite) {
-      await vault.storage.writeNote(note);
-      filesToCommit.push(`notes/${note.id}.md`);
-    }
+    await Promise.all(
+      notesToWrite.map(async (note) => {
+        await vault.storage.writeNote(note);
+        filesToCommit.push(`notes/${note.id}.md`);
+      }),
+    );
 
     const commitMessage = [
       `import: claude-memory (${notesToWrite.length} note${notesToWrite.length === 1 ? "" : "s"})`,
@@ -560,22 +565,26 @@ async function ensureBranchSynced(cwd?: string): Promise<boolean> {
 
   console.error(`[branch] Detected branch change from '${previousBranch}' — auto-syncing`);
   
-  // Trigger sync to rebuild embeddings
-  const mainResult = await vaultManager.main.git.sync();
-  console.error(`[branch] Main vault sync: ${JSON.stringify(mainResult)}`);
-
+  // Different git roots = different lock keys. sync() acquires withMutationLock internally.
+  // Safe to parallelize across vaults.
   const projectVault = await vaultManager.getProjectVaultIfExists(cwd);
-  if (projectVault) {
-    const projectResult = await projectVault.git.sync();
-    console.error(`[branch] Project vault sync: ${JSON.stringify(projectResult)}`);
-    
-    // Backfill embeddings after sync
-    const backfill = await backfillEmbeddingsAfterSync(projectVault.storage, "project vault", [], true);
-    console.error(`[branch] Project vault embedded ${backfill.embedded} notes`);
-  }
 
-  const mainBackfill = await backfillEmbeddingsAfterSync(vaultManager.main.storage, "main vault", [], true);
-  console.error(`[branch] Main vault embedded ${mainBackfill.embedded} notes`);
+  const [mainResult, projectSyncResult] = await Promise.all([
+    vaultManager.main.git.sync().then(async (result) => {
+      console.error(`[branch] Main vault sync: ${JSON.stringify(result)}`);
+      const backfill = await backfillEmbeddingsAfterSync(vaultManager.main.storage, "main vault", [], true);
+      console.error(`[branch] Main vault embedded ${backfill.embedded} notes`);
+      return result;
+    }),
+    projectVault
+      ? projectVault.git.sync().then(async (result) => {
+          console.error(`[branch] Project vault sync: ${JSON.stringify(result)}`);
+          const backfill = await backfillEmbeddingsAfterSync(projectVault.storage, "project vault", [], true);
+          console.error(`[branch] Project vault embedded ${backfill.embedded} notes`);
+          return result;
+        })
+      : Promise.resolve(undefined),
+  ]);
 
   // Vault contents changed — discard session cache so next access rebuilds from fresh state
   invalidateActiveProjectCache();
@@ -662,10 +671,15 @@ function toRecallFreshness(updatedAt: string): "today" | "thisWeek" | "thisMonth
     return "older";
   }
 
-  const ageDays = Math.max(0, (Date.now() - updated.getTime()) / (1000 * 60 * 60 * 24));
-  if (ageDays <= 1) return "today";
-  if (ageDays <= 7) return "thisWeek";
-  if (ageDays <= 31) return "thisMonth";
+  const DAY_MS = 1000 * 60 * 60 * 24;
+  const FRESHNESS_TODAY_DAYS = 1;
+  const FRESHNESS_THIS_WEEK_DAYS = 7;
+  const FRESHNESS_THIS_MONTH_DAYS = 31;
+
+  const ageDays = Math.max(0, (Date.now() - updated.getTime()) / DAY_MS);
+  if (ageDays <= FRESHNESS_TODAY_DAYS) return "today";
+  if (ageDays <= FRESHNESS_THIS_WEEK_DAYS) return "thisWeek";
+  if (ageDays <= FRESHNESS_THIS_MONTH_DAYS) return "thisMonth";
   return "older";
 }
 
@@ -1410,21 +1424,27 @@ async function moveNoteBetweenVaults(
 async function removeRelationshipsToNoteIds(noteIds: string[]): Promise<Map<Vault, string[]>> {
   const vaultChanges = new Map<Vault, string[]>();
 
-  for (const vault of vaultManager.allKnownVaults()) {
-    const notes = await vault.storage.listNotes();
-    for (const note of notes) {
-      const filtered = filterRelationships(note.relatedTo, noteIds);
-      if (filtered === note.relatedTo) {
-        continue;
-      }
+  // Different vaults = different repos = different lock keys. Safe to parallelize across vaults.
+  await Promise.all(
+    vaultManager.allKnownVaults().map(async (vault) => {
+      const notes = await vault.storage.listNotes();
+      // Within a vault, writeNote writes to independent files (staged or direct paths).
+      await Promise.all(
+        notes.map(async (note) => {
+          const filtered = filterRelationships(note.relatedTo, noteIds);
+          if (filtered === note.relatedTo) {
+            return;
+          }
 
-      await vault.storage.writeNote({
-        ...note,
-        relatedTo: filtered,
-      });
-      addVaultChange(vaultChanges, vault, vaultManager.noteRelPath(vault, note.id));
-    }
-  }
+          await vault.storage.writeNote({
+            ...note,
+            relatedTo: filtered,
+          });
+          addVaultChange(vaultChanges, vault, vaultManager.noteRelPath(vault, note.id));
+        }),
+      );
+    }),
+  );
 
   return vaultChanges;
 }
@@ -1437,14 +1457,15 @@ function addVaultChange(vaultChanges: Map<Vault, string[]>, vault: Vault, file: 
   }
 }
 
-const ROLE_LIFECYCLE_DEFAULTS: Record<string, NoteLifecycle> = {
+const ROLE_LIFECYCLE_DEFAULTS = {
   research: "temporary",
   plan: "temporary",
   review: "temporary",
+  context: "temporary",
   decision: "permanent",
   summary: "permanent",
   reference: "permanent",
-};
+} as const satisfies Record<NoteRole, NoteLifecycle>;
 
 function projectNotFoundResponse(cwd: string) {
   return { content: [{ type: "text" as const, text: `Could not detect a project for: ${cwd}` }], isError: true as const };
@@ -1606,7 +1627,7 @@ server.registerTool(
     },
     inputSchema: z.object({
       cwd: z.string().describe("Absolute project working directory. Pass this whenever the task is project-related so routing, search boosting, policy, and vault selection work correctly."),
-      remoteName: z.string().min(1).describe("Git remote name to use as the canonical project identity, such as `upstream`")
+      remoteName: RemoteNameSchema.describe("Git remote name to use as the canonical project identity, such as `upstream`")
     }),
     outputSchema: ProjectIdentityResultSchema,
   },
@@ -1903,8 +1924,8 @@ server.registerTool(
       openWorldHint: true,
     },
     inputSchema: z.object({
-      title: z.string().describe("Specific, retrieval-friendly title. Prefer the concrete topic or decision, not a vague label."),
-      content: z.string().describe(
+      title: z.string().max(500, "Title must be at most 500 characters").describe("Specific, retrieval-friendly title. Prefer the concrete topic or decision, not a vague label."),
+      content: z.string().max(100000, "Content must be at most 100,000 characters").describe(
         "Markdown note body. Put the key fact, decision, or outcome in the opening lines, then supporting detail. Embeddings weight early content more heavily. " +
         "Content must pass markdown lint. Auto-fixable issues are fixed automatically. Common unfixable issues: fenced code blocks need a language tag (e.g. use ```text not bare ```), and broken links are rejected. " +
         "If lint fails, fix the specific issues listed in the error and retry the same call."
@@ -2573,9 +2594,11 @@ server.registerTool(
       return note;
     };
 
-    for (const vault of vaults) {
-      await embedMissingNotes(vault.storage).catch(() => { /* best-effort: don't block recall if Ollama is down */ });
-    }
+    await Promise.allSettled(
+      vaults.map((vault) =>
+        embedMissingNotes(vault.storage).catch(() => { /* best-effort: don't block recall if Ollama is down */ }),
+      ),
+    );
 
     const scored: ScoredRecallCandidate[] = [];
     const temporalQueryHint = detectTemporalQueryHint(query);
@@ -2766,7 +2789,7 @@ server.registerTool(
         lastCommitMessage: string;
         recentlyChanged: boolean;
       };
-      confidence?: "high" | "medium" | "low";
+      confidence?: Confidence;
       history?: Array<{
         commitHash: string;
         timestamp: string;
@@ -2947,7 +2970,7 @@ server.registerTool(
       openWorldHint: true,
     },
     inputSchema: z.object({
-      id: z.string().describe("Exact memory id. Use an id returned by `recall`, `list`, `recent_memories`, or `where_is`."),
+      id: NoteIdSchema.describe("Exact memory id. Use an id returned by `recall`, `list`, `recent_memories`, or `where_is`."),
       semanticPatch: z
         .preprocess(
           (val) => {
@@ -2993,8 +3016,8 @@ server.registerTool(
           "]\n\n" +
           "IMPORTANT: `appendChild`, `prependChild`, and `replaceChildren` do NOT work with `heading` selectors (headings only contain inline text, not block content). To add or replace content under a heading, use `insertAfter`. To replace a heading entirely, use `replace`."
         ),
-      content: z.string().optional().describe("Full note body replacement. Use only for complete rewrites or when the note is small. Mutually exclusive with semanticPatch. Content must pass markdown lint. Auto-fixable issues are fixed automatically. Common unfixable issues: fenced code blocks need a language tag (e.g. use ```text not bare ```), and broken links are rejected. If lint fails, fix the specific issues and retry — do NOT fall back to semanticPatch for this."),
-      title: z.string().optional().describe("Specific, retrieval-friendly title. Prefer the concrete topic or decision, not a vague label."),
+      content: z.string().max(100000, "Content must be at most 100,000 characters").optional().describe("Full note body replacement. Use only for complete rewrites or when the note is small. Mutually exclusive with semanticPatch. Content must pass markdown lint. Auto-fixable issues are fixed automatically. Common unfixable issues: fenced code blocks need a language tag (e.g. use ```text not bare ```), and broken links are rejected. If lint fails, fix the specific issues and retry — do NOT fall back to semanticPatch for this."),
+      title: z.string().max(500, "Title must be at most 500 characters").optional().describe("Specific, retrieval-friendly title. Prefer the concrete topic or decision, not a vague label."),
       tags: z.array(z.string()).optional().describe("Optional tags for later filtering. Use a small number of stable, meaningful tags."),
       lifecycle: z
         .enum(NOTE_LIFECYCLES)
@@ -3318,7 +3341,7 @@ server.registerTool(
       openWorldHint: false,
     },
     inputSchema: z.object({
-      id: z.string().describe("Exact memory id. Use an id returned by `recall`, `list`, `recent_memories`, or `where_is`."),
+      id: NoteIdSchema.describe("Exact memory id. Use an id returned by `recall`, `list`, `recent_memories`, or `where_is`."),
       cwd: projectParam,
       allowProtectedBranch: z
         .boolean()
@@ -3448,7 +3471,7 @@ server.registerTool(
       openWorldHint: false,
     },
     inputSchema: z.object({
-      ids: z.array(z.string()).min(1).describe("One or more memory ids to fetch"),
+      ids: z.array(NoteIdSchema).min(1).describe("One or more memory ids to fetch"),
       cwd: projectParam,
       includeRelationships: z.boolean().optional().default(false).describe("Include bounded direct relationship previews (1-hop expansion, max 3 shown)"),
     }),
@@ -3568,7 +3591,7 @@ server.registerTool(
       openWorldHint: false,
     },
     inputSchema: z.object({
-      id: z.string().describe("Exact memory id. Use an id returned by `recall`, `list`, `recent_memories`, or `where_is`."),
+      id: NoteIdSchema.describe("Exact memory id. Use an id returned by `recall`, `list`, `recent_memories`, or `where_is`."),
       cwd: projectParam,
     }),
     outputSchema: WhereIsResultSchema,
@@ -4591,7 +4614,7 @@ server.registerTool(
     const permanentOverrideUsed = Boolean(recentPermanent && recent[0] && recentPermanent.note.id !== recent[0].note.id);
 
     // Enrich fallback primaryEntry when no anchors exist
-    let fallbackEnriched: { provenance?: { lastUpdatedAt: string; lastCommitHash: string; lastCommitMessage: string; recentlyChanged: boolean }; confidence?: "high" | "medium" | "low" } = {};
+    let fallbackEnriched: { provenance?: { lastUpdatedAt: string; lastCommitHash: string; lastCommitMessage: string; recentlyChanged: boolean }; confidence?: Confidence } = {};
     let fallbackRelationships: { relationships?: RelationshipPreview } = {};
     if (!primaryAnchor && fallbackEntry) {
       const fallbackNote = fallbackEntry.note;
@@ -4842,7 +4865,7 @@ server.registerTool(
       openWorldHint: false,
     },
     inputSchema: z.object({
-      id: z.string().describe("Exact memory id. Use an id returned by `recall`, `list`, `recent_memories`, or `where_is`."),
+      id: NoteIdSchema.describe("Exact memory id. Use an id returned by `recall`, `list`, `recent_memories`, or `where_is`."),
       target: z.enum(["main-vault", "project-vault"]).describe("Destination: 'main-vault' for private/global storage, 'project-vault' for shared project storage"),
       vaultFolder: z
         .string()
@@ -4995,15 +5018,6 @@ server.registerTool(
 );
 
 // ── relate ────────────────────────────────────────────────────────────────────
-const RELATIONSHIP_TYPES: [RelationshipType, ...RelationshipType[]] = [
-  "related-to",
-  "explains",
-  "example-of",
-  "supersedes",
-  "derives-from",
-  "follows",
-];
-
 server.registerTool(
   "relate",
   {
@@ -5444,7 +5458,7 @@ server.registerTool(
         .object({
           sourceIds: z.array(z.string()).min(2).describe("Ids of notes to merge into one consolidated note"),
           targetTitle: z.string().describe("Title for the consolidated note"),
-          content: z.string().optional().describe("Custom body for the consolidated note — distill durable knowledge rather than dumping all source content verbatim"),
+          content: z.string().max(100000, "Content must be at most 100,000 characters").optional().describe("Custom body for the consolidated note — distill durable knowledge rather than dumping all source content verbatim"),
           description: z.string().optional().describe("Context explaining the consolidation rationale (stored in the note)"),
           summary: z.string().optional().describe("Git commit summary only. Imperative mood, concise, and focused on why the change matters."),
           tags: z.array(z.string()).optional().describe("Optional tags for later filtering. Use a small number of stable, meaningful tags."),
@@ -5512,8 +5526,10 @@ server.registerTool(
       case "dry-run":
         return dryRunAll(projectNotes, threshold, defaultConsolidationMode, project, mode, evidence);
 
-      default:
-        return { content: [{ type: "text", text: `Unknown strategy: ${strategy}` }], isError: true };
+      default: {
+        const _exhaustive: never = strategy;
+        return { content: [{ type: "text", text: `Unknown strategy: ${_exhaustive}` }], isError: true };
+      }
     }
   }
 );
