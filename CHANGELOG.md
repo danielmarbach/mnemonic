@@ -6,6 +6,25 @@ The format is loosely based on Keep a Changelog and uses semver-style version he
 
 ## [Unreleased]
 
+## [0.28.0] - 2026-05-03
+
+### Changed
+
+- Recall and note handling pipelines are now protected against undefined-index crashes through stricter TypeScript compilation with exhaustive switch guards on union types.
+- Branded types now validate note IDs, project IDs, embedding model IDs, and ISO dates at trust boundaries, replacing unsafe type casts with validation and narrowing.
+- Union type literals are now single-source const arrays with derived Zod enums, ensuring runtime values and schema definitions stay synchronized.
+- The monolithic `index.ts` has been split into dedicated modules for tools, helpers, CLI commands, and server context. No functional changes — pure structural refactoring that improves maintainability and testability.
+- Project config lookups are now cached in memory, eliminating redundant file reads on repeated policy and identity queries.
+- The markdown AST processor is now reused across note parsing calls, improving throughput on repeated operations.
+
+### Fixed
+
+- Note IDs and remote names are now regex-validated at the MCP boundary, preventing path traversal from malformed identifiers.
+- `OLLAMA_URL` is now validated against SSRF patterns before use.
+- Branch pattern matching now uses safe regex construction, preventing ReDoS from crafted branch names.
+- JSON.parse results at trust boundaries (embeddings, projections, frontmatter relationships) are now validated through Zod schemas, preventing corrupted local data from silently propagating.
+- Title and content inputs now have defense-in-depth size limits (500 and 100,000 characters respectively).
+
 ## [0.27.2] - 2026-05-01
 
 ### Fixed
