@@ -17,8 +17,6 @@ projectName: mnemonic
 relatedTo:
   - id: request-research-cag-bench-paper-gaps-and-applications-for-m-450273ae
     type: derives-from
-  - id: plan-retrieval-precision-and-diversity-diagnostics-51c5277c
-    type: derives-from
 memoryVersion: 1
 ---
 ## Research: CAG-Bench Paper Analysis for mnemonic
