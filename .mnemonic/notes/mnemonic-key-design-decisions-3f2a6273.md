@@ -7,7 +7,7 @@ tags:
   - rationale
 lifecycle: permanent
 createdAt: '2026-03-07T17:59:12.124Z'
-updatedAt: '2026-05-09T21:10:52.765Z'
+updatedAt: '2026-05-09T21:10:58.715Z'
 role: summary
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
@@ -45,6 +45,8 @@ relatedTo:
   - id: multi-vault-architecture-sub-vault-support-and-label-convent-d5e5840d
     type: related-to
   - id: protected-branch-policy-consistency-rollout-consolidated-d9892181
+    type: related-to
+  - id: mnemonic-relate-retry-does-not-reconcile-partial-git-persist-fd9d13c9
     type: related-to
 memoryVersion: 1
 ---

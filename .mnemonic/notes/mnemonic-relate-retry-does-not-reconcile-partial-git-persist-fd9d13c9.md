@@ -9,9 +9,12 @@ tags:
   - mcp
 lifecycle: permanent
 createdAt: '2026-03-19T22:01:11.193Z'
-updatedAt: '2026-03-19T22:10:02.637Z'
+updatedAt: '2026-05-09T21:10:58.715Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: mnemonic-key-design-decisions-3f2a6273
+    type: related-to
 memoryVersion: 1
 ---
 ## Issue (Fixed)
