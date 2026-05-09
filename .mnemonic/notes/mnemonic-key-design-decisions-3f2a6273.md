@@ -7,7 +7,7 @@ tags:
   - rationale
 lifecycle: permanent
 createdAt: '2026-03-07T17:59:12.124Z'
-updatedAt: '2026-05-09T21:10:39.019Z'
+updatedAt: '2026-05-09T21:10:52.765Z'
 role: summary
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
@@ -41,6 +41,10 @@ relatedTo:
   - id: zod-v4-migration-requires-explicit-key-schema-for-z-record-0229f4e5
     type: related-to
   - id: decision-phase-2-recall-scoring-uses-rrf-with-dense-rank-tie-7969c37d
+    type: related-to
+  - id: multi-vault-architecture-sub-vault-support-and-label-convent-d5e5840d
+    type: related-to
+  - id: protected-branch-policy-consistency-rollout-consolidated-d9892181
     type: related-to
 memoryVersion: 1
 ---
