@@ -10,6 +10,7 @@ on:
 permissions:
   pull-requests: write
   contents: read
+  models: read
 
 jobs:
   update-pr-description:

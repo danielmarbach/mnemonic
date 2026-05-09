@@ -412,11 +412,17 @@ async function fetchAiEnhancement(prompt, model) {
       signal: AbortSignal.timeout(15_000),
     });
 
-    if (!response.ok) return null;
+    if (!response.ok) {
+      process.stderr.write(
+        `GitHub Models API error: ${response.status} ${response.statusText} (model: ${model})\n`,
+      );
+      return null;
+    }
 
     const data = await response.json();
     return data?.choices?.[0]?.message?.content?.trim() ?? null;
-  } catch {
+  } catch (err) {
+    process.stderr.write(`GitHub Models API fetch failed: ${err.message}\n`);
     return null;
   }
 }
