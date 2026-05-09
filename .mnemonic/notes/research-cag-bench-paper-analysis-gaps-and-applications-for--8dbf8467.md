@@ -9,7 +9,7 @@ tags:
   - retrieval
 lifecycle: temporary
 createdAt: '2026-05-09T07:20:50.314Z'
-updatedAt: '2026-05-09T07:46:37.938Z'
+updatedAt: '2026-05-09T07:48:46.489Z'
 role: research
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -27,17 +27,17 @@ CAG-Bench (Canfield, Guideboard Labs, May 2026) evaluates three context strategi
 
 **Key architectural elements:**
 
-- 30 sequential tasks with explicit inter-dependencies via continuity_terms
-- Per-task promote_summary/promote_terms enter durable memory from ground truth (never model output)
-- Scoring via concept groups: checklist_terms, source_evidence_terms, domain_rule_terms, continuity_recall
-- Four metrics: memory_recall (coverage), memory_precision (relevance), continuity_recall (answer coverage), memory_usage_rate (uptake — retrieved concepts appearing in final answer)
+- 30 sequential tasks with explicit inter-dependencies via continuity\_terms
+- Per-task promote\_summary/promote\_terms enter durable memory from ground truth (never model output)
+- Scoring via concept groups: checklist\_terms, source\_evidence\_terms, domain\_rule\_terms, continuity\_recall
+- Four metrics: memory\_recall (coverage), memory\_precision (relevance), continuity\_recall (answer coverage), memory\_usage\_rate (uptake — retrieved concepts appearing in final answer)
 
 **Memory selection variants:**
 
 - cag (base): unbounded dump, cap=25 — 100% recall, 39.3% precision, 48.4% usage
-- cag_scoped (label-informed): K=5 using continuity_terms in scoring — 80.7% recall, 53.0% precision, 54.1% usage
-- cag_scoped_promptonly (deployable): K=5 using only task title/prompt/tags/docs — 60.9% recall, 47.7% precision, 54.0% usage
-- cag_oracle_memory (ceiling): K=5 filtered to rows where promoted_terms overlap continuity_terms — 80.7% recall, 53.0% precision, 54.2% usage
+- cag\_scoped (label-informed): K=5 using continuity\_terms in scoring — 80.7% recall, 53.0% precision, 54.1% usage
+- cag\_scoped\_promptonly (deployable): K=5 using only task title/prompt/tags/docs — 60.9% recall, 47.7% precision, 54.0% usage
+- cag\_oracle\_memory (ceiling): K=5 filtered to rows where promoted\_terms overlap continuity\_terms — 80.7% recall, 53.0% precision, 54.2% usage
 
 ### Scale: Not One Data Point
 
@@ -71,7 +71,7 @@ Mnemonic already operates in scoped-retrieval for any vault above 25 notes. The 
 
 #### Gap 1: No Memory Validation Gate
 
-The paper uses grounded memory (promote_summary from task definitions, never model output). PersistBench findings: median 53% cross-domain memory leakage, 97% memory-induced sycophancy when model-generated memories are stored without validation.
+The paper uses grounded memory (promote\_summary from task definitions, never model output). PersistBench findings: median 53% cross-domain memory leakage, 97% memory-induced sycophancy when model-generated memories are stored without validation.
 
 Mnemonic has no validation gate. The agent calls `remember` with whatever content it produces. A hallucinated architectural decision becomes trusted memory indistinguishable from correct facts. The paper's grounding contract deliberately isolates retrieval/uptake from memory-formation errors — this is structurally absent in mnemonic.
 
@@ -81,7 +81,7 @@ Mnemonic has no validation gate. The agent calls `remember` with whatever conten
 
 #### Gap 2: No Retrieval Precision Measurement
 
-The paper measures recall and precision against ground-truth continuity_terms. Mnemonic has no ground truth — it cannot compute what fraction of truly relevant concepts a recall missed.
+The paper measures recall and precision against ground-truth continuity\_terms. Mnemonic has no ground truth — it cannot compute what fraction of truly relevant concepts a recall missed.
 
 The existing `retrievalEvidence` on recall results (channels, rankBand, freshness, superseded) explains HOW a result was retrieved, not WHETHER it should have been. It is a retrieval-rationale signal, not a retrieval-quality signal.
 
@@ -146,6 +146,14 @@ Direct uptake measurement requires observing the agent output. A MCP server cann
 
 ### Consolidation vs Accumulation
 
+The paper evaluates linear accumulation — every task's promoted decisions are appended to a growing store. There is no pruning, no merging, no lifecycle management. The paper implicitly assumes more accumulated memory is better, while Mnemonic's architecture is actually memory evolution. Those are fundamentally different models.
+
+The paper's degradation curve (base CAG usage rate dropping from 62.6% to 38.1% across three phases) may partially emerge from: duplicated concepts, unresolved historical branches, stale decisions, and accumulation without canonicalization.
+
+Mnemonic's temporary/permanent lifecycle plus consolidation (`supersedes` and `delete` strategies), canonical promotion in recall ranking, and explicit metadata may directly attack the degradation mechanism itself, not merely retrieval quality. This is a materially different architectural hypothesis.
+
+This is currently untested and may represent mnemonic's strongest architectural advantage relative to naive accumulation systems.
+
 The paper evaluates linear accumulation — every task's promoted decisions are appended to a growing store. There is no pruning, no merging, no lifecycle management. Mnemonic's temporary/permanent lifecycle plus consolidation (`supersedes` and `delete` strategies) may directly counter the late-phase degradation observed in CAG-Bench, where base CAG's usage rate drops from 62.6% to 38.1% across three phases. Consolidation reduces redundancy, canonicalizes decisions, and keeps the active memory store focused. This is currently untested and may represent mnemonic's strongest architectural advantage relative to naive accumulation systems.
 
 ### Concrete Actions (Non-Aspirational)
@@ -179,6 +187,32 @@ The paper evaluates linear accumulation — every task's promoted decisions are 
 - Explicit metadata outranks inferred (no heuristic write-back)
 
 ### Verdict
+
+The shallow analysis was directionally correct (memory uptake beats retrieval breadth) but over-engineered. Several phases already exist, one is structurally impossible at the MCP server level, and others are aspirational conventions.
+
+The right next step is 2-3 concrete, low-risk additions to recall structured output (diversity metrics, vault-size context, retrievalCoverage) plus one medium-investment feature (diversity-aware selection). Everything else is deferred.
+
+The paper's most important lesson for mnemonic is NOT about retrieval quality. It is that the retrieval system can be excellent and the model still won't use what was retrieved. Since mnemonic can't fix uptake directly, its job is to make retrieval output as useful, precise, and diverse as possible so the agent has the best chance of incorporating it into its answer.
+
+**Framing mnemonic's role:** mnemonic is not a memory-usage system. mnemonic is a memory-shaping system. The practical consequence:
+
+Improve: retrieval precision, retrieval diversity, orientation quality, context shaping, token efficiency.
+Do not attempt: uptake enforcement, hidden validation layers, opaque memory arbitration, server-side behavioral measurement.
+
+**Layer separation:** mnemonic's architecture naturally separates concerns:
+
+- mnemonic shapes and retrieves memory
+- the consuming agent decides what to use
+- humans remain the ultimate validation authority
+
+Attempting to collapse these layers into the MCP server would violate the project's simplicity, local-first, and fail-soft constraints.
+
+This layer separation explains:
+
+- why server-side uptake metrics are impossible (mnemonic never sees the agent's output)
+- why validation gates are problematic (collapsing human authority into an automated layer)
+- why explicit metadata matters (the shaping layer communicates via metadata, not behavioral intervention)
+- why local-first still works (each layer can operate independently)
 
 The shallow analysis was directionally correct (memory uptake beats retrieval breadth) but over-engineered. Several phases already exist, one is structurally impossible at the MCP server level, and others are aspirational conventions.
 
