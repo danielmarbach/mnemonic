@@ -9,11 +9,14 @@ tags:
   - retrieval
 lifecycle: temporary
 createdAt: '2026-05-09T07:20:50.314Z'
-updatedAt: '2026-05-09T07:42:17.389Z'
+updatedAt: '2026-05-09T07:42:26.189Z'
 role: research
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: request-research-cag-bench-paper-gaps-and-applications-for-m-450273ae
+    type: derives-from
 memoryVersion: 1
 ---
 ## Research: CAG-Bench Paper Analysis for mnemonic
