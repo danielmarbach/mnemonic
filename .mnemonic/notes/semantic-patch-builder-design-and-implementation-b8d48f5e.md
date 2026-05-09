@@ -9,7 +9,7 @@ tags:
   - llm-usability
 lifecycle: permanent
 createdAt: '2026-05-01T19:57:15.220Z'
-updatedAt: '2026-05-01T19:57:15.220Z'
+updatedAt: '2026-05-09T21:09:01.886Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
@@ -19,6 +19,8 @@ relatedTo:
     type: derives-from
   - id: research-semanticpatch-failure-patterns-analysis-43e810a6
     type: derives-from
+  - id: mnemonic-key-design-decisions-3f2a6273
+    type: related-to
 memoryVersion: 1
 ---
 # Semantic Patch Builder: Design and Implementation
