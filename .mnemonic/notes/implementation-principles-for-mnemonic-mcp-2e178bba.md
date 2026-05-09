@@ -9,7 +9,7 @@ tags:
   - documentation
 lifecycle: permanent
 createdAt: '2026-05-09T12:54:02.094Z'
-updatedAt: '2026-05-09T20:07:06.948Z'
+updatedAt: '2026-05-09T21:03:51.514Z'
 role: summary
 alwaysLoad: true
 project: https-github-com-danielmarbach-mnemonic
@@ -24,6 +24,10 @@ relatedTo:
   - id: changelog-writing-principles-87cdbc5b
     type: related-to
   - id: documentation-split-for-readme-architecture-and-agent-4e20a50b
+    type: related-to
+  - id: retrieval-precision-and-diversity-diagnostics-implemented-763c1459
+    type: related-to
+  - id: enriched-confidence-scoring-with-signal-strength-composite-i-06563116
     type: related-to
 memoryVersion: 1
 ---

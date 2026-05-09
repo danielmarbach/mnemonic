@@ -9,7 +9,7 @@ tags:
   - plan
 lifecycle: permanent
 createdAt: '2026-05-09T21:02:25.406Z'
-updatedAt: '2026-05-09T21:02:25.406Z'
+updatedAt: '2026-05-09T21:03:51.512Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
@@ -17,6 +17,10 @@ relatedTo:
     type: derives-from
   - id: research-cag-bench-paper-analysis-gaps-and-applications-for--8dbf8467
     type: derives-from
+  - id: implementation-principles-for-mnemonic-mcp-2e178bba
+    type: related-to
+  - id: summary-evidence-enrichment-implementation-across-recall-and-10b7ba37
+    type: related-to
 memoryVersion: 1
 ---
 ## Consolidated from:
