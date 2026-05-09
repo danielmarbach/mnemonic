@@ -145,6 +145,7 @@ async function main() {
   const recallReadFirst = await callTool("recall", { query: "what should I read first to understand temporal interpretation", cwd, limit: 5, scope: "all" });
   const recallArchitecture = await callTool("recall", { query: "projections enrichment layer design", cwd, limit: 5, scope: "all" });
   const recallRecentWeek = await callTool("recall", { query: "recent changes this week", cwd, limit: 5, scope: "all" });
+  const recallDiagnostics = await callTool("recall", { query: "key design decisions", cwd, limit: 5, scope: "all" });
   const recentTemporary = await callTool("recent_memories", { cwd, scope: "all", storedIn: "any", limit: 5, lifecycle: "temporary" });
   const recalledTemporary = await callTool("recall", { query: "phase 2 working-state continuity", cwd, limit: 5, scope: "all", lifecycle: "temporary" });
 
@@ -200,11 +201,27 @@ async function main() {
   const architectureTop = recallArchitecture.structured?.results?.[0];
   const tempRecallResults = recalledTemporary.structured?.results ?? [];
 
+  const diagStructured = recallDiagnostics.structured;
+  const diagResults = diagStructured?.results ?? [];
+  const diagHasScopeCount = typeof diagStructured?.recallScopeNoteCount === "number";
+  const diagHasDiversity = diagStructured?.diversity != null;
+  const diagHasRetrievalCoverage = diagStructured?.retrievalCoverage != null;
+  const diagResultsHaveSignalStrength = diagResults.some((r) => typeof r.signalStrength === "number");
+  const diagResultsHaveConfidence = diagResults.some((r) => typeof r.confidence === "string");
+  const diagConfidenceTiers = [...new Set(diagResults.map((r) => r.confidence).filter(Boolean))];
+  const diagDiversityThemeCount = diagStructured?.diversity?.themeCount ?? null;
+  const diagCoverageFraction = diagStructured?.retrievalCoverage?.fraction ?? null;
+
   const packA = {
     advisory: [
       !canonicalDesignInTopEmbeddings && "recall answers canonical design questions",
       !reachesArchitectureWithinThreeSteps && "recent-to-architecture navigation works",
       !b5HasResults && "temporal filter not over-excluding",
+      !diagHasScopeCount && "recallScopeNoteCount missing from structured output",
+      !diagHasDiversity && "diversity missing from structured output",
+      !diagHasRetrievalCoverage && "retrievalCoverage missing from structured output",
+      !diagResultsHaveSignalStrength && "signalStrength missing from recall results",
+      !diagResultsHaveConfidence && "confidence missing from recall results",
     ].filter(Boolean),
     themeCount: themeEntries.length,
     topEmbeddingResult: b1Top?.title,
@@ -216,6 +233,17 @@ async function main() {
     verboseTemporalTop: b3Top?.title ?? null,
     hybridTop: b4Top?.title ?? null,
     temporalFilterNotOverExcluding: b5HasResults,
+    diagnostics: {
+      scopeNoteCountPresent: diagHasScopeCount,
+      scopeNoteCount: diagStructured?.recallScopeNoteCount ?? null,
+      diversityPresent: diagHasDiversity,
+      diversityThemeCount: diagDiversityThemeCount,
+      retrievalCoveragePresent: diagHasRetrievalCoverage,
+      coverageFraction: diagCoverageFraction,
+      signalStrengthPresent: diagResultsHaveSignalStrength,
+      confidencePresent: diagResultsHaveConfidence,
+      confidenceTiers: diagConfidenceTiers,
+    },
   };
 
   const packB = {
@@ -239,7 +267,8 @@ async function main() {
 
   const vaultLabel = useIsolated ? "isolated vault" : "installed mnemonic server";
 
-  const packAContent = `Dogfooding results for the core enrichment/orientation pack on ${today} using the ${vaultLabel}.\n\nAdvisory findings:\n${packA.advisory.length === 0 ? "- none" : packA.advisory.map((item) => `- ${item}`).join("\n")}\n\nObservations:\n- Theme count: ${packA.themeCount}\n- Top embeddings recall hit: ${packA.topEmbeddingResult}\n- Recent navigation reaches architecture/decision notes within three steps: ${packA.reachesArchitectureWithinThreeSteps}\n- Working-state note count: ${packA.workingStateCount}\n- Temporal filter returns results: ${packA.temporalFilterNotOverExcluding}`;
+  const diag = packA.diagnostics;
+  const packAContent = `Dogfooding results for the core enrichment/orientation pack on ${today} using the ${vaultLabel}.\n\nAdvisory findings:\n${packA.advisory.length === 0 ? "- none" : packA.advisory.map((item) => `- ${item}`).join("\n")}\n\nObservations:\n- Theme count: ${packA.themeCount}\n- Top embeddings recall hit: ${packA.topEmbeddingResult}\n- Recent navigation reaches architecture/decision notes within three steps: ${packA.reachesArchitectureWithinThreeSteps}\n- Working-state note count: ${packA.workingStateCount}\n- Temporal filter returns results: ${packA.temporalFilterNotOverExcluding}\n\nDiagnostics:\n- recallScopeNoteCount present: ${diag.scopeNoteCountPresent} (value: ${diag.scopeNoteCount})\n- diversity present: ${diag.diversityPresent} (themeCount: ${diag.diversityThemeCount})\n- retrievalCoverage present: ${diag.retrievalCoveragePresent} (fraction: ${diag.coverageFraction})\n- signalStrength on results: ${diag.signalStrengthPresent}\n- confidence on results: ${diag.confidencePresent} (tiers: ${diag.confidenceTiers.join(", ") || "none"})`;
 
   const packBContent = `Dogfooding results for the working-state continuity pack on ${today} using the ${vaultLabel}.\n\nAdvisory findings:\n${packB.advisory.length === 0 ? "- none" : packB.advisory.map((item) => `- ${item}`).join("\n")}\n\nObservations:\n- Temporary recent titles: ${packB.recentTemporaryTitles.map((title) => `\`${title}\``).join(", ") || "none"}\n- Temporary recall titles: ${packB.recalledTemporaryTitles.map((title) => `\`${title}\``).join(", ") || "none"}`;
 
