@@ -343,4 +343,59 @@ describe("recall pipeline integration", () => {
       await embeddingServer.close();
     }
   }, 15000);
+
+  it("recall results include signalStrength for project context", async () => {
+    const mainVaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-signal-"));
+    tempDirs.push(mainVaultDir);
+    const repoDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-signal-repo-"));
+    tempDirs.push(repoDir);
+    await initTestRepo(repoDir);
+    const embeddingServer = await startFakeEmbeddingServer();
+
+    try {
+      await callLocalMcp(mainVaultDir, "remember", {
+        title: "Permanent Summary Note",
+        content: "A permanent summary note with high structural support for signalStrength testing.",
+        tags: ["integration", "signal"],
+        cwd: repoDir,
+        scope: "project",
+        lifecycle: "permanent",
+        role: "summary",
+        alwaysLoad: true,
+      }, embeddingServer.url);
+
+      await callLocalMcp(mainVaultDir, "remember", {
+        title: "Temporary Context Note",
+        content: "A temporary context note with no relations — should have low signalStrength.",
+        tags: ["integration", "signal"],
+        cwd: repoDir,
+        scope: "project",
+        lifecycle: "temporary",
+        role: "context",
+      }, embeddingServer.url);
+
+      const response = await callLocalMcpResponse(mainVaultDir, "recall", {
+        query: "signal testing",
+        cwd: repoDir,
+        limit: 10,
+        scope: "all",
+      }, embeddingServer.url);
+
+      const result = RecallResultSchema.parse(response.structuredContent);
+
+      expect(result.results.length).toBeGreaterThanOrEqual(1);
+
+      for (const r of result.results) {
+        expect(typeof r.signalStrength).toBe("number");
+        expect(r.signalStrength).toBeGreaterThanOrEqual(0);
+        expect(r.confidence).toBeDefined();
+      }
+
+      const summaryResult = result.results.find((r) => r.title === "Permanent Summary Note");
+      expect(summaryResult).toBeDefined();
+      expect(summaryResult!.signalStrength).toBeGreaterThan(0.3);
+    } finally {
+      await embeddingServer.close();
+    }
+  }, 20000);
 });
