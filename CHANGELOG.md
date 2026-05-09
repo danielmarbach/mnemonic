@@ -4,6 +4,12 @@ All notable changes to `mnemonic` will be documented in this file.
 
 The format is loosely based on Keep a Changelog and uses semver-style version headings.
 
+## [0.30.0] - 2026-05-10
+
+### Changed
+
+- Switch docker image from Alpine to Debian due to intermittent failures with musl
+
 ## [0.29.0] - 2026-05-09
 
 ### Added
