@@ -10,6 +10,7 @@ The format is loosely based on Keep a Changelog and uses semver-style version he
 
 - `recall` results now include `recallScopeNoteCount`, `diversity` (theme count, role/lifecycle mix), and `retrievalCoverage` (fraction of high-priority anchors covered) in structured output.
 - Recall automatically expands its default result limit for small vaults (25 notes or fewer), providing full-context retrieval without requiring the caller to tune the limit parameter.
+- `recall` results now include per-result `signalStrength` — a composite quality signal (0.00-0.50) from role, centrality, lifecycle, and recency — alongside confidence tiers now derived from this richer dimensional score rather than a single coarse heuristic.
 
 ### Changed
 
