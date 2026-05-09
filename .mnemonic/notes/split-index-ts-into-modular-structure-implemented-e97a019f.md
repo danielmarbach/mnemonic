@@ -1,23 +1,26 @@
 ---
-title: 'Plan: Split index.ts into modular structure'
+title: Split index.ts into modular structure (implemented)
 tags:
   - workflow
   - plan
   - refactoring
-lifecycle: temporary
-createdAt: '2026-05-02T06:10:17.697Z'
-updatedAt: '2026-05-02T20:14:31.921Z'
-role: plan
-alwaysLoad: false
+  - request
+lifecycle: permanent
+createdAt: '2026-05-09T21:05:56.027Z'
+updatedAt: '2026-05-09T21:05:56.027Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
   - id: research-index-ts-dependency-analysis-for-modular-extraction-07f545d4
     type: derives-from
-  - id: request-split-index-ts-into-modular-structure-cf87b146
-    type: follows
+  - id: typescript-code-review-mnemonic-project-961d984b
+    type: related-to
 memoryVersion: 1
 ---
+## Consolidated from:
+### Plan: Split index.ts into modular structure
+*Source: `plan-split-index-ts-into-modular-structure-e1cd6944`*
+
 ## Plan: Split index.ts into Modular Structure
 
 Phase 1: ServerContext + Extract Helpers — DONE (845 lines extracted, 6 new modules, index.ts down to 5819 lines, committed)
@@ -147,3 +150,21 @@ All modularization complete. Committed.
 - \[ ] Target: ~100-150 lines
 - \[ ] Verify: `tsc --noEmit` passes, all tests pass
 - \[ ] Final review of module boundaries and naming
+
+### Request: Split index.ts into modular structure
+*Source: `request-split-index-ts-into-modular-structure-cf87b146`*
+
+## Request
+
+Refactor `src/index.ts` (6,664 lines) into a modular structure. The file is a monolithic entry point mixing CLI commands, config constants, 20+ MCP tool handlers, helper functions, prompt registrations, and startup logic. Zero exports — everything is module-private.
+
+## Motivation
+
+- Reviewed in TypeScript code review (memory `typescript-code-review-mnemonic-project-961d984b`) and flagged as a deferred improvement
+- The file is difficult to navigate, test, and reason about
+- Individual tool handlers can't be unit-tested in isolation
+- Helper functions are tightly coupled to module-level singletons
+
+## Scope
+
+Full extraction of all tool handlers, CLI commands, helpers, and prompts into separate modules, leaving a slim entry point that wires everything together.

@@ -11,11 +11,6 @@ role: research
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
-relatedTo:
-  - id: request-split-index-ts-into-modular-structure-cf87b146
-    type: derives-from
-  - id: plan-split-index-ts-into-modular-structure-e1cd6944
-    type: derives-from
 memoryVersion: 1
 ---
 ## Research: index.ts Dependency Analysis for Modular Extraction
