@@ -8,7 +8,7 @@ tags:
   - cag-bench
 lifecycle: temporary
 createdAt: '2026-05-09T07:50:29.361Z'
-updatedAt: '2026-05-09T08:02:54.986Z'
+updatedAt: '2026-05-09T08:04:12.727Z'
 role: plan
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -34,16 +34,6 @@ Single threshold, single source of evidence: the paper's cap=25 baseline works a
 
 - noteCount <= 25: effective limit = Math.min(noteCount, 20) — dump everything, paper-justified
 - noteCount > 25: effective limit = configured default (5) — agent uses `recallScopeNoteCount` from output to decide whether to tighten or loosen on subsequent calls
-
-Reuses already-in-memory data. No new I/O or git calls. Fail-soft to configured default when cache is unavailable.
-
-In `src/tools/recall.ts` handler, before scoring, derive note count from the session cache (`noteList.length` on cached vault). The cache is already populated by `getOrBuildVaultEmbeddings` earlier in the pipeline for the project case. For the non-project (global) cold path, fall back to the configured default — don't add I/O just for this heuristic.
-
-Conservative heuristic to avoid accidental context dumping:
-
-- noteCount <= 12: effective limit = noteCount
-- noteCount < 30: effective limit = Math.min(10, noteCount)
-- noteCount >= 30: effective limit = configured default (5)
 
 Reuses already-in-memory data. No new I/O or git calls. Fail-soft to configured default when cache is unavailable.
 
