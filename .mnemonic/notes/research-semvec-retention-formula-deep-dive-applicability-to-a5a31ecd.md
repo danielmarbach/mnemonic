@@ -10,11 +10,14 @@ tags:
   - ranking
 lifecycle: temporary
 createdAt: '2026-05-09T15:19:01.021Z'
-updatedAt: '2026-05-09T15:19:01.021Z'
+updatedAt: '2026-05-09T15:24:15.017Z'
 role: research
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: research-semvec-analysis-applicability-and-alignment-with-mn-7a42ac50
+    type: derives-from
 memoryVersion: 1
 ---
 ## Research: Semvec Retention Formula Deep-Dive
