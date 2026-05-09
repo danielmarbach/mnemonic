@@ -138,7 +138,8 @@ export function computeSignalStrength(params: {
   const recencyWeight =
     SIGNAL_RECENCY_MAX * Math.max(0, 1 - daysSinceUpdateNum / SIGNAL_RECENCY_WINDOW_DAYS);
 
-  return roleWeight + centralityWeight + lifecycleWeight + recencyWeight;
+  const result = roleWeight + centralityWeight + lifecycleWeight + recencyWeight;
+  return Number.isFinite(result) ? result : 0;
 }
 
 export function computeConfidence(

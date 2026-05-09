@@ -219,3 +219,25 @@ describe("computeConfidence with signalStrength", () => {
     expect(["high", "medium", "low"]).toContain(lowResult);
   });
 });
+
+describe("computeSignalStrength fail-soft guards", () => {
+  it("gracefully handles invalid updatedAt (daysSince returns 0, yielding full recency)", () => {
+    const result = computeSignalStrength({
+      lifecycle: "permanent",
+      updatedAt: "not-a-date",
+      role: "summary",
+      centrality: 5,
+    });
+    expect(Number.isFinite(result)).toBe(true);
+    expect(result).toBeGreaterThan(0);
+  });
+
+  it("returns 0 for NaN-producing negative centrality via NaN guard", () => {
+    const result = computeSignalStrength({
+      lifecycle: "temporary",
+      updatedAt: new Date().toISOString(),
+      centrality: -5,
+    });
+    expect(result).toBe(0);
+  });
+});

@@ -405,12 +405,19 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
           const centrality = note.relatedTo?.length ?? 0;
           const filePath = `${vault.notesRelDir}/${id}.md`;
           const provenance = await getNoteProvenance(vault.git, filePath);
-          const signalStrength = computeSignalStrength({
-            lifecycle: note.lifecycle,
-            updatedAt: note.updatedAt,
-            role: note.role,
-            centrality,
-          });
+          const signalStrength = (() => {
+            try {
+              const ss = computeSignalStrength({
+                lifecycle: note.lifecycle,
+                updatedAt: note.updatedAt,
+                role: note.role,
+                centrality,
+              });
+              return Number.isFinite(ss) ? ss : undefined;
+            } catch {
+              return undefined;
+            }
+          })();
           const confidence = computeConfidence(note.lifecycle, note.updatedAt, centrality, signalStrength);
           let history: Array<{
             commitHash: string;
