@@ -11,6 +11,10 @@ The format is loosely based on Keep a Changelog and uses semver-style version he
 - `recall` results now include `recallScopeNoteCount`, `diversity` (theme count, role/lifecycle mix), and `retrievalCoverage` (fraction of high-priority anchors covered) in structured output.
 - Recall automatically expands its default result limit for small vaults (25 notes or fewer), providing full-context retrieval without requiring the caller to tune the limit parameter.
 
+### Changed
+
+- `mnemonic-rpi-workflow` skill: Review phase now always requires a fresh-context subagent with adversarial posture — constraint violation hunting, deliverable completeness check, and fresh verification. Removes same-context self-review option. Review handoff template includes constraint checklist and 6-point adversarial mandate.
+
 ## [0.28.0] - 2026-05-03
 
 ### Changed
