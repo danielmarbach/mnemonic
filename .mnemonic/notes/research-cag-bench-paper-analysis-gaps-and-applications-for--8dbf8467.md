@@ -9,7 +9,7 @@ tags:
   - retrieval
 lifecycle: temporary
 createdAt: '2026-05-09T07:20:50.314Z'
-updatedAt: '2026-05-09T07:42:26.189Z'
+updatedAt: '2026-05-09T07:44:40.177Z'
 role: research
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -79,6 +79,15 @@ Pure parameter adjustment, no new infrastructure.
 
 #### Gap 4: Token Efficiency Metrics Missing
 
+The paper introduces `continuity_per_memory_token` — output quality per token of context spent. Mnemonic structured output has provenance, confidence, evidence, and relationships on each result — but no efficiency ratio or context to let agents compute their own.
+
+**Actionable?** Yes, trivial additions to structured `RecallResult`:
+
+- `vaultSize`: total notes in visible vaults
+- The agent computes its own efficiency ratio from `results.length` vs `vaultSize`
+
+Both values derivable from data already in the pipeline.
+
 Paper: `continuity_per_memory_token`. Mnemonic: provenance, confidence, evidence, relationships on each result — but no efficiency ratio.
 
 **Actionable?** Yes. Add to structured `RecallResult`:
@@ -101,13 +110,42 @@ This is a model/client problem. Mnemonic can help indirectly:
 
 ### What the Paper Confirms Mnemonic Does Right
 
-1. File-first embedding-driven storage: persistent store beats source-only
-2. Project bias essential: domain rule recall 56.4% for CAG vs 47.2% for RAG — project-specific constraints carried in accumulated memory improve output
-3. Rich metadata improves ranking: label-informed vs label-free gap validates mnemonic's confidence/provenance/centrality signals
-4. Orientation-first workflow: Phase analysis shows orientation matters most when concept space is large
-5. Token discipline: focused K=5 can outperform cap=25 dumps in quality per token
+1. **File-first embedding-driven storage is correct.** Persistent memory beats source-only retrieval. Mnemonic's one .md file per note, local embeddings, no database architecture is validated.
+
+2. **Project bias is essential.** Domain rule recall (CAG 56.4% vs RAG 47.2%) shows project-specific constraints carried in accumulated memory improve output. Mnemonic's project boost and project-scoped storage are the right pattern.
+
+3. **Rich metadata plausibly improves ranking quality.** The label-informed vs label-free retrieval gap validates the *value of additional retrieval signals*. Mnemonic's provenance/confidence/centrality metadata may help close this gap without requiring answer-key leakage. The paper does not directly validate provenance or confidence signals — it validates that additional signals improve retrieval, and mnemonic's metadata stack is a plausible candidate for closing the gap that label-free retrieval leaves open.
+
+4. **Orientation-first workflow is validated.** The three-phase breakdown (T01-T10, T11-T20, T21-T30) shows orientation matters most when the concept space is large. `project_memory_summary` with primaryEntry and suggestedNext is the right entry point.
+
+5. **Token discipline matters.** Focused K=5 selection can outperform cap=25 dumps in answer quality per token. Mnemonic's `limit` parameter and bounded relationship expansion (max 3 shown) are correct constraints.
+
+6. **Mnemonic is already closer to the deployable retriever, not the oracle.** The paper's `cag_scoped_promptonly` uses only task title, prompt, tags, source documents, and recency — no answer-key leakage. mnemonic's retrieval stack (semantic embeddings + lexical RRF + graph spreading + canonical promotion + project locality + recency + explicit metadata) is architecturally similar to this deployable variant. This is encouraging: the deployable retriever already substantially outperforms RAG/DAG (composite 42.6 vs 29.6/28.5), and the paper also found that label-free retrieval drives *higher uptake* in early and middle phases (63.2% vs 56.8% for label-informed in T01-T10) — surface-matching retrieval produces context the model naturally recognizes as connected to its current task.
+
+1) File-first embedding-driven storage: persistent store beats source-only
+2) Project bias essential: domain rule recall 56.4% for CAG vs 47.2% for RAG — project-specific constraints carried in accumulated memory improve output
+3) Rich metadata improves ranking: label-informed vs label-free gap validates mnemonic's confidence/provenance/centrality signals
+4) Orientation-first workflow: Phase analysis shows orientation matters most when concept space is large
+5) Token discipline: focused K=5 can outperform cap=25 dumps in quality per token
 
 ### Concrete Actions (Non-Aspirational)
+
+**Immediate (low risk, additive, no new infrastructure):**
+
+1. **Vault-size awareness in recall defaults** — heuristic on `limit` based on total visible vault notes count
+2. **Diversity metrics in structured output** — theme/role/lifecycle mix per recall result set, all derivable from existing metadata
+3. **Token-efficiency context** — include `vaultSize` in `RecallResult` so agents can compute their own efficiency ratios
+4. **`retrievalCoverage` in structured output** — proportion of relevant high-priority anchors (alwaysLoad, role: summary, canonical project notes) represented in final result set. Not raw vault-wide anchor counting, which is noisy; project-local anchors matter more than global anchors, and some alwaysLoad notes are intentionally orthogonal to a query.
+
+**Medium-term (new code but additive, fail-soft):**
+
+1. **Diversity-aware result selection** — after ranking, pass through diversity check ensuring theme, role, and lifecycle spread. The paper shows this matters for high concept density tasks. Builds on existing theme classification and anchor scoring.
+2. **Adaptive limit** — auto-adjust based on query specificity plus vault size, similar to existing temporal hint detection pattern
+
+**Deferred:**
+
+1. **Memory validation gate** — premature, acknowledged risk
+2. **Uptake measurement** — client-side concern, could become a client benchmark like dogfooding packs, not a server feature
 
 **Immediate (low risk, additive):**
 
@@ -134,7 +172,22 @@ This is a model/client problem. Mnemonic can help indirectly:
 - Metadata-only changes don't re-embed
 - Explicit metadata outranks inferred (no heuristic write-back)
 
-## Verdict
+### Consolidation vs Accumulation
+
+The paper evaluates linear accumulation — every task's promoted decisions are appended to a growing store. There is no pruning, no merging, no lifecycle management. Mnemonic's temporary/permanent lifecycle plus consolidation (`supersedes` and `delete` strategies) may directly counter the late-phase degradation observed in CAG-Bench, where base CAG's usage rate drops from 62.6% to 38.1% across three phases. Consolidation reduces redundancy, canonicalizes decisions, and keeps the active memory store focused. This is currently untested and may represent mnemonic's strongest architectural advantage relative to naive accumulation systems.
+
+### Verdict
+
+The shallow analysis was directionally correct (memory uptake beats retrieval breadth) but over-engineered. Several phases already exist, one is structurally impossible at the MCP server level, and others are aspirational conventions.
+
+The right next step is 2-3 concrete, low-risk additions to recall structured output (diversity metrics, vault-size context, retrievalCoverage) plus one medium-investment feature (diversity-aware selection). Everything else is deferred.
+
+The paper's most important lesson for mnemonic is NOT about retrieval quality. It is that the retrieval system can be excellent and the model still won't use what was retrieved. Since mnemonic can't fix uptake directly, its job is to make retrieval output as useful, precise, and diverse as possible so the agent has the best chance of incorporating it into its answer.
+
+**Framing mnemonic's role:** mnemonic is not a memory-usage system. mnemonic is a memory-shaping system. The practical consequence:
+
+Improve: retrieval precision, retrieval diversity, orientation quality, context shaping, token efficiency.
+Do not attempt: uptake enforcement, hidden validation layers, opaque memory arbitration, server-side behavioral measurement.
 
 The shallow analysis was directionally correct (memory uptake beats retrieval breadth) but over-engineered. Several phases already exist, one is structurally impossible at the MCP server level, and others are aspirational conventions.
 
