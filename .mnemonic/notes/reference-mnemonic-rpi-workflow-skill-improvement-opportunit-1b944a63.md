@@ -10,7 +10,7 @@ tags:
   - phase2
 lifecycle: permanent
 createdAt: '2026-04-25T07:47:46.589Z'
-updatedAt: '2026-04-25T07:47:56.559Z'
+updatedAt: '2026-05-09T16:09:50.552Z'
 role: reference
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -110,3 +110,17 @@ Why: prevents overfitting product code to brittle quality gates.
 - More consistent evidence-backed reviews
 - Better reliability across weaker/less disciplined models
 - More predictable phase completion quality
+
+### 8) Require fresh-context subagent for review (implemented 2026-05-09)
+
+Previous review phase made subagent dispatch optional ("for non-trivial work"). The implementer's own context is contaminated — they designed the code, so they see intent rather than behavior. The recall diagnostics review passed I/O violations, missed schema descriptions, and missed tests, all caught only after review during dogfood verification.
+
+Changes:
+
+- Review section header now says "Fresh-Context Subagent Required"
+- Removed optional language; review always dispatches a fresh subagent
+- Added adversarial posture mandate: assume violations exist, prove they don't
+- Added three review subsections: A) constraint violation hunting, B) deliverable completeness, C) fresh verification
+- Added constraint checklist template (plan constraint → status → evidence)
+- Review handoff template now includes adversarial mandate with 6-point instructions and constraint checklist
+- Removed the old self-review checklist that could be done in same context

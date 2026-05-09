@@ -114,6 +114,7 @@ export interface RecallResult extends Record<string, unknown> {
     updatedAt: string;
     provenance?: Provenance;
     confidence?: Confidence;
+    signalStrength?: number;
     history?: Array<{
       commitHash: string;
       timestamp: string;
@@ -667,6 +668,7 @@ export const RecallResultSchema = z.object({
       recentlyChanged: z.boolean(),
     }).optional(),
     confidence: _Confidence.optional(),
+    signalStrength: z.number().min(0).optional().describe("Composite quality signal (0-0.50). Higher = more structural support from role, centrality, lifecycle, and recency. Use alongside confidence."),
     history: z.array(z.object({
       commitHash: z.string(),
       timestamp: z.string(),

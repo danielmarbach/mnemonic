@@ -354,6 +354,13 @@ Project identity derives from the **git remote URL**, normalized to a stable slu
 
 `recall` with `cwd` searches both vaults. Project notes get a **small tiebreaker boost** — a soft signal, not a hard filter — so global memories remain accessible while project context floats to the top.
 
+Every result carries structured quality signals to help agents decide what to trust:
+
+- **`signalStrength`** — a composite score (0.00-0.50) from role, graph centrality, lifecycle, and recency. Higher values mean more structural support behind the note.
+- **`confidence`** — high/medium/low tier derived from `signalStrength`, replacing a single coarse heuristic.
+- **`diversity`** — theme count, role mix, and lifecycle mix across selected results.
+- **`retrievalCoverage`** — fraction of high-priority anchors (alwaysLoad and summary notes) represented in results.
+
 **Hybrid recall** enhances semantic search with lightweight lexical reranking over note projections. When semantic results are weak, a bounded lexical rescue path scans projections for additional candidates, improving exact-match and identifier-heavy recall without changing the storage model or adding new infrastructure. **Canonical explanation promotion** boosts notes that explain key decisions and concepts for "why"-style questions, using structural signals like role, connections, and format rather than keyword matching. **Temporal recency:** when a query suggests temporal intent, newer notes receive an additive ranking nudge in default mode.
 
 Recall modes:

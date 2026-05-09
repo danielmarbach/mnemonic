@@ -62,6 +62,7 @@ import {
   getNoteProvenance,
   buildTemporalHistoryEntry,
   computeConfidence,
+  computeSignalStrength,
 } from "../provenance.js";
 import { enrichTemporalHistory } from "../temporal-interpretation.js";
 import { getRelationshipPreview } from "../relationships.js";
@@ -91,7 +92,8 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
         "- Optional retrieval evidence via `evidence: \"compact\"` for why a result ranked\n" +
         "- `recallScopeNoteCount`: total notes visible in the recall scope (omit-aware: if vault is small, consider increasing limit)\n" +
         "- `diversity`: theme count (unique tags), role mix, and lifecycle mix of selected results — use to gauge whether results span enough perspectives\n" +
-        "- `retrievalCoverage`: fraction of high-priority anchors (alwaysLoad or summary notes) present in results, with capped missing list — use to decide if another recall with broader terms is needed\n\n" +
+        "- `retrievalCoverage`: fraction of high-priority anchors (alwaysLoad or summary notes) present in results, with capped missing list — use to decide if another recall with broader terms is needed\n" +
+        "- `signalStrength`: per-result composite quality signal (0-0.50) from role, centrality, lifecycle, and recency — higher values mean more structural support; use alongside confidence to assess note reliability\n\n" +
         "Read-only.\n\n" +
         "Typical next step:\n" +
         "- Use `get`, `update`, `relate`, or `consolidate` based on the results.",
@@ -375,6 +377,7 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
           recentlyChanged: boolean;
         };
         confidence?: Confidence;
+        signalStrength?: number;
         history?: Array<{
           commitHash: string;
           timestamp: string;
@@ -402,7 +405,20 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
           const centrality = note.relatedTo?.length ?? 0;
           const filePath = `${vault.notesRelDir}/${id}.md`;
           const provenance = await getNoteProvenance(vault.git, filePath);
-          const confidence = computeConfidence(note.lifecycle, note.updatedAt, centrality);
+          const signalStrength = (() => {
+            try {
+              const ss = computeSignalStrength({
+                lifecycle: note.lifecycle,
+                updatedAt: note.updatedAt,
+                role: note.role,
+                centrality,
+              });
+              return Number.isFinite(ss) ? ss : undefined;
+            } catch {
+              return undefined;
+            }
+          })();
+          const confidence = computeConfidence(note.lifecycle, note.updatedAt, centrality, signalStrength);
           let history: Array<{
             commitHash: string;
             timestamp: string;
@@ -492,6 +508,7 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
             updatedAt: note.updatedAt,
             provenance,
             confidence,
+            signalStrength,
             history,
             historySummary,
             relationships,

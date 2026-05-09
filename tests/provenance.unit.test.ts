@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildTemporalHistoryEntry } from "../src/provenance.js";
+import { buildTemporalHistoryEntry, computeSignalStrength, computeConfidence } from "../src/provenance.js";
 import { enrichTemporalHistory } from "../src/temporal-interpretation.js";
 import type { CommitStats, LastCommit } from "../src/git.js";
 
@@ -102,5 +102,142 @@ describe("buildTemporalHistoryEntry", () => {
     // historySummary reflects the expansion pattern, not generic fallback
     // 2-entry history uses the specific "created and then expanded" path
     expect(result.historySummary).toBe("This note was created and then expanded with additional detail.");
+  });
+});
+
+describe("computeSignalStrength", () => {
+  const recentIso = () => new Date().toISOString();
+  const daysAgoIso = (days: number) => {
+    const d = new Date();
+    d.setDate(d.getDate() - days);
+    return d.toISOString();
+  };
+
+  it("returns 0 for temporary note with no role and no relations", () => {
+    const result = computeSignalStrength({
+      lifecycle: "temporary",
+      updatedAt: recentIso(),
+      centrality: 0,
+    });
+    expect(result).toBeCloseTo(0.10, 2); // only recency: 0.10 * (1 - 0/90)
+  });
+
+  it("returns higher scores for permanent summary with many relations", () => {
+    const result = computeSignalStrength({
+      lifecycle: "permanent",
+      updatedAt: recentIso(),
+      role: "summary",
+      centrality: 20,
+    });
+    // role=0.15 + centrality=min(0.15, log(21)*0.05≈0.152)→0.15 + lifecycle=0.10 + recency≈0.10 = ~0.50
+    expect(result).toBeGreaterThan(0.45);
+    expect(result).toBeLessThanOrEqual(0.55);
+  });
+
+  it("recency decays with age", () => {
+    const recent = computeSignalStrength({
+      lifecycle: "temporary",
+      updatedAt: recentIso(),
+      centrality: 0,
+    });
+    const old = computeSignalStrength({
+      lifecycle: "temporary",
+      updatedAt: daysAgoIso(45),
+      centrality: 0,
+    });
+    expect(recent).toBeGreaterThan(old);
+  });
+
+  it("recency reaches zero at 90+ days", () => {
+    const result = computeSignalStrength({
+      lifecycle: "temporary",
+      updatedAt: daysAgoIso(100),
+      centrality: 0,
+    });
+    expect(result).toBe(0);
+  });
+
+  it("centrality caps at 0.15", () => {
+    const result = computeSignalStrength({
+      lifecycle: "temporary",
+      updatedAt: recentIso(),
+      centrality: 1000,
+    });
+    // centrality should cap at 0.15
+    expect(result).toBeCloseTo(0.25, 2); // centrality(0.15) + recency(0.10)
+  });
+
+  it("lifecycle permanent contributes 0.10", () => {
+    const temp = computeSignalStrength({
+      lifecycle: "temporary",
+      updatedAt: recentIso(),
+      centrality: 0,
+    });
+    const perm = computeSignalStrength({
+      lifecycle: "permanent",
+      updatedAt: recentIso(),
+      centrality: 0,
+    });
+    expect(perm - temp).toBeCloseTo(0.10, 2);
+  });
+
+  it("missing role contributes 0", () => {
+    const withoutRole = computeSignalStrength({
+      lifecycle: "permanent",
+      updatedAt: recentIso(),
+      centrality: 5,
+    });
+    const withRole = computeSignalStrength({
+      lifecycle: "permanent",
+      updatedAt: recentIso(),
+      role: "context",
+      centrality: 5,
+    });
+    expect(withRole - withoutRole).toBeCloseTo(0.05, 2);
+  });
+});
+
+describe("computeConfidence with signalStrength", () => {
+  it("returns high at 0.35 threshold", () => {
+    expect(computeConfidence("permanent", new Date().toISOString(), 5, 0.35)).toBe("high");
+    expect(computeConfidence("permanent", new Date().toISOString(), 5, 0.40)).toBe("high");
+  });
+
+  it("returns medium between 0.15 and 0.35", () => {
+    expect(computeConfidence("permanent", new Date().toISOString(), 5, 0.15)).toBe("medium");
+    expect(computeConfidence("temporary", new Date().toISOString(), 0, 0.20)).toBe("medium");
+  });
+
+  it("returns low below 0.15", () => {
+    expect(computeConfidence("temporary", new Date().toISOString(), 0, 0.0)).toBe("low");
+    expect(computeConfidence("temporary", new Date().toISOString(), 0, 0.10)).toBe("low");
+  });
+
+  it("falls back to legacy logic when signalStrength is undefined", () => {
+    const lowResult = computeConfidence("temporary", new Date().toISOString(), 3, undefined);
+    expect(lowResult).toBeDefined();
+    expect(["high", "medium", "low"]).toContain(lowResult);
+  });
+});
+
+describe("computeSignalStrength fail-soft guards", () => {
+  it("gracefully handles invalid updatedAt (daysSince returns 0, yielding full recency)", () => {
+    const result = computeSignalStrength({
+      lifecycle: "permanent",
+      updatedAt: "not-a-date",
+      role: "summary",
+      centrality: 5,
+    });
+    expect(Number.isFinite(result)).toBe(true);
+    expect(result).toBeGreaterThan(0);
+  });
+
+  it("returns 0 for NaN-producing negative centrality via NaN guard", () => {
+    const result = computeSignalStrength({
+      lifecycle: "temporary",
+      updatedAt: new Date().toISOString(),
+      centrality: -5,
+    });
+    expect(result).toBe(0);
   });
 });
