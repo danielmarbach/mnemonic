@@ -976,4 +976,52 @@ This note has no embedding.`,
       await embeddingServer.close();
     }
   }, 15000);
+
+  it("includes diagnostics and signalStrength in recall text output", async () => {
+    const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-diagnostics-text-"));
+    tempDirs.push(vaultDir);
+    const embeddingServer = await startFakeEmbeddingServer();
+
+    try {
+      const repoDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-diagnostics-text-repo-"));
+      tempDirs.push(repoDir);
+      await initTestRepo(repoDir);
+
+      await callLocalMcp(vaultDir, "remember", {
+        title: "Diagnostics Text Anchor",
+        content: "A summary note marked alwaysLoad to anchor coverage text output testing.",
+        tags: ["diagnostics", "text"],
+        lifecycle: "permanent",
+        role: "summary",
+        alwaysLoad: true,
+        scope: "project",
+        cwd: repoDir,
+        summary: "Anchor for diagnostics text test",
+      }, embeddingServer.url);
+
+      await callLocalMcp(vaultDir, "remember", {
+        title: "Diagnostics Text Context",
+        content: "A temporary context note for text output diagnostics.",
+        tags: ["diagnostics", "text"],
+        lifecycle: "temporary",
+        role: "context",
+        scope: "project",
+        cwd: repoDir,
+      }, embeddingServer.url);
+
+      const response = await callLocalMcpResponse(vaultDir, "recall", {
+        query: "diagnostics text output",
+        cwd: repoDir,
+        limit: 10,
+        scope: "all",
+      }, embeddingServer.url);
+
+      expect(response.text).toMatch(/scope notes: \d+/);
+      expect(response.text).toMatch(/themes: \d+/);
+      expect(response.text).toMatch(/anchor coverage: \d+\.\d+ \(\d+\/\d+\)/);
+      expect(response.text).toMatch(/signalStrength: \d+\.\d+/);
+    } finally {
+      await embeddingServer.close();
+    }
+  }, 15000);
 });
