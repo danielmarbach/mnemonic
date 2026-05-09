@@ -98,6 +98,9 @@ export interface RecallResult extends Record<string, unknown> {
   action: "recalled";
   query: string;
   scope: "project" | "global" | "all";
+  recallScopeNoteCount?: number;
+  diversity?: RecallDiversity;
+  retrievalCoverage?: RecallRetrievalCoverage;
   results: Array<{
     id: string;
     title: string;
@@ -129,6 +132,19 @@ export interface RecallResult extends Record<string, unknown> {
     relationships?: RelationshipPreview;
     retrievalEvidence?: RetrievalEvidence;
   }>;
+}
+
+export interface RecallDiversity {
+  themeCount: number;
+  roleMix: Partial<Record<NoteRole, number>>;
+  lifecycleMix: Partial<Record<NoteLifecycle, number>>;
+}
+
+export interface RecallRetrievalCoverage {
+  anchorsInResults: number;
+  highPriorityAnchorsTotal: number;
+  fraction: number;
+  missingAnchors: Array<{ id: string; title: string }>;
 }
 
 export type RetrievalEvidenceChannel = "semantic" | "lexical" | "graph" | "temporal-boost" | "canonical" | "rescue";
@@ -618,6 +634,21 @@ export const RecallResultSchema = z.object({
   action: z.literal("recalled"),
   query: z.string(),
   scope: z.enum(["project", "global", "all"]),
+  recallScopeNoteCount: z.number().int().min(0).optional(),
+  diversity: z.object({
+    themeCount: z.number().int().min(0),
+    roleMix: z.record(z.string(), z.number()),
+    lifecycleMix: z.record(z.string(), z.number()),
+  }).optional(),
+  retrievalCoverage: z.object({
+    anchorsInResults: z.number().int().min(0),
+    highPriorityAnchorsTotal: z.number().int().min(0),
+    fraction: z.number().min(0).max(1),
+    missingAnchors: z.array(z.object({
+      id: z.string(),
+      title: z.string(),
+    })),
+  }).optional(),
   results: z.array(z.object({
     id: z.string(),
     title: z.string(),
