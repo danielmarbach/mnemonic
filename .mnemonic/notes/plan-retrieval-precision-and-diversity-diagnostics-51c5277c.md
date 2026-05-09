@@ -8,7 +8,7 @@ tags:
   - cag-bench
 lifecycle: temporary
 createdAt: '2026-05-09T07:50:29.361Z'
-updatedAt: '2026-05-09T07:50:58.287Z'
+updatedAt: '2026-05-09T07:52:46.517Z'
 role: plan
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -27,6 +27,16 @@ Deliver immediate actions 1-4 from CAG-Bench research. No new persistence, no ne
 Add `vaultSize: number` to `RecallResult` interface in `src/structured-content.ts`. This is the total count of notes across all visible vaults for the recall scope. Already tracked during the recall pipeline — just expose it.
 
 ### Step 2: Vault-size-aware default limit
+
+In `src/tools/recall.ts` handler, before scoring, derive vault size from the session cache (`noteList.length` on cached vault). The cache is already populated by `getOrBuildVaultEmbeddings` earlier in the pipeline for the project case. For the non-project (global) cold path, fall back to the configured default — don't add I/O just for this heuristic.
+
+Apply heuristic:
+
+- vaultSize < 30: effective limit = Math.min(vaultSize, 20)
+- vaultSize 30-100: effective limit = configured default (5)
+- vaultSize > 100: effective limit = configured default (5), surface vaultSize hint in output
+
+This reuses already-in-memory data. No new I/O or git calls. Fail-soft to configured default when cache is unavailable.
 
 In `src/tools/recall.ts` handler, before scoring, count total visible notes. Apply heuristic:
 
@@ -51,6 +61,23 @@ diversity: {
 After `selectRecallResults` in the tool handler, compute these from the selected result set. Themes derivable from note tags and content classification used in `project_memory_summary`. Roles and lifecycles already in note frontmatter.
 
 ### Step 4: retrievalCoverage in RecallResult
+
+Add to `RecallResult` interface:
+
+```typescript
+retrievalCoverage: {
+  anchorsInResults: number;
+  highPriorityAnchorsTotal: number;
+  fraction: number;
+  missingAnchors: string[]; // ids of anchors NOT in results, capped at 5
+}
+```
+
+High-priority anchors are notes with: `alwaysLoad === true` OR `role === "summary"`, scoped to current project vault. Use only frontmatter fields — no dynamic computation of `confidence` or `centrality`. This keeps anchor identification O(1) per note lookup from the session cache (`noteList` already in memory from `getOrBuildVaultEmbeddings`).
+
+Project scope is essential: project-local anchors matter more than global anchors and some alwaysLoad notes are intentionally orthogonal to a query. Skip anchor coverage when no project context is available.
+
+Compute after selection. Fail-soft — if anchor identification fails or cache is unavailable, omit the field.
 
 Add to `RecallResult` interface:
 
