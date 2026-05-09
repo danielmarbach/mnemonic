@@ -8,11 +8,14 @@ tags:
   - cag-bench
 lifecycle: temporary
 createdAt: '2026-05-09T11:55:51.123Z'
-updatedAt: '2026-05-09T11:55:51.123Z'
+updatedAt: '2026-05-09T11:57:42.942Z'
 role: review
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: apply-retrieval-precision-and-diversity-diagnostics-1a7e78c0
+    type: derives-from
 memoryVersion: 1
 ---
 ## Review: Retrieval Precision and Diversity Diagnostics
