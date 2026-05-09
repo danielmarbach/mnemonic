@@ -8,7 +8,7 @@ tags:
   - signal-strength
 lifecycle: permanent
 createdAt: '2026-05-09T16:56:35.454Z'
-updatedAt: '2026-05-09T16:56:35.454Z'
+updatedAt: '2026-05-09T16:56:51.190Z'
 role: review
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -18,6 +18,8 @@ relatedTo:
     type: related-to
   - id: mnemonic-key-design-decisions-3f2a6273
     type: related-to
+  - id: review-signal-strength-confidence-scoring-implementation-9710c108
+    type: derives-from
 memoryVersion: 1
 ---
 ## Dogfooding Results: SignalStrength Validation Pack (2026-05-09)
