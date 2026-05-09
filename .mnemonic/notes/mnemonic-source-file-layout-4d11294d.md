@@ -13,8 +13,6 @@ projectName: mnemonic
 relatedTo:
   - id: mnemonic-project-overview-and-purpose-763b7a51
     type: explains
-  - id: mnemonic-bugs-fixed-during-initial-setup-e4faea32
-    type: related-to
   - id: path-resolution-support-both-absolute-and-tilde-home-paths-e48a0280
     type: explains
   - id: split-index-ts-into-modular-structure-implemented-e97a019f
