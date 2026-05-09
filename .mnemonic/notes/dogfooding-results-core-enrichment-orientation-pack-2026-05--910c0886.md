@@ -7,12 +7,14 @@ tags:
   - regression
 lifecycle: permanent
 createdAt: '2026-05-09T12:09:58.133Z'
-updatedAt: '2026-05-09T12:09:58.133Z'
+updatedAt: '2026-05-09T21:09:01.891Z'
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
   - id: embedding-lazy-backfill-and-staleness-detection-implementati-c87cce90
+    type: related-to
+  - id: implementation-principles-for-mnemonic-mcp-2e178bba
     type: related-to
 memoryVersion: 1
 ---
