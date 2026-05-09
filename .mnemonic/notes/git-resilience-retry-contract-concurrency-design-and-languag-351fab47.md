@@ -11,7 +11,7 @@ tags:
   - decision
 lifecycle: permanent
 createdAt: '2026-03-24T10:53:27.605Z'
-updatedAt: '2026-05-09T21:10:39.021Z'
+updatedAt: '2026-05-09T21:16:14.025Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
@@ -25,6 +25,8 @@ relatedTo:
     type: explains
   - id: sync-tool-per-phase-git-error-surfacing-with-conflict-detect-ce15062e
     type: derives-from
+  - id: automatic-branch-change-detection-and-sync-89f4da23
+    type: related-to
 memoryVersion: 1
 ---
 ## Why retry is necessary
