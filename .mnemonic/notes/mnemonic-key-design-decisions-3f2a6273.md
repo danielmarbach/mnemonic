@@ -7,7 +7,8 @@ tags:
   - rationale
 lifecycle: permanent
 createdAt: '2026-03-07T17:59:12.124Z'
-updatedAt: '2026-05-09T12:54:16.522Z'
+updatedAt: '2026-05-09T20:53:37.132Z'
+role: summary
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
