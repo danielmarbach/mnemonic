@@ -8,9 +8,12 @@ tags:
   - json
 lifecycle: permanent
 createdAt: '2026-03-07T23:17:24.549Z'
-updatedAt: '2026-03-07T23:17:56.240Z'
+updatedAt: '2026-05-09T21:16:14.020Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: mcp-stdio-protocol-each-json-rpc-message-must-be-one-line-7a4c9438
+    type: related-to
 memoryVersion: 1
 ---
 When dogfooding mnemonic via direct stdio communication, complex JSON payloads with newlines and special characters can fail silently due to shell escaping issues.

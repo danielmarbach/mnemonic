@@ -8,9 +8,14 @@ tags:
   - json
 lifecycle: permanent
 createdAt: '2026-03-10T19:35:45.607Z'
-updatedAt: '2026-03-10T19:35:45.607Z'
+updatedAt: '2026-05-09T21:16:14.028Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: mcp-stdio-communication-troubleshooting-401d3cd9
+    type: related-to
+  - id: mcp-stdio-transport-onclose-must-not-call-process-exit-0-ee06c161
+    type: related-to
 memoryVersion: 1
 ---
 When invoking the mnemonic MCP server via stdio (scripts/mcp-local.sh or direct node build/index.js), the server uses newline-delimited JSON. Each JSON-RPC message must be exactly one line.
