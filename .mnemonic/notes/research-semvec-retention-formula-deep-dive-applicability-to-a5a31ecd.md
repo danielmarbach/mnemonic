@@ -10,7 +10,7 @@ tags:
   - ranking
 lifecycle: temporary
 createdAt: '2026-05-09T15:19:01.021Z'
-updatedAt: '2026-05-09T15:34:41.324Z'
+updatedAt: '2026-05-09T21:04:35.045Z'
 role: research
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -19,6 +19,8 @@ relatedTo:
   - id: research-semvec-analysis-applicability-and-alignment-with-mn-7a42ac50
     type: derives-from
   - id: reference-mnemonic-ranking-signals-inventory-all-scoring-for-27ae79dc
+    type: derives-from
+  - id: enriched-confidence-scoring-with-signal-strength-composite-i-06563116
     type: derives-from
 memoryVersion: 1
 ---
