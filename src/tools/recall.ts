@@ -130,18 +130,13 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
 
       let effectiveLimit = limit;
       let recallScopeNoteCount: number | undefined;
-      if (limit >= ctx.defaultRecallLimit) {
+      if (project && limit >= ctx.defaultRecallLimit) {
         try {
           let totalVisible = 0;
           for (const vault of vaults) {
-            const noteList = project
-              ? (await getOrBuildVaultNoteList(project.id, vault))
-              : undefined;
+            const noteList = await getOrBuildVaultNoteList(project.id, vault);
             if (noteList) {
               totalVisible += noteList.length;
-            } else {
-              const notes = await vault.storage.listNotes();
-              totalVisible += notes.length;
             }
           }
           recallScopeNoteCount = totalVisible;
