@@ -8,9 +8,12 @@ tags:
   - release
 lifecycle: permanent
 createdAt: '2026-03-12T05:41:48.692Z'
-updatedAt: '2026-03-12T05:46:28.186Z'
+updatedAt: '2026-05-09T21:10:52.757Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: github-packages-publishing-and-ci-workflow-55495350
+    type: related-to
 memoryVersion: 1
 ---
 The `create-release` job in `.github/workflows/publish.yml` fails when `workflow_dispatch` is triggered targeting a tag ref (e.g. `v0.5.0`) in the GitHub UI.
