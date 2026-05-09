@@ -10,11 +10,14 @@ tags:
   - design
 lifecycle: permanent
 createdAt: '2026-05-09T15:25:30.750Z'
-updatedAt: '2026-05-09T15:25:30.750Z'
+updatedAt: '2026-05-09T15:25:45.271Z'
 role: reference
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: research-semvec-retention-formula-deep-dive-applicability-to-a5a31ecd
+    type: derives-from
 memoryVersion: 1
 ---
 ## Reference: Mnemonic Ranking Signals Inventory
