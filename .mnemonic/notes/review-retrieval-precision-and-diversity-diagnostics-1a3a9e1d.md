@@ -8,7 +8,7 @@ tags:
   - cag-bench
 lifecycle: temporary
 createdAt: '2026-05-09T11:55:51.123Z'
-updatedAt: '2026-05-09T12:20:13.019Z'
+updatedAt: '2026-05-09T12:40:11.873Z'
 role: review
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -37,14 +37,31 @@ memoryVersion: 1
 
 ### Performance principles verification
 
+### Post-review fix: recallScopeNoteCount gating
+
+The initial implementation computed `recallScopeNoteCount` only inside the `limit >= ctx.defaultRecallLimit` gate. Dogfood verification revealed that agents passing `limit: 1` (explicit, not default) received `recallScopeNoteCount: undefined` instead of the total scope note count. The plan states agents should use `recallScopeNoteCount` to decide whether to tighten or loosen on subsequent calls — this requires it regardless of the current limit.
+
+Fix: moved note count computation outside the limit expansion gate. The heuristic expansion (`totalVisible <= 25 → effectiveLimit = min(totalVisible, 20)`) is still gated on `limit >= ctx.defaultRecallLimit`, but `recallScopeNoteCount` is now always populated when project context exists.
+
+Dogfood results confirmed: `limit: 1` now returns `recallScopeNoteCount: 159` alongside `results.length: 1`. Diversity metrics correctly show `roleMix` with all role types when results include role-bearing notes (verified with `limit: 10` query). retrievalCoverage correctly identifies 3 high-priority anchors (summary+alwaysLoad notes) and computes fraction.
+
+### Integration test notes
+
+- `detectProject` has a folder-name fallback, so there is no practical way to test a true no-project context in the integration harness. Tests verify project-context diagnostics instead.
+- `retrievalCoverage` with `scope: global` only includes results from the global vault, so anchor fraction reflects project anchors vs global-only results. Tests use conditional assertions for scope=global since result counts vary by similarity threshold.
+
 ### Post-review fixes applied
 
 - **I/O constraint violation fixed**: The initial implementation violated the plan's "no new I/O for the non-project cold path" principle by falling back to `vault.storage.listNotes()` when `project` was undefined. Fixed by gating the entire limit-heuristic block on `project` being defined. When no project context is available, `recallScopeNoteCount` and `effectiveLimit` use the configured defaults — no extra I/O.
+
 - **Unit tests added**: `tests/recall-helpers.unit.test.ts` with 11 tests covering `computeRecallDiversity` (5 tests) and `computeRecallRetrievalCoverage` (6 tests). Plan specified "unit tests for limit heuristic, integration tests for recall result schema" but no tests were initially shipped.
+
 - **Build rebuilt** after stale `build/tools/recall-helpers.js` caused integration test failure (missing export `computeRecallMetadataBoost`).
 
 - Anchor identification reuses session cache (`getOrBuildVaultNoteList`), no new I/O
+
 - Limit heuristic reads from already-populated cache, falls back to default on miss
+
 - No git calls added, no full-vault scans on mutation paths
 
 ### Fail-soft verification
