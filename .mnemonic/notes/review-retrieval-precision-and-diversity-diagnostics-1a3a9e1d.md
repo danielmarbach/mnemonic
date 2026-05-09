@@ -8,7 +8,7 @@ tags:
   - cag-bench
 lifecycle: temporary
 createdAt: '2026-05-09T11:55:51.123Z'
-updatedAt: '2026-05-09T12:10:31.866Z'
+updatedAt: '2026-05-09T12:20:13.019Z'
 role: review
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -36,6 +36,12 @@ memoryVersion: 1
 - All new fields optional for backward compatibility
 
 ### Performance principles verification
+
+### Post-review fixes applied
+
+- **I/O constraint violation fixed**: The initial implementation violated the plan's "no new I/O for the non-project cold path" principle by falling back to `vault.storage.listNotes()` when `project` was undefined. Fixed by gating the entire limit-heuristic block on `project` being defined. When no project context is available, `recallScopeNoteCount` and `effectiveLimit` use the configured defaults — no extra I/O.
+- **Unit tests added**: `tests/recall-helpers.unit.test.ts` with 11 tests covering `computeRecallDiversity` (5 tests) and `computeRecallRetrievalCoverage` (6 tests). Plan specified "unit tests for limit heuristic, integration tests for recall result schema" but no tests were initially shipped.
+- **Build rebuilt** after stale `build/tools/recall-helpers.js` caused integration test failure (missing export `computeRecallMetadataBoost`).
 
 - Anchor identification reuses session cache (`getOrBuildVaultNoteList`), no new I/O
 - Limit heuristic reads from already-populated cache, falls back to default on miss
@@ -71,7 +77,7 @@ memoryVersion: 1
 
 ### Recommendation
 
-Continue. All plan deliverables shipped, all constraints preserved, all tests passing. Ready for you to decide on commit.### Dogfood verification* Command: `MNEMONIC_ENTRYPOINT=./build/index.js node scripts/run-dogfood-packs.mjs`
+Continue. All plan deliverables shipped, all constraints preserved, all tests passing. Ready for you to decide on commit.### Dogfood verification\* Command: `MNEMONIC_ENTRYPOINT=./build/index.js node scripts/run-dogfood-packs.mjs`
 
 - Result: pass (2 pre-existing advisories listed below, no regressions from changes)
 - Pack A advisory: "recall answers canonical design questions" — embedding note outranks key design decisions for B1 query (pre-existing ranking gap)
