@@ -11,8 +11,6 @@ updatedAt: '2026-05-09T21:06:02.096Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
-  - id: research-index-ts-dependency-analysis-for-modular-extraction-07f545d4
-    type: derives-from
   - id: typescript-code-review-mnemonic-project-961d984b
     type: related-to
   - id: mnemonic-key-design-decisions-3f2a6273
