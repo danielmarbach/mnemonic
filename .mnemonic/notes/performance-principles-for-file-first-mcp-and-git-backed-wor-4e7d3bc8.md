@@ -9,7 +9,7 @@ tags:
   - completed
 lifecycle: permanent
 createdAt: '2026-03-14T22:14:46.759Z'
-updatedAt: '2026-05-09T12:54:15.193Z'
+updatedAt: '2026-05-09T21:09:01.893Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
@@ -21,6 +21,8 @@ relatedTo:
     type: derives-from
   - id: implementation-principles-for-mnemonic-mcp-2e178bba
     type: related-to
+  - id: hindsight-phases-1-5-review-findings-addressed-consolidated-2f24cf85
+    type: derives-from
 memoryVersion: 1
 ---
 ## Durable Performance Principles
