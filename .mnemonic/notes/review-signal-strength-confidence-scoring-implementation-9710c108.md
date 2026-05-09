@@ -13,8 +13,6 @@ alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
-  - id: apply-enriched-confidence-scoring-with-signal-strength-compo-32416560
-    type: derives-from
   - id: dogfooding-results-signalstrength-validation-pack-2026-05-09-c06ffece
     type: derives-from
 memoryVersion: 1

@@ -20,8 +20,6 @@ relatedTo:
     type: derives-from
   - id: reference-mnemonic-ranking-signals-inventory-all-scoring-for-27ae79dc
     type: derives-from
-  - id: plan-enriched-confidence-scoring-with-signal-strength-compos-83ac7a58
-    type: derives-from
 memoryVersion: 1
 ---
 ## Research: Semvec Retention Formula Deep-Dive
