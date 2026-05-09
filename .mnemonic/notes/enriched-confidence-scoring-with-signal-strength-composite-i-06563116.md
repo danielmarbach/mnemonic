@@ -9,7 +9,7 @@ tags:
   - apply
 lifecycle: permanent
 createdAt: '2026-05-09T21:03:06.420Z'
-updatedAt: '2026-05-09T21:03:06.420Z'
+updatedAt: '2026-05-09T21:03:51.515Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
@@ -17,6 +17,12 @@ relatedTo:
     type: derives-from
   - id: review-signal-strength-confidence-scoring-implementation-9710c108
     type: derives-from
+  - id: summary-evidence-enrichment-implementation-across-recall-and-10b7ba37
+    type: derives-from
+  - id: reference-mnemonic-ranking-signals-inventory-all-scoring-for-27ae79dc
+    type: derives-from
+  - id: dogfooding-results-signalstrength-validation-pack-2026-05-09-c06ffece
+    type: example-of
 memoryVersion: 1
 ---
 ## Consolidated from:
