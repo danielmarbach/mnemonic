@@ -7,9 +7,12 @@ tags:
   - embeddings
 lifecycle: permanent
 createdAt: '2026-03-24T10:56:06.201Z'
-updatedAt: '2026-03-24T10:56:06.201Z'
+updatedAt: '2026-05-09T21:10:39.020Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: performance-principles-for-file-first-mcp-and-git-backed-wor-4e7d3bc8
+    type: related-to
 memoryVersion: 1
 ---
 ## Decision
