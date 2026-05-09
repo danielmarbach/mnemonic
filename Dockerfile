@@ -10,9 +10,7 @@ COPY src ./src
 RUN npm run build
 
 # ── runtime ──────────────────────────────────────────────────────────────────
-FROM node:24-alpine
-
-RUN apk add --no-cache git openssh-client
+FROM node:24
 
 WORKDIR /app
 
