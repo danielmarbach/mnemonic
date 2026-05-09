@@ -7,7 +7,7 @@ tags:
   - decision
 lifecycle: permanent
 createdAt: '2026-03-24T10:55:20.655Z'
-updatedAt: '2026-05-09T12:54:17.854Z'
+updatedAt: '2026-05-09T21:16:14.027Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
@@ -24,6 +24,8 @@ relatedTo:
   - id: rpir-workflow-design-for-mnemonic-research-plan-implement-re-80b00851
     type: related-to
   - id: implementation-principles-for-mnemonic-mcp-2e178bba
+    type: related-to
+  - id: mcp-stdio-transport-onclose-must-not-call-process-exit-0-ee06c161
     type: related-to
 memoryVersion: 1
 ---
