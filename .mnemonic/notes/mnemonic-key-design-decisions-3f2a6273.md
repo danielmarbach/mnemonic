@@ -7,7 +7,7 @@ tags:
   - rationale
 lifecycle: permanent
 createdAt: '2026-03-07T17:59:12.124Z'
-updatedAt: '2026-05-09T21:09:07.363Z'
+updatedAt: '2026-05-09T21:10:39.019Z'
 role: summary
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
@@ -33,6 +33,14 @@ relatedTo:
   - id: semantic-patch-builder-design-and-implementation-b8d48f5e
     type: related-to
   - id: dogfooding-results-core-enrichment-orientation-pack-2026-05--910c0886
+    type: related-to
+  - id: design-principle-git-commits-must-only-touch-mnemonic-manage-cecb8d11
+    type: related-to
+  - id: bug-fix-update-tool-no-op-detection-1031c864
+    type: related-to
+  - id: zod-v4-migration-requires-explicit-key-schema-for-z-record-0229f4e5
+    type: related-to
+  - id: decision-phase-2-recall-scoring-uses-rrf-with-dense-rank-tie-7969c37d
     type: related-to
 memoryVersion: 1
 ---
