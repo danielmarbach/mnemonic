@@ -8,7 +8,7 @@ tags:
   - cag-bench
 lifecycle: temporary
 createdAt: '2026-05-09T07:50:29.361Z'
-updatedAt: '2026-05-09T08:04:12.727Z'
+updatedAt: '2026-05-09T11:55:32.654Z'
 role: plan
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -16,6 +16,8 @@ projectName: mnemonic
 relatedTo:
   - id: research-cag-bench-paper-analysis-gaps-and-applications-for--8dbf8467
     type: derives-from
+  - id: apply-retrieval-precision-and-diversity-diagnostics-1a7e78c0
+    type: follows
 memoryVersion: 1
 ---
 ## Plan: Retrieval Precision and Diversity Diagnostics
