@@ -15,8 +15,6 @@ alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
-  - id: request-research-cag-bench-paper-gaps-and-applications-for-m-450273ae
-    type: derives-from
   - id: retrieval-precision-and-diversity-diagnostics-implemented-763c1459
     type: derives-from
 memoryVersion: 1
