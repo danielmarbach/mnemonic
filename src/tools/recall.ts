@@ -12,6 +12,7 @@ import {
   RetrievalEvidence,
   RelationshipPreview,
   ProjectRef,
+  type RecallRetrievalCoverage,
 } from "../structured-content.js";
 import { embed, cosineSimilarity } from "../embeddings.js";
 import {
@@ -33,6 +34,7 @@ import {
 import { shouldTriggerLexicalRescue } from "../lexical.js";
 import {
   getOrBuildVaultEmbeddings,
+  getOrBuildVaultNoteList,
   setSessionCachedProjection,
   getSessionCachedProjection,
   recordSessionNoteAccess,
@@ -63,7 +65,7 @@ import {
 } from "../provenance.js";
 import { enrichTemporalHistory } from "../temporal-interpretation.js";
 import { getRelationshipPreview } from "../relationships.js";
-import { collectLexicalRescueCandidates, buildRecallCandidateContext } from "./recall-helpers.js";
+import { collectLexicalRescueCandidates, buildRecallCandidateContext, identifyHighPriorityAnchors, computeRecallDiversity, computeRecallRetrievalCoverage } from "./recall-helpers.js";
 
 export function registerRecallTool(server: McpServer, ctx: ServerContext): void {
   server.registerTool(
@@ -86,7 +88,10 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
         "- Ranked memory matches with scores, vault label, tags, lifecycle, and updated time\n" +
         "- Bounded 1-hop relationship previews automatically attached to top results\n" +
         "- In temporal mode, optional compact history entries for top matches\n" +
-        "- Optional retrieval evidence via `evidence: \"compact\"` for why a result ranked\n\n" +
+        "- Optional retrieval evidence via `evidence: \"compact\"` for why a result ranked\n" +
+        "- `recallScopeNoteCount`: total notes visible in the recall scope (omit-aware: if vault is small, consider increasing limit)\n" +
+        "- `diversity`: theme count (unique tags), role mix, and lifecycle mix of selected results — use to gauge whether results span enough perspectives\n" +
+        "- `retrievalCoverage`: fraction of high-priority anchors (alwaysLoad or summary notes) present in results, with capped missing list — use to decide if another recall with broader terms is needed\n\n" +
         "Read-only.\n\n" +
         "Typical next step:\n" +
         "- Use `get`, `update`, `relate`, or `consolidate` based on the results.",
@@ -125,6 +130,26 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
       const project = await resolveProject(ctx, cwd);
       const queryVec = await embed(query);
       const vaults = await ctx.vaultManager.searchOrder(cwd);
+
+      let effectiveLimit = limit;
+      let recallScopeNoteCount: number | undefined;
+      if (project) {
+        try {
+          let totalVisible = 0;
+          for (const vault of vaults) {
+            const noteList = await getOrBuildVaultNoteList(project.id, vault);
+            if (noteList) {
+              totalVisible += noteList.length;
+            }
+          }
+          recallScopeNoteCount = totalVisible;
+          if (limit >= ctx.defaultRecallLimit && totalVisible <= 25) {
+            effectiveLimit = Math.min(totalVisible, 20);
+          }
+        } catch {
+          // fail-soft: use configured limit
+        }
+      }
       const noteCache = new Map<string, Note>();
 
       const noteCacheKey = (vault: Vault, id: string): string => `${vault.storage.vaultPath}::${id}`;
@@ -313,11 +338,17 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
       }
 
       const top = mode === "workflow"
-        ? selectWorkflowResults(promoted, limit, scope)
-        : selectRecallResults(promoted, limit, scope);
+        ? selectWorkflowResults(promoted, effectiveLimit, scope)
+        : selectRecallResults(promoted, effectiveLimit, scope);
 
       if (top.length === 0) {
-        const structuredContent: RecallResult = { action: "recalled", query, scope: scope || "all", results: [] };
+        const structuredContent: RecallResult = {
+          action: "recalled",
+          query,
+          scope: scope || "all",
+          recallScopeNoteCount,
+          results: [],
+        };
         return { content: [{ type: "text", text: "No memories found matching that query." }], structuredContent };
       }
 
@@ -482,10 +513,28 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
 
       const textContent = `${header}\n\n${sections.join("\n\n---\n\n")}`;
 
+      let diversity: RecallResult["diversity"] | undefined;
+      let retrievalCoverage: RecallRetrievalCoverage | undefined;
+      if (structuredResults.length > 0) {
+        diversity = computeRecallDiversity(structuredResults);
+        if (project) {
+          try {
+            const { anchorIds, anchorLookup } = await identifyHighPriorityAnchors(vaults, project.id);
+            const resultIds = structuredResults.map((r) => r.id);
+            retrievalCoverage = computeRecallRetrievalCoverage(resultIds, anchorIds, anchorLookup);
+          } catch {
+            // fail-soft
+          }
+        }
+      }
+
       const structuredContent: RecallResult = {
         action: "recalled",
         query,
         scope: scope || "all",
+        recallScopeNoteCount,
+        diversity,
+        retrievalCoverage,
         results: structuredResults,
       };
 

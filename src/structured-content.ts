@@ -98,6 +98,9 @@ export interface RecallResult extends Record<string, unknown> {
   action: "recalled";
   query: string;
   scope: "project" | "global" | "all";
+  recallScopeNoteCount?: number;
+  diversity?: RecallDiversity;
+  retrievalCoverage?: RecallRetrievalCoverage;
   results: Array<{
     id: string;
     title: string;
@@ -129,6 +132,19 @@ export interface RecallResult extends Record<string, unknown> {
     relationships?: RelationshipPreview;
     retrievalEvidence?: RetrievalEvidence;
   }>;
+}
+
+export interface RecallDiversity {
+  themeCount: number;
+  roleMix: Partial<Record<NoteRole, number>>;
+  lifecycleMix: Partial<Record<NoteLifecycle, number>>;
+}
+
+export interface RecallRetrievalCoverage {
+  anchorsInResults: number;
+  highPriorityAnchorsTotal: number;
+  fraction: number;
+  missingAnchors: Array<{ id: string; title: string }>;
 }
 
 export type RetrievalEvidenceChannel = "semantic" | "lexical" | "graph" | "temporal-boost" | "canonical" | "rescue";
@@ -618,6 +634,21 @@ export const RecallResultSchema = z.object({
   action: z.literal("recalled"),
   query: z.string(),
   scope: z.enum(["project", "global", "all"]),
+  recallScopeNoteCount: z.number().int().min(0).optional().describe("Total notes visible across all vaults for this recall scope. Use to decide whether to increase limit for small vaults."),
+  diversity: z.object({
+    themeCount: z.number().int().min(0).describe("Unique tag count across selected results"),
+    roleMix: z.record(z.string(), z.number()).describe("Count of each NoteRole present in selected results"),
+    lifecycleMix: z.record(z.string(), z.number()).describe("Count of each NoteLifecycle present in selected results"),
+  }).optional().describe("Diversity metrics: gauge whether results span enough perspectives"),
+  retrievalCoverage: z.object({
+    anchorsInResults: z.number().int().min(0).describe("Number of high-priority anchors found in results"),
+    highPriorityAnchorsTotal: z.number().int().min(0).describe("Total high-priority anchors in the project vault"),
+    fraction: z.number().min(0).max(1).describe("Fraction of high-priority anchors present in results (0 when no anchors exist)"),
+    missingAnchors: z.array(z.object({
+      id: z.string(),
+      title: z.string(),
+    })).describe("Up to 5 high-priority anchors not in results, for follow-up recall"),
+  }).optional().describe("How well results cover the project's most important notes. Only present when project context is available."),
   results: z.array(z.object({
     id: z.string(),
     title: z.string(),

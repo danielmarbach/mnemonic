@@ -3,8 +3,9 @@ import type { Vault } from "../vault.js";
 import { getEffectiveMetadata } from "../role-suggestions.js";
 import { computeRecallMetadataBoost, type ScoredRecallCandidate, type TemporalQueryHint, shouldApplyTemporalFiltering, computeTemporalRecencyBoost, isWithinTemporalFilterWindow } from "../recall.js";
 import { getOrBuildProjection } from "../projections.js";
-import { getSessionCachedProjectionTokens, setSessionCachedProjectionTokens } from "../cache.js";
+import { getSessionCachedProjectionTokens, setSessionCachedProjectionTokens, getOrBuildVaultNoteList } from "../cache.js";
 import { tokenize, prepareTfIdfCorpusFromTokenizedDocuments, rankDocumentsByTfIdf, LEXICAL_RESCUE_CANDIDATE_LIMIT, LEXICAL_RESCUE_THRESHOLD, LEXICAL_RESCUE_RESULT_LIMIT } from "../lexical.js";
+import type { RecallDiversity, RecallRetrievalCoverage } from "../structured-content.js";
 
 // ── Recall candidate context ──────────────────────────────────────────────────
 
@@ -203,4 +204,98 @@ export function hasExactTagContextMatch(tag: string, values: Array<string | unde
   const normalizedTag = tag.toLowerCase();
   const pattern = new RegExp(`(^|[^a-z0-9_-])${escapeRegex(normalizedTag)}([^a-z0-9_-]|$)`);
   return values.some(value => value ? pattern.test(value.toLowerCase()) : false);
+}
+
+export async function identifyHighPriorityAnchors(
+  vaults: Vault[],
+  projectId: string,
+): Promise<{ anchorIds: Set<string>; anchorLookup: Map<string, string> }> {
+  const anchorIds = new Set<string>();
+  const anchorLookup = new Map<string, string>();
+
+  for (const vault of vaults) {
+    try {
+      const notes = await getOrBuildVaultNoteList(projectId, vault);
+      if (!notes) continue;
+      const supersededTargets = new Set<string>();
+      for (const note of notes) {
+        if (note.project !== projectId) continue;
+        for (const rel of note.relatedTo ?? []) {
+          if (rel.type === "supersedes") {
+            supersededTargets.add(rel.id);
+          }
+        }
+      }
+      for (const note of notes) {
+        if (note.project !== projectId) continue;
+        if (
+          (note.alwaysLoad === true || note.role === "summary")
+          && !supersededTargets.has(note.id)
+        ) {
+          anchorIds.add(note.id);
+          anchorLookup.set(note.id, note.title);
+        }
+      }
+    } catch {
+      continue;
+    }
+  }
+
+  return { anchorIds, anchorLookup };
+}
+
+export function computeRecallDiversity(
+  results: Array<{ id: string; tags: string[]; lifecycle: NoteLifecycle; role?: string }>,
+): RecallDiversity | undefined {
+  try {
+    const allTags = new Set<string>();
+    const roleCounts = new Map<string, number>();
+    const lifecycleCounts = new Map<string, number>();
+
+    for (const r of results) {
+      for (const tag of r.tags) {
+        allTags.add(tag);
+      }
+      if (r.role) {
+        roleCounts.set(r.role, (roleCounts.get(r.role) ?? 0) + 1);
+      }
+      lifecycleCounts.set(r.lifecycle, (lifecycleCounts.get(r.lifecycle) ?? 0) + 1);
+    }
+
+    return {
+      themeCount: allTags.size,
+      roleMix: Object.fromEntries(roleCounts) as Record<string, number>,
+      lifecycleMix: Object.fromEntries(lifecycleCounts) as Record<string, number>,
+    };
+  } catch {
+    return undefined;
+  }
+}
+
+export function computeRecallRetrievalCoverage(
+  resultIds: string[],
+  anchorIds: Set<string>,
+  anchorLookup: Map<string, string>,
+  maxMissing = 5,
+): RecallRetrievalCoverage | undefined {
+  try {
+    const resultIdSet = new Set(resultIds);
+    const anchorsInResults = [...anchorIds].filter((id) => resultIdSet.has(id)).length;
+    const highPriorityAnchorsTotal = anchorIds.size;
+    const fraction = highPriorityAnchorsTotal > 0 ? anchorsInResults / highPriorityAnchorsTotal : 0;
+
+    const missingAnchors = [...anchorIds]
+      .filter((id) => !resultIdSet.has(id))
+      .slice(0, maxMissing)
+      .map((id) => ({ id, title: anchorLookup.get(id) ?? "(unknown)" }));
+
+    return {
+      anchorsInResults,
+      highPriorityAnchorsTotal,
+      fraction,
+      missingAnchors,
+    };
+  } catch {
+    return undefined;
+  }
 }

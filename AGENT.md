@@ -393,6 +393,17 @@ Any change to note format, frontmatter schema, config structure, or relationship
 - `src/vault.ts` → `tests/vault.test.ts`
 - `src/migration.ts` → `tests/migration.test.ts`
 
+### Structured output changes
+
+When adding or modifying any Zod output schema field (`RecallResultSchema`, `RememberResultSchema`, etc.):
+
+- **Add `.describe()` to every new field and sub-field.** Weaker models rely on schema descriptions for correct tool use. A field without a description is invisible to many clients.
+- **Update the corresponding tool description `Returns` section.** Stronger models benefit from contextual prose that explains when and how to use the field.
+- **Both are required.** Schema descriptions are machine-readable; tool description prose is agent-readable. Neither alone is sufficient.
+- **Cross-reference the plan's performance constraints.** No new I/O on cold/fallback paths, fail-soft to `undefined`, optional fields for backward compatibility. These are hard requirements, not suggestions.
+- **Add an integration test that parses the real MCP response through the exported schema.** This catches handler/schema drift — a class of bugs where the code produces a shape the schema doesn't validate, or vice versa.
+- **Contextual metrics must be populated regardless of caller parameters.** If a field like `recallScopeNoteCount` exists so agents can decide whether to adjust behavior, it must be present in every response where the context is available. Gating it behind incidental conditions (like "only when limit equals default") makes it invisible when agents need it most.
+
 **Running tests**:
 ```bash
 npm test                    # all tests
