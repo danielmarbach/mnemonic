@@ -7,7 +7,7 @@ tags:
   - completed
 lifecycle: permanent
 createdAt: '2026-04-25T21:42:49.274Z'
-updatedAt: '2026-04-25T21:58:27.743Z'
+updatedAt: '2026-05-09T21:09:07.363Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
@@ -15,6 +15,8 @@ relatedTo:
     type: related-to
   - id: performance-principles-for-file-first-mcp-and-git-backed-wor-4e7d3bc8
     type: explains
+  - id: mnemonic-key-design-decisions-3f2a6273
+    type: related-to
 memoryVersion: 1
 ---
 # Hindsight phases 1-5 review: findings addressed
