@@ -9,7 +9,7 @@ tags:
   - documentation
 lifecycle: permanent
 createdAt: '2026-05-09T12:54:02.094Z'
-updatedAt: '2026-05-09T21:09:01.891Z'
+updatedAt: '2026-05-09T21:10:52.760Z'
 role: summary
 alwaysLoad: true
 project: https-github-com-danielmarbach-mnemonic
@@ -30,6 +30,10 @@ relatedTo:
   - id: enriched-confidence-scoring-with-signal-strength-composite-i-06563116
     type: related-to
   - id: dogfooding-results-core-enrichment-orientation-pack-2026-05--910c0886
+    type: related-to
+  - id: structured-mcp-schema-audit-test-strategy-targeted-high-risk-f966c089
+    type: related-to
+  - id: ci-safe-mcp-integration-and-failure-learning-workflow-91431beb
     type: related-to
 memoryVersion: 1
 ---

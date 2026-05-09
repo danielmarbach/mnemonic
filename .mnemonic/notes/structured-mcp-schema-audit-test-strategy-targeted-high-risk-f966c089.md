@@ -10,9 +10,12 @@ tags:
   - decision
 lifecycle: permanent
 createdAt: '2026-03-11T15:11:28.262Z'
-updatedAt: '2026-04-05T10:57:18.662Z'
+updatedAt: '2026-05-09T21:10:52.756Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: implementation-principles-for-mnemonic-mcp-2e178bba
+    type: related-to
 memoryVersion: 1
 ---
 Decision: use targeted schema-audit integration tests for high-risk MCP tools instead of requiring a bespoke schema-parsing test for every single tool immediately.
