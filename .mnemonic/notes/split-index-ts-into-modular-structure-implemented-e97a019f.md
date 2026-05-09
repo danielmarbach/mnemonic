@@ -7,7 +7,7 @@ tags:
   - request
 lifecycle: permanent
 createdAt: '2026-05-09T21:05:56.027Z'
-updatedAt: '2026-05-09T21:05:56.027Z'
+updatedAt: '2026-05-09T21:06:02.096Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
@@ -15,6 +15,8 @@ relatedTo:
     type: derives-from
   - id: typescript-code-review-mnemonic-project-961d984b
     type: related-to
+  - id: mnemonic-key-design-decisions-3f2a6273
+    type: derives-from
 memoryVersion: 1
 ---
 ## Consolidated from:
