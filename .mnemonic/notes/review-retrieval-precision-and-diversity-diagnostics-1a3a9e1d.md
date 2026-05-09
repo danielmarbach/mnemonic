@@ -8,7 +8,7 @@ tags:
   - cag-bench
 lifecycle: temporary
 createdAt: '2026-05-09T11:55:51.123Z'
-updatedAt: '2026-05-09T12:40:11.873Z'
+updatedAt: '2026-05-09T12:47:41.510Z'
 role: review
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -36,6 +36,18 @@ memoryVersion: 1
 - All new fields optional for backward compatibility
 
 ### Performance principles verification
+
+### Post-review: Schema and tool description clarity
+
+Missing from initial implementation: the new `RecallResult` fields (`recallScopeNoteCount`, `diversity`, `retrievalCoverage`) had no descriptions in the Zod output schema or the tool description \`Returns\` section. Per the "workflow UX: hint prompt, tool descriptions, and session-start orientation" principle, agents — especially weaker models — need explicit descriptions to know how to use structured output fields.
+
+Added:
+
+- `.describe()` strings on all three new Zod schema fields and their sub-fields
+- Three new bullet points in the recall tool description \`Returns\` section explaining when and how to use each field
+- `recallScopeNoteCount`: "total notes visible in recall scope (omit-aware: if vault is small, consider increasing limit)"
+- `diversity`: "theme count, role mix, lifecycle mix — use to gauge whether results span enough perspectives"
+- `retrievalCoverage`: "fraction of high-priority anchors present, with capped missing list — use to decide if another recall with broader terms is needed"
 
 ### Post-review fix: recallScopeNoteCount gating
 
