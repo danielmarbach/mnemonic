@@ -7,9 +7,12 @@ tags:
   - scaling
 lifecycle: permanent
 createdAt: '2026-03-08T08:36:41.517Z'
-updatedAt: '2026-03-08T08:36:41.517Z'
+updatedAt: '2026-05-09T21:16:14.023Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: dynamic-project-context-loading-plan-9f2ed29c
+    type: related-to
 memoryVersion: 1
 ---
 Decision on the dynamic project context loading plan.
