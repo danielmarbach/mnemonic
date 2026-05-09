@@ -9,7 +9,7 @@ tags:
   - documentation
 lifecycle: permanent
 createdAt: '2026-05-09T12:54:02.094Z'
-updatedAt: '2026-05-09T21:10:52.760Z'
+updatedAt: '2026-05-09T21:16:14.015Z'
 role: summary
 alwaysLoad: true
 project: https-github-com-danielmarbach-mnemonic
@@ -34,6 +34,8 @@ relatedTo:
   - id: structured-mcp-schema-audit-test-strategy-targeted-high-risk-f966c089
     type: related-to
   - id: ci-safe-mcp-integration-and-failure-learning-workflow-91431beb
+    type: related-to
+  - id: dogfooding-test-suite-reusable-prompt-for-phases-1-8-validat-c7c702d8
     type: related-to
 memoryVersion: 1
 ---
