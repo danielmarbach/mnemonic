@@ -404,6 +404,13 @@ When adding or modifying any Zod output schema field (`RecallResultSchema`, `Rem
 - **Add an integration test that parses the real MCP response through the exported schema.** This catches handler/schema drift — a class of bugs where the code produces a shape the schema doesn't validate, or vice versa.
 - **Contextual metrics must be populated regardless of caller parameters.** If a field like `recallScopeNoteCount` exists so agents can decide whether to adjust behavior, it must be present in every response where the context is available. Gating it behind incidental conditions (like "only when limit equals default") makes it invisible when agents need it most.
 
+### Text output rendering
+
+- **Every new per-result field renders in text output.** If a field like `signalStrength` appears in structured output, it must also appear in the human-readable text rendering. LLMs consume text output first; structured output is a machine-readable complement.
+- **Every new aggregate diagnostic renders in text output.** If recall returns `recallScopeNoteCount`, `diversity`, or `retrievalCoverage` in structured output, include a compact `key: value` summary line in the text header. Agents that don't parse structured content must still see these signals.
+- **New text rendering needs integration tests asserting on the text string.** A field that exists only in structured output is invisible to text-only consumers. Each new text-rendered field should have at least one test that matches the text pattern (e.g., `/signalStrength: \d+\.\d+/`).
+- **Neither output alone is sufficient.** Text output is agent-readable, structured output is machine-readable. Both must exist for new fields.
+
 **Running tests**:
 ```bash
 npm test                    # all tests

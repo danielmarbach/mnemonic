@@ -467,8 +467,10 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
             ? `\n\n${formatRelationshipPreview(relationships)}`
             : "";
           const provenanceLine = provenance || confidence
-            ? `\n**confidence:** ${confidence ?? "medium"}${provenance?.recentlyChanged ? " | **recently changed**" : ""}`
-            : "";
+            ? `\n**confidence:** ${confidence ?? "medium"}${provenance?.recentlyChanged ? " | **recently changed**" : ""}${signalStrength !== undefined ? ` | signalStrength: ${signalStrength.toFixed(2)}` : ""}`
+            : signalStrength !== undefined
+              ? `\n**signalStrength:** ${signalStrength.toFixed(2)}`
+              : "";
           const supersededRelations = (note.relatedTo ?? []).filter((rel) => rel.type === "supersedes");
           const retrievalEvidence: RetrievalEvidence | undefined = evidence === "compact"
             ? {
@@ -527,8 +529,6 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
         }
       }
 
-      const textContent = `${header}\n\n${sections.join("\n\n---\n\n")}`;
-
       let diversity: RecallResult["diversity"] | undefined;
       let retrievalCoverage: RecallRetrievalCoverage | undefined;
       if (structuredResults.length > 0) {
@@ -541,6 +541,19 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
           }
         }
       }
+
+      const diagnosticsParts: string[] = [];
+      if (recallScopeNoteCount !== undefined) {
+        diagnosticsParts.push(`scope notes: ${recallScopeNoteCount}`);
+      }
+      if (diversity) {
+        diagnosticsParts.push(`themes: ${diversity.themeCount}`);
+      }
+      if (retrievalCoverage) {
+        diagnosticsParts.push(`anchor coverage: ${retrievalCoverage.fraction.toFixed(2)} (${retrievalCoverage.anchorsInResults}/${retrievalCoverage.highPriorityAnchorsTotal})`);
+      }
+      const diagnosticsLine = diagnosticsParts.length > 0 ? `\n${diagnosticsParts.join(" | ")}` : "";
+      const textContent = `${header}${diagnosticsLine}\n\n${sections.join("\n\n---\n\n")}`;
 
       const structuredContent: RecallResult = {
         action: "recalled",
