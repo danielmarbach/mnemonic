@@ -1,23 +1,34 @@
 ---
-title: 'Plan: Enriched confidence scoring with signal-strength composite'
+title: Enriched confidence scoring with signal-strength composite (implemented)
 tags:
   - workflow
   - plan
   - confidence
   - ranking
   - semvec
-lifecycle: temporary
-createdAt: '2026-05-09T15:34:27.654Z'
-updatedAt: '2026-05-09T15:34:41.324Z'
-role: plan
-alwaysLoad: false
+  - apply
+lifecycle: permanent
+createdAt: '2026-05-09T21:03:06.420Z'
+updatedAt: '2026-05-09T21:03:51.515Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
   - id: research-semvec-retention-formula-deep-dive-applicability-to-a5a31ecd
     type: derives-from
+  - id: review-signal-strength-confidence-scoring-implementation-9710c108
+    type: derives-from
+  - id: summary-evidence-enrichment-implementation-across-recall-and-10b7ba37
+    type: derives-from
+  - id: reference-mnemonic-ranking-signals-inventory-all-scoring-for-27ae79dc
+    type: derives-from
+  - id: dogfooding-results-signalstrength-validation-pack-2026-05-09-c06ffece
+    type: example-of
 memoryVersion: 1
 ---
+## Consolidated from:
+### Plan: Enriched confidence scoring with signal-strength composite
+*Source: `plan-enriched-confidence-scoring-with-signal-strength-compos-83ac7a58`*
+
 ## Plan: Enriched Confidence Scoring with Signal-Strength Composite
 
 Derive a richer confidence signal for recall results using existing, already-in-memory structural signals. Additive, fail-soft, no new infrastructure or ranking behavior changes.
@@ -114,3 +125,42 @@ Record dogfooding results as an apply note linked to this plan.
 - research-semvec-retention-formula-deep-dive-applicability-to-a5a31ecd
 - research-semvec-analysis-applicability-and-alignment-with-mn-7a42ac50
 - reference-mnemonic-ranking-signals-inventory-all-scoring-for-27ae79dc
+
+### Apply: Enriched confidence scoring with signal-strength composite
+*Source: `apply-enriched-confidence-scoring-with-signal-strength-compo-32416560`*
+
+## Apply: Enriched Confidence Scoring with Signal-Strength Composite
+
+Implements plan: `plan-enriched-confidence-scoring-with-signal-strength-compos-83ac7a58`
+
+### Checklist
+
+- [x] Step 1: computeSignalStrength in src/provenance.ts
+- [x] Step 2: signalStrength in RecallResult interface + Zod schema
+- [x] Step 3: Update computeConfidence to use signalStrength tiers
+- [x] Step 4: Populate signalStrength in recall tool handler
+- [x] Step 5: Unit tests in tests/provenance.unit.test.ts
+- [x] Step 6: Integration tests in tests/recall-pipeline.integration.test.ts
+- [x] Step 7: Dogfooding pack for signal validation — captured at `dogfooding-results-signalstrength-validation-pack-2026-05-09-c06ffece`
+- [x] Verification: npx tsc --noEmit
+- [x] Verification: npm test (51 files, 870 tests, 0 failures from this change)
+
+### Derivations from plan
+
+All signal weights from plan Step 1. Confidence thresholds from plan Step 3. No new I/O, all signals from frontmatter + session cache.
+
+### Changes
+
+**src/provenance.ts**: Added `computeSignalStrength()` — composite from role (0.05-0.15), centrality (0-0.15 capped log), lifecycle (0 or 0.10), recency (0-0.10 linear decay over 90d). Updated `computeConfidence` to accept optional `signalStrength` parameter; when present, thresholds at 0.35 (high) and 0.15 (medium). Fallback legacy path preserved with exact original constants.
+
+**src/structured-content.ts**: Added `signalStrength?: number` to RecallResult interface and Zod schema with `.describe()`.
+
+**src/tools/recall.ts**: Import `computeSignalStrength`. Call it alongside existing confidence computation. Pass result to `computeConfidence`. Include `signalStrength` in structuredResults. Tool description updated with signalStrength bullet.
+
+**tests/provenance.unit.test.ts**: 11 new tests covering computeSignalStrength (edge cases: zero relations, stale notes, role weights, lifecycle contribution, centrality cap) and computeConfidence with signalStrength (high/medium/low thresholds, undefined fallback).
+
+**tests/recall-pipeline.integration.test.ts**: New test verifying signalStrength present in recall results for project context, values in valid range, summary note scores higher than context note.
+
+### Dogfooding results
+
+Full dogfooding pack at `dogfooding-results-signalstrength-validation-pack-2026-05-09-c06ffece`. Key findings: signalStrength present in all results, values 0.13-0.44 (within expected 0-0.50), no false positives or false negatives, weights stable under ±0.02 variation (generalizable).

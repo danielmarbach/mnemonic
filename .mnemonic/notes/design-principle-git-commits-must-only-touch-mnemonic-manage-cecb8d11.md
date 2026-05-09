@@ -7,9 +7,12 @@ tags:
   - commit-scope
 lifecycle: permanent
 createdAt: '2026-03-12T15:45:37.398Z'
-updatedAt: '2026-03-12T15:45:37.398Z'
+updatedAt: '2026-05-09T21:10:39.013Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: mnemonic-key-design-decisions-3f2a6273
+    type: related-to
 memoryVersion: 1
 ---
 Mnemonic's git operations must never commit files outside the vault's own scope, even if such files happen to be staged in the same repository (e.g. source edits made while dogfooding).

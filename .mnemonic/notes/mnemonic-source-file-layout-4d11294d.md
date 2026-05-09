@@ -7,16 +7,16 @@ tags:
   - structure
 lifecycle: permanent
 createdAt: '2026-03-07T17:58:59.865Z'
-updatedAt: '2026-03-11T10:32:28.988Z'
+updatedAt: '2026-05-09T21:06:02.096Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
   - id: mnemonic-project-overview-and-purpose-763b7a51
     type: explains
-  - id: mnemonic-bugs-fixed-during-initial-setup-e4faea32
-    type: related-to
   - id: path-resolution-support-both-absolute-and-tilde-home-paths-e48a0280
     type: explains
+  - id: split-index-ts-into-modular-structure-implemented-e97a019f
+    type: related-to
 memoryVersion: 1
 ---
 All runtime TypeScript source files live under `src/` to keep the repository layout obvious and predictable.

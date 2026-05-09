@@ -10,9 +10,12 @@ tags:
   - schema
 lifecycle: permanent
 createdAt: '2026-03-18T07:25:30.436Z'
-updatedAt: '2026-03-18T07:25:30.436Z'
+updatedAt: '2026-05-09T21:10:39.021Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: git-resilience-retry-contract-concurrency-design-and-languag-351fab47
+    type: derives-from
 memoryVersion: 1
 ---
 The `sync` tool previously swallowed all git errors inside a single try-catch, returning empty arrays indistinguishable from a clean no-op sync. A merge conflict during `pull --rebase` was completely invisible to callers.

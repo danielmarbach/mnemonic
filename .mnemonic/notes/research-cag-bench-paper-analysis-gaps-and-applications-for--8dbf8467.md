@@ -9,15 +9,13 @@ tags:
   - retrieval
 lifecycle: temporary
 createdAt: '2026-05-09T07:20:50.314Z'
-updatedAt: '2026-05-09T07:50:58.287Z'
+updatedAt: '2026-05-09T21:03:51.515Z'
 role: research
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
-  - id: request-research-cag-bench-paper-gaps-and-applications-for-m-450273ae
-    type: derives-from
-  - id: plan-retrieval-precision-and-diversity-diagnostics-51c5277c
+  - id: retrieval-precision-and-diversity-diagnostics-implemented-763c1459
     type: derives-from
 memoryVersion: 1
 ---

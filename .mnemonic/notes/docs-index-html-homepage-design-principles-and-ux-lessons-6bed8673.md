@@ -9,9 +9,12 @@ tags:
   - navigation
 lifecycle: permanent
 createdAt: '2026-03-12T05:20:45.016Z'
-updatedAt: '2026-04-05T10:22:33.748Z'
+updatedAt: '2026-05-09T21:16:14.014Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: documentation-split-for-readme-architecture-and-agent-4e20a50b
+    type: related-to
 memoryVersion: 1
 ---
 Accumulated design principles and UX lessons for `docs/index.html`, distilled from two redesign sessions (March 2026).

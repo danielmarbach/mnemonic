@@ -7,9 +7,12 @@ tags:
   - decision
 lifecycle: permanent
 createdAt: '2026-03-28T22:11:33.811Z'
-updatedAt: '2026-03-28T22:11:33.811Z'
+updatedAt: '2026-05-09T21:10:39.011Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: temporal-interpretation-strategy-f8573d1d
+    type: related-to
 memoryVersion: 1
 ---
 The `verbose` flag on `recall` must only control what is returned to the caller — it must not gate data that the internal classification pipeline depends on.

@@ -7,7 +7,7 @@ tags:
   - typescript
 lifecycle: permanent
 createdAt: '2026-03-07T17:58:49.005Z'
-updatedAt: '2026-03-08T13:08:05.469Z'
+updatedAt: '2026-05-09T21:16:14.012Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
@@ -18,6 +18,8 @@ relatedTo:
   - id: mnemonic-docker-and-ollama-compose-setup-e58f1e98
     type: related-to
   - id: dynamic-project-context-loading-plan-9f2ed29c
+    type: related-to
+  - id: theme-refinement-design-emergent-themes-and-graduation-8bd47342
     type: related-to
 memoryVersion: 1
 ---

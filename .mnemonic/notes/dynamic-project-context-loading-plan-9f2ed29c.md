@@ -8,7 +8,7 @@ tags:
   - architecture
 lifecycle: permanent
 createdAt: '2026-03-07T20:51:24.526Z'
-updatedAt: '2026-03-07T20:51:25.054Z'
+updatedAt: '2026-05-09T21:16:14.023Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
@@ -17,6 +17,8 @@ relatedTo:
   - id: mnemonic-project-overview-and-purpose-763b7a51
     type: related-to
   - id: github-packages-publishing-and-ci-workflow-55495350
+    type: related-to
+  - id: recall-heuristic-instead-of-full-dynamic-context-loading-12324717
     type: related-to
 memoryVersion: 1
 ---

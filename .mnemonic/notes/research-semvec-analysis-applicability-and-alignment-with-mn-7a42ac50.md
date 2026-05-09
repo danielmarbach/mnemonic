@@ -14,8 +14,6 @@ alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
-  - id: request-research-semvec-applicability-and-alignment-with-mne-e599b944
-    type: derives-from
   - id: research-semvec-retention-formula-deep-dive-applicability-to-a5a31ecd
     type: derives-from
 memoryVersion: 1

@@ -7,9 +7,12 @@ tags:
   - automation
 lifecycle: permanent
 createdAt: '2026-03-14T22:41:26.358Z'
-updatedAt: '2026-03-14T23:12:08.871Z'
+updatedAt: '2026-05-09T21:16:14.025Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: git-resilience-retry-contract-concurrency-design-and-languag-351fab47
+    type: related-to
 memoryVersion: 1
 ---
 Automatic branch change detection and sync now applies to `cwd`-aware memory operations plus migration execution, not literally every tool.

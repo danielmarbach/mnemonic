@@ -8,7 +8,7 @@ tags:
   - verification
 lifecycle: permanent
 createdAt: '2026-04-26T19:00:03.718Z'
-updatedAt: '2026-04-28T16:06:00.244Z'
+updatedAt: '2026-05-09T21:03:51.512Z'
 role: summary
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -20,6 +20,10 @@ relatedTo:
     type: follows
   - id: theme-evidence-enrichment-design-research-signal-inventory-d-294ccd73
     type: derives-from
+  - id: enriched-confidence-scoring-with-signal-strength-composite-i-06563116
+    type: derives-from
+  - id: retrieval-precision-and-diversity-diagnostics-implemented-763c1459
+    type: related-to
 memoryVersion: 1
 ---
 # Summary: evidence enrichment implementation across recall and consolidate

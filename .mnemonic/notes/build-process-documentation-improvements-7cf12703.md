@@ -7,9 +7,12 @@ tags:
   - p1-medium
 lifecycle: permanent
 createdAt: '2026-03-08T14:25:52.466Z'
-updatedAt: '2026-03-08T14:25:52.466Z'
+updatedAt: '2026-05-09T21:10:52.761Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: mnemonic-key-design-decisions-3f2a6273
+    type: related-to
 memoryVersion: 1
 ---
 ## Priority P1 - Build and Documentation Enhancements

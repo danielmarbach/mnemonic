@@ -9,7 +9,7 @@ tags:
   - documentation
 lifecycle: permanent
 createdAt: '2026-05-09T12:54:02.094Z'
-updatedAt: '2026-05-09T20:07:06.948Z'
+updatedAt: '2026-05-09T21:16:14.015Z'
 role: summary
 alwaysLoad: true
 project: https-github-com-danielmarbach-mnemonic
@@ -24,6 +24,18 @@ relatedTo:
   - id: changelog-writing-principles-87cdbc5b
     type: related-to
   - id: documentation-split-for-readme-architecture-and-agent-4e20a50b
+    type: related-to
+  - id: retrieval-precision-and-diversity-diagnostics-implemented-763c1459
+    type: related-to
+  - id: enriched-confidence-scoring-with-signal-strength-composite-i-06563116
+    type: related-to
+  - id: dogfooding-results-core-enrichment-orientation-pack-2026-05--910c0886
+    type: related-to
+  - id: structured-mcp-schema-audit-test-strategy-targeted-high-risk-f966c089
+    type: related-to
+  - id: ci-safe-mcp-integration-and-failure-learning-workflow-91431beb
+    type: related-to
+  - id: dogfooding-test-suite-reusable-prompt-for-phases-1-8-validat-c7c702d8
     type: related-to
 memoryVersion: 1
 ---

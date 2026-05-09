@@ -11,9 +11,12 @@ tags:
   - decision
 lifecycle: permanent
 createdAt: '2026-03-08T09:08:28.685Z'
-updatedAt: '2026-03-08T09:08:28.685Z'
+updatedAt: '2026-05-09T21:10:52.760Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: implementation-principles-for-mnemonic-mcp-2e178bba
+    type: related-to
 memoryVersion: 1
 ---
 Consolidated operational guidance for CI-safe MCP integration tests and artifact-first CI failure learning in mnemonic.

@@ -8,9 +8,12 @@ tags:
   - decision
 lifecycle: permanent
 createdAt: '2026-03-08T18:14:44.358Z'
-updatedAt: '2026-03-08T18:14:44.358Z'
+updatedAt: '2026-05-09T21:10:52.765Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: mnemonic-key-design-decisions-3f2a6273
+    type: related-to
 memoryVersion: 1
 ---
 Decision: `move_memory` should rewrite `project` and `projectName` from `cwd` when moving a note from the main vault into a project vault, but it should preserve existing project association when moving a project note out to the main vault.

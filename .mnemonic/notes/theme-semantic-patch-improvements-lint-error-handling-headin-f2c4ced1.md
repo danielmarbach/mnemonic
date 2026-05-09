@@ -10,11 +10,14 @@ tags:
   - llm-usability
 lifecycle: permanent
 createdAt: '2026-04-28T15:59:57.519Z'
-updatedAt: '2026-04-28T15:59:57.519Z'
+updatedAt: '2026-05-09T21:09:01.897Z'
 role: reference
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: semantic-patch-builder-design-and-implementation-b8d48f5e
+    type: explains
 memoryVersion: 1
 ---
 # Theme: Semantic patch improvements — lint error handling, heading operations, and LLM usability

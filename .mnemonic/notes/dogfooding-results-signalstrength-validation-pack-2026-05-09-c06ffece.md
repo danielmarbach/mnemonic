@@ -8,7 +8,7 @@ tags:
   - signal-strength
 lifecycle: permanent
 createdAt: '2026-05-09T16:56:35.454Z'
-updatedAt: '2026-05-09T16:56:51.190Z'
+updatedAt: '2026-05-09T21:03:51.515Z'
 role: review
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -20,6 +20,8 @@ relatedTo:
     type: related-to
   - id: review-signal-strength-confidence-scoring-implementation-9710c108
     type: derives-from
+  - id: enriched-confidence-scoring-with-signal-strength-composite-i-06563116
+    type: example-of
 memoryVersion: 1
 ---
 ## Dogfooding Results: SignalStrength Validation Pack (2026-05-09)

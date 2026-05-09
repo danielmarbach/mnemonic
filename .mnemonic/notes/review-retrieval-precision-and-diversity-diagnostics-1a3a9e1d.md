@@ -14,8 +14,6 @@ alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
-  - id: apply-retrieval-precision-and-diversity-diagnostics-1a7e78c0
-    type: derives-from
   - id: temporal-interpretation-strategy-f8573d1d
     type: related-to
 memoryVersion: 1
