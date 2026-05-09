@@ -177,6 +177,140 @@ describe("recall pipeline integration", () => {
     }
   }, 15000);
 
+  it("recall diagnostics: project context provides scopeNoteCount, diversity, and coverage", async () => {
+    const mainVaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-diagnostics-main-"));
+    tempDirs.push(mainVaultDir);
+    const repoDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-diagnostics-repo-"));
+    tempDirs.push(repoDir);
+    await initTestRepo(repoDir);
+    const embeddingServer = await startFakeEmbeddingServer();
+
+    try {
+      await callLocalMcp(mainVaultDir, "remember", {
+        title: "Project Anchor Note",
+        content: "A project-scoped summary note marked as alwaysLoad for coverage testing.",
+        tags: ["integration", "diagnostics"],
+        cwd: repoDir,
+        scope: "project",
+        lifecycle: "permanent",
+        role: "summary",
+        alwaysLoad: true,
+        summary: "Project anchor for diagnostics test",
+      }, embeddingServer.url);
+
+      await callLocalMcp(mainVaultDir, "remember", {
+        title: "Global Diagnostics Note",
+        content: "A global note used to test recallScopeNoteCount and diversity metrics across vaults.",
+        tags: ["integration", "global-diagnostics"],
+        scope: "global",
+        lifecycle: "permanent",
+        cwd: repoDir,
+      }, embeddingServer.url);
+
+      await callLocalMcp(mainVaultDir, "remember", {
+        title: "Project Context Note",
+        content: "Another project note with a different role to test roleMix diversity.",
+        tags: ["integration", "diagnostics"],
+        cwd: repoDir,
+        scope: "project",
+        lifecycle: "temporary",
+        role: "context",
+      }, embeddingServer.url);
+
+      const projectResponse = await callLocalMcpResponse(mainVaultDir, "recall", {
+        query: "diagnostics testing",
+        cwd: repoDir,
+        limit: 10,
+        scope: "all",
+      }, embeddingServer.url);
+
+      const projectResult = RecallResultSchema.parse(projectResponse.structuredContent);
+
+      expect(projectResult.recallScopeNoteCount).toBeDefined();
+      expect(typeof projectResult.recallScopeNoteCount).toBe("number");
+      expect(projectResult.recallScopeNoteCount!).toBeGreaterThanOrEqual(2);
+
+      expect(projectResult.diversity).toBeDefined();
+      expect(projectResult.diversity!.themeCount).toBeGreaterThanOrEqual(1);
+      expect(projectResult.diversity!.lifecycleMix).toBeDefined();
+
+      expect(projectResult.retrievalCoverage).toBeDefined();
+      expect(projectResult.retrievalCoverage!.highPriorityAnchorsTotal).toBeGreaterThanOrEqual(1);
+      expect(projectResult.retrievalCoverage!.fraction).toBeGreaterThanOrEqual(0);
+      expect(projectResult.retrievalCoverage!.fraction).toBeLessThanOrEqual(1);
+
+      const globalScopeResponse = await callLocalMcpResponse(mainVaultDir, "recall", {
+        query: "global diagnostics note",
+        cwd: repoDir,
+        limit: 10,
+        scope: "global",
+      }, embeddingServer.url);
+
+      const globalScopeResult = RecallResultSchema.parse(globalScopeResponse.structuredContent);
+      expect(globalScopeResult.recallScopeNoteCount).toBeDefined();
+      expect(typeof globalScopeResult.recallScopeNoteCount).toBe("number");
+
+      if (globalScopeResult.results.length > 0 && globalScopeResult.retrievalCoverage) {
+        expect(globalScopeResult.retrievalCoverage.highPriorityAnchorsTotal).toBeGreaterThanOrEqual(0);
+        expect(globalScopeResult.retrievalCoverage.fraction).toBeGreaterThanOrEqual(0);
+      }
+
+      if (globalScopeResult.results.length > 0 && globalScopeResult.diversity) {
+        expect(globalScopeResult.diversity.themeCount).toBeGreaterThanOrEqual(1);
+      }
+
+      const emptyVaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-diagnostics-empty-"));
+      tempDirs.push(emptyVaultDir);
+
+      const emptyResponse = await callLocalMcpResponse(emptyVaultDir, "recall", {
+        query: "nonexistent query",
+        limit: 10,
+        scope: "global",
+        cwd: emptyVaultDir,
+      }, embeddingServer.url);
+
+      const emptyResult = RecallResultSchema.parse(emptyResponse.structuredContent);
+      expect(emptyResult.results).toHaveLength(0);
+      expect(emptyResult.diversity).toBeUndefined();
+    } finally {
+      await embeddingServer.close();
+    }
+  }, 30000);
+
+  it("recall diagnostics: explicit limit=1 still populates recallScopeNoteCount", async () => {
+    const mainVaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-diagnostics-limit-"));
+    tempDirs.push(mainVaultDir);
+    const repoDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-diagnostics-limit-repo-"));
+    tempDirs.push(repoDir);
+    await initTestRepo(repoDir);
+    const embeddingServer = await startFakeEmbeddingServer();
+
+    try {
+      await callLocalMcp(mainVaultDir, "remember", {
+        title: "Note for limit test",
+        content: "A note to verify recallScopeNoteCount appears even with explicit limit=1.",
+        tags: ["integration", "limit-test"],
+        cwd: repoDir,
+        scope: "project",
+        lifecycle: "permanent",
+      }, embeddingServer.url);
+
+      const response = await callLocalMcpResponse(mainVaultDir, "recall", {
+        query: "limit test",
+        cwd: repoDir,
+        limit: 1,
+        scope: "all",
+      }, embeddingServer.url);
+
+      const result = RecallResultSchema.parse(response.structuredContent);
+      expect(result.recallScopeNoteCount).toBeDefined();
+      expect(typeof result.recallScopeNoteCount).toBe("number");
+      expect(result.results.length).toBeLessThanOrEqual(1);
+    } finally {
+      await embeddingServer.close();
+    }
+  }, 20000);
+
   it("temporal filter does not over-exclude for explicit window queries", async () => {
     const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-pipeline-temporal-"));
     tempDirs.push(vaultDir);

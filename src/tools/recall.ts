@@ -88,7 +88,10 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
         "- Ranked memory matches with scores, vault label, tags, lifecycle, and updated time\n" +
         "- Bounded 1-hop relationship previews automatically attached to top results\n" +
         "- In temporal mode, optional compact history entries for top matches\n" +
-        "- Optional retrieval evidence via `evidence: \"compact\"` for why a result ranked\n\n" +
+        "- Optional retrieval evidence via `evidence: \"compact\"` for why a result ranked\n" +
+        "- `recallScopeNoteCount`: total notes visible in the recall scope (omit-aware: if vault is small, consider increasing limit)\n" +
+        "- `diversity`: theme count (unique tags), role mix, and lifecycle mix of selected results — use to gauge whether results span enough perspectives\n" +
+        "- `retrievalCoverage`: fraction of high-priority anchors (alwaysLoad or summary notes) present in results, with capped missing list — use to decide if another recall with broader terms is needed\n\n" +
         "Read-only.\n\n" +
         "Typical next step:\n" +
         "- Use `get`, `update`, `relate`, or `consolidate` based on the results.",
@@ -130,7 +133,7 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
 
       let effectiveLimit = limit;
       let recallScopeNoteCount: number | undefined;
-      if (project && limit >= ctx.defaultRecallLimit) {
+      if (project) {
         try {
           let totalVisible = 0;
           for (const vault of vaults) {
@@ -140,7 +143,7 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
             }
           }
           recallScopeNoteCount = totalVisible;
-          if (totalVisible <= 25) {
+          if (limit >= ctx.defaultRecallLimit && totalVisible <= 25) {
             effectiveLimit = Math.min(totalVisible, 20);
           }
         } catch {
