@@ -8,10 +8,13 @@ tags:
   - scorecard
 lifecycle: permanent
 createdAt: '2026-03-28T18:54:38.792Z'
-updatedAt: '2026-04-25T21:24:15.658Z'
+updatedAt: '2026-05-09T21:16:14.015Z'
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: implementation-principles-for-mnemonic-mcp-2e178bba
+    type: related-to
 memoryVersion: 1
 ---
 # Dogfooding test packs: reusable prompts and scorecards
