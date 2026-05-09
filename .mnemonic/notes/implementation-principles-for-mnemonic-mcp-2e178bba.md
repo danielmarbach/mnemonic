@@ -9,11 +9,14 @@ tags:
   - documentation
 lifecycle: permanent
 createdAt: '2026-05-09T12:54:02.094Z'
-updatedAt: '2026-05-09T12:54:02.094Z'
+updatedAt: '2026-05-09T12:54:15.193Z'
 role: summary
 alwaysLoad: true
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: performance-principles-for-file-first-mcp-and-git-backed-wor-4e7d3bc8
+    type: related-to
 memoryVersion: 1
 ---
 ## Implementation principles for mnemonic MCP
