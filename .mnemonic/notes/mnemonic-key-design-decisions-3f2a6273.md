@@ -7,7 +7,7 @@ tags:
   - rationale
 lifecycle: permanent
 createdAt: '2026-03-07T17:59:12.124Z'
-updatedAt: '2026-05-09T21:06:02.096Z'
+updatedAt: '2026-05-09T21:09:01.886Z'
 role: summary
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
@@ -30,6 +30,8 @@ relatedTo:
     type: derives-from
   - id: split-index-ts-into-modular-structure-implemented-e97a019f
     type: derives-from
+  - id: semantic-patch-builder-design-and-implementation-b8d48f5e
+    type: related-to
 memoryVersion: 1
 ---
 **One file per note:** Critical for git conflict isolation. Never aggregate notes into a single file.

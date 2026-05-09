@@ -7,13 +7,17 @@ tags:
   - bug
 lifecycle: temporary
 createdAt: '2026-05-01T11:27:01.925Z'
-updatedAt: '2026-05-01T12:03:03.372Z'
+updatedAt: '2026-05-09T21:09:01.896Z'
 role: research
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
   - id: review-semanticpatch-llm-usability-fixes-4d4022ce
+    type: derives-from
+  - id: mnemonic-key-design-decisions-3f2a6273
+    type: related-to
+  - id: theme-semantic-patch-improvements-lint-error-handling-headin-f2c4ced1
     type: derives-from
 memoryVersion: 1
 ---
