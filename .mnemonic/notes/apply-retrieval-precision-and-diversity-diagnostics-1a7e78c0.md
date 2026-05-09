@@ -8,7 +8,7 @@ tags:
   - cag-bench
 lifecycle: temporary
 createdAt: '2026-05-09T11:55:21.079Z'
-updatedAt: '2026-05-09T11:57:42.942Z'
+updatedAt: '2026-05-09T12:19:53.455Z'
 role: context
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -28,7 +28,7 @@ Implemented Steps 1-4 from plan `plan-retrieval-precision-and-diversity-diagnost
 
 **src/structured-content.ts**:
 
-- Added `RecallDiversity` interface: `themeCount`, `roleMix` (Partial<Record<NoteRole, number>>), `lifecycleMix` (Partial<Record<NoteLifecycle, number>>)
+- Added `RecallDiversity` interface: `themeCount`, `roleMix` (Partial\<Record\<NoteRole, number>>), `lifecycleMix` (Partial\<Record\<NoteLifecycle, number>>)
 - Added `RecallRetrievalCoverage` interface: `anchorsInResults`, `highPriorityAnchorsTotal`, `fraction`, `missingAnchors`
 - Extended `RecallResult` with `recallScopeNoteCount`, `diversity`, `retrievalCoverage` (all optional)
 - Updated `RecallResultSchema` with corresponding Zod schemas
@@ -46,6 +46,9 @@ Implemented Steps 1-4 from plan `plan-retrieval-precision-and-diversity-diagnost
 - Coverage skipped when no project context
 
 ### Design decisions
+
+- **I/O constraint fix (post-review)**: Removed non-project `vault.storage.listNotes()` fallback in limit heuristic. The plan states: "For the non-project cold path, fall back to the configured default — don't add I/O just for this heuristic." The original implementation violated this by making direct I/O calls when no project context exists. Fixed by gating the entire heuristic block on `project` being defined, so no new I/O is introduced on the global-only path.
+- **Unit tests added (post-review)**: New `tests/recall-helpers.unit.test.ts` with 11 tests covering `computeRecallDiversity` and `computeRecallRetrievalCoverage` helpers.
 
 - Limit heuristic only expands the Zod-provided default (5), never overrides caller-explicit limit (e.g. `limit: 1`)
 - Anchors use only frontmatter fields (`alwaysLoad`, `role`), no dynamic computation
