@@ -8,7 +8,7 @@ tags:
   - cag-bench
 lifecycle: temporary
 createdAt: '2026-05-09T11:55:21.079Z'
-updatedAt: '2026-05-09T12:19:53.455Z'
+updatedAt: '2026-05-09T12:39:44.868Z'
 role: context
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -47,12 +47,19 @@ Implemented Steps 1-4 from plan `plan-retrieval-precision-and-diversity-diagnost
 
 ### Design decisions
 
+- **recallScopeNoteCount always populated for project contexts (post-review fix)**: The initial implementation gated `recallScopeNoteCount` computation inside the limit heuristic block (`limit >= ctx.defaultRecallLimit`), meaning agents passing explicit `limit: 1` got no scope note count to decide whether to tighten or loosen on subsequent calls. Fixed by moving the note count computation outside the limit expansion gate while keeping the expansion heuristic gated. Now `recallScopeNoteCount` is always available when project context exists, regardless of the caller's limit.
+- **Integration tests added (post-review)**: `recall-pipeline.integration.test.ts` now covers project-context diagnostics (recallScopeNoteCount, diversity themeCount/lifecycleMix, retrievalCoverage anchors and fraction) and explicit `limit:1` still populating recallScopeNoteCount.
+
 - **I/O constraint fix (post-review)**: Removed non-project `vault.storage.listNotes()` fallback in limit heuristic. The plan states: "For the non-project cold path, fall back to the configured default — don't add I/O just for this heuristic." The original implementation violated this by making direct I/O calls when no project context exists. Fixed by gating the entire heuristic block on `project` being defined, so no new I/O is introduced on the global-only path.
+
 - **Unit tests added (post-review)**: New `tests/recall-helpers.unit.test.ts` with 11 tests covering `computeRecallDiversity` and `computeRecallRetrievalCoverage` helpers.
 
 - Limit heuristic only expands the Zod-provided default (5), never overrides caller-explicit limit (e.g. `limit: 1`)
+
 - Anchors use only frontmatter fields (`alwaysLoad`, `role`), no dynamic computation
+
 - Superseded detection uses session cache with `continue` on vault failure (skip vault, not silently return empty set)
+
 - Zod v4: `z.record(z.string(), z.number())` instead of `.partial()` on typed record (not supported in v4)
 
 ### Verification
