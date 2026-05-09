@@ -9,7 +9,7 @@ tags:
   - documentation
 lifecycle: permanent
 createdAt: '2026-05-09T12:54:02.094Z'
-updatedAt: '2026-05-09T12:54:26.793Z'
+updatedAt: '2026-05-09T20:04:25.616Z'
 role: summary
 alwaysLoad: true
 project: https-github-com-danielmarbach-mnemonic
@@ -43,6 +43,13 @@ Mnemonic is a file-first, git-backed MCP memory server. No database, no daemon, 
 - **Contextual metrics must be populated regardless of caller parameters.** If a field like `recallScopeNoteCount` exists so that agents can decide whether to adjust their behavior, it must be present in every response where project context is available. Gating it behind an incidental condition (like "only when limit equals default") makes it invisible when agents need it most.
 
 ### Structured output contract
+
+### Text output rendering
+
+- **Every new per-result field renders in text output.** If a field like `signalStrength` appears in structured output, it must also appear in the human-readable text rendering. LLMs consume text output first; structured output is a machine-readable complement.
+- **Every new aggregate diagnostic renders in text output.** If recall returns `recallScopeNoteCount`, `diversity`, or `retrievalCoverage` in structured output, include a compact `key: value` summary line in the text header. Agents that don't parse structured content must still see these signals.
+- **New text rendering needs integration tests asserting on the text string.** A field that exists only in structured output is invisible to text-only consumers. Each new text-rendered field should have at least one test that matches the text pattern (e.g., `/signalStrength: \d+\.\d+/`).
+- **Neither output alone is sufficient.** The pattern is the same as for schema descriptions: text output is agent-readable, structured output is machine-readable. Both must exist for new fields.
 
 - **Every new Zod output schema field gets `.describe()`.** Weaker models rely on schema descriptions for correct tool use. A field without a description is invisible to many clients.
 - **Every new output field gets a bullet in the tool description `Returns` section.** Stronger models benefit from contextual prose that explains when and how to use the field.
