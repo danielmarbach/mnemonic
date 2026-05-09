@@ -95,6 +95,8 @@ See [references/performance-tips.md](references/performance-tips.md).
 3. **Memory leaks** — Event listeners, subscriptions, timers without cleanup.
 4. **Bundle size** — Named imports over whole-library. Dynamic imports for heavy modules.
 5. **React specifics** — Missing `memo`/`useMemo`/`useCallback`, unstable object deps.
+6. **Loops** — Prefer `for...of` over `forEach` for performance and clarity. Use `map`/`filter`/`reduce` when constructing new collections.
+7. **String building** — Prefer template literals over string concatenation (`+`). Template literals are faster and more readable.
 
 ### Step 6: Code Quality Evaluation
 
@@ -105,6 +107,9 @@ See [references/performance-tips.md](references/performance-tips.md).
 5. **Error handling** — Catch `unknown` errors. Throw `Error` objects (custom error classes for domain). Never throw strings or plain objects.
 6. **Import hygiene** — `import type` for type-only imports. No barrel exports that load everything.
 7. **Modern patterns** — `satisfies`, `as const`, template literal types, branded types.
+8. **Control flow** — Always use block statements (`{}`) for if/for/while — no single-line bodies. Prefer early returns over nested if/else chains. No dangling else blocks after return.
+9. **No non-null assertions** — Avoid `!` on property access. Use `?.`, `??`, or explicit null checks. Indexed array access (`arr[i]!`) and `Map.get()!` are acceptable workarounds for `noUncheckedIndexedAccess`.
+10. **No eval or Function constructor** — Never use `eval()` or `new Function()` — they allow arbitrary code execution, disable tree-shaking, and defeat static analysis.
 
 ### Step 7: Structure Findings
 

@@ -1,15 +1,17 @@
 import type { EmbeddingModelId } from "./brands.js";
 import { embeddingModelId } from "./brands.js";
+import { OllamaUrlError, OllamaEmbeddingError } from "./domain-errors.js";
+import { z } from "zod";
 
 function validateOllamaUrl(url: string): string {
   let parsed: URL;
   try {
     parsed = new URL(url);
   } catch {
-    throw new Error(`OLLAMA_URL is not a valid URL: ${url}`);
+    throw new OllamaUrlError("OLLAMA_URL is not a valid URL", url);
   }
   if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-    throw new Error(`OLLAMA_URL must use http: or https: scheme, got ${parsed.protocol}`);
+    throw new OllamaUrlError("OLLAMA_URL must use http: or https: scheme", `got ${parsed.protocol}`);
   }
   const host = parsed.hostname;
   const isLocalhost = host === "localhost" || host === "127.0.0.1" || host === "::1";
@@ -18,9 +20,7 @@ function validateOllamaUrl(url: string): string {
     /^172\.(1[6-9]|2\d|3[01])\./.test(host) ||
     /^192\.168\./.test(host);
   if (!isLocalhost && !isPrivate) {
-    throw new Error(
-      `OLLAMA_URL must resolve to a localhost or private-network address, got ${host}`
-    );
+    throw new OllamaUrlError("OLLAMA_URL must resolve to a localhost or private-network address", `got ${host}`);
   }
   return url;
 }
@@ -36,16 +36,20 @@ export async function embed(text: string): Promise<number[]> {
   });
 
   if (!res.ok) {
-    throw new Error(
+    throw new OllamaEmbeddingError(
       `Ollama embedding failed: ${res.status} ${res.statusText}. ` +
       `Is Ollama running at ${OLLAMA_URL} with model '${EMBED_MODEL}' pulled?`
     );
   }
 
-  const data = (await res.json()) as { embeddings?: number[][] };
-  const embedding = data.embeddings?.[0];
+  const OllamaEmbedResponseSchema = z.object({ embeddings: z.array(z.array(z.number())).optional() });
+  const parseResult = OllamaEmbedResponseSchema.safeParse(await res.json());
+  if (!parseResult.success) {
+    throw new OllamaEmbeddingError(`Ollama embedding response had unexpected shape: ${parseResult.error.message}`);
+  }
+  const embedding = parseResult.data.embeddings?.[0];
   if (!embedding) {
-    throw new Error(`Ollama embedding response did not include an embedding for model '${EMBED_MODEL}'`);
+    throw new OllamaEmbeddingError(`Ollama embedding response did not include an embedding for model '${EMBED_MODEL}'`);
   }
 
   return embedding;
@@ -54,9 +58,11 @@ export async function embed(text: string): Promise<number[]> {
 export function cosineSimilarity(a: number[], b: number[]): number {
   let dot = 0, normA = 0, normB = 0;
   for (let i = 0; i < a.length; i++) {
-    dot += a[i]! * b[i]!;
-    normA += a[i]! * a[i]!;
-    normB += b[i]! * b[i]!;
+    const av = a[i] ?? 0;
+    const bv = b[i] ?? 0;
+    dot += av * bv;
+    normA += av * av;
+    normB += bv * bv;
   }
   if (normA === 0 || normB === 0) return 0;
   return dot / (Math.sqrt(normA) * Math.sqrt(normB));

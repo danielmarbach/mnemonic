@@ -3,7 +3,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ServerContext } from "../server-context.js";
 import { NOTE_LIFECYCLES, NOTE_ROLES, type Note } from "../storage.js";
 import { isoDateString } from "../brands.js";
-import { getErrorMessage } from "../error-utils.js";
+import { getErrorMessage, attempt } from "../error-utils.js";
 import { embed, embedModel } from "../embeddings.js";
 import {
   invalidateActiveProjectCache,
@@ -131,9 +131,9 @@ export function registerRememberTool(server: McpServer, ctx: ServerContext): voi
 
       const project = await resolveProject(ctx, cwd);
       let cleanedContent: string;
-      try {
-        cleanedContent = await cleanMarkdown(content);
-      } catch (err) {
+      const cleanResult = await attempt("remember:clean-markdown", async () => cleanMarkdown(content));
+      if (!cleanResult.ok) {
+        const err = cleanResult.error;
         if (err instanceof MarkdownLintError) {
           const message = `Markdown lint issues prevented this note from being stored. Fix the specific lint errors listed below in your content and retry the remember call — the note was NOT stored.\n\n${err.message}`;
           return {
@@ -144,6 +144,7 @@ export function registerRememberTool(server: McpServer, ctx: ServerContext): voi
         }
         throw err;
       }
+      cleanedContent = cleanResult.value;
       const policy = project ? await ctx.configStore.getProjectPolicy(project.id) : undefined;
       const policyScope = policy?.defaultScope;
       const projectVaultExists = cwd ? Boolean(await ctx.vaultManager.getProjectVaultIfExists(cwd)) : true;
@@ -204,13 +205,14 @@ export function registerRememberTool(server: McpServer, ctx: ServerContext): voi
 
       let embeddingStatus: { status: "written" | "skipped"; reason?: string } = { status: "written" };
 
-      try {
+      const embedResult = await attempt("remember:embed", async () => {
         const text = await embedTextForNote(vault.storage, note);
         const vector = await embed(text);
         await vault.storage.writeEmbedding({ id, model: embedModel, embedding: vector, updatedAt: now });
-      } catch (err) {
-        embeddingStatus = { status: "skipped", reason: getErrorMessage(err) };
-        console.error(`[embedding] Skipped for '${id}': ${err}`);
+      });
+      if (!embedResult.ok) {
+        embeddingStatus = { status: "skipped", reason: getErrorMessage(embedResult.error) };
+        console.error(`[embedding] Skipped for '${id}': ${embedResult.error}`);
       }
 
       const projectScope = describeProject(project);

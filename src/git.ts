@@ -3,6 +3,7 @@ import { debugLog } from "./error-utils.js";
 import { access } from "fs/promises";
 import path from "path";
 import { simpleGit, SimpleGit } from "simple-git";
+import { GitLockRetriesExhaustedError } from "./domain-errors.js";
 
 const mutationLocks = new Map<string, Promise<void>>();
 
@@ -133,6 +134,7 @@ export class GitOps {
         return { status: "committed" };
       } catch (err) {
         const errMessage = getErrorMessage(err);
+        debugLog("git:commit", `failed: ${errMessage}`);
         console.error(`[git] Commit failed: ${errMessage}`);
         return { status: "failed", reason: "error", operation: "commit", error: errMessage };
       }
@@ -149,6 +151,7 @@ export class GitOps {
       return { status: "committed" };
     } catch (err) {
       const errMessage = getErrorMessage(err);
+      debugLog("git:add", `failed: ${errMessage}`);
       console.error(`[git] add() failed: ${errMessage}`);
       return { status: "failed", reason: "error", operation: "add", error: errMessage };
     }
@@ -351,7 +354,7 @@ export class GitOps {
       }
     }
 
-    throw new Error(`[git] ${operationName}() lock retries exhausted`);
+    throw new GitLockRetriesExhaustedError(operationName);
   }
 
   private isLockError(errMessage: string): boolean {
@@ -373,7 +376,8 @@ export class GitOps {
         message: entry.message,
         timestamp: entry.date,
       };
-    } catch {
+    } catch (err) {
+      debugLog("git:last-commit", `failed: ${getErrorMessage(err)}`);
       return null;
     }
   }

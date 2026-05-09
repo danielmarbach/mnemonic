@@ -2,7 +2,7 @@ import fs from "fs/promises";
 import path from "path";
 import { z } from "zod";
 
-import { debugLog, getErrorMessage } from "./error-utils.js";
+import { attempt, attemptSync, debugLog, getErrorMessage } from "./error-utils.js";
 import {
   CONSOLIDATION_MODES,
   PROJECT_POLICY_SCOPES,
@@ -156,13 +156,12 @@ function normalizeProjectMemoryPolicies(value: unknown): Record<string, ProjectM
  */
 export async function readVaultSchemaVersion(vaultPath: string): Promise<string> {
   const filePath = path.join(path.resolve(vaultPath), "config.json");
-  try {
-    const raw = await fs.readFile(filePath, "utf-8");
-    const parsed = VaultSchemaVersionFragmentSchema.safeParse(JSON.parse(raw));
-    return normalizeSchemaVersion(parsed.success ? parsed.data.schemaVersion : undefined);
-  } catch {
-    return defaultConfig.schemaVersion;
-  }
+  const result = await attempt("config:read-schema", () => fs.readFile(filePath, "utf-8"));
+  if (!result.ok) return defaultConfig.schemaVersion;
+  const jsonResult = attemptSync("config:parse", () => JSON.parse(result.value));
+  if (!jsonResult.ok) return defaultConfig.schemaVersion;
+  const parsed = VaultSchemaVersionFragmentSchema.safeParse(jsonResult.value);
+  return normalizeSchemaVersion(parsed.success ? parsed.data.schemaVersion : undefined);
 }
 
 /**
@@ -172,12 +171,13 @@ export async function readVaultSchemaVersion(vaultPath: string): Promise<string>
 export async function writeVaultSchemaVersion(vaultPath: string, schemaVersion: string): Promise<void> {
   const filePath = path.join(path.resolve(vaultPath), "config.json");
   let existing: Record<string, unknown> = {};
-  try {
-    const raw = await fs.readFile(filePath, "utf-8");
-    const parsed = ConfigJsonObjectSchema.safeParse(JSON.parse(raw));
+  const existingResult = await attempt("config:read-existing", () => fs.readFile(filePath, "utf-8"));
+  if (existingResult.ok) {
+    const jsonResult = attemptSync("config:parse", () => JSON.parse(existingResult.value));
+    const parsed = jsonResult.ok ? ConfigJsonObjectSchema.safeParse(jsonResult.value) : { success: false as const, data: undefined };
     existing = parsed.success ? parsed.data : {};
-  } catch (err) {
-    debugLog("config:write-schema-version", `no existing config, starting fresh: ${getErrorMessage(err)}`);
+  } else {
+    debugLog("config:write-schema-version", `no existing config, starting fresh: ${getErrorMessage(existingResult.error)}`);
   }
   existing.schemaVersion = normalizeSchemaVersion(schemaVersion);
   await fs.writeFile(filePath, JSON.stringify(existing, null, 2) + "\n", "utf-8");
@@ -233,9 +233,10 @@ export class MnemonicConfigStore {
     }
 
     let config: MnemonicConfig;
-    try {
-      const raw = await fs.readFile(this.filePath, "utf-8");
-      const parsed = MnemonicConfigRawSchema.safeParse(JSON.parse(raw));
+    const readResult = await attempt("config:read", () => fs.readFile(this.filePath, "utf-8"));
+    if (readResult.ok) {
+      const jsonResult = attemptSync("config:parse", () => JSON.parse(readResult.value));
+      const parsed = jsonResult.ok ? MnemonicConfigRawSchema.safeParse(jsonResult.value) : { success: false as const, data: undefined };
       const data = parsed.success ? parsed.data : {};
       config = {
         schemaVersion: normalizeSchemaVersion(data.schemaVersion),
@@ -244,8 +245,8 @@ export class MnemonicConfigStore {
         projectMemoryPolicies: normalizeProjectMemoryPolicies(data.projectMemoryPolicies),
         projectIdentityOverrides: normalizeProjectIdentityOverrides(data.projectIdentityOverrides),
       };
-    } catch (err) {
-      debugLog("config:read", `failed, returning defaults: ${getErrorMessage(err)}`);
+    } else {
+      debugLog("config:read", `failed, returning defaults: ${getErrorMessage(readResult.error)}`);
       config = { ...defaultConfig };
     }
 

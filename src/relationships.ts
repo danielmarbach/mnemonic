@@ -4,6 +4,7 @@ import type { Confidence, RelatedNotePreview, RelationshipPreview } from "./stru
 import { classifyTheme } from "./project-introspection.js";
 import { getEffectiveMetadata, type EffectiveNoteMetadata, type RoleSuggestionContext } from "./role-suggestions.js";
 import { daysSince } from "./date-utils.js";
+import { attempt } from "./error-utils.js";
 
 const RECENTLY_CHANGED_DAYS = 5;
 const HIGH_CONFIDENCE_CENTRALITY = 5;
@@ -175,7 +176,7 @@ export async function getDirectRelatedNotes(
     if (!entry) continue;
 
     const { note: relatedNote, vault } = entry;
-    const relationship = note.relatedTo!.find(r => r.id === relatedId);
+    const relationship = note.relatedTo?.find(r => r.id === relatedId);
     if (!relationship) continue;
 
     const metadata = getEffectiveMetadata(relatedNote, buildRoleSuggestionContext(relatedNote, visibleNotes));
@@ -255,11 +256,10 @@ export async function getRelationshipPreview(
   allVaults: Vault[],
   options: RelationshipExpansionOptions
 ): Promise<RelationshipPreview | undefined> {
-  try {
+  const result = await attempt("relationships:preview", async () => {
     const scored = await getDirectRelatedNotes(note, allVaults, options.activeProjectId);
     return buildRelationshipPreview(scored, options);
-  } catch {
-    // Fail-soft: omit preview on error
-    return undefined;
-  }
+  });
+  if (!result.ok) return undefined;
+  return result.value;
 }

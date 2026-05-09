@@ -10,7 +10,7 @@ import {
 } from "../consolidate.js";
 import { cosineSimilarity, embed, embedModel } from "../embeddings.js";
 import { classifyTheme, titleCaseTheme } from "../project-introspection.js";
-import { getErrorMessage } from "../error-utils.js";
+import { getErrorMessage, attempt } from "../error-utils.js";
 import { makeId, slugify } from "../helpers/index.js";
 import { memoryId, isoDateString } from "../brands.js";
 import { formatCommitBody, shouldBlockProtectedBranchCommit as shouldBlockProtectedBranchCommitFromModule, wouldRelationshipCleanupTouchProjectVault as wouldRelationshipCleanupTouchProjectVaultFromModule } from "../helpers/git-commit.js";
@@ -24,6 +24,7 @@ import type { Vault } from "../vault.js";
 import type { ConsolidationMode, ProjectMemoryPolicy } from "../project-memory-policy.js";
 import type { ConsolidateResult, ConsolidateExecuteMergeEvidence } from "../structured-content.js";
 import type { CommitResult, PushResult } from "../git.js";
+import { UnknownConsolidationModeError } from "../domain-errors.js";
 
 // Re-export helpers that close over ctx for convenience
 async function shouldBlockProtectedBranchCommit(ctx: ServerContext, options: Omit<Parameters<typeof shouldBlockProtectedBranchCommitFromModule>[0], "ctx">) {
@@ -311,10 +312,10 @@ export async function suggestMerges(
             return "preserves history";
           case "delete":
             return "removes sources";
-          default: {
-            const _exhaustive: never = effectiveMode;
-            return _exhaustive;
-          }
+    default: {
+      const _exhaustive: never = effectiveMode;
+      throw new UnknownConsolidationModeError(_exhaustive);
+    }
         }
       })();
 
@@ -547,8 +548,7 @@ export async function executeMerge(
 
   let embeddingStatus: { status: "written" | "skipped"; reason?: string } = { status: "written" };
 
-  // Generate embedding for consolidated note
-  try {
+  const embedResult = await attempt("consolidate:embed", async () => {
     const text = await embedTextForNote(targetVault.storage, consolidatedNote);
     const vector = await embed(text);
     await targetVault.storage.writeEmbedding({
@@ -557,9 +557,10 @@ export async function executeMerge(
       embedding: vector,
       updatedAt: now,
     });
-  } catch (err) {
-    embeddingStatus = { status: "skipped", reason: getErrorMessage(err) };
-    console.error(`[embedding] Failed for consolidated note '${targetId}': ${err}`);
+  });
+  if (!embedResult.ok) {
+    embeddingStatus = { status: "skipped", reason: getErrorMessage(embedResult.error) };
+    console.error(`[embedding] Failed for consolidated note '${targetId}': ${embedResult.error}`);
   }
 
   const vaultChanges = new Map<Vault, string[]>();
@@ -599,7 +600,7 @@ export async function executeMerge(
     }
     default: {
       const _exhaustive: never = consolidationMode;
-      throw new Error(`Unknown consolidation mode: ${_exhaustive}`);
+      throw new UnknownConsolidationModeError(_exhaustive);
     }
   }
 
@@ -629,7 +630,7 @@ export async function executeMerge(
         break;
       default: {
         const _exhaustive: never = consolidationMode;
-        throw new Error(`Unknown consolidation mode: ${_exhaustive}`);
+        throw new UnknownConsolidationModeError(_exhaustive);
       }
     }
 
@@ -705,7 +706,7 @@ export async function executeMerge(
       break;
     default: {
       const _exhaustive: never = consolidationMode;
-      throw new Error(`Unknown consolidation mode: ${_exhaustive}`);
+      throw new UnknownConsolidationModeError(_exhaustive);
     }
   }
 

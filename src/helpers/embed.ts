@@ -2,16 +2,14 @@ import { promises as fs } from "fs";
 import { embed, embedModel } from "../embeddings.js";
 import { memoryId, isoDateString } from "../brands.js";
 import { getOrBuildProjection } from "../projections.js";
+import { attempt } from "../error-utils.js";
 import type { Storage, Note } from "../storage.js";
 import type { ServerContext } from "../server-context.js";
 
 export async function embedTextForNote(storage: Storage, note: Note): Promise<string> {
-  try {
-    const projection = await getOrBuildProjection(storage, note);
-    return projection.projectionText;
-  } catch {
-    return `${note.title}\n\n${note.content}`;
-  }
+  const result = await attempt("projection:build", () => getOrBuildProjection(storage, note));
+  if (!result.ok) return `${note.title}\n\n${note.content}`;
+  return result.value.projectionText;
 }
 
 export async function embedMissingNotes(
@@ -43,7 +41,7 @@ export async function embedMissingNotes(
         }
       }
 
-      try {
+      const embedResult = await attempt("embed:note", async () => {
         const text = await embedTextForNote(storage, note);
         const vector = await embed(text);
         await storage.writeEmbedding({
@@ -52,8 +50,10 @@ export async function embedMissingNotes(
           embedding: vector,
           updatedAt: isoDateString(new Date().toISOString()),
         });
+      });
+      if (embedResult.ok) {
         rebuilt++;
-      } catch {
+      } else {
         failed.push(note.id);
       }
     }
@@ -86,6 +86,7 @@ export async function backfillEmbeddingsAfterSync(
 
 export async function removeStaleEmbeddings(storage: Storage, noteIds: string[]): Promise<void> {
   for (const id of noteIds) {
-    try { await fs.unlink(storage.embeddingPath(memoryId(id))); } catch { /* already gone */ }
+    const result = await attempt("embed:unlink", () => fs.unlink(storage.embeddingPath(memoryId(id))));
+    if (!result.ok) { /* already gone */ }
   }
 }

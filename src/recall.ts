@@ -2,6 +2,7 @@ import type { Vault } from "./vault.js";
 import type { EffectiveNoteMetadata } from "./role-suggestions.js";
 import { computeLexicalScore, tokenize } from "./lexical.js";
 import { MS_PER_DAY } from "./date-utils.js";
+import { UnknownRelationshipTypeError } from "./domain-errors.js";
 
 import type { Confidence } from "./structured-content.js";
 import type { RelationshipType } from "./storage.js";
@@ -469,7 +470,7 @@ function getRelationshipMultiplier(type: RelationshipType): number {
       return SPREADING_RELATED_TO_MULTIPLIER;
     default: {
       const _exhaustive: never = type;
-      throw new Error(`Unhandled relationship type: ${_exhaustive}`);
+      throw new UnknownRelationshipTypeError(_exhaustive);
     }
   }
 }

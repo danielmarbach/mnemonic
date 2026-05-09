@@ -8,6 +8,7 @@ import { resolveUserPath, defaultVaultPath, defaultClaudeHome } from "../paths.j
 import { VaultManager } from "../vault.js";
 import { parseMemorySections } from "../import.js";
 import { MnemonicConfigStore } from "../config.js";
+import { debugLog, getErrorMessage } from "../error-utils.js";
 import type { Note } from "../storage.js";
 
 export function makeImportNoteId(title: string): MemoryId {
@@ -70,7 +71,8 @@ Examples:
 
   try {
     await fs.access(memoryDir);
-  } catch {
+  } catch (err) {
+    debugLog("import:access", `memory dir not found: ${getErrorMessage(err)}`);
     console.log(`No Claude memory found for this project.`);
     console.log(`Expected: ${memoryDir}`);
     process.exit(0);

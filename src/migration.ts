@@ -2,7 +2,8 @@ import fs from "fs/promises";
 import path from "path";
 import matter from "gray-matter";
 
-import { getErrorMessage } from "./error-utils.js";
+import { getErrorMessage, debugLog } from "./error-utils.js";
+import { MigrationAlreadyRegisteredError, UnknownMigrationError, InvalidSchemaVersionError } from "./domain-errors.js";
 
 import type { Vault, VaultManager } from "./vault.js";
 import type { Note } from "./storage.js";
@@ -46,7 +47,7 @@ export class Migrator {
 
   registerMigration(migration: Migration): void {
     if (this.migrations.has(migration.name)) {
-      throw new Error(`Migration already registered: ${migration.name}`);
+      throw new MigrationAlreadyRegisteredError(migration.name);
     }
 
     if (!migration.minSchemaVersion && !migration.maxSchemaVersion) {
@@ -108,7 +109,7 @@ export class Migrator {
   ): Promise<{ results: Map<string, MigrationResult>; vaultsProcessed: number }> {
     const migration = this.migrations.get(migrationName);
     if (!migration) {
-      throw new Error(`Unknown migration: ${migrationName}`);
+      throw new UnknownMigrationError(migrationName);
     }
 
     const vaults: Vault[] = [];
@@ -273,7 +274,7 @@ export class Migrator {
 
   private parseVersion(version: string): number[] {
     if (!/^\d+(\.\d+)*$/.test(version)) {
-      throw new Error(`Invalid schema version: ${version}`);
+      throw new InvalidSchemaVersionError(version);
     }
 
     return version.split(".").map(n => parseInt(n, 10));
@@ -389,6 +390,7 @@ function createV010BackfillMemoryVersionMigration(): Migration {
             }
           }
         } catch (err) {
+          debugLog("migration:backfill-version", `note ${note.id}: ${getErrorMessage(err)}`);
           result.errors.push({
             noteId: note.id,
             error: getErrorMessage(err),
@@ -438,6 +440,7 @@ function createV011BackfillLifecycleMigration(): Migration {
             });
           }
         } catch (err) {
+          debugLog("migration:backfill-lifecycle", `note ${note.id}: ${getErrorMessage(err)}`);
           result.errors.push({
             noteId: note.id,
             error: getErrorMessage(err),

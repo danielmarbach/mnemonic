@@ -2,7 +2,7 @@ import fs from "fs/promises";
 import path from "path";
 import { simpleGit } from "simple-git";
 
-import { debugLog, getErrorMessage } from "./error-utils.js";
+import { attempt, debugLog, getErrorMessage } from "./error-utils.js";
 import { Storage, type Note } from "./storage.js";
 import { memoryId } from "./brands.js";
 import { GitOps } from "./git.js";
@@ -258,57 +258,58 @@ function makeVault(
  * namespaces for submodule-specific context while sharing the same git history.
  */
 async function discoverSubmoduleVaultFolders(gitRoot: string): Promise<string[]> {
-  try {
-    const entries = await fs.readdir(gitRoot, { withFileTypes: true });
-    return entries
-      .filter(e => e.isDirectory() && e.name.startsWith(".mnemonic-"))
-      .map(e => e.name)
-      .sort();
-  } catch (err) {
-    debugLog("vault:discover-submodules", `failed: ${getErrorMessage(err)}`);
+  const result = await attempt("vault:discover-submodules", () =>
+    fs.readdir(gitRoot, { withFileTypes: true })
+  );
+  if (!result.ok) {
+    debugLog("vault:discover-submodules", `failed: ${getErrorMessage(result.error)}`);
     return [];
   }
+  return result.value
+    .filter(e => e.isDirectory() && e.name.startsWith(".mnemonic-"))
+    .map(e => e.name)
+    .sort();
 }
 
 async function findGitRoot(cwd: string, visited: Set<string> = new Set()): Promise<string | null> {
-  try {
-    const git = simpleGit(cwd);
-    const root = await git.revparse(["--show-toplevel"]);
-    const trimmedRoot = root.trim();
-    if (!trimmedRoot) return null;
-
-    // Guard against infinite recursion in pathological submodule configurations.
-    if (visited.has(trimmedRoot)) return trimmedRoot;
-    visited.add(trimmedRoot);
-
-    // When inside a git submodule, walk up to the top-level superproject root
-    // so that project vaults are always anchored at the main repository.
-    try {
-      const superproject = await git.revparse(["--show-superproject-working-tree"]);
-      const trimmedSuperproject = superproject.trim();
-      if (trimmedSuperproject) {
-        return findGitRoot(trimmedSuperproject, visited);
-      }
-    } catch {
-      debugLog("vault:find-git-root", "not inside a submodule or flag unsupported, using current root");
-    }
-
-    return trimmedRoot;
-  } catch (err) {
-    debugLog("vault:find-git-root", `failed: ${getErrorMessage(err)}`);
+  const git = simpleGit(cwd);
+  const rootResult = await attempt("vault:find-git-root", () =>
+    git.revparse(["--show-toplevel"])
+  );
+  if (!rootResult.ok) {
+    debugLog("vault:find-git-root", `failed: ${getErrorMessage(rootResult.error)}`);
     return null;
   }
+  const trimmedRoot = rootResult.value.trim();
+  if (!trimmedRoot) return null;
+
+  if (visited.has(trimmedRoot)) return trimmedRoot;
+  visited.add(trimmedRoot);
+
+  const superResult = await attempt("vault:find-git-root:superproject", () =>
+    git.revparse(["--show-superproject-working-tree"])
+  );
+  if (superResult.ok) {
+    const trimmedSuperproject = superResult.value.trim();
+    if (trimmedSuperproject) {
+      return findGitRoot(trimmedSuperproject, visited);
+    }
+  } else {
+    debugLog("vault:find-git-root", "not inside a submodule or flag unsupported, using current root");
+  }
+
+  return trimmedRoot;
 }
 
 export async function ensureGitignore(ignorePath: string): Promise<void> {
   const requiredLines = ["embeddings/", "projections/"];
-  let existing: string;
-  try {
-    existing = await fs.readFile(ignorePath, "utf-8");
-  } catch (err) {
-    debugLog("vault:ensure-gitignore", `no existing gitignore: ${getErrorMessage(err)}`);
-    existing = "";
-  }
+  const existingResult = await attempt("vault:ensure-gitignore", () =>
+    fs.readFile(ignorePath, "utf-8")
+  );
+  const existing = existingResult.ok ? existingResult.value : (() => {
+    debugLog("vault:ensure-gitignore", `no existing gitignore: ${getErrorMessage(existingResult.error)}`);
+    return "";
+  })();
   const missing = requiredLines.filter(line => !existing.includes(line));
   if (missing.length === 0) return;
   const updated = existing.trimEnd() + "\n" + missing.join("\n") + "\n";
@@ -316,10 +317,6 @@ export async function ensureGitignore(ignorePath: string): Promise<void> {
 }
 
 async function pathExists(p: string): Promise<boolean> {
-  try {
-    await fs.access(p);
-    return true;
-  } catch {
-    return false;
-  }
+  const result = await attempt("vault:pathExists", () => fs.access(p));
+  return result.ok;
 }

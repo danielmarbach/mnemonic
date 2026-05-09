@@ -32,6 +32,7 @@ import {
   type ScoredRecallCandidate,
 } from "../recall.js";
 import { shouldTriggerLexicalRescue } from "../lexical.js";
+import { attempt } from "../error-utils.js";
 import {
   getOrBuildVaultEmbeddings,
   getOrBuildVaultNoteList,
@@ -136,7 +137,7 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
       let effectiveLimit = limit;
       let recallScopeNoteCount: number | undefined;
       if (project) {
-        try {
+        const scopeResult = await attempt("recall:scope-notes", async () => {
           let totalVisible = 0;
           for (const vault of vaults) {
             const noteList = await getOrBuildVaultNoteList(project.id, vault);
@@ -148,7 +149,8 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
           if (limit >= ctx.defaultRecallLimit && totalVisible <= 25) {
             effectiveLimit = Math.min(totalVisible, 20);
           }
-        } catch {
+        });
+        if (!scopeResult.ok) {
           // fail-soft: use configured limit
         }
       }
@@ -405,19 +407,16 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
           const centrality = note.relatedTo?.length ?? 0;
           const filePath = `${vault.notesRelDir}/${id}.md`;
           const provenance = await getNoteProvenance(vault.git, filePath);
-          const signalStrength = (() => {
-            try {
-              const ss = computeSignalStrength({
-                lifecycle: note.lifecycle,
-                updatedAt: note.updatedAt,
-                role: note.role,
-                centrality,
-              });
-              return Number.isFinite(ss) ? ss : undefined;
-            } catch {
-              return undefined;
-            }
-          })();
+          const signalStrengthResult = await attempt("recall:signal-strength", async () => {
+            const ss = computeSignalStrength({
+              lifecycle: note.lifecycle,
+              updatedAt: note.updatedAt,
+              role: note.role,
+              centrality,
+            });
+            return Number.isFinite(ss) ? ss : undefined;
+          });
+          const signalStrength = signalStrengthResult.ok ? signalStrengthResult.value : undefined;
           const confidence = computeConfidence(note.lifecycle, note.updatedAt, centrality, signalStrength);
           let history: Array<{
             commitHash: string;
@@ -533,14 +532,12 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
       let diversity: RecallResult["diversity"] | undefined;
       let retrievalCoverage: RecallRetrievalCoverage | undefined;
       if (structuredResults.length > 0) {
-        diversity = computeRecallDiversity(structuredResults);
+        diversity = await computeRecallDiversity(structuredResults);
         if (project) {
-          try {
-            const { anchorIds, anchorLookup } = await identifyHighPriorityAnchors(vaults, project.id);
-            const resultIds = structuredResults.map((r) => r.id);
-            retrievalCoverage = computeRecallRetrievalCoverage(resultIds, anchorIds, anchorLookup);
-          } catch {
-            // fail-soft
+          const { anchorIds, anchorLookup } = await identifyHighPriorityAnchors(vaults, project.id);
+          const coverageResult = await computeRecallRetrievalCoverage(structuredResults.map((r) => r.id), anchorIds, anchorLookup);
+          if (coverageResult) {
+            retrievalCoverage = coverageResult;
           }
         }
       }

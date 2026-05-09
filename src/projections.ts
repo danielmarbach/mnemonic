@@ -78,7 +78,7 @@ export function extractHeadings(markdown: string): string[] {
   for (const line of markdown.split("\n")) {
     const match = /^(#{1,3})\s+(.+)/.exec(line.trim());
     if (!match) continue;
-    const text = stripMarkdownInline(match[2]!).trim();
+    const text = stripMarkdownInline(match[2] ?? "").trim();
     if (!text || seen.has(text)) continue;
     seen.add(text);
     headings.push(text);

@@ -6,6 +6,8 @@ import type { NoteProjection } from "./structured-content.js";
 import { validateEmbeddingRecord, validateNoteProjection, validateRelatedTo } from "./validation.js";
 import type { MemoryId, EmbeddingModelId, ISO8601DateString } from "./brands.js";
 import { memoryId, isoDateString, isValidMemoryId } from "./brands.js";
+import { attempt } from "./error-utils.js";
+import { AtomicWriteInProgressError, MalformedNoteError, InvalidNoteIdError } from "./domain-errors.js";
 
 export const RELATIONSHIP_TYPES = ["related-to", "explains", "example-of", "supersedes", "derives-from", "follows"] as const;
 export type RelationshipType = typeof RELATIONSHIP_TYPES[number];
@@ -84,7 +86,7 @@ export class Storage {
 
   async beginAtomicNotesWrite(): Promise<void> {
     if (this.stagedNotesDir) {
-      throw new Error("Atomic notes write already in progress");
+      throw new AtomicWriteInProgressError();
     }
 
     this.stagedNotesDir = path.join(this.vaultPath, `.notes-staging-${randomUUID()}`);
@@ -137,20 +139,18 @@ export class Storage {
 
     const stagedPath = this.stagedNotePath(id);
     if (stagedPath) {
-      try {
+      const result = await attempt("storage:readNote", async () => {
         const raw = await fs.readFile(stagedPath, "utf-8");
         return this.parseNote(id, raw);
-      } catch {
-        // fall back to committed note
-      }
+      });
+      if (result.ok) return result.value;
     }
 
-    try {
+    const result = await attempt("storage:readNote", async () => {
       const raw = await fs.readFile(this.notePath(id), "utf-8");
       return this.parseNote(id, raw);
-    } catch {
-      return null;
-    }
+    });
+    return result.ok ? result.value : null;
   }
 
   async deleteNote(id: MemoryId): Promise<boolean> {
@@ -158,11 +158,7 @@ export class Storage {
       this.stagedDeletedNoteIds.add(id);
       const stagedPath = this.stagedNotePath(id);
       if (stagedPath) {
-        try {
-          await fs.unlink(stagedPath);
-        } catch {
-          // ok
-        }
+        await attempt("storage:deleteStaged", () => fs.unlink(stagedPath));
       }
       return true;
     }
@@ -237,21 +233,16 @@ export class Storage {
   }
 
   async readEmbedding(id: MemoryId): Promise<EmbeddingRecord | null> {
-    try {
-      const raw = await fs.readFile(this.embeddingPath(id), "utf-8");
-      return validateEmbeddingRecord(JSON.parse(raw));
-    } catch {
-      return null;
-    }
+    const raw = await attempt("storage:readEmbedding", () => fs.readFile(this.embeddingPath(id), "utf-8"));
+    if (!raw.ok) return null;
+    const parsed = await attempt("storage:readEmbedding", () => JSON.parse(raw.value));
+    if (!parsed.ok) return null;
+    return validateEmbeddingRecord(parsed.value);
   }
 
   async listEmbeddings(): Promise<EmbeddingRecord[]> {
-    let files: string[];
-    try {
-      files = await fs.readdir(this.embeddingsDir);
-    } catch {
-      return [];
-    }
+    const filesResult = await attempt("storage:listEmbeddings", () => fs.readdir(this.embeddingsDir), [] as string[]);
+    const files = filesResult.ok ? filesResult.value : [];
     const ids = files
       .filter((file) => file.endsWith(".json"))
       .map((file) => memoryId(file.replace(/\.json$/, "")));
@@ -271,12 +262,11 @@ export class Storage {
   }
 
   async readProjection(id: MemoryId): Promise<NoteProjection | null> {
-    try {
-      const raw = await fs.readFile(this.projectionPath(id), "utf-8");
-      return validateNoteProjection(JSON.parse(raw));
-    } catch {
-      return null;
-    }
+    const raw = await attempt("storage:readProjection", () => fs.readFile(this.projectionPath(id), "utf-8"));
+    if (!raw.ok) return null;
+    const parsed = await attempt("storage:readProjection", () => JSON.parse(raw.value));
+    if (!parsed.ok) return null;
+    return validateNoteProjection(parsed.value);
   }
 
   // ── Helpers ────────────────────────────────────────────────────────────────
@@ -306,27 +296,22 @@ export class Storage {
   private async listNoteIds(): Promise<MemoryId[]> {
     const ids = new Set<string>();
 
-    try {
-      const files = await fs.readdir(this.notesDir);
-      for (const file of files) {
-        if (file.endsWith(".md")) {
-          ids.add(file.replace(/\.md$/, ""));
-        }
+    const filesResult = await attempt("storage:listNoteIds", () => fs.readdir(this.notesDir), [] as string[]);
+    const files = filesResult.ok ? filesResult.value : [];
+    for (const file of files) {
+      if (file.endsWith(".md")) {
+        ids.add(file.replace(/\.md$/, ""));
       }
-    } catch {
-      // treat as empty
     }
 
     if (this.stagedNotesDir) {
-      try {
-        const stagedFiles = await fs.readdir(this.stagedNotesDir);
-        for (const file of stagedFiles) {
-          if (file.endsWith(".md")) {
-            ids.add(file.replace(/\.md$/, ""));
-          }
+      const stagedDir = this.stagedNotesDir;
+      const stagedResult = await attempt("storage:listStagedNoteIds", () => fs.readdir(stagedDir), [] as string[]);
+      const stagedFiles = stagedResult.ok ? stagedResult.value : [];
+      for (const file of stagedFiles) {
+        if (file.endsWith(".md")) {
+          ids.add(file.replace(/\.md$/, ""));
         }
-      } catch {
-        // treat as empty
       }
     }
 
@@ -349,7 +334,7 @@ export class Storage {
 
   private parseNote(id: MemoryId, raw: string): Note {
     if (!raw.trimStart().startsWith("---")) {
-      throw new Error(`Malformed note '${id}': missing frontmatter`);
+      throw new MalformedNoteError(id);
     }
 
     const parsed = matter(raw);
@@ -406,7 +391,7 @@ function isNoteImportance(value: unknown): value is NoteImportance {
 
 function validateNoteId(id: string): void {
   if (!isValidMemoryId(id)) {
-    throw new Error(`Invalid note ID: "${id}" contains characters that are not allowed (only alphanumeric, hyphens, and underscores)`);
+    throw new InvalidNoteIdError(id);
   }
 }
 

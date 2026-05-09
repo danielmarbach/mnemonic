@@ -444,7 +444,7 @@ describe("measurement / instrumentation", () => {
     await getOrBuildVaultNoteList("test-project", vault);
 
     const logs = spy.mock.calls.map((args) => args[0] as string);
-    expect(logs.some((l) => l.includes("[cache:fallback]"))).toBe(true);
+    expect(logs.some((l) => l.includes("[cache:build]") && l.includes("fail-soft"))).toBe(true);
     spy.mockRestore();
   });
 

@@ -3,7 +3,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ServerContext } from "../server-context.js";
 import { readVaultSchemaVersion } from "../config.js";
 import { MigrationListResultSchema, type MigrationListResult, MigrationExecuteResultSchema, type MigrationExecuteResult } from "../structured-content.js";
-import { getErrorMessage } from "../error-utils.js";
+import { getErrorMessage, attempt } from "../error-utils.js";
 import { ensureBranchSynced as ensureBranchSyncedFromModule, projectParam } from "../helpers/project.js";
 
 export function registerListMigrationsTool(server: McpServer, ctx: ServerContext): void {
@@ -111,7 +111,7 @@ export function registerExecuteMigrationTool(server: McpServer, ctx: ServerConte
     async ({ migrationName, dryRun, backup, cwd }) => {
       await ensureBranchSyncedFromModule(ctx, cwd);
 
-      try {
+      const migrationResult = await attempt("migration:execute", async () => {
         const { results, vaultsProcessed } = await ctx.migrator.runMigration(migrationName, {
           dryRun,
           backup,
@@ -169,15 +169,18 @@ export function registerExecuteMigrationTool(server: McpServer, ctx: ServerConte
           vaultResults,
         };
         
-        return { content: [{ type: "text", text: lines.join("\n") }], structuredContent };
-      } catch (err) {
+        return { content: [{ type: "text" as const, text: lines.join("\n") }], structuredContent };
+      });
+
+      if (!migrationResult.ok) {
         return {
           content: [{
-            type: "text",
-            text: `Migration failed: ${getErrorMessage(err)}`,
+            type: "text" as const,
+            text: `Migration failed: ${getErrorMessage(migrationResult.error)}`,
           }],
         };
       }
+      return migrationResult.value;
     }
   );
 }
