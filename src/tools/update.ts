@@ -235,10 +235,11 @@ export function registerUpdateTool(server: McpServer, ctx: ServerContext): void 
       let relatedToChanged = false;
       let resolvedRelatedTo = note.relatedTo;
       if (note.project) {
-        const accessCandidates = getRecentSessionNoteAccesses(note.project)
+        const project = note.project;
+        const accessCandidates = getRecentSessionNoteAccesses(project)
           .map((entry) => {
-            const cachedNote = getSessionCachedNote(note.project!, entry.vaultPath, entry.noteId)
-              ?? getRecentSessionAccessNote(note.project!, entry.vaultPath, entry.noteId);
+            const cachedNote = getSessionCachedNote(project, entry.vaultPath, entry.noteId)
+              ?? getRecentSessionAccessNote(project, entry.vaultPath, entry.noteId);
             return cachedNote
               ? { note: cachedNote, accessedAt: entry.accessedAt, accessKind: entry.accessKind, score: entry.score }
               : null;

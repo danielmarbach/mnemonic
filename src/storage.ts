@@ -305,7 +305,8 @@ export class Storage {
     }
 
     if (this.stagedNotesDir) {
-      const stagedResult = await attempt("storage:listStagedNoteIds", () => fs.readdir(this.stagedNotesDir!), [] as string[]);
+      const stagedDir = this.stagedNotesDir;
+      const stagedResult = await attempt("storage:listStagedNoteIds", () => fs.readdir(stagedDir), [] as string[]);
       const stagedFiles = stagedResult.ok ? stagedResult.value : [];
       for (const file of stagedFiles) {
         if (file.endsWith(".md")) {

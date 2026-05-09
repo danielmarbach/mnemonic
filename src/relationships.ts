@@ -176,7 +176,7 @@ export async function getDirectRelatedNotes(
     if (!entry) continue;
 
     const { note: relatedNote, vault } = entry;
-    const relationship = note.relatedTo!.find(r => r.id === relatedId);
+    const relationship = note.relatedTo?.find(r => r.id === relatedId);
     if (!relationship) continue;
 
     const metadata = getEffectiveMetadata(relatedNote, buildRoleSuggestionContext(relatedNote, visibleNotes));

@@ -1,0 +1,33 @@
+id: no-throw-non-error
+language: TypeScript
+severity: error
+message: "Throw only Error objects — never throw strings, numbers, or plain objects"
+rule:
+  pattern: "throw $VALUE"
+  not:
+    any:
+      - pattern: throw err
+      - pattern: throw new $$$ARGS
+files:
+  - "src/**/*.ts"
+ignores:
+  - "src/__tests__/**"
+  - "src/brands.ts"
+  - "src/git.ts"
+  - "src/migration.ts"
+note: |
+  Throwing non-Error objects produces no stack trace and makes debugging
+  nearly impossible. Always throw Error instances — domain error classes
+  that extend Error are perfectly fine.
+
+  ```typescript
+  // ❌ Bad — no stack trace
+  throw "User not found";
+  throw { message: "User not found", code: 404 };
+
+  // ✅ Good — stack trace preserved
+  throw new Error("User not found");
+
+  // ✅ Best — domain error class with discriminable name
+  throw new UserNotFoundError(userId);
+  ```

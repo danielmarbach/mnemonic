@@ -385,7 +385,9 @@ export function computeThemesWithGraduation(
   }
 
   candidates.sort((a, b) => {
-    const freqDiff = keywordFrequencies.get(b)! - keywordFrequencies.get(a)!;
+    const freqB = keywordFrequencies.get(b) ?? 0;
+    const freqA = keywordFrequencies.get(a) ?? 0;
+    const freqDiff = freqB - freqA;
     if (freqDiff !== 0) return freqDiff;
     return a.localeCompare(b);
   });

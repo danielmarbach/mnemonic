@@ -1,0 +1,34 @@
+id: no-enum-declaration
+language: TypeScript
+severity: error
+message: "Avoid enum declarations — use const object + 'as const' with derived type unions instead"
+rule:
+  kind: enum_declaration
+files:
+  - "src/**/*.ts"
+ignores:
+  - "src/__tests__/**"
+note: |
+  Enum declarations generate runtime code, can't be tree-shaken, and
+  TypeScript infers wider types than needed. Prefer `as const` objects
+  with derived union types — no runtime overhead, full type safety,
+  and better IDE autocomplete.
+
+  ```typescript
+  // ❌ Bad — generates runtime code, tree-shaking issues
+  enum Status {
+    Pending,
+    Approved,
+    Rejected,
+  }
+
+  // ✅ Good — no runtime code, narrow types, autocomplete works
+  const Status = {
+    Pending: "PENDING",
+    Approved: "APPROVED",
+    Rejected: "REJECTED",
+  } as const;
+
+  type Status = typeof Status[keyof typeof Status];
+  // "PENDING" | "APPROVED" | "REJECTED"
+  ```

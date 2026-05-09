@@ -119,9 +119,9 @@ function generateChangeDescription(
   context?: InterpretHistoryContext
 ): string {
   const hasContent = hasStats(entry);
-  const isSubstantial = hasContent &&
-    (entry.stats!.changeType === "substantial update" ||
-     entry.stats!.additions + entry.stats!.deletions > 50);
+  const isSubstantial = hasContent && entry.stats &&
+    (entry.stats.changeType === "substantial update" ||
+     entry.stats.additions + entry.stats.deletions > 50);
 
   switch (category) {
     case "create":

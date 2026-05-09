@@ -1,0 +1,35 @@
+id: no-non-null-assertion
+language: TypeScript
+severity: error
+message: "Avoid non-null assertion (!) on property access — use optional chaining (?.), nullish coalescing (??), or a type guard"
+rule:
+  kind: non_null_expression
+  not:
+    has:
+      any:
+        - kind: subscript_expression
+        - kind: call_expression
+files:
+  - "src/**/*.ts"
+ignores:
+  - "src/__tests__/**"
+  - "src/cli/**"
+note: |
+  Non-null assertions (`!`) on property access bypass the type checker and
+  will crash at runtime if the value is null/undefined.
+
+  Indexed access (`arr[i]!`) and call-result access (`map.get(k)!`,
+  `queue.shift()!`) are excluded — these are standard workarounds for
+  `noUncheckedIndexedAccess`.
+
+  ```typescript
+  // ❌ Bad — crashes if value is null/undefined
+  const files = fs.readdir(this.stagedNotesDir!);
+
+  // ✅ Good — explicit check
+  if (!this.stagedNotesDir) return;
+  const files = fs.readdir(this.stagedNotesDir);
+
+  // ✅ Good — optional chaining + fallback
+  const files = fs.readdir(this.stagedNotesDir ?? "");
+  ```
