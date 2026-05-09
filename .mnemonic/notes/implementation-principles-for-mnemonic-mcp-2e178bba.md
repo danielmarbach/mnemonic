@@ -9,7 +9,7 @@ tags:
   - documentation
 lifecycle: permanent
 createdAt: '2026-05-09T12:54:02.094Z'
-updatedAt: '2026-05-09T12:54:16.522Z'
+updatedAt: '2026-05-09T12:54:17.854Z'
 role: summary
 alwaysLoad: true
 project: https-github-com-danielmarbach-mnemonic
@@ -19,6 +19,8 @@ relatedTo:
     type: related-to
   - id: mnemonic-key-design-decisions-3f2a6273
     type: derives-from
+  - id: mcp-workflow-ux-hint-prompt-tool-descriptions-and-session-st-e89a18fc
+    type: related-to
 memoryVersion: 1
 ---
 ## Implementation principles for mnemonic MCP
