@@ -1,6 +1,7 @@
 import type { EmbeddingModelId } from "./brands.js";
 import { embeddingModelId } from "./brands.js";
 import { OllamaUrlError, OllamaEmbeddingError } from "./domain-errors.js";
+import { z } from "zod";
 
 function validateOllamaUrl(url: string): string {
   let parsed: URL;
@@ -41,8 +42,12 @@ export async function embed(text: string): Promise<number[]> {
     );
   }
 
-  const data = (await res.json()) as { embeddings?: number[][] };
-  const embedding = data.embeddings?.[0];
+  const OllamaEmbedResponseSchema = z.object({ embeddings: z.array(z.array(z.number())).optional() });
+  const parseResult = OllamaEmbedResponseSchema.safeParse(await res.json());
+  if (!parseResult.success) {
+    throw new OllamaEmbeddingError(`Ollama embedding response had unexpected shape: ${parseResult.error.message}`);
+  }
+  const embedding = parseResult.data.embeddings?.[0];
   if (!embedding) {
     throw new OllamaEmbeddingError(`Ollama embedding response did not include an embedding for model '${EMBED_MODEL}'`);
   }

@@ -1,0 +1,33 @@
+id: no-interpolated-logging-in-lib
+language: TypeScript
+severity: error
+message: "Use debugLog(scope, message) instead of console.error with template literals in library code"
+rule:
+  any:
+    - all:
+        - pattern: console.error($$$ARGS)
+        - has:
+            kind: template_substitution
+    - pattern: console.error($LEFT + $RIGHT)
+files:
+  - "src/**/*.ts"
+ignores:
+  - "src/cli/**"
+  - "src/startup.ts"
+  - "src/__tests__/**"
+note: |
+  Library code under src/ should use debugLog(scope, message) for structured,
+  gated logging. console.error with interpolated strings bypasses the
+  MNEMONIC_DEBUG gate and produces unstructured output.
+
+  debugLog already separates scope from message — that IS the structured
+  logging pattern for this codebase. Template interpolation in debugLog
+  messages is fine since the scope provides the key.
+
+  ```typescript
+  // ❌ Bad — unstructured, always-on output
+  console.error(`[embedding] Skipped for '${id}': ${err}`);
+
+  // ✅ Good — gated behind MNEMONIC_DEBUG, structured scope + message
+  debugLog("embedding", `Skipped for '${id}': ${getErrorMessage(err)}`);
+  ```
