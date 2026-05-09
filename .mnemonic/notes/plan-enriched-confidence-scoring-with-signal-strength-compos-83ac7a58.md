@@ -8,11 +8,14 @@ tags:
   - semvec
 lifecycle: temporary
 createdAt: '2026-05-09T15:34:27.654Z'
-updatedAt: '2026-05-09T15:34:27.654Z'
+updatedAt: '2026-05-09T15:34:41.324Z'
 role: plan
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: research-semvec-retention-formula-deep-dive-applicability-to-a5a31ecd
+    type: derives-from
 memoryVersion: 1
 ---
 ## Plan: Enriched Confidence Scoring with Signal-Strength Composite
