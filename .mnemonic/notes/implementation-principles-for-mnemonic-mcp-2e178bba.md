@@ -9,7 +9,7 @@ tags:
   - documentation
 lifecycle: permanent
 createdAt: '2026-05-09T12:54:02.094Z'
-updatedAt: '2026-05-09T12:54:19.746Z'
+updatedAt: '2026-05-09T12:54:26.793Z'
 role: summary
 alwaysLoad: true
 project: https-github-com-danielmarbach-mnemonic
@@ -22,6 +22,8 @@ relatedTo:
   - id: mcp-workflow-ux-hint-prompt-tool-descriptions-and-session-st-e89a18fc
     type: related-to
   - id: changelog-writing-principles-87cdbc5b
+    type: related-to
+  - id: documentation-split-for-readme-architecture-and-agent-4e20a50b
     type: related-to
 memoryVersion: 1
 ---

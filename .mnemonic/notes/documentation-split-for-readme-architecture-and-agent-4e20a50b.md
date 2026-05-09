@@ -7,13 +7,15 @@ tags:
   - decision
 lifecycle: permanent
 createdAt: '2026-03-08T09:22:05.553Z'
-updatedAt: '2026-03-14T13:09:33.040Z'
+updatedAt: '2026-05-09T12:54:26.793Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
   - id: agent-instruction-improvements-session-start-recall-first-an-ecd402c3
     type: related-to
   - id: changelog-writing-principles-87cdbc5b
+    type: related-to
+  - id: implementation-principles-for-mnemonic-mcp-2e178bba
     type: related-to
 memoryVersion: 1
 ---
