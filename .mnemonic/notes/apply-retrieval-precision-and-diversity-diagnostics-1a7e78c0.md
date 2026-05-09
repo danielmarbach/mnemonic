@@ -8,7 +8,7 @@ tags:
   - cag-bench
 lifecycle: temporary
 createdAt: '2026-05-09T11:55:21.079Z'
-updatedAt: '2026-05-09T12:39:44.868Z'
+updatedAt: '2026-05-09T12:47:24.610Z'
 role: context
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -47,7 +47,10 @@ Implemented Steps 1-4 from plan `plan-retrieval-precision-and-diversity-diagnost
 
 ### Design decisions
 
+- **Schema descriptions added (post-review)**: Zod output schema fields `recallScopeNoteCount`, `diversity`, and `retrievalCoverage` now carry `.describe()` strings that appear in the MCP JSON schema. Tool description `Returns` section updated with three new bullet points explaining `recallScopeNoteCount` (omit-aware, vault-size heuristic signal), `diversity` (theme/role/lifecycle mix for perspective breadth), and `retrievalCoverage` (anchor coverage fraction + missing list for follow-up recall). Per the structured-content principle, both prose and schema descriptions are needed — weaker models rely on schema descriptions, stronger models benefit from the tool description context.
+
 - **recallScopeNoteCount always populated for project contexts (post-review fix)**: The initial implementation gated `recallScopeNoteCount` computation inside the limit heuristic block (`limit >= ctx.defaultRecallLimit`), meaning agents passing explicit `limit: 1` got no scope note count to decide whether to tighten or loosen on subsequent calls. Fixed by moving the note count computation outside the limit expansion gate while keeping the expansion heuristic gated. Now `recallScopeNoteCount` is always available when project context exists, regardless of the caller's limit.
+
 - **Integration tests added (post-review)**: `recall-pipeline.integration.test.ts` now covers project-context diagnostics (recallScopeNoteCount, diversity themeCount/lifecycleMix, retrievalCoverage anchors and fraction) and explicit `limit:1` still populating recallScopeNoteCount.
 
 - **I/O constraint fix (post-review)**: Removed non-project `vault.storage.listNotes()` fallback in limit heuristic. The plan states: "For the non-project cold path, fall back to the configured default — don't add I/O just for this heuristic." The original implementation violated this by making direct I/O calls when no project context exists. Fixed by gating the entire heuristic block on `project` being defined, so no new I/O is introduced on the global-only path.
