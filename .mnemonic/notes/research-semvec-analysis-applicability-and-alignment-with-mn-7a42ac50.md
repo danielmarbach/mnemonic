@@ -8,11 +8,14 @@ tags:
   - semantic-state
 lifecycle: temporary
 createdAt: '2026-05-09T15:11:26.439Z'
-updatedAt: '2026-05-09T15:11:26.439Z'
+updatedAt: '2026-05-09T15:19:16.629Z'
 role: research
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: request-research-semvec-applicability-and-alignment-with-mne-e599b944
+    type: derives-from
 memoryVersion: 1
 ---
 ## Research: Semvec Analysis for mnemonic
