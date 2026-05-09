@@ -445,6 +445,19 @@ All new MCP tools MUST be documented in both AGENT.md and README.md:
 
 **Keep README.md, AGENT.md, and SYSTEM_PROMPT.md in sync** - they serve different audiences (README.md for users, AGENT.md for agents/developers, SYSTEM_PROMPT.md for LLM system prompts).
 
+## Error handling & ast-grep rules
+
+Use `attempt()` from `src/error-utils.ts` for all fail-soft operations. It auto-logs failures via `debugLog` and returns `Result<T, E>` or a fallback value. Never write raw try/catch for fail-soft paths — use `attempt("scope:label", fn)` instead.
+
+Run `npm run lint:ast` to check. Violations fail CI. Rules live in `rules/` — each rule's YAML has the fix examples built in.
+
+### File-level allowlists
+
+- `src/git.ts`, `src/cli/`, `src/index.ts`, `src/startup.ts`, `src/migration.ts`, `src/embeddings.ts`, `src/error-utils.ts` — excluded from `no-bare-try-catch`
+- `src/cli/` — excluded from `no-console-log`
+- `src/brands.ts` — excluded from `no-bare-new-error`
+- `src/__tests__/` — excluded from all rules
+
 ## Critical constraints
 
 - **One file per note** — git conflict isolation

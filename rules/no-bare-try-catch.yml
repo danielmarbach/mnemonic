@@ -1,0 +1,58 @@
+id: no-bare-try-catch
+language: TypeScript
+severity: error
+message: "Use attempt() from error-utils instead of bare try/catch for fail-soft operations"
+rule:
+  kind: try_statement
+  not:
+    any:
+      - inside:
+          pattern: attempt($$$ARGS)
+files:
+  - "src/**/*.ts"
+ignores:
+  - "src/git.ts"
+  - "src/cli/**"
+  - "src/index.ts"
+  - "src/startup.ts"
+  - "src/migration.ts"
+  - "src/embeddings.ts"
+  - "src/error-utils.ts"
+  - "src/__tests__/**"
+note: |
+  Fail-soft operations should use `attempt()` from `error-utils.ts` instead of
+  raw try/catch. The `attempt()` wrapper:
+  - Returns a `Result<T, E>` that forces explicit success/failure handling
+  - Auto-logs failures via `debugLog` so no error path is invisible
+  - Makes fail-soft intent scannable and consistent across the codebase
+
+  Use `attempt` with a fallback for simple default-on-error cases:
+
+  ```typescript
+  // ❌ Bad — raw try/catch, failure may be invisible
+  try {
+    const notes = await storage.listNotes();
+  } catch {
+    return [];
+  }
+
+  // ✅ Good — attempt with fallback, auto-logged on failure
+  const notes = await attempt("storage:list", () => storage.listNotes(), []);
+  ```
+
+  Use `attempt` without fallback when you need explicit error handling:
+
+  ```typescript
+  // ❌ Bad — failure logged only if you remember to
+  try {
+    const projection = await getOrBuildProjection(storage, note);
+    return projection.projectionText;
+  } catch {
+    return `${note.title}\n\n${note.content}`;
+  }
+
+  // ✅ Good — Result type forces handling both paths
+  const result = await attempt("projection:build", () => getOrBuildProjection(storage, note));
+  if (!result.ok) return `${note.title}\n\n${note.content}`;
+  return result.value.projectionText;
+  ```

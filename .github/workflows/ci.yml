@@ -28,6 +28,9 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      - name: AST lint
+        run: npm run lint:ast
+
       - name: Clean and build
         run: npm run build:clean
 

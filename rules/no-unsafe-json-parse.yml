@@ -1,0 +1,36 @@
+id: no-unsafe-json-parse
+language: TypeScript
+severity: error
+message: "Bare JSON.parse returns any — validate with Zod schema or wrap in attempt()"
+rule:
+  pattern: JSON.parse($$$ARGS)
+  not:
+    any:
+      - inside:
+          pattern: $SCHEMA.safeParse(JSON.parse($$$ARGS))
+      - inside:
+          pattern: $SCHEMA.parse(JSON.parse($$$ARGS))
+      - inside:
+          pattern: attempt($$$INNER)
+files:
+  - "src/**/*.ts"
+ignores:
+  - "src/__tests__/**"
+note: |
+  `JSON.parse` returns `any`, disabling type checking on everything downstream.
+  Always validate the result through a Zod schema or wrap in `attempt()`.
+
+  ```typescript
+  // ❌ Bad — result is any, no runtime validation
+  const data = JSON.parse(raw);
+
+  // ✅ Good — Zod schema validation
+  const parsed = MySchema.safeParse(JSON.parse(raw));
+  if (!parsed.success) return undefined;
+  const data = parsed.data;
+
+  // ✅ Good — wrapped in attempt for fail-soft
+  const result = await attempt("config:read", () => JSON.parse(raw));
+  if (!result.ok) return defaultConfig;
+  const data = result.value;
+  ```

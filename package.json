@@ -37,7 +37,8 @@
     "skills:update": "node scripts/install-skills.mjs --target all --mode copy --update",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "lint:ast": "ast-grep scan"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.10.1",
@@ -50,6 +51,7 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
+    "@ast-grep/cli": "^0.42.1",
     "@types/node": "^24.0.0",
     "typescript": "^6.0.0",
     "vitest": "^4.0.18"
