@@ -7,7 +7,7 @@ tags:
   - rationale
 lifecycle: permanent
 createdAt: '2026-03-07T17:59:12.124Z'
-updatedAt: '2026-05-09T20:53:37.132Z'
+updatedAt: '2026-05-09T21:06:02.096Z'
 role: summary
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
@@ -27,6 +27,8 @@ relatedTo:
   - id: performance-principles-for-file-first-mcp-and-git-backed-wor-4e7d3bc8
     type: related-to
   - id: implementation-principles-for-mnemonic-mcp-2e178bba
+    type: derives-from
+  - id: split-index-ts-into-modular-structure-implemented-e97a019f
     type: derives-from
 memoryVersion: 1
 ---
