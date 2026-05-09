@@ -6,6 +6,7 @@ import type { ServerContext } from "../server-context.js";
 import { embedModel } from "../embeddings.js";
 import { memoryId } from "../brands.js";
 import { storageLabel } from "./vault.js";
+import { UnknownRecoveryKindError, UnknownMutationPushModeError } from "../domain-errors.js";
 
 export function resolveDurability(commit: CommitResult, push: PushResult): PersistenceStatus["durability"] {
   if (push.status === "pushed") {
@@ -159,7 +160,7 @@ export function formatRetrySummary(retry?: MutationRetryContract): string | unde
       break;
     default: {
       const _exhaustive: never = retry.recovery.kind;
-      throw new Error(`Unknown recovery kind: ${_exhaustive}`);
+      throw new UnknownRecoveryKindError(_exhaustive);
     }
   }
 
@@ -215,7 +216,7 @@ export async function pushAfterMutation(ctx: ServerContext, vault: Vault): Promi
       return { status: "skipped" as const, reason: "auto-push-disabled" as const };
     default: {
       const _exhaustive: never = mutationPushMode;
-      throw new Error(`Unknown mutation push mode: ${_exhaustive}`);
+      throw new UnknownMutationPushModeError(_exhaustive);
     }
   }
 }

@@ -64,3 +64,21 @@ export async function attempt<T, E = Error>(
     return { ok: false, error: error as E };
   }
 }
+
+export function attemptSync<T, E = Error>(
+  scope: string,
+  fn: () => T,
+  fallback?: T,
+): Result<T, E> {
+  try {
+    const value = fn();
+    return { ok: true, value };
+  } catch (error) {
+    const message = getErrorMessage(error);
+    debugLog(scope, `fail-soft: ${message}`);
+    if (fallback !== undefined) {
+      return { ok: true, value: fallback };
+    }
+    return { ok: false, error: error as E };
+  }
+}

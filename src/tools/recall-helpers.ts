@@ -3,6 +3,7 @@ import type { Vault } from "../vault.js";
 import { getEffectiveMetadata } from "../role-suggestions.js";
 import { computeRecallMetadataBoost, type ScoredRecallCandidate, type TemporalQueryHint, shouldApplyTemporalFiltering, computeTemporalRecencyBoost, isWithinTemporalFilterWindow } from "../recall.js";
 import { getOrBuildProjection } from "../projections.js";
+import { attempt } from "../error-utils.js";
 import { getSessionCachedProjectionTokens, setSessionCachedProjectionTokens, getOrBuildVaultNoteList } from "../cache.js";
 import { tokenize, prepareTfIdfCorpusFromTokenizedDocuments, rankDocumentsByTfIdf, LEXICAL_RESCUE_CANDIDATE_LIMIT, LEXICAL_RESCUE_THRESHOLD, LEXICAL_RESCUE_RESULT_LIMIT } from "../lexical.js";
 import type { RecallDiversity, RecallRetrievalCoverage } from "../structured-content.js";
@@ -214,9 +215,9 @@ export async function identifyHighPriorityAnchors(
   const anchorLookup = new Map<string, string>();
 
   for (const vault of vaults) {
-    try {
+    const vaultResult = await attempt("recall:anchor-scan", async () => {
       const notes = await getOrBuildVaultNoteList(projectId, vault);
-      if (!notes) continue;
+      if (!notes) return undefined;
       const supersededTargets = new Set<string>();
       for (const note of notes) {
         if (note.project !== projectId) continue;
@@ -236,18 +237,18 @@ export async function identifyHighPriorityAnchors(
           anchorLookup.set(note.id, note.title);
         }
       }
-    } catch {
-      continue;
-    }
+      return undefined;
+    });
+    if (!vaultResult.ok) continue;
   }
 
   return { anchorIds, anchorLookup };
 }
 
-export function computeRecallDiversity(
+export async function computeRecallDiversity(
   results: Array<{ id: string; tags: string[]; lifecycle: NoteLifecycle; role?: string }>,
-): RecallDiversity | undefined {
-  try {
+): Promise<RecallDiversity | undefined> {
+  const result = await attempt("recall:diversity", () => {
     const allTags = new Set<string>();
     const roleCounts = new Map<string, number>();
     const lifecycleCounts = new Map<string, number>();
@@ -267,18 +268,18 @@ export function computeRecallDiversity(
       roleMix: Object.fromEntries(roleCounts) as Record<string, number>,
       lifecycleMix: Object.fromEntries(lifecycleCounts) as Record<string, number>,
     };
-  } catch {
-    return undefined;
-  }
+  });
+  if (!result.ok) return undefined;
+  return result.value;
 }
 
-export function computeRecallRetrievalCoverage(
+export async function computeRecallRetrievalCoverage(
   resultIds: string[],
   anchorIds: Set<string>,
   anchorLookup: Map<string, string>,
   maxMissing = 5,
-): RecallRetrievalCoverage | undefined {
-  try {
+): Promise<RecallRetrievalCoverage | undefined> {
+  const result = await attempt("recall:coverage", () => {
     const resultIdSet = new Set(resultIds);
     const anchorsInResults = [...anchorIds].filter((id) => resultIdSet.has(id)).length;
     const highPriorityAnchorsTotal = anchorIds.size;
@@ -295,7 +296,7 @@ export function computeRecallRetrievalCoverage(
       fraction,
       missingAnchors,
     };
-  } catch {
-    return undefined;
-  }
+  });
+  if (!result.ok) return undefined;
+  return result.value;
 }

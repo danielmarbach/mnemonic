@@ -1,6 +1,7 @@
 import type { Root, Content, Heading, Paragraph, Blockquote, List } from "mdast";
 import { parseBody, serializeBody } from "./markdown-ast.js";
 import { attemptCleanMarkdown } from "./markdown.js";
+import { SemanticPatchError } from "./domain-errors.js";
 
 export type SemanticSelector =
   | { heading: string }
@@ -118,7 +119,7 @@ export async function applySemanticPatches(body: string, patches: SemanticPatch[
       } else {
         diagnostic += "\nNo headings in document.";
       }
-      throw new Error(diagnostic);
+      throw new SemanticPatchError(diagnostic);
     }
 
     const { parent, index, target } = resolved;
@@ -128,7 +129,7 @@ export async function applySemanticPatches(body: string, patches: SemanticPatch[
       case "appendChild": {
         const targetChildren = getTargetChildren(target);
         if (!targetChildren) {
-          throw new Error(`Cannot appendChild to node of type '${target.type}'`);
+          throw new SemanticPatchError(`Cannot appendChild to node of type '${target.type}'`);
         }
         const newNodes = parseValueNodes(op.value);
         targetChildren.push(...newNodes);
@@ -137,7 +138,7 @@ export async function applySemanticPatches(body: string, patches: SemanticPatch[
       case "prependChild": {
         const targetChildren = getTargetChildren(target);
         if (!targetChildren) {
-          throw new Error(`Cannot prependChild to node of type '${target.type}'`);
+          throw new SemanticPatchError(`Cannot prependChild to node of type '${target.type}'`);
         }
         const newNodes = parseValueNodes(op.value);
         targetChildren.unshift(...newNodes);
@@ -151,7 +152,7 @@ export async function applySemanticPatches(body: string, patches: SemanticPatch[
       case "replaceChildren": {
         const targetChildren = getTargetChildren(target);
         if (!targetChildren) {
-          throw new Error(`Cannot replaceChildren of node of type '${target.type}'`);
+          throw new SemanticPatchError(`Cannot replaceChildren of node of type '${target.type}'`);
         }
         const newNodes = parseValueNodes(op.value);
         targetChildren.length = 0;
@@ -174,7 +175,7 @@ export async function applySemanticPatches(body: string, patches: SemanticPatch[
       }
       default: {
         const _exhaustive: never = op;
-        throw new Error(`Unknown operation: ${_exhaustive}`);
+        throw new SemanticPatchError(`Unknown operation: ${_exhaustive}`);
       }
     }
   }

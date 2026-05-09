@@ -1,4 +1,5 @@
 import { metadataPrefixes } from "./git-constants.js";
+import { UnknownChangeCategoryError } from "./domain-errors.js";
 
 export const CHANGE_CATEGORIES = ["create", "refine", "expand", "clarify", "connect", "restructure", "reverse", "unknown"] as const;
 export type ChangeCategory = typeof CHANGE_CATEGORIES[number];
@@ -154,7 +155,7 @@ function generateChangeDescription(
 
     default: {
       const _exhaustive: never = category;
-      throw new Error(`Unhandled change category: ${_exhaustive}`);
+      throw new UnknownChangeCategoryError(_exhaustive);
     }
   }
 }

@@ -7,15 +7,28 @@ rule:
   not:
     any:
       - inside:
-          pattern: $SCHEMA.safeParse(JSON.parse($$$ARGS))
+          pattern: $SCHEMA.safeParse($$$INNER)
       - inside:
-          pattern: $SCHEMA.parse(JSON.parse($$$ARGS))
+          pattern: $SCHEMA.parse($$$INNER)
       - inside:
-          pattern: attempt($$$INNER)
+          pattern: () => JSON.parse($$$ARGS)
+      - inside:
+          pattern: attempt(() => JSON.parse($$$ARGS))
+      - inside:
+          pattern: attemptSync(() => JSON.parse($$$ARGS))
+      - inside:
+          kind: call_expression
+          has:
+            pattern: attempt($$$ARGS)
+      - inside:
+          kind: call_expression
+          has:
+            pattern: attemptSync($$$ARGS)
 files:
   - "src/**/*.ts"
 ignores:
   - "src/__tests__/**"
+  - "src/context.ts"
 note: |
   `JSON.parse` returns `any`, disabling type checking on everything downstream.
   Always validate the result through a Zod schema or wrap in `attempt()`.

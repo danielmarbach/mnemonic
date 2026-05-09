@@ -9,11 +9,54 @@ rule:
       - has:
           pattern: debugLog($$$ARGS)
       - has:
+          has:
+            pattern: debugLog($$$ARGS)
+      - has:
+          has:
+            has:
+              pattern: debugLog($$$ARGS)
+      - has:
+          has:
+            has:
+              has:
+                pattern: debugLog($$$ARGS)
+      - has:
           pattern: console.error($$$ARGS)
+      - has:
+          has:
+            pattern: console.error($$$ARGS)
+      - has:
+          has:
+            has:
+              pattern: console.error($$$ARGS)
+      - has:
+          has:
+            has:
+              has:
+                pattern: console.error($$$ARGS)
       - has:
           pattern: console.warn($$$ARGS)
       - has:
+          has:
+            pattern: console.warn($$$ARGS)
+      - has:
+          has:
+            has:
+              pattern: console.warn($$$ARGS)
+      - has:
+          has:
+            has:
+              has:
+                pattern: console.warn($$$ARGS)
+      - has:
           pattern: throw $ERR
+      - has:
+          has:
+            pattern: throw $ERR
+      - has:
+          has:
+            has:
+              pattern: throw $ERR
       - inside:
           pattern: attempt($$$ARGS)
 files:

@@ -20,7 +20,7 @@ import {
 import { embedTextForNote } from "../helpers/embed.js";
 import { memoryId, isoDateString } from "../brands.js";
 import { cleanMarkdown, MarkdownLintError } from "../markdown.js";
-import { getErrorMessage } from "../error-utils.js";
+import { getErrorMessage, attempt, attemptSync } from "../error-utils.js";
 import { embed, embedModel } from "../embeddings.js";
 import { applySemanticPatches, type SemanticPatch } from "../semantic-patch.js";
 import { hasActualChanges, computeFieldsModified } from "../update-detect-changes.js";
@@ -39,6 +39,14 @@ import {
   NoteIdSchema,
   type PersistenceStatus,
 } from "../structured-content.js";
+
+function preprocessSemanticPatch(val: unknown): unknown {
+  if (typeof val === "string") {
+    const result = attemptSync("update:json-preprocess", () => JSON.parse(val));
+    return result.ok ? result.value : val;
+  }
+  return val;
+}
 
 export function registerUpdateTool(server: McpServer, ctx: ServerContext): void {
   server.registerTool(
@@ -70,12 +78,7 @@ export function registerUpdateTool(server: McpServer, ctx: ServerContext): void 
         id: NoteIdSchema.describe("Exact memory id. Use an id returned by `recall`, `list`, `recent_memories`, or `where_is`."),
         semanticPatch: z
           .preprocess(
-            (val) => {
-              if (typeof val === "string") {
-                try { return JSON.parse(val); } catch { return val; }
-              }
-              return val;
-            },
+            preprocessSemanticPatch,
             z.array(z.object({
             selector: z.object({
               heading: z.string().optional(),
@@ -189,11 +192,11 @@ export function registerUpdateTool(server: McpServer, ctx: ServerContext): void 
       let patchedContent: string | undefined;
       let lintWarnings: string[] | undefined;
       if (semanticPatch && semanticPatch.length > 0) {
-        try {
-          const result = await applySemanticPatches(note.content, semanticPatch as SemanticPatch[]);
-          patchedContent = result.content;
-          lintWarnings = result.lintWarnings;
-        } catch (err) {
+        const patchResult = await attempt("update:semantic-patch", () =>
+          applySemanticPatches(note.content, semanticPatch as SemanticPatch[]),
+        );
+        if (!patchResult.ok) {
+          const err = patchResult.error;
           if (err instanceof MarkdownLintError) {
             const message = `Semantic patch produced content with markdown lint issues. Fix the lint issues in your patch values and retry — do NOT fall back to full content rewrite.\n\n${err.message}`;
             return { content: [{ type: "text", text: message }], isError: true };
@@ -201,12 +204,14 @@ export function registerUpdateTool(server: McpServer, ctx: ServerContext): void 
           const message = getErrorMessage(err);
           return { content: [{ type: "text", text: `Semantic patch failed: ${message}` }], isError: true };
         }
+        patchedContent = patchResult.value.content;
+        lintWarnings = patchResult.value.lintWarnings;
       }
       let cleanedContent: string | undefined;
       if (content !== undefined) {
-        try {
-          cleanedContent = await cleanMarkdown(content);
-        } catch (err) {
+        const cleanResult = await attempt("update:clean-markdown", () => cleanMarkdown(content));
+        if (!cleanResult.ok) {
+          const err = cleanResult.error;
           if (err instanceof MarkdownLintError) {
             const message = `Markdown lint issues prevented the update. Fix the specific lint errors in your content and retry — do NOT fall back to semanticPatch for this.\n\n${err.message}`;
             return {
@@ -217,6 +222,7 @@ export function registerUpdateTool(server: McpServer, ctx: ServerContext): void 
           }
           throw err;
         }
+        cleanedContent = cleanResult.value;
       }
 
       const resolvedTitle = title ?? note.title;
@@ -346,14 +352,16 @@ export function registerUpdateTool(server: McpServer, ctx: ServerContext): void 
       let embeddingStatus: { status: "written" | "skipped"; reason?: string } = { status: "skipped", reason: shouldReembed ? undefined : "metadata-only" };
 
       if (shouldReembed) {
-        try {
+        const embedResult = await attempt("update:re-embed", async () => {
           const text = await embedTextForNote(vault.storage, updated);
           const vector = await embed(text);
           await vault.storage.writeEmbedding({ id: noteId, model: embedModel, embedding: vector, updatedAt: now });
+        });
+        if (embedResult.ok) {
           embeddingStatus = { status: "written" };
-        } catch (err) {
-          embeddingStatus = { status: "skipped", reason: getErrorMessage(err) };
-          console.error(`[embedding] Re-embed failed for '${id}': ${err}`);
+        } else {
+          embeddingStatus = { status: "skipped", reason: getErrorMessage(embedResult.error) };
+          console.error(`[embedding] Re-embed failed for '${id}': ${embedResult.error}`);
         }
       }
 

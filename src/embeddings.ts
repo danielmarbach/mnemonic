@@ -1,15 +1,16 @@
 import type { EmbeddingModelId } from "./brands.js";
 import { embeddingModelId } from "./brands.js";
+import { OllamaUrlError, OllamaEmbeddingError } from "./domain-errors.js";
 
 function validateOllamaUrl(url: string): string {
   let parsed: URL;
   try {
     parsed = new URL(url);
   } catch {
-    throw new Error(`OLLAMA_URL is not a valid URL: ${url}`);
+    throw new OllamaUrlError("OLLAMA_URL is not a valid URL", url);
   }
   if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-    throw new Error(`OLLAMA_URL must use http: or https: scheme, got ${parsed.protocol}`);
+    throw new OllamaUrlError("OLLAMA_URL must use http: or https: scheme", `got ${parsed.protocol}`);
   }
   const host = parsed.hostname;
   const isLocalhost = host === "localhost" || host === "127.0.0.1" || host === "::1";
@@ -18,9 +19,7 @@ function validateOllamaUrl(url: string): string {
     /^172\.(1[6-9]|2\d|3[01])\./.test(host) ||
     /^192\.168\./.test(host);
   if (!isLocalhost && !isPrivate) {
-    throw new Error(
-      `OLLAMA_URL must resolve to a localhost or private-network address, got ${host}`
-    );
+    throw new OllamaUrlError("OLLAMA_URL must resolve to a localhost or private-network address", `got ${host}`);
   }
   return url;
 }
@@ -36,7 +35,7 @@ export async function embed(text: string): Promise<number[]> {
   });
 
   if (!res.ok) {
-    throw new Error(
+    throw new OllamaEmbeddingError(
       `Ollama embedding failed: ${res.status} ${res.statusText}. ` +
       `Is Ollama running at ${OLLAMA_URL} with model '${EMBED_MODEL}' pulled?`
     );
@@ -45,7 +44,7 @@ export async function embed(text: string): Promise<number[]> {
   const data = (await res.json()) as { embeddings?: number[][] };
   const embedding = data.embeddings?.[0];
   if (!embedding) {
-    throw new Error(`Ollama embedding response did not include an embedding for model '${EMBED_MODEL}'`);
+    throw new OllamaEmbeddingError(`Ollama embedding response did not include an embedding for model '${EMBED_MODEL}'`);
   }
 
   return embedding;

@@ -2,7 +2,7 @@ import { performance } from "perf_hooks";
 import type { Note, EmbeddingRecord } from "./storage.js";
 import type { NoteProjection } from "./structured-content.js";
 import type { Vault } from "./vault.js";
-import { debugLog } from "./error-utils.js";
+import { attempt, debugLog } from "./error-utils.js";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -131,7 +131,7 @@ export async function getOrBuildVaultNoteList(
   }
 
   debugLog("cache:miss", `project=${projectId} vault=${vaultPath}`);
-  try {
+  const result = await attempt("cache:build", async () => {
     const t0 = performance.now();
     const [noteList, embeddings] = await Promise.all([
       vault.storage.listNotes(),
@@ -145,10 +145,11 @@ export async function getOrBuildVaultNoteList(
       `project=${projectId} vault=${vaultPath} notes=${noteList.length} embeddings=${embeddings.length} time=${ms}ms`
     );
     return noteList;
-  } catch (err) {
-    debugLog("cache:fallback", `project=${projectId} vault=${vaultPath} error=${String(err)}`);
+  });
+  if (!result.ok) {
     return undefined;
   }
+  return result.value;
 }
 
 /**
@@ -173,7 +174,7 @@ export async function getOrBuildVaultEmbeddings(
   }
 
   debugLog("cache:miss", `project=${projectId} vault=${vaultPath}`);
-  try {
+  const result = await attempt("cache:build", async () => {
     const t0 = performance.now();
     const [noteList, embeddings] = await Promise.all([
       vault.storage.listNotes(),
@@ -187,10 +188,11 @@ export async function getOrBuildVaultEmbeddings(
       `project=${projectId} vault=${vaultPath} notes=${noteList.length} embeddings=${embeddings.length} time=${ms}ms`
     );
     return embeddings;
-  } catch (err) {
-    debugLog("cache:fallback", `project=${projectId} vault=${vaultPath} error=${String(err)}`);
+  });
+  if (!result.ok) {
     return undefined;
   }
+  return result.value;
 }
 
 /**
