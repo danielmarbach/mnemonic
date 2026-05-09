@@ -9,9 +9,12 @@ tags:
   - release
 lifecycle: permanent
 createdAt: '2026-03-14T23:34:02.745Z'
-updatedAt: '2026-03-14T23:34:02.745Z'
+updatedAt: '2026-05-09T21:10:52.765Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: mnemonic-key-design-decisions-3f2a6273
+    type: related-to
 memoryVersion: 1
 ---
 Merge the protected-branch policy design note and the rollout execution note into one authoritative memory covering both the decision and the shipped behavior.
