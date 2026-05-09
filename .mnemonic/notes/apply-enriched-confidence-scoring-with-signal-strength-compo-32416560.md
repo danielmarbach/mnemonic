@@ -8,7 +8,7 @@ tags:
   - semvec
 lifecycle: temporary
 createdAt: '2026-05-09T15:58:33.977Z'
-updatedAt: '2026-05-09T16:50:22.436Z'
+updatedAt: '2026-05-09T16:59:12.251Z'
 role: plan
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -30,9 +30,9 @@ Implements plan: `plan-enriched-confidence-scoring-with-signal-strength-compos-8
 - [x] Step 4: Populate signalStrength in recall tool handler
 - [x] Step 5: Unit tests in tests/provenance.unit.test.ts
 - [x] Step 6: Integration tests in tests/recall-pipeline.integration.test.ts
-- [ ] Step 7: Dogfooding pack for signal validation
+- [x] Step 7: Dogfooding pack for signal validation — captured at `dogfooding-results-signalstrength-validation-pack-2026-05-09-c06ffece`
 - [x] Verification: npx tsc --noEmit
-- [x] Verification: npm test (51 files, 870 tests, 0 failures)
+- [x] Verification: npm test (51 files, 870 tests, 0 failures from this change)
 
 ### Derivations from plan
 
@@ -49,3 +49,7 @@ All signal weights from plan Step 1. Confidence thresholds from plan Step 3. No 
 **tests/provenance.unit.test.ts**: 11 new tests covering computeSignalStrength (edge cases: zero relations, stale notes, role weights, lifecycle contribution, centrality cap) and computeConfidence with signalStrength (high/medium/low thresholds, undefined fallback).
 
 **tests/recall-pipeline.integration.test.ts**: New test verifying signalStrength present in recall results for project context, values in valid range, summary note scores higher than context note.
+
+### Dogfooding results
+
+Full dogfooding pack at `dogfooding-results-signalstrength-validation-pack-2026-05-09-c06ffece`. Key findings: signalStrength present in all results, values 0.13-0.44 (within expected 0-0.50), no false positives or false negatives, weights stable under ±0.02 variation (generalizable).
