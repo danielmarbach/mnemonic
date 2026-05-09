@@ -46,8 +46,6 @@ relatedTo:
     type: related-to
   - id: protected-branch-policy-consistency-rollout-consolidated-d9892181
     type: related-to
-  - id: mnemonic-relate-retry-does-not-reconcile-partial-git-persist-fd9d13c9
-    type: related-to
 memoryVersion: 1
 ---
 **One file per note:** Critical for git conflict isolation. Never aggregate notes into a single file.
