@@ -8,7 +8,7 @@ tags:
   - cag-bench
 lifecycle: temporary
 createdAt: '2026-05-09T11:55:51.123Z'
-updatedAt: '2026-05-09T11:57:42.942Z'
+updatedAt: '2026-05-09T12:10:31.866Z'
 role: review
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -16,16 +16,18 @@ projectName: mnemonic
 relatedTo:
   - id: apply-retrieval-precision-and-diversity-diagnostics-1a7e78c0
     type: derives-from
+  - id: temporal-interpretation-strategy-f8573d1d
+    type: related-to
 memoryVersion: 1
 ---
 ## Review: Retrieval Precision and Diversity Diagnostics
 
 ### Plan deliverables check
 
-- [x] Step 1: `recallScopeNoteCount` in RecallResult schema — shipped, optional number on both interface and Zod
-- [x] Step 2: Vault-size-aware default limit — gated on `limit >= ctx.defaultRecallLimit`, single threshold (<=25 dump all), session-cache derived
-- [x] Step 3: Diversity metrics — themeCount (unique tags), roleMix, lifecycleMix with proper types
-- [x] Step 4: retrievalCoverage — anchorsInResults, fraction, missingAnchors with titles, superseded exclusion, project-scoped only
+- \[x] Step 1: `recallScopeNoteCount` in RecallResult schema — shipped, optional number on both interface and Zod
+- \[x] Step 2: Vault-size-aware default limit — gated on `limit >= ctx.defaultRecallLimit`, single threshold (<=25 dump all), session-cache derived
+- \[x] Step 3: Diversity metrics — themeCount (unique tags), roleMix, lifecycleMix with proper types
+- \[x] Step 4: retrievalCoverage — anchorsInResults, fraction, missingAnchors with titles, superseded exclusion, project-scoped only
 
 ### Type safety verification
 
@@ -56,13 +58,25 @@ memoryVersion: 1
 ### Test verification
 
 - Command: `npx tsc --noEmit`
+
 - Result: pass
+
 - Details: zero errors
 
 - Command: `npm test`
+
 - Result: pass
+
 - Details: 50 files, 845 tests, all passing
 
 ### Recommendation
 
-Continue. All plan deliverables shipped, all constraints preserved, all tests passing. Ready for you to decide on commit.
+Continue. All plan deliverables shipped, all constraints preserved, all tests passing. Ready for you to decide on commit.### Dogfood verification* Command: `MNEMONIC_ENTRYPOINT=./build/index.js node scripts/run-dogfood-packs.mjs`
+
+- Result: pass (2 pre-existing advisories listed below, no regressions from changes)
+- Pack A advisory: "recall answers canonical design questions" — embedding note outranks key design decisions for B1 query (pre-existing ranking gap)
+- Pack A advisory: "recent-to-architecture navigation works" — graph connectivity gap, reachable=false in 3 steps (pre-existing graph issue)
+- Pack A B4 (cold hybrid): hybrid recall design note at top — PASS (no regression confirmed against fresh build)
+- Pack A B3 (verbose temporal): key design decisions at top — PASS
+- Pack A B2 (temporal): Temporal Interpretation Strategy at top, filter not over-excluding — PASS
+- Pack B (working-state): all checks PASS, no advisories, temporary notes surfaced correctly### RecommendationContinue. All plan deliverables shipped, all constraints preserved, all tests passing, dogfood confirms no regression. The two Pack A advisories are pre-existing and unrelated to the recall diagnostics additions.
