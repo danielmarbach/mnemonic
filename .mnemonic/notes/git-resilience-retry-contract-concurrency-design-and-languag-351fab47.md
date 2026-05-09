@@ -11,7 +11,7 @@ tags:
   - decision
 lifecycle: permanent
 createdAt: '2026-03-24T10:53:27.605Z'
-updatedAt: '2026-04-05T12:54:17.658Z'
+updatedAt: '2026-05-09T21:10:39.021Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
@@ -23,6 +23,8 @@ relatedTo:
     type: explains
   - id: git-mutation-coordination-per-repo-mutex-plus-retry-fallback-56264a36
     type: explains
+  - id: sync-tool-per-phase-git-error-surfacing-with-conflict-detect-ce15062e
+    type: derives-from
 memoryVersion: 1
 ---
 ## Why retry is necessary
