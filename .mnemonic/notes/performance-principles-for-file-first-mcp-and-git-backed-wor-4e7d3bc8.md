@@ -9,7 +9,7 @@ tags:
   - completed
 lifecycle: permanent
 createdAt: '2026-03-14T22:14:46.759Z'
-updatedAt: '2026-05-09T21:09:01.893Z'
+updatedAt: '2026-05-09T21:10:39.020Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
@@ -23,6 +23,10 @@ relatedTo:
     type: related-to
   - id: hindsight-phases-1-5-review-findings-addressed-consolidated-2f24cf85
     type: derives-from
+  - id: decision-phase-2-recall-scoring-uses-rrf-with-dense-rank-tie-7969c37d
+    type: derives-from
+  - id: sync-redesign-decouple-embedding-from-git-force-flag-remove--6f2c1517
+    type: related-to
 memoryVersion: 1
 ---
 ## Durable Performance Principles
