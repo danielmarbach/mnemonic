@@ -7,11 +7,14 @@ tags:
   - semvec
 lifecycle: temporary
 createdAt: '2026-05-09T16:50:05.657Z'
-updatedAt: '2026-05-09T16:50:05.657Z'
+updatedAt: '2026-05-09T16:50:22.436Z'
 role: review
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: apply-enriched-confidence-scoring-with-signal-strength-compo-32416560
+    type: derives-from
 memoryVersion: 1
 ---
 ## Review: signal-strength confidence scoring
