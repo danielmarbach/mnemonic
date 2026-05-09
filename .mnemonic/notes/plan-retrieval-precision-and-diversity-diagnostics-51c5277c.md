@@ -8,7 +8,7 @@ tags:
   - cag-bench
 lifecycle: temporary
 createdAt: '2026-05-09T07:50:29.361Z'
-updatedAt: '2026-05-09T07:58:56.101Z'
+updatedAt: '2026-05-09T08:02:54.986Z'
 role: plan
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -27,6 +27,15 @@ Deliver immediate actions 1-4 from CAG-Bench research. No new persistence, no ne
 Add `recallScopeNoteCount?: number` to `RecallResult` interface in `src/structured-content.ts`. Total count of notes across all visible vaults for the recall scope. Already tracked during the recall pipeline — just expose it. Named to reflect multi-vault visibility, not single-vault assumption. Optional for backward compatibility.
 
 ### Step 2: Vault-size-aware default limit
+
+In `src/tools/recall.ts` handler, before scoring, derive note count from the session cache (`noteList.length` on cached vault). The cache is already populated by `getOrBuildVaultEmbeddings` earlier in the pipeline for the project case. For the non-project (global) cold path, fall back to the configured default — don't add I/O just for this heuristic.
+
+Single threshold, single source of evidence: the paper's cap=25 baseline works at 30 rows (the only store size it studied). No speculative tiers.
+
+- noteCount <= 25: effective limit = Math.min(noteCount, 20) — dump everything, paper-justified
+- noteCount > 25: effective limit = configured default (5) — agent uses `recallScopeNoteCount` from output to decide whether to tighten or loosen on subsequent calls
+
+Reuses already-in-memory data. No new I/O or git calls. Fail-soft to configured default when cache is unavailable.
 
 In `src/tools/recall.ts` handler, before scoring, derive note count from the session cache (`noteList.length` on cached vault). The cache is already populated by `getOrBuildVaultEmbeddings` earlier in the pipeline for the project case. For the non-project (global) cold path, fall back to the configured default — don't add I/O just for this heuristic.
 
