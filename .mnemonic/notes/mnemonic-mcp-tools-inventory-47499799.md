@@ -6,13 +6,15 @@ tags:
   - api
 lifecycle: permanent
 createdAt: '2026-03-07T17:59:25.498Z'
-updatedAt: '2026-04-26T19:41:01.445Z'
+updatedAt: '2026-05-09T21:16:14.019Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
   - id: mnemonic-relationship-graph-implementation-386be386
     type: related-to
   - id: remember-tool-checkedforexisting-is-schema-only-agent-hint-w-a2c94093
+    type: related-to
+  - id: tag-discovery-design-note-oriented-pivot-and-cognitive-model-31e928dc
     type: related-to
 memoryVersion: 1
 ---
