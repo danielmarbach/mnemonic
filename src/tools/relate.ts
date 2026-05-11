@@ -29,16 +29,14 @@ export function registerRelateTool(server: McpServer, ctx: ServerContext): void 
       title: "Relate Memories",
       description:
         "Use after you have identified the exact memories to connect.\n\n" +
-        "Create a typed bidirectional relationship between two memories.\n\n" +
         "Use this when:\n" +
         "- A newly stored or updated note meaningfully connects to another note\n" +
         "- One note explains, exemplifies, supersedes, or closely relates to another\n\n" +
         "Do not use this when:\n" +
         "- The connection is weak or speculative\n" +
         "- You need to remove a relationship rather than add one\n\n" +
-        "Returns:\n" +
-        "- Both memory ids and the created relationship type\n\n" +
-        "Side effects: modifies both notes, git commits per affected vault, and may push.\n\n" +
+        "Returns: both ids, relationship type.\n\n" +
+        "[mutating: modifies both notes, git commits, may push]\n\n" +
         "Typical next step:\n" +
         "- Use `get` on both notes to verify the relationship context reads well.",
       annotations: {

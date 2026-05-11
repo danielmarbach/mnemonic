@@ -29,16 +29,14 @@ export function registerConsolidateTool(server: McpServer, ctx: ServerContext): 
       title: "Consolidate Memories",
       description:
         "Use after `recall`, `list`, or `memory_graph` shows overlap that should be merged or cleaned up.\n\n" +
-        "Merge overlapping memories into a cleaner canonical note and retire the sources.\n\n" +
         "Use this when:\n" +
         "- Multiple notes cover the same decision, fix, or concept\n" +
         "- One memory supersedes several older fragments\n\n" +
         "Do not use this when:\n" +
         "- You only need a small edit to one note; use `update`\n" +
         "- You only want to connect notes; use `relate`\n\n" +
-        "Returns:\n" +
-        "- The canonical memory, source ids, resulting relationships, and persistence status\n\n" +
-        "Side effects: creates or updates the canonical note, modifies or removes source notes according to mode, git commits, and may push.\n\n" +
+        "Returns: canonical memory id, source ids, relationships, persistence status.\n\n" +
+        "[mutating: creates/updates canonical note, modifies/removes sources per mode, git commits, may push]\n\n" +
         "Typical next step:\n" +
         "- Use `get` to inspect the canonical note and `recall` to confirm duplication is reduced.\n" +
         "- Evidence defaults on for consolidate analysis strategies and execute-merge (lifecycle, risk, warnings).",

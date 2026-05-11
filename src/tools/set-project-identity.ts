@@ -13,15 +13,13 @@ export function registerSetProjectIdentityTool(server: McpServer, ctx: ServerCon
     {
       title: "Set Project Identity",
       description:
-        "Override which git remote defines project identity for a repo.\n\n" +
         "Use this when:\n" +
         "- A fork should associate memory with the upstream project rather than the fork remote\n" +
         "- Project detection is resolving to the wrong canonical repo\n\n" +
         "Do not use this when:\n" +
         "- The default remote already identifies the correct project\n\n" +
-        "Returns:\n" +
-        "- The new effective project identity after applying the override\n\n" +
-        "Side effects: writes config, git commits, and may push.\n\n" +
+        "Returns: the new effective project identity after applying the override.\n\n" +
+        "[mutating: writes config, git commits, may push]\n\n" +
         "Typical next step:\n" +
         "- Re-run `detect_project` or `get_project_identity` to verify the result.",
       annotations: {
@@ -31,7 +29,7 @@ export function registerSetProjectIdentityTool(server: McpServer, ctx: ServerCon
         openWorldHint: false,
       },
       inputSchema: z.object({
-        cwd: z.string().describe("Absolute project working directory. Pass this whenever the task is project-related so routing, search boosting, policy, and vault selection work correctly."),
+        cwd: z.string().describe("Absolute path of the project working directory. Required for project-scoped routing, vault selection, and search boosting."),
         remoteName: RemoteNameSchema.describe("Git remote name to use as the canonical project identity, such as `upstream`")
       }),
       outputSchema: ProjectIdentityResultSchema,

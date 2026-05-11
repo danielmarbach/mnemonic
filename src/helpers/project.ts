@@ -12,7 +12,7 @@ export const projectParam = z
   .string()
   .optional()
   .describe(
-    "Absolute project working directory. Pass this whenever the task is project-related so routing, search boosting, policy, and vault selection work correctly."
+    "Absolute path of the project working directory. Required for project-scoped routing, vault selection, and search boosting."
   );
 
 export async function resolveProject(ctx: ServerContext, cwd?: string) {

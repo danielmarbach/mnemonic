@@ -44,9 +44,8 @@ export function registerForgetTool(server: McpServer, ctx: ServerContext): void 
         "Do not use this when:\n" +
         "- The note should stay but move to another vault; use `move_memory`\n" +
         "- The note should be replaced or merged; use `consolidate`\n\n" +
-        "Returns:\n" +
-        "- Deleted memory id/title and relationship cleanup details\n\n" +
-        "Side effects: deletes note files, cleans relationship references, git commits, and may push.\n\n" +
+        "Returns: deleted id/title, relationship cleanup details.\n\n" +
+        "[mutating: deletes note, cleans relationships, git commits, may push]\n\n" +
         "Typical next step:\n" +
         "- Use `recall` or `list` to confirm the remaining memory set is clean.",
       annotations: {

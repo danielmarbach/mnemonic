@@ -12,15 +12,12 @@ export function registerListMigrationsTool(server: McpServer, ctx: ServerContext
     {
       title: "List Migrations",
       description:
-        "List available schema migrations and show which ones are pending for each vault.\n\n" +
         "Use this when:\n" +
         "- Checking whether a mnemonic upgrade requires vault changes\n" +
         "- Preparing to run `execute_migration`\n\n" +
         "Do not use this when:\n" +
         "- You already know the exact migration to run and only need to execute it\n\n" +
-        "Returns:\n" +
-        "- Available migrations, vault schema versions, and pending counts\n\n" +
-        "Read-only.\n\n" +
+        "Returns: available migrations, vault schema versions, pending counts.\n\n" +
         "Typical next step:\n" +
         "- Run `execute_migration` with `dryRun: true` first.",
       annotations: {
@@ -83,15 +80,13 @@ export function registerExecuteMigrationTool(server: McpServer, ctx: ServerConte
     {
       title: "Execute Migration",
       description:
-        "Execute a named schema migration on vault notes.\n\n" +
         "Use this when:\n" +
         "- `list_migrations` shows pending migrations that should be applied\n\n" +
         "Do not use this when:\n" +
         "- You have not checked pending migrations yet\n" +
         "- You have not previewed the migration with `dryRun: true`\n\n" +
-        "Returns:\n" +
-        "- Per-vault migration results, counts, warnings, and errors\n\n" +
-        "Side effects: modifies note files, git commits per affected vault, and may push.\n\n" +
+        "Returns: per-vault migration results, counts, warnings, errors.\n\n" +
+        "[mutating: modifies note files, git commits, may push]\n\n" +
         "Typical next step:\n" +
         "- Re-run `list_migrations` to confirm nothing is pending.",
       annotations: {

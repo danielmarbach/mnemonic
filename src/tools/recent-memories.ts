@@ -20,16 +20,13 @@ export function registerRecentMemoriesTool(server: McpServer, ctx: ServerContext
     {
       title: "Recent Memories",
       description:
-        "Show the most recently updated memories.\n\n" +
         "Use this when:\n" +
         "- You want to see what changed most recently\n" +
         "- You are resuming work and want a quick chronological view\n\n" +
         "Do not use this when:\n" +
         "- You need topic-based search; use `recall`\n" +
         "- You need a tag/scope inventory; use `list`\n\n" +
-        "Returns:\n" +
-        "- Recently updated memories with ids, timestamps, storage labels, and basic metadata\n\n" +
-        "Read-only.\n\n" +
+        "Returns: recently updated memories with ids, timestamps, storage labels, metadata.\n\n" +
         "Typical next step:\n" +
         "- Use `get` for exact inspection or `update` to continue refining a recent note.",
       annotations: {

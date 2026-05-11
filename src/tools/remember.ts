@@ -44,17 +44,15 @@ export function registerRememberTool(server: McpServer, ctx: ServerContext): voi
       title: "Remember",
       description:
         "REQUIRES: Call `recall` or `list` first to check whether this memory already exists.\n\n" +
-        "Create a new memory as a markdown note with embeddings for future recall.\n\n" +
         "Use this when:\n" +
-        "- A decision, preference, bug fix, or durable context should survive beyond this session\n" +
+        "- Creating a decision, preference, bug fix, or durable context as a new note with embeddings\n" +
         "- No existing note already covers the topic\n\n" +
         "Do not use this when:\n" +
         "- A memory may already exist; use `recall` first to check\n" +
         "- You need to change an existing memory; use `update`\n" +
         "- Several overlapping notes should be merged; use `consolidate`\n\n" +
-        "Returns:\n" +
-        "- The created memory id, scope, vault label, lifecycle, and persistence status\n\n" +
-        "Side effects: writes a note, writes embeddings, git commits, and may push.\n\n" +
+        "Returns: created id, scope, vault label, lifecycle, persistence status.\n\n" +
+        "[mutating: writes note, embeddings, git commits, may push]\n\n" +
         "Typical next step:\n" +
         "- Use `relate` if this new memory connects to something recalled earlier.",
       annotations: {

@@ -11,16 +11,13 @@ export function registerWhereIsMemoryTool(server: McpServer, ctx: ServerContext)
     {
       title: "Where Is Memory",
       description:
-        "Locate which storage label and project association a memory currently has.\n\n" +
         "Use this when:\n" +
         "- You know the id and want to see where the memory lives\n" +
         "- You are deciding whether a note should be moved between project storage locations\n\n" +
         "Do not use this when:\n" +
         "- You need the full note content; use `get`\n" +
         "- You want to search for a note by topic; use `recall`\n\n" +
-        "Returns:\n" +
-        "- Title, project association, storage label, updated time, and relationship count\n\n" +
-        "Read-only.\n\n" +
+        "Returns: title, project association, storage label, updated time, relationship count.\n\n" +
         "Typical next step:\n" +
         "- Use `move_memory` if the storage location is wrong, or `get` for full inspection.",
       annotations: {

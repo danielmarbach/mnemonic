@@ -12,7 +12,6 @@ export function registerListTool(server: McpServer, ctx: ServerContext): void {
     {
       title: "List Memories",
       description:
-        "List stored memories with filtering by scope, storage label, and tags.\n\n" +
         "Use this when:\n" +
         "- You want to browse what exists for a project or globally\n" +
         "- You want a deterministic filtered list rather than a semantic search\n" +
@@ -20,9 +19,7 @@ export function registerListTool(server: McpServer, ctx: ServerContext): void {
         "Do not use this when:\n" +
         "- You want topic-based semantic search; use `recall`\n" +
         "- You already know the exact id; use `get`\n\n" +
-        "Returns:\n" +
-        "- Matching memories with ids, titles, scope/storage context, and metadata\n\n" +
-        "Read-only.\n\n" +
+        "Returns: matching memories with ids, titles, scope/storage context, metadata.\n\n" +
         "Typical next step:\n" +
         "- Use `get` for exact inspection or `update` / `consolidate` for cleanup.",
       annotations: {

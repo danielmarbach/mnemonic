@@ -52,15 +52,13 @@ export function registerSyncTool(server: McpServer, ctx: ServerContext): void {
     {
       title: "Sync",
       description:
-        "Sync mnemonic vaults with their git remotes and repair local embedding coverage as needed.\n\n" +
         "Use this when:\n" +
         "- You want the local vault state aligned with remote changes\n" +
         "- You suspect another machine or collaborator updated the vaults\n\n" +
         "Do not use this when:\n" +
         "- You only need to inspect or edit a single memory\n\n" +
-        "Returns:\n" +
-        "- Per-vault pull/push results, deletions, additions, and embedding rebuild info\n\n" +
-        "Side effects: performs git sync and may rebuild local embeddings.\n\n" +
+        "Returns: per-vault pull/push results, deletions, additions, embedding rebuild info.\n\n" +
+        "[mutating: git sync, may rebuild embeddings]\n\n" +
         "Typical next step:\n" +
         "- Use `recent_memories`, `list`, or `recall` to inspect newly synced changes.",
       annotations: {
