@@ -4,6 +4,12 @@ All notable changes to `mnemonic` will be documented in this file.
 
 The format is loosely based on Keep a Changelog and uses semver-style version headings.
 
+## [0.30.2] - 2026-05-11
+
+### Changed
+
+- Reduced MCP tool description context footprint by ~870 tokens (~22%) by replacing verbose Returns/Side effects prose with terse field lists and `[mutating: ...]` tags. All routing guards, prerequisite guards, diagnostic field names, and Typical next step guidance are preserved.
+
 ## [0.30.1] - 2026-05-11
 
 ### Fixed
