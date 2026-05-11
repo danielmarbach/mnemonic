@@ -12,15 +12,12 @@ export function registerGetProjectIdentityTool(server: McpServer, ctx: ServerCon
     {
       title: "Get Project Identity",
       description:
-        "Show the effective project identity for a working directory, including any configured remote override.\n\n" +
         "Use this when:\n" +
         "- You need to verify whether project identity comes from `origin`, `upstream`, or an override\n" +
         "- You are debugging project scoping issues\n\n" +
         "Do not use this when:\n" +
         "- You only need the project id/name to continue; use `detect_project` instead\n\n" +
-        "Returns:\n" +
-        "- Effective project identity, default identity, and any configured override\n\n" +
-        "Read-only.\n\n" +
+        "Returns: effective project identity, default identity, any configured override.\n\n" +
         "Typical next step:\n" +
         "- Use `set_project_identity` only if the wrong remote is defining identity.",
       annotations: {
@@ -30,7 +27,7 @@ export function registerGetProjectIdentityTool(server: McpServer, ctx: ServerCon
         openWorldHint: false,
       },
       inputSchema: z.object({
-        cwd: z.string().describe("Absolute project working directory. Pass this whenever the task is project-related so routing, search boosting, policy, and vault selection work correctly."),
+        cwd: z.string().describe("Absolute path of the project working directory. Required for project-scoped routing, vault selection, and search boosting."),
       }),
       outputSchema: ProjectIdentityResultSchema,
     },

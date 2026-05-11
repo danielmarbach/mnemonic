@@ -543,7 +543,7 @@ Imported notes are written to the main vault with `lifecycle: permanent` and `sc
 | `set_project_memory_policy` | Save project policy defaults (scope, consolidation mode, protected-branch behavior/patterns) |
 | `sync`                      | Git sync when remote exists plus embedding backfill always; `force=true` rebuilds all embeddings |
 | `unrelate`                  | Remove relationship between notes                                        |
-| `update`                    | Update note content/title/tags/lifecycle, re-embeds always               |
+| `update`                    | Update note content/title/tags/lifecycle; re-embeds when content changes |
 | `where_is_memory`           | Show note's project association and storage location                     |
 
 ### Theme emergence

@@ -75,27 +75,16 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
     {
       title: "Recall",
       description:
-        "Semantic search over stored memories using embeddings.\n\n" +
-        "Supports opt-in temporal mode (`mode: \"temporal\"`) to enrich top semantic matches with compact git-backed history.\n\n" +
-        "Supports workflow mode (`mode: \"workflow\"`) to prioritize RPIR-style chain reconstruction while retaining compatibility with legacy relationships.\n\n" +
+        "Supports opt-in temporal mode (`mode: \"temporal\"`) for git-backed history and workflow mode (`mode: \"workflow\"`) for RPIR chain reconstruction.\n\n" +
         "Use this when:\n" +
         "- You know the topic but not the exact memory id\n" +
-        "- You are starting a session and want relevant prior context\n" +
-        "- You want to check whether a memory already exists before creating another one\n" +
-        "- You explicitly want to inspect how a note evolved over time\n\n" +
+        "- Starting a session and want relevant prior context\n" +
+        "- Checking whether a memory already exists before creating another\n" +
+        "- You want to inspect how a note evolved over time\n\n" +
         "Do not use this when:\n" +
         "- You already know the exact id; use `get`\n" +
         "- You just want to browse by tags or scope; use `list`\n\n" +
-        "Returns:\n" +
-        "- Ranked memory matches with scores, vault label, tags, lifecycle, and updated time\n" +
-        "- Bounded 1-hop relationship previews automatically attached to top results\n" +
-        "- In temporal mode, optional compact history entries for top matches\n" +
-        "- Optional retrieval evidence via `evidence: \"compact\"` for why a result ranked\n" +
-        "- `recallScopeNoteCount`: total notes visible in the recall scope (omit-aware: if vault is small, consider increasing limit)\n" +
-        "- `diversity`: theme count (unique tags), role mix, and lifecycle mix of selected results — use to gauge whether results span enough perspectives\n" +
-        "- `retrievalCoverage`: fraction of high-priority anchors (alwaysLoad or summary notes) present in results, with capped missing list — use to decide if another recall with broader terms is needed\n" +
-        "- `signalStrength`: per-result composite quality signal (0-0.50) from role, centrality, lifecycle, and recency — higher values mean more structural support; use alongside confidence to assess note reliability\n\n" +
-        "Read-only.\n\n" +
+        "Returns: ranked matches (id, title, score, vault, tags, lifecycle, updatedAt), 1-hop relationship previews on top results, temporal history (mode: temporal), retrieval evidence (evidence: compact), diagnostics: recallScopeNoteCount, diversity, retrievalCoverage, signalStrength.\n\n" +
         "Typical next step:\n" +
         "- Use `get`, `update`, `relate`, or `consolidate` based on the results.",
       annotations: {

@@ -14,15 +14,13 @@ export function registerSetProjectMemoryPolicyTool(server: McpServer, ctx: Serve
     {
       title: "Set Project Memory Policy",
       description:
-        "Set the default write scope and memory behavior for a project.\n\n" +
         "Use this when:\n" +
         "- A project should default to project or global storage\n" +
         "- Protected-branch handling or consolidation behavior should be standardized\n\n" +
         "Do not use this when:\n" +
         "- You only need a one-off write location for a single `remember` call\n\n" +
-        "Returns:\n" +
-        "- The saved project policy and effective values\n\n" +
-        "Side effects: writes config, git commits, and may push.\n\n" +
+        "Returns: saved project policy and effective values.\n\n" +
+        "[mutating: writes config, git commits, may push]\n\n" +
         "Typical next step:\n" +
         "- Use `get_project_memory_policy` to verify the saved policy.",
       annotations: {
@@ -32,7 +30,7 @@ export function registerSetProjectMemoryPolicyTool(server: McpServer, ctx: Serve
         openWorldHint: false,
       },
       inputSchema: z.object({
-        cwd: z.string().describe("Absolute project working directory. Pass this whenever the task is project-related so routing, search boosting, policy, and vault selection work correctly."),
+        cwd: z.string().describe("Absolute path of the project working directory. Required for project-scoped routing, vault selection, and search boosting."),
         defaultScope: z.enum(PROJECT_POLICY_SCOPES).optional().describe(
           "Default storage: 'project' = shared project vault, 'global' = private main vault, 'ask' = prompt each time"
         ),
@@ -157,16 +155,13 @@ export function registerGetProjectMemoryPolicyTool(server: McpServer, ctx: Serve
     {
       title: "Get Project Memory Policy",
       description:
-        "Show the saved memory policy for a project.\n\n" +
         "Use this when:\n" +
         "- You want to confirm the default write scope before storing memory\n" +
         "- You are debugging why notes land in an unexpected vault\n" +
         "- You need to inspect protected-branch or consolidation defaults\n\n" +
         "Do not use this when:\n" +
         "- You want to change the policy; use `set_project_memory_policy`\n\n" +
-        "Returns:\n" +
-        "- Saved policy values or an explanation of the fallback behavior\n\n" +
-        "Read-only.\n\n" +
+        "Returns: saved policy values or an explanation of the fallback behavior.\n\n" +
         "Typical next step:\n" +
         "- Call `remember` with explicit `scope` for a one-off override, or `set_project_memory_policy` to change defaults.",
       annotations: {
@@ -176,7 +171,7 @@ export function registerGetProjectMemoryPolicyTool(server: McpServer, ctx: Serve
         openWorldHint: false,
       },
       inputSchema: z.object({
-        cwd: z.string().describe("Absolute project working directory. Pass this whenever the task is project-related so routing, search boosting, policy, and vault selection work correctly."),
+        cwd: z.string().describe("Absolute path of the project working directory. Required for project-scoped routing, vault selection, and search boosting."),
       }),
       outputSchema: PolicyResultSchema,
     },

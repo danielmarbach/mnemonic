@@ -44,18 +44,13 @@ export function registerProjectMemorySummaryTool(server: McpServer, ctx: ServerC
     {
       title: "Project Memory Summary",
       description:
-        "Generate a high-level summary of what is already known for a project.\n\n" +
         "Use this when:\n" +
         "- You want fast orientation before starting work\n" +
         "- You need a synthesized overview instead of raw note listings\n\n" +
         "Do not use this when:\n" +
         "- You need exact note contents; use `get`\n" +
         "- You need direct semantic matches for a query; use `recall`\n\n" +
-        "Returns:\n" +
-        "- A synthesized project-level summary based on stored memories\n" +
-        "- Bounded 1-hop relationship previews on orientation entry points (primaryEntry and suggestedNext)\n\n" +
-        "- Optional compact working-state recovery hints when relevant temporary notes exist\n\n" +
-        "Read-only.\n\n" +
+        "Returns: synthesized project summary, themes, anchors, orientation entry points with 1-hop previews, optional working-state recovery hints.\n\n" +
         "Typical next step:\n" +
         "- Use `recall` or `list` to drill down into specific areas.",
       annotations: {
@@ -65,7 +60,7 @@ export function registerProjectMemorySummaryTool(server: McpServer, ctx: ServerC
         openWorldHint: false,
       },
       inputSchema: z.object({
-        cwd: z.string().describe("Absolute project working directory. Pass this whenever the task is project-related so routing, search boosting, policy, and vault selection work correctly."),
+        cwd: z.string().describe("Absolute path of the project working directory. Required for project-scoped routing, vault selection, and search boosting."),
         maxPerTheme: z.number().int().min(1).max(5).optional().default(3),
         recentLimit: z.number().int().min(1).max(10).optional().default(5),
         anchorLimit: z.number().int().min(1).max(10).optional().default(5),

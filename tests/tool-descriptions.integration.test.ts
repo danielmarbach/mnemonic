@@ -71,12 +71,12 @@ describe("tool-descriptions", () => {
     expect(byName.get("remember")).toContain("REQUIRES: Call `recall` or `list` first to check whether this memory already exists.");
     expect(byName.get("get")).toContain("Use after `recall`, `list`, or `recent_memories` when you need the full note content.");
     expect(byName.get("update")).toContain("Use after `recall` + `get` when an existing memory should be refined instead of creating a duplicate.");
-    expect(byName.get("recall")).toContain("Optional retrieval evidence via `evidence: \"compact\"`");
+    expect(byName.get("recall")).toContain("retrieval evidence (evidence: compact)");
     expect(byName.get("relate")).toContain("Use after you have identified the exact memories to connect.");
     expect(byName.get("consolidate")).toContain("Use after `recall`, `list`, or `memory_graph` shows overlap that should be merged or cleaned up.");
     expect(byName.get("consolidate")).toContain("Evidence defaults on for consolidate analysis strategies");
     expect(byName.get("move_memory")).toContain("Use `relate` if the moved memory connects to existing notes in the new vault.");
-    expect(byName.get("discover_tags")).toContain("Suggest canonical tags for a specific note before `remember` when tag choice is ambiguous.");
+    expect(byName.get("discover_tags")).toContain("Suggest canonical tags for a note before `remember` when tag choice is ambiguous.");
   }, 15000);
 
   it("suggests note-oriented canonical tags by default", async () => {

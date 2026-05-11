@@ -30,9 +30,8 @@ export function registerUnrelateTool(server: McpServer, ctx: ServerContext): voi
         "- Two notes should remain independent\n\n" +
         "Do not use this when:\n" +
         "- You are adding a new connection; use `relate`\n\n" +
-        "Returns:\n" +
-        "- Both memory ids and the removed relationship details\n\n" +
-        "Side effects: modifies both notes, git commits per affected vault, and may push.\n\n" +
+        "Returns: both ids, removed relationship details.\n\n" +
+        "[mutating: modifies both notes, git commits, may push]\n\n" +
         "Typical next step:\n" +
         "- Use `get` to verify both notes now stand on their own.",
       annotations: {

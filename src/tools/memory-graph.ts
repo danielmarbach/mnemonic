@@ -21,16 +21,13 @@ export function registerMemoryGraphTool(server: McpServer, ctx: ServerContext): 
     {
       title: "Memory Graph",
       description:
-        "Show memory nodes and their relationships as a graph-oriented view.\n\n" +
         "Use this when:\n" +
         "- You want to inspect how notes connect across a topic or project\n" +
         "- You are evaluating whether relationships are too sparse or too dense\n\n" +
         "Do not use this when:\n" +
         "- You only need one note; use `get`\n" +
         "- You only need ranked topic matches; use `recall`\n\n" +
-        "Returns:\n" +
-        "- Memory nodes and relationship edges for the requested slice\n\n" +
-        "Read-only.\n\n" +
+        "Returns: memory nodes and relationship edges for the requested slice.\n\n" +
         "Typical next step:\n" +
         "- Use `get`, `relate`, `unrelate`, or `consolidate` based on what the graph reveals.",
       annotations: {

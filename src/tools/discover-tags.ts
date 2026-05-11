@@ -18,7 +18,7 @@ export function registerDiscoverTagsTool(server: McpServer, ctx: ServerContext):
     {
       title: "Discover Tags",
       description:
-        "Suggest canonical tags for a specific note before `remember` when tag choice is ambiguous.\n\n" +
+        "Suggest canonical tags for a note before `remember` when tag choice is ambiguous.\n\n" +
         "Use this when:\n" +
         "- You have a note title, content, or query and want compact tag suggestions\n" +
         "- You want canonical project terminology without exposing lots of unrelated tags\n" +
@@ -27,14 +27,9 @@ export function registerDiscoverTagsTool(server: McpServer, ctx: ServerContext):
         "- You need to browse notes by tag; use `list` with `tags` filter instead\n" +
         "- You already know the exact tags you want to use\n" +
         "- You want broad inventory output but are not explicitly requesting `mode: \"browse\"`\n\n" +
-        "Returns:\n" +
-        "- Default: bounded `recommendedTags` ranked by note relevance first and usage count second\n" +
-        "- Each suggestion includes canonicality and lifecycle signals plus one compact example\n" +
-        "- Optional `mode: \"browse\"` returns broader inventory output\n\n" +
+        "Returns: recommendedTags ranked by relevance and usage, with canonicality/lifecycle signals and one example per tag. Optional `mode: \"browse\"` for broader inventory.\n\n" +
         "Typical next step:\n" +
-        "- Reuse suggested canonical tags when they fit, or create a new tag only when genuinely novel.\n\n" +
-        "Performance: O(n) where n = total notes scanned. Expect 100-200ms for 500 notes.\n\n" +
-        "Read-only.",
+        "- Reuse suggested canonical tags when they fit, or create a new tag only when genuinely novel.",
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,

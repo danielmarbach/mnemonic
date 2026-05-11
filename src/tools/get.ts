@@ -32,17 +32,13 @@ export function registerGetTool(server: McpServer, ctx: ServerContext): void {
       title: "Get Memory",
       description:
         "Use after `recall`, `list`, or `recent_memories` when you need the full note content.\n\n" +
-        "Fetch one or more memories by exact id.\n\n" +
         "Use this when:\n" +
         "- You already know the memory id and need the full note content\n" +
         "- A previous tool returned ids that you now want to inspect exactly\n\n" +
         "Do not use this when:\n" +
         "- You are still searching by topic; use `recall`\n" +
         "- You want to browse many notes; use `list`\n\n" +
-        "Returns:\n" +
-        "- Full note content and metadata for the requested ids, including storage label\n" +
-        "- Bounded 1-hop relationship previews when `includeRelationships` is true (max 3 shown)\n\n" +
-        "Read-only.\n\n" +
+        "Returns: full note content, metadata, storage label. With includeRelationships: bounded 1-hop previews.\n\n" +
         "Typical next step:\n" +
         "- Use `update`, `forget`, `move_memory`, or `relate` after inspection.",
       annotations: {

@@ -55,16 +55,14 @@ export function registerUpdateTool(server: McpServer, ctx: ServerContext): void 
       title: "Update Memory",
       description:
         "Use after `recall` + `get` when an existing memory should be refined instead of creating a duplicate.\n\n" +
-        "Modify an existing memory by id.\n\n" +
         "Use this when:\n" +
         "- A stored memory is stale, incomplete, or wrong\n" +
         "- You recalled something useful and want to refine the same note instead of creating a duplicate\n\n" +
         "Do not use this when:\n" +
         "- No note exists yet; use `remember`\n" +
         "- Several notes need to be merged or retired together; use `consolidate`\n\n" +
-        "Returns:\n" +
-        "- The updated memory id, changed fields, and persistence status\n\n" +
-        "Side effects: rewrites the note, refreshes embeddings, git commits, and may push.\n\n" +
+        "Returns: updated id, changed fields, persistence status.\n\n" +
+        "[mutating: rewrites note, refreshes embeddings, git commits, may push]\n\n" +
         "Typical next step:\n" +
         "- Use `relate` or `consolidate` if the update changes how this note connects to others.\n\n" +
         "Use `semanticPatch` for targeted edits (more token-efficient). Use `content` only for complete rewrites.",

@@ -34,15 +34,12 @@ export function registerDetectProjectTool(server: McpServer, ctx: ServerContext)
     {
       title: "Detect Project",
       description:
-        "Detect the effective project identity for a working directory.\n\n" +
         "Use this when:\n" +
         "- You have a repo path and need the project id/name before storing or searching memories\n" +
         "- You want project-aware routing and search boosting\n\n" +
         "Do not use this when:\n" +
         "- You need to inspect identity override details; use `get_project_identity` instead\n\n" +
-        "Returns:\n" +
-        "- Effective project id, name, source, and any active policy hint\n\n" +
-        "Read-only.\n\n" +
+        "Returns: effective project id, name, source, policy hint.\n\n" +
         "Typical next step:\n" +
         "- Use `recall` or `project_memory_summary` to orient on existing memory.",
       annotations: {
@@ -53,7 +50,7 @@ export function registerDetectProjectTool(server: McpServer, ctx: ServerContext)
       },
       outputSchema: ProjectIdentityResultSchema,
       inputSchema: z.object({
-        cwd: z.string().describe("Absolute project working directory. Pass this whenever the task is project-related so routing, search boosting, policy, and vault selection work correctly."),
+        cwd: z.string().describe("Absolute path of the project working directory. Required for project-scoped routing, vault selection, and search boosting."),
       }),
     },
     async ({ cwd }) => {

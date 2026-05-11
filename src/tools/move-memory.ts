@@ -31,7 +31,6 @@ export function registerMoveMemoryTool(server: McpServer, ctx: ServerContext): v
       title: "Move Memory",
       description:
         "Use after `where_is_memory` or `get` confirms a memory is stored in the wrong place.\n\n" +
-        "Move a memory between main storage and project storage, optionally targeting a specific sub-vault folder.\n\n" +
         "Use this when:\n" +
         "- A note is stored in the wrong place\n" +
         "- Project-specific knowledge should move between shared project storage and main storage\n" +
@@ -39,9 +38,8 @@ export function registerMoveMemoryTool(server: McpServer, ctx: ServerContext): v
         "Do not use this when:\n" +
         "- You only need to edit the note content; use `update`\n" +
         "- You want to delete the note; use `forget`\n\n" +
-        "Returns:\n" +
-        "- The moved memory id, resulting storage label, project association, and persistence status\n\n" +
-        "Side effects: rewrites storage location, may adjust project association, git commits, and may push.\n\n" +
+        "Returns: moved id, from/to vault labels, project association, persistence status.\n\n" +
+        "[mutating: moves note between vaults, may adjust project association, git commits, may push]\n\n" +
         "Typical next step:\n" +
         "- Use `where_is_memory` or `get` to verify the final state.\n" +
         "- Use `relate` if the moved memory connects to existing notes in the new vault.",
