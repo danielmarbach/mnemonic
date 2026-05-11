@@ -5,11 +5,14 @@ tags:
   - apply
 lifecycle: temporary
 createdAt: '2026-05-11T17:51:44.944Z'
-updatedAt: '2026-05-11T17:51:44.944Z'
+updatedAt: '2026-05-11T17:51:55.364Z'
 role: context
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: plan-compact-mcp-tool-descriptions-c35d8705
+    type: derives-from
 memoryVersion: 1
 ---
 # Apply: Compact MCP Tool Descriptions

@@ -5,13 +5,15 @@ tags:
   - plan
 lifecycle: temporary
 createdAt: '2026-05-11T17:36:36.041Z'
-updatedAt: '2026-05-11T17:36:47.366Z'
+updatedAt: '2026-05-11T17:51:55.364Z'
 role: plan
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
   - id: compact-mcp-tool-descriptions-reduce-context-window-footprin-05bd0fc5
+    type: derives-from
+  - id: apply-compact-mcp-tool-descriptions-02780260
     type: derives-from
 memoryVersion: 1
 ---
