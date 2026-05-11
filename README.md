@@ -509,7 +509,7 @@ mnemonic import-claude-memory --cwd=/path/to/project
 mnemonic import-claude-memory --claude-home=/custom/.claude
 ```
 
-Imported notes are written to the main vault with `lifecycle: permanent` and `scope: global`. After importing, run `sync` to embed them and push to your remote.
+Imported notes are written to the main vault with `lifecycle: permanent` and `scope: global`. After importing, ask your MCP client to run the `sync` tool to embed them and push to your remote.
 
 ## Prompts
 

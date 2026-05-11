@@ -11,6 +11,7 @@ files:
   - "src/**/*.ts"
 ignores:
   - "src/brands.ts"
+  - "src/cli/**"
   - "src/__tests__/**"
 note: |
   Bare `new Error(...)` is acceptable in assertion functions (`brands.ts`) and
