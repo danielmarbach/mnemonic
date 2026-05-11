@@ -5,25 +5,28 @@ import { registerAllTools } from "./tools/index.js";
 import { registerPrompts } from "./prompts.js";
 import { createServerContext, readPackageVersion } from "./context.js";
 import { startServer } from "./startup.js";
-import { runMigrateCli } from "./cli/migrate.js";
-import { runImportCli } from "./cli/import-claude-memory.js";
+import { isCliCommand, showHelp, rejectUnknownCommand, runCliCommand } from "./cli/dispatch.js";
 
-// ── CLI commands ────────────────────────────────────────────────────────────────
+// ── CLI dispatch ────────────────────────────────────────────────────────────────
 
-if (process.argv[2] === "migrate") {
-  await runMigrateCli().catch(err => {
-    console.error("Migration failed:", err);
-    process.exit(1);
-  });
-  process.exit(0);
+const cliArg = process.argv[2];
+
+if (cliArg === "--help" || cliArg === "-h") {
+  showHelp();
 }
 
-if (process.argv[2] === "import-claude-memory") {
-  await runImportCli().catch(err => {
-    console.error("Import failed:", err);
-    process.exit(1);
-  });
-  process.exit(0);
+if (cliArg !== undefined && isCliCommand(cliArg)) {
+  await runCliCommand(cliArg);
+}
+
+if (cliArg !== undefined && !cliArg.startsWith("-")) {
+  rejectUnknownCommand(cliArg);
+}
+
+if (cliArg !== undefined && cliArg.startsWith("-")) {
+  console.error(`Unknown option: ${cliArg}`);
+  console.error("Run 'mnemonic --help' for usage.");
+  process.exit(1);
 }
 
 // ── MCP Server ────────────────────────────────────────────────────────────────

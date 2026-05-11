@@ -4,6 +4,17 @@ All notable changes to `mnemonic` will be documented in this file.
 
 The format is loosely based on Keep a Changelog and uses semver-style version headings.
 
+## [0.30.1] - 2026-05-11
+
+### Fixed
+
+- Running an unrecognized CLI command (e.g. `mnemonic sync`) now prints a clear error instead of silently starting the MCP server and hanging. The error lists available CLI commands and explains that tools like `sync` require an MCP client session.
+- `mnemonic --help` now shows available CLI commands, MCP-only tools, and usage examples.
+
+### Changed
+
+- README and homepage: the `import-claude-memory` follow-up step now references the `sync` MCP tool instead of suggesting `mnemonic sync` as a CLI command.
+
 ## [0.30.0] - 2026-05-10
 
 ### Changed
