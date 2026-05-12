@@ -10,7 +10,7 @@ tags:
   - ranking
 lifecycle: temporary
 createdAt: '2026-05-09T15:19:01.021Z'
-updatedAt: '2026-05-09T21:04:35.045Z'
+updatedAt: '2026-05-12T20:17:05.277Z'
 role: research
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -22,6 +22,8 @@ relatedTo:
     type: derives-from
   - id: enriched-confidence-scoring-with-signal-strength-composite-i-06563116
     type: derives-from
+  - id: research-microsoft-human-inspired-memory-architecture-applic-3eeefced
+    type: related-to
 memoryVersion: 1
 ---
 ## Research: Semvec Retention Formula Deep-Dive
