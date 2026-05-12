@@ -9,7 +9,7 @@ tags:
   - consolidation
 lifecycle: temporary
 createdAt: '2026-05-12T20:26:48.494Z'
-updatedAt: '2026-05-12T20:55:41.898Z'
+updatedAt: '2026-05-12T21:07:41.635Z'
 role: plan
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -22,6 +22,8 @@ relatedTo:
   - id: apply-phase-1-advisory-memory-guidance-from-microsoft-memory-c5e347cc
     type: follows
   - id: apply-phase-2-internal-decay-evidence-helper-f1e1e348
+    type: follows
+  - id: apply-phase-3-project-summary-maintenance-warnings-2b8b06e5
     type: follows
 memoryVersion: 1
 ---

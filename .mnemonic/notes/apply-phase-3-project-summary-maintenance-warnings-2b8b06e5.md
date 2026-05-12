@@ -8,11 +8,14 @@ tags:
   - maintenance-warnings
 lifecycle: temporary
 createdAt: '2026-05-12T21:07:34.336Z'
-updatedAt: '2026-05-12T21:07:34.336Z'
+updatedAt: '2026-05-12T21:07:41.635Z'
 role: context
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: plan-advisory-memory-health-diagnostics-from-microsoft-memor-a0aa3e62
+    type: follows
 memoryVersion: 1
 ---
 # Apply: Phase 3 Project Summary Maintenance Warnings
