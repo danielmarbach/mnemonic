@@ -8,11 +8,14 @@ tags:
   - guidance
 lifecycle: temporary
 createdAt: '2026-05-12T20:38:30.151Z'
-updatedAt: '2026-05-12T20:38:30.151Z'
+updatedAt: '2026-05-12T20:38:35.289Z'
 role: context
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: plan-advisory-memory-health-diagnostics-from-microsoft-memor-a0aa3e62
+    type: follows
 memoryVersion: 1
 ---
 # Apply: Phase 1 Advisory Memory Guidance
