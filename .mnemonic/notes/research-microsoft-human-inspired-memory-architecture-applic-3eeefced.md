@@ -11,7 +11,7 @@ tags:
   - consolidation
 lifecycle: temporary
 createdAt: '2026-05-12T20:16:26.194Z'
-updatedAt: '2026-05-12T20:22:43.463Z'
+updatedAt: '2026-05-12T20:26:58.556Z'
 role: research
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -23,6 +23,8 @@ relatedTo:
     type: related-to
   - id: research-semvec-retention-formula-deep-dive-applicability-to-a5a31ecd
     type: related-to
+  - id: plan-advisory-memory-health-diagnostics-from-microsoft-memor-a0aa3e62
+    type: derives-from
 memoryVersion: 1
 ---
 # Research: Microsoft Human-Inspired Memory Architecture Applicability to Mnemonic
