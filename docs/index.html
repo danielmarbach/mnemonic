@@ -1282,7 +1282,7 @@
       <div class="feature-card fade-up">
         <span class="feature-icon">&#x1F4CC;</span>
         <h3>Notes surface smarter over time</h3>
-        <p>Mark notes <code style="font-family:JetBrains Mono,monospace;font-size:0.8em;color:var(--cyan-lt)">temporary</code> for plans and WIP, <code style="font-family:JetBrains Mono,monospace;font-size:0.8em;color:var(--cyan-lt)">permanent</code> for decisions worth keeping. Decision and summary notes rank higher automatically as they accumulate references and relationships — no manual tagging required. Pin any note as a session anchor to always bring it to the top.</p>
+        <p>Mark notes <code style="font-family:JetBrains Mono,monospace;font-size:0.8em;color:var(--cyan-lt)">temporary</code> for plans and WIP, <code style="font-family:JetBrains Mono,monospace;font-size:0.8em;color:var(--cyan-lt)">permanent</code> for decisions worth keeping. Capture what future work will need — decisions, outcomes, corrections, and constraints — and leave routine chatter out. Pin any note as a session anchor to always bring it to the top.</p>
       </div>
       <div class="feature-card fade-up">
         <span class="feature-icon">&#x1F4DC;</span>
@@ -1590,7 +1590,7 @@
             <div class="tool-card-name">memory_graph</div>
             <div class="tool-card-purpose">See how your memories are connected</div>
           </div>
-          <div class="tool-card" data-tip="Detects near-duplicates and suggests merges with built-in evidence on lifecycle, risk, and warnings. You choose whether to delete originals or keep them for traceability. Execute-merge also surfaces trust signals before committing.">
+          <div class="tool-card" data-tip="Finds notes that cover the same ground and helps you turn them into a clearer lasting memory. Keep details that still matter; choose whether originals are deleted or kept for traceability.">
             <div class="tool-card-name">consolidate</div>
             <div class="tool-card-purpose">Clean up overlapping notes</div>
           </div>
@@ -2093,7 +2093,7 @@ VAULT_PATH = <span class="str">"/Users/you/mnemonic-vault"</span></pre>
         <h3 class="dogfood-title">Orientation before recovery</h3>
         <div class="dogfood-body">
           <p><strong>Call <code>project_memory_summary</code> first for orientation</strong>, then recover working state. The <code>mnemonic-workflow-hint</code> prompt establishes this order explicitly so agents orient on project context before diving into temporary-note recovery.</p>
-          <p><strong>Temporary notes are scaffolding, not permanent knowledge.</strong> When consolidating finished work, default to deleting temporary sources rather than preserving them. The working-state section in <code>project_memory_summary</code> surfaces WIP notes so agents can resume without searching.</p>
+          <p><strong>Temporary notes are scaffolding, not permanent knowledge.</strong> When finished work stabilizes, keep the useful outcome, preserve details future work may need, and remove scaffolding when safe. The working-state section in <code>project_memory_summary</code> surfaces WIP notes so agents can resume without searching.</p>
         </div>
         <div class="dogfood-footer">
           <span class="dogfood-rel">relates to 3 other notes</span>

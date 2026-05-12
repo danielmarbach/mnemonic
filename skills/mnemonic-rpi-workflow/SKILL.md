@@ -9,6 +9,8 @@ description: Executes multi-step research-plan-implement-review workflows using 
 
 mnemonic stores workflow artifacts; it does not run the workflow.
 
+Note creation is the attention filter: capture decisions, outcomes, corrections, durable constraints, and validated learnings; skip routine low-signal chatter.
+
 ## Relationship Conventions
 
 Use `derives-from` for lineage and `follows` for sequence by default. Fall back to `related-to` only when direction is unclear. Keep relationships sparse — link only to immediate upstream artifacts.
@@ -113,7 +115,8 @@ And a constraint checklist:
 
 - Create permanent decision note(s) and summary note(s).
 - Promote reusable patterns into permanent reference notes.
-- Let temporary scaffolding expire.
+- Deduplicate overlap while preserving unique evidence; do not aggressively summarize away factual detail.
+- Explicitly remove temporary scaffolding through consolidation choices when safe. mnemonic does not auto-expire notes.
 
 Use the templates in [closeout-templates.md](closeout-templates.md).
 

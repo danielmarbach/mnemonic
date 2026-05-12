@@ -16,7 +16,7 @@ export function registerPrompts(server: McpServer): void {
             type: "text",
             text:
               "## Mnemonic MCP workflow hints\n\n" +
-              "Avoid duplicate memories. Prefer inspecting and updating existing memories before creating new ones.\n\n" +
+              "Avoid duplicate memories. Prefer inspecting and updating existing memories before creating new ones. Treat note creation as the attention filter: capture durable decisions, outcomes, corrections, constraints, and validated learnings; skip routine chatter.\n\n" +
               "- REQUIRES: Before `remember`, call `recall` or `list` first.\n" +
               "- If `recall` or `list` returns a plausible match, call `get` before deciding whether to `update` or `remember`.\n" +
               "- If an existing memory already covers the topic, use `update`, not `remember`.\n" +
@@ -36,7 +36,7 @@ export function registerPrompts(server: McpServer): void {
               "- One checkpoint per active task or investigation thread\n" +
               "- Update the same checkpoint note as work progresses (don't create new ones)\n" +
               "- Link to related decisions: use `relate` to connect temporary checkpoints to permanent decisions\n" +
-              "- Consolidate into a durable note when complete; let lifecycle defaults delete temporary scaffolding unless you intentionally need preserved history\n\n" +
+              "- Consolidate into a durable note when complete; deduplicate overlap while preserving unique evidence; explicitly remove temporary scaffolding when safe\n\n" +
               "**Recovery workflow:**\n" +
               "- Call `project_memory_summary` first for orientation (do not skip to recovery)\n" +
               "- Use `lifecycle: temporary` for active plans, WIP checkpoints, draft investigations, and unvalidated options\n" +
@@ -66,6 +66,7 @@ export function registerPrompts(server: McpServer): void {
               "- Two notes overlap heavily -> inspect -> clean up with `consolidate`.\n" +
               "- Unsure why a recall hit ranked high -> rerun `recall` with `evidence: \"compact\"`.\n" +
               "- Unsure whether to merge/prune -> run `consolidate` analysis with `evidence: true` before `execute-merge` or `prune-superseded`.\n" +
+              "- Forgetting is explicit: lifecycle, `supersedes`, `delete`, and `prune-superseded`; mnemonic does not auto-expire notes.\n" +
               "- Resume work: `project_memory_summary` -> `recall` (lifecycle: temporary) -> continue from temporary notes.\n\n" +
               "### semanticPatch format\n\n" +
               "When using `update` with `semanticPatch`:\n" +
@@ -91,7 +92,7 @@ export function registerPrompts(server: McpServer): void {
           type: "text" as const,
           text:
             "## RPIR workflow: research → plan → implement → review\n\n" +
-            "mnemonic is the artifact store, not the runtime. Store workflow artifacts with correct roles and lifecycle; do not build orchestration in core.\n\n" +
+            "mnemonic is the artifact store, not the runtime. Store workflow artifacts with correct roles and lifecycle; do not build orchestration in core. Note creation is the attention filter: capture durable decisions, outcomes, corrections, constraints, and validated learnings; skip routine chatter.\n\n" +
             "### Request root note\n\n" +
             "For each RPIR workflow, create one request root note: `role: context`, `lifecycle: temporary`, `tags: [\"workflow\", \"request\"]`. All artifacts relate to it.\n\n" +
             "### Stage 1 — Research\n\n" +
@@ -123,7 +124,8 @@ export function registerPrompts(server: McpServer): void {
             "- Create decision note for resolved approaches (`lifecycle: permanent`).\n" +
             "- Create summary note for outcome recaps (`lifecycle: permanent`).\n" +
             "- Promote reusable facts and patterns into permanent reference notes.\n" +
-            "- Let pure scaffolding and redundant checkpoints expire as temporary notes.\n\n" +
+            "- Deduplicate overlap while preserving unique evidence; do not aggressively summarize away factual detail.\n" +
+            "- Explicitly remove pure scaffolding and redundant checkpoints through consolidation choices when safe. mnemonic does not auto-expire notes.\n\n" +
             "### Relationship conventions\n\n" +
             "Minimal set. Link to immediate upstream artifacts only. No dense cross-linking.\n" +
             "- research → request root\n" +

@@ -23,6 +23,7 @@ describe("tool-descriptions", () => {
     const promptText = await callLocalMcpPrompt(vaultDir, "mnemonic-workflow-hint");
 
     expect(promptText).toContain("Avoid duplicate memories.");
+    expect(promptText).toContain("Treat note creation as the attention filter");
     expect(promptText).toContain("REQUIRES: Before `remember`, call `recall` or `list` first.");
     expect(promptText).toContain("If `recall` or `list` returns a plausible match, call `get` before deciding whether to `update` or `remember`.");
     expect(promptText).toContain("When unsure, prefer `recall` over `remember`.");
@@ -37,6 +38,8 @@ describe("tool-descriptions", () => {
     expect(promptText).toContain("Prioritization is language-independent by default.");
     expect(promptText).toContain("Call `project_memory_summary` first for orientation");
     expect(promptText).toContain("Recovery is a follow-on step, not a replacement for orientation");
+    expect(promptText).toContain("deduplicate overlap while preserving unique evidence");
+    expect(promptText).toContain("mnemonic does not auto-expire notes");
     expect(promptText).not.toContain("strategy `supersedes`");
   }, 15000);
 
@@ -59,6 +62,9 @@ describe("tool-descriptions", () => {
     expect(promptText).toContain("One current plan per request");
     expect(promptText).toContain("Subagent returns: updated apply note");
     expect(promptText).toContain("Three classes: memory (research/plan/review artifacts), work (code/test/docs), memory (consolidation/promotion)");
+    expect(promptText).toContain("Note creation is the attention filter");
+    expect(promptText).toContain("Deduplicate overlap while preserving unique evidence");
+    expect(promptText).toContain("mnemonic does not auto-expire notes");
   }, 15000);
 
   it("surfaces prerequisite-first workflow wording in phase-aware tool descriptions", async () => {

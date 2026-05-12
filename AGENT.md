@@ -34,14 +34,15 @@ Before calling `remember`:
    - Use `mode: "browse"` only when you intentionally need broader inventory output.
    - Create new tags when genuinely novel, but prefer canonical forms when they exist.
 2. `recall` first — if a related note exists, call `update` instead to avoid fragmentation.
-3. Consider lifecycle: use `lifecycle: temporary` for plans and WIP; use `permanent` for decisions and durable knowledge.
-4. If you've made several closely-related captures in this session, consider `consolidate` before wrapping up.
-3. Write the note summary-first: put the main fact, decision, or outcome in the opening sentences, then follow with supporting detail.
-4. Pass `cwd` for anything about the current repo, even if you intend to store it in the main vault with `scope: "global"`.
-5. Omit `cwd` only for truly cross-project or personal memories; missing `cwd` makes the note global and unassociated.
-6. After `remember`, `update`, `move_memory`, or consolidation writes, inspect the returned structured persistence status before doing extra verification calls. It tells you the note path, embedding path, embedding outcome, and git commit/push outcome, including when push is intentionally skipped by config.
-7. Memory work is not complete after `remember`, `update`, or `consolidate` alone. If the note extends, implements, or was informed by an existing note surfaced via `recall`, `list`, `recent_memories`, or `get`, explicitly decide whether to `relate` or `consolidate` before finishing.
-8. Default stance: if a note continues a prior design, bug, decision, or implementation arc, create a relationship unless there is a concrete reason not to. Treat skipped relationships as something you should be able to justify, not as optional cleanup.
+3. Treat note creation as the attention filter: capture decisions, outcomes, corrections, durable constraints, and validated learnings; skip routine low-signal chatter.
+4. Consider lifecycle: use `lifecycle: temporary` for plans and WIP; use `permanent` for decisions and durable knowledge.
+5. If you've made several closely-related captures in this session, consider `consolidate` before wrapping up.
+6. Write the note summary-first: put the main fact, decision, or outcome in the opening sentences, then follow with supporting detail.
+7. Pass `cwd` for anything about the current repo, even if you intend to store it in the main vault with `scope: "global"`.
+8. Omit `cwd` only for truly cross-project or personal memories; missing `cwd` makes the note global and unassociated.
+9. After `remember`, `update`, `move_memory`, or consolidation writes, inspect the returned structured persistence status before doing extra verification calls. It tells you the note path, embedding path, embedding outcome, and git commit/push outcome, including when push is intentionally skipped by config.
+10. Memory work is not complete after `remember`, `update`, or `consolidate` alone. If the note extends, implements, or was informed by an existing note surfaced via `recall`, `list`, `recent_memories`, or `get`, explicitly decide whether to `relate` or `consolidate` before finishing.
+11. Default stance: if a note continues a prior design, bug, decision, or implementation arc, create a relationship unless there is a concrete reason not to. Treat skipped relationships as something you should be able to justify, not as optional cleanup.
 
 ### Choosing note lifecycle
 
@@ -95,11 +96,14 @@ Consolidate when:
 - A feature or bug arc is complete and related notes can be synthesized into one
 - `memory_graph` shows a dense cluster of tightly-related nodes
 
+Consolidate by deduplicating overlap while preserving unique evidence. Do not aggressively summarize away factual detail.
+
 Use `consolidate` strategy `supersedes` to preserve source history (sources remain with `supersedes` relationship, cleanable later via `prune-superseded`); use `delete` to remove sources immediately.
 
 When consolidating:
 - If all source notes are `temporary`, prefer delete behavior so the temporary scaffolding disappears once the durable note exists.
 - Consolidated notes should be `permanent` by default.
+- Forgetting is explicit: lifecycle, `supersedes`, `delete`, and `prune-superseded` guide cleanup; mnemonic does not auto-expire memories.
 
 When calling `update`:
 - Preserve the existing lifecycle unless you are intentionally changing it.
