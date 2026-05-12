@@ -8,11 +8,14 @@ tags:
   - classification
 lifecycle: temporary
 createdAt: '2026-05-12T21:13:59.496Z'
-updatedAt: '2026-05-12T21:13:59.496Z'
+updatedAt: '2026-05-12T21:14:03.056Z'
 role: plan
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: plan-advisory-memory-health-diagnostics-from-microsoft-memor-a0aa3e62
+    type: follows
 memoryVersion: 1
 ---
 # Apply: Phase 4 Consolidation Evidence Refinement
