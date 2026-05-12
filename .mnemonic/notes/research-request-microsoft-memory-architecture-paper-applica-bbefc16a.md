@@ -9,11 +9,14 @@ tags:
   - memory-architecture
 lifecycle: temporary
 createdAt: '2026-05-12T20:15:50.732Z'
-updatedAt: '2026-05-12T20:15:50.732Z'
+updatedAt: '2026-05-12T20:17:05.223Z'
 role: context
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: research-microsoft-human-inspired-memory-architecture-applic-3eeefced
+    type: derives-from
 memoryVersion: 1
 ---
 # Research Request

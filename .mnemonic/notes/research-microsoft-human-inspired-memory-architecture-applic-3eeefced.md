@@ -11,11 +11,18 @@ tags:
   - consolidation
 lifecycle: temporary
 createdAt: '2026-05-12T20:16:26.194Z'
-updatedAt: '2026-05-12T20:16:58.307Z'
+updatedAt: '2026-05-12T20:17:05.277Z'
 role: research
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: research-request-microsoft-memory-architecture-paper-applica-bbefc16a
+    type: derives-from
+  - id: mnemonic-key-design-decisions-3f2a6273
+    type: related-to
+  - id: research-semvec-retention-formula-deep-dive-applicability-to-a5a31ecd
+    type: related-to
 memoryVersion: 1
 ---
 # Research: Microsoft Human-Inspired Memory Architecture Applicability to Mnemonic
