@@ -9,11 +9,16 @@ tags:
   - consolidation
 lifecycle: temporary
 createdAt: '2026-05-12T20:26:48.494Z'
-updatedAt: '2026-05-12T20:26:48.494Z'
+updatedAt: '2026-05-12T20:26:58.643Z'
 role: plan
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: research-microsoft-human-inspired-memory-architecture-applic-3eeefced
+    type: derives-from
+  - id: apply-compact-mcp-tool-descriptions-02780260
+    type: related-to
 memoryVersion: 1
 ---
 # Plan: Advisory Memory Health Diagnostics From Microsoft Memory Research
