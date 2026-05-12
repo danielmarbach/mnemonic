@@ -9,7 +9,7 @@ tags:
   - consolidation
 lifecycle: temporary
 createdAt: '2026-05-12T20:26:48.494Z'
-updatedAt: '2026-05-12T20:47:15.395Z'
+updatedAt: '2026-05-12T20:55:41.898Z'
 role: plan
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -42,7 +42,9 @@ The plan focuses on advisory memory-shaping signals: documentation guidance, mai
 ## Non-Negotiable Constraints
 
 - Structured output and text output must align: every new structured diagnostic must have compact text rendering, and every new text diagnostic must be represented in structured output unless explicitly text-only with rationale.
+
 - Follow the structured-output principle for every new field: exported TypeScript type/interface, Zod schema with `.describe()`, tool description Returns mention when exposed through an MCP tool, text rendering, and integration tests that parse real MCP responses.
+
 - Any TypeScript implementation phase must be reviewed by a fresh subagent using the TypeScript code review skill, with attention to type safety, schema drift, output alignment, and maintainability.
 
 - Preserve the recent compact MCP tool-description optimization: do not expand tool prose unless the added wording is load-bearing for routing or safe use.
@@ -166,6 +168,13 @@ Open design questions:
 - \[ ] Should permanent decisions ever receive a maintenance hint solely from age? Initial recommendation: no.
 
 ## Phase 3: Maintenance Pressure Diagnostics
+
+Surface selection clarification:
+
+- \[ ] Use `project_memory_summary` first for metadata-only project health signals that help at session start: stale temporary notes, superseded cleanup candidates, weak anchors, and taxonomy dilution.
+- \[ ] Keep embedding/similarity-backed interference diagnostics in `consolidate(dry-run)` for Phase 4, because consolidate is the explicit maintenance-analysis tool and already performs duplicate/cluster work.
+- \[ ] Do not run duplicate detection inside `project_memory_summary`; if overlap analysis is needed, the summary should route agents to `consolidate(dry-run)` rather than doing heavier analysis itself.
+- \[ ] If the same warning is later useful in both tools, keep summary broad and project-level, and consolidate specific and merge-oriented.
 
 Output-alignment constraint:
 
