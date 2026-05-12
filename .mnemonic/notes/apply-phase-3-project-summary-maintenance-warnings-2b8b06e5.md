@@ -8,7 +8,7 @@ tags:
   - maintenance-warnings
 lifecycle: temporary
 createdAt: '2026-05-12T21:07:34.336Z'
-updatedAt: '2026-05-12T21:07:41.635Z'
+updatedAt: '2026-05-12T21:12:02.041Z'
 role: context
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -76,7 +76,7 @@ Final review found no blockers and recommended continue.
 ## Validation
 
 - `npm run build` — pass
-- `npm test -- tests/project-memory-summary.integration.test.ts tests/project-summary.unit.test.ts tests/provenance.unit.test.ts` — pass, 74 tests
+- `npm test — tests/project-memory-summary.integration.test.ts tests/project-summary.unit.test.ts tests/provenance.unit.test.ts` — pass, 74 tests
 
 ## Follow-Up
 
