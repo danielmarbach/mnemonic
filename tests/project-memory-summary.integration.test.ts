@@ -1037,6 +1037,158 @@ describe("project-memory-summary", () => {
     }
   }, 20000);
 
+  it("emits metadata-only maintenance warnings in structured and text output", async () => {
+    const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-vault-"));
+    const repoDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-project-"));
+    tempDirs.push(vaultDir, repoDir);
+
+    await initTestRepo(repoDir);
+
+    const embeddingServer = await startFakeEmbeddingServer();
+
+    try {
+      const stalePlanId = extractRememberedId(await callLocalMcp(vaultDir, "remember", {
+        title: "Old implementation plan",
+        content: "Plan details that should be reviewed after enough time passes.",
+        tags: ["workflow", "integration"],
+        summary: "Create stale plan note",
+        cwd: repoDir,
+        scope: "project",
+        lifecycle: "temporary",
+        role: "plan",
+      }, embeddingServer.url));
+
+      const staleContextId = extractRememberedId(await callLocalMcp(vaultDir, "remember", {
+        title: "Old investigation context",
+        content: "Context that may no longer be useful.",
+        tags: ["workflow", "integration"],
+        summary: "Create stale context note",
+        cwd: repoDir,
+        scope: "project",
+        lifecycle: "temporary",
+        role: "context",
+      }, embeddingServer.url));
+
+      const replacementId = extractRememberedId(await callLocalMcp(vaultDir, "remember", {
+        title: "Replacement decision",
+        content: "The newer decision that supersedes old context.",
+        tags: ["decisions", "integration"],
+        summary: "Create replacement decision",
+        cwd: repoDir,
+        scope: "project",
+        lifecycle: "permanent",
+        role: "decision",
+      }, embeddingServer.url));
+
+      const supersededId = extractRememberedId(await callLocalMcp(vaultDir, "remember", {
+        title: "Superseded decision",
+        content: "Old decision kept for traceability until pruned.",
+        tags: ["decisions", "integration"],
+        summary: "Create superseded decision",
+        cwd: repoDir,
+        scope: "project",
+        lifecycle: "permanent",
+        role: "decision",
+      }, embeddingServer.url));
+
+      const oldTemporary = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString();
+      const oldSuperseded = new Date(Date.now() - 45 * 24 * 60 * 60 * 1000).toISOString();
+      await updateProjectNoteFrontmatter(repoDir, stalePlanId, { updatedAt: oldTemporary, createdAt: oldTemporary, role: "plan" });
+      await updateProjectNoteFrontmatter(repoDir, staleContextId, { updatedAt: oldTemporary, createdAt: oldTemporary, role: "context" });
+      await updateProjectNoteFrontmatter(repoDir, supersededId, {
+        updatedAt: oldSuperseded,
+        createdAt: oldSuperseded,
+        role: "decision",
+        relatedTo: [{ id: replacementId, type: "supersedes" }],
+      });
+
+      const summary = await callLocalMcpResponse(vaultDir, "project_memory_summary", {
+        cwd: repoDir,
+      }, embeddingServer.url);
+
+      const parsed = ProjectSummaryResultSchema.parse(summary.structuredContent);
+      expect(parsed.maintenanceWarnings).toBeDefined();
+      expect(parsed.maintenanceWarnings?.map((w) => w.code)).toEqual([
+        "stale-temporary-notes",
+        "superseded-prune-candidates",
+      ]);
+
+      const staleWarning = parsed.maintenanceWarnings?.find((w) => w.code === "stale-temporary-notes");
+      expect(staleWarning?.count).toBe(2);
+      expect(staleWarning?.sampleNotes?.map((note) => note.id)).toContain(stalePlanId);
+      expect(staleWarning?.sampleNotes?.map((note) => note.id)).toContain(staleContextId);
+      expect(staleWarning?.suggestedAction).toContain("consolidate");
+
+      const pruneWarning = parsed.maintenanceWarnings?.find((w) => w.code === "superseded-prune-candidates");
+      expect(pruneWarning?.count).toBe(1);
+      expect(pruneWarning?.sampleNotes?.[0]?.id).toBe(supersededId);
+
+      expect(summary.text).toContain("Maintenance:");
+      expect(summary.text).toContain("2 stale temporary notes may need review or consolidation.");
+      expect(summary.text).toContain("1 superseded note may be a prune candidate.");
+    } finally {
+      await embeddingServer.close();
+    }
+  }, 20000);
+
+  it("uses effective metadata for maintenance warnings and avoids weak-anchor noise with durable orientation notes", async () => {
+    const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-vault-"));
+    const repoDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-project-"));
+    tempDirs.push(vaultDir, repoDir);
+
+    await initTestRepo(repoDir);
+
+    const embeddingServer = await startFakeEmbeddingServer();
+
+    try {
+      const inferredPlanId = extractRememberedId(await callLocalMcp(vaultDir, "remember", {
+        title: "Old checklist without explicit role",
+        content: "1. Inspect schema\n2. Update tests\n\n- [ ] run build\n- [ ] review output",
+        tags: ["workflow", "integration"],
+        summary: "Create inferred plan-like note",
+        cwd: repoDir,
+        scope: "project",
+        lifecycle: "temporary",
+      }, embeddingServer.url));
+
+      await callLocalMcp(vaultDir, "remember", {
+        title: "Durable summary note",
+        content: "A durable project summary that can orient future sessions.",
+        tags: ["overview", "integration"],
+        summary: "Create durable summary note",
+        cwd: repoDir,
+        scope: "project",
+        lifecycle: "permanent",
+        role: "summary",
+      }, embeddingServer.url);
+
+      await callLocalMcp(vaultDir, "remember", {
+        title: "Supporting permanent note",
+        content: "Supporting durable context.",
+        tags: ["integration"],
+        summary: "Create supporting permanent note",
+        cwd: repoDir,
+        scope: "project",
+        lifecycle: "permanent",
+      }, embeddingServer.url);
+
+      const oldTemporary = new Date(Date.now() - 31 * 24 * 60 * 60 * 1000).toISOString();
+      await updateProjectNoteFrontmatter(repoDir, inferredPlanId, { updatedAt: oldTemporary, createdAt: oldTemporary });
+
+      const summary = await callLocalMcpResponse(vaultDir, "project_memory_summary", {
+        cwd: repoDir,
+      }, embeddingServer.url);
+
+      const parsed = ProjectSummaryResultSchema.parse(summary.structuredContent);
+      expect(parsed.maintenanceWarnings?.map((warning) => warning.code)).toEqual(["stale-temporary-notes"]);
+      expect(parsed.maintenanceWarnings?.[0]?.sampleNotes?.[0]?.id).toBe(inferredPlanId);
+      expect(summary.text).toContain("1 stale temporary note may need review or consolidation.");
+      expect(summary.text).not.toContain("No strong anchor notes found");
+    } finally {
+      await embeddingServer.close();
+    }
+  }, 20000);
+
   it("does not include relatedGlobal unless explicitly requested", async () => {
     const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-vault-"));
     const repoDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-project-"));

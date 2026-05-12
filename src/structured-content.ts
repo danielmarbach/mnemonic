@@ -5,6 +5,9 @@ import type { NoteLifecycle, NoteRole, RelationshipType } from "./storage.js";
 import { MERGE_RISKS } from "./consolidate.js";
 import type { MergeRisk } from "./consolidate.js";
 
+export const PROJECT_MAINTENANCE_WARNING_CODES = ["stale-temporary-notes", "superseded-prune-candidates", "weak-orientation-anchors"] as const;
+export const PROJECT_MAINTENANCE_WARNING_SEVERITIES = ["info", "warning"] as const;
+
 export interface PersistenceStatus {
   notePath: string;
   embeddingPath: string;
@@ -491,6 +494,18 @@ export interface WorkingState {
   notes: WorkingStateNote[];
 }
 
+export type ProjectMaintenanceWarningCode = typeof PROJECT_MAINTENANCE_WARNING_CODES[number];
+export type ProjectMaintenanceWarningSeverity = typeof PROJECT_MAINTENANCE_WARNING_SEVERITIES[number];
+
+export interface ProjectMaintenanceWarning {
+  code: ProjectMaintenanceWarningCode;
+  severity: ProjectMaintenanceWarningSeverity;
+  message: string;
+  count?: number;
+  sampleNotes?: Array<{ id: string; title: string }>;
+  suggestedAction: string;
+}
+
 export interface ProjectSummaryNotes {
   total: number;
   projectVault: number;
@@ -518,6 +533,7 @@ export interface ProjectSummaryResult extends Record<string, unknown> {
   recent: RecentNote[];
   anchors: AnchorNote[];
   orientation: Orientation;
+  maintenanceWarnings?: ProjectMaintenanceWarning[];
   workingState?: WorkingState;
   relatedGlobal?: {
     notes: RelatedGlobalNote[];
@@ -868,6 +884,24 @@ export const WorkingStateSchema = z.object({
   notes: z.array(WorkingStateNoteSchema),
 });
 
+export const ProjectMaintenanceWarningSchema = z.object({
+  code: z.enum(PROJECT_MAINTENANCE_WARNING_CODES)
+    .describe("Stable warning code for a project memory maintenance condition."),
+  severity: z.enum(PROJECT_MAINTENANCE_WARNING_SEVERITIES)
+    .describe("Advisory severity for the maintenance condition; warnings still require explicit user action."),
+  message: z.string()
+    .describe("Compact human-readable maintenance warning matching the text output."),
+  count: z.number().optional()
+    .describe("Number of notes or conditions represented by this warning when applicable."),
+  sampleNotes: z.array(z.object({
+    id: z.string().describe("Memory id for a bounded sample note that triggered this warning."),
+    title: z.string().describe("Title for a bounded sample note that triggered this warning."),
+  })).optional()
+    .describe("Bounded sample of notes that triggered this warning."),
+  suggestedAction: z.string()
+    .describe("Explicit next action the agent can take; never an automatic cleanup action."),
+});
+
 export const ProjectSummaryResultSchema = z.object({
   action: z.literal("project_summary_shown"),
   project: ProjectRefSchema,
@@ -876,6 +910,8 @@ export const ProjectSummaryResultSchema = z.object({
   recent: z.array(RecentNoteSchema),
   anchors: z.array(AnchorNoteSchema),
   orientation: OrientationSchema,
+  maintenanceWarnings: z.array(ProjectMaintenanceWarningSchema).optional()
+    .describe("Advisory project memory health warnings derived from loaded metadata only."),
   workingState: WorkingStateSchema.optional(),
   relatedGlobal: z.object({
     notes: z.array(RelatedGlobalNoteSchema),
