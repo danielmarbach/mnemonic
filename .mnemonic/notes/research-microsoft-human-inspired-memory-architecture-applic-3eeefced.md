@@ -11,7 +11,7 @@ tags:
   - consolidation
 lifecycle: temporary
 createdAt: '2026-05-12T20:16:26.194Z'
-updatedAt: '2026-05-12T20:16:26.194Z'
+updatedAt: '2026-05-12T20:16:58.307Z'
 role: research
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -134,3 +134,46 @@ The most promising additive work is:
 ## Research Handoff Verdict
 
 Proceed cautiously. The highest-confidence action is documentation/tool guidance reinforcing dedup-first consolidation and avoiding automatic forgetting. The highest-value possible code change is analysis-only interference/overlap warnings, but only if it can reuse existing embeddings/session cache and remain fail-soft.
+
+## Medium Article Additions
+
+The Medium article reinforces the arXiv paper but adds practical engineering lessons that matter for mnemonic:
+
+- **Attention is a first-class memory decision.** The article says choosing which event types become memories was critical: issue creations/comments/status changes mattered, while subscriptions/mentions/cross-references were noise. For mnemonic this maps to note-creation discipline and explicit `remember`/`update` usage, not automatic ingestion. Existing role, lifecycle, tags, `alwaysLoad`, and project-scoped storage are mnemonic's attention controls.
+- **Domain-relative time beats wall-clock time.** Their flawed quarterly evaluation made decay far too aggressive; the corrected setup used fixed-size batches matching intended cadence. Mnemonic already avoids universal automatic decay. If mnemonic adds any maintenance warning based on age, it must be contextual and explanatory, not a deletion rule.
+- **Agents need to study before interacting.** The article describes embedding-distribution study, thresholds, entity resolution, and domain vocabulary before building the graph. Mnemonic's closest equivalent is `project_memory_summary` plus explicit anchor/summary/decision notes. This supports orientation-first usage rather than hidden pre-processing.
+- **Targeted retrieval and broad summarization need different strategies.** The article admits precise retrieval won for terminal-specific questions, while broad critical-issue summarization needed more context. For mnemonic, this supports keeping `recall` scoped and using `project_memory_summary` for broad orientation instead of overloading one retrieval mode.
+- **Evaluation methodology can dominate algorithm choice.** Their corrected stateful evaluation changed precision from 84.4% to 97.2%. For mnemonic, any forgetting/consolidation change should be validated with stateful dogfooding over real workflows, not one-off query examples.
+
+## Medium-Informed Applicability Updates
+
+### Attention Controller: Mostly Existing As Explicit Metadata
+
+Do not add a hidden attention controller that decides what is memorable. Mnemonic's architecture intentionally lets the agent/human decide what to write. However, the article validates stronger guidance in the memory workflow hint and docs: record decisions, outcomes, corrections, and durable context; avoid storing routine low-signal chatter.
+
+### Domain-Relative Time: Reject Universal Decay
+
+The article makes universal decay less attractive, not more. The correct half-life differed drastically from the initial biological guess. Mnemonic should not adopt a global TTL or decay rule. If age appears in diagnostics, it should remain a soft signal like existing recency/confidence, not an automatic prune criterion.
+
+### Study-Before-Interact: Strengthen Orientation
+
+This supports `project_memory_summary` as the canonical start point. Possible low-risk improvement: have project summaries warn when the vault lacks anchor/summary/decision notes, because that means the project has weak domain vocabulary for future recall.
+
+### Retrieval Mode Separation
+
+The article's broad-query failure argues against making `recall` return large context by default. Keep `recall` precision-oriented. Use `project_memory_summary` or explicit higher limits for broad summarization.
+
+## Revised Recommendation
+
+No architectural pivot is justified. The paper/article mostly validate mnemonic's current philosophy but suggest one sharper framing:
+
+Mnemonic should be an explicit memory-shaping system, not an autonomous memory-governance system.
+
+Most promising next steps remain additive:
+
+- Documentation/tool guidance: consolidation should deduplicate and preserve detail, not aggressively summarize.
+- Workflow guidance: note creation is the attention controller; store durable decisions/outcomes/corrections, not low-signal events.
+- Optional diagnostics: surface overlap/interference or weak-anchor warnings as recommendations only.
+- Evaluation: run any proposed forgetting/consolidation change through stateful dogfooding with realistic cadence.
+
+Do not add automatic TTL expiration, read-path access counters, hidden LLM relationship/entity extraction, or delayed visibility for new notes.
