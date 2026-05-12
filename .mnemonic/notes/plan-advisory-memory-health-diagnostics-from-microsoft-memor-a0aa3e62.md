@@ -9,7 +9,7 @@ tags:
   - consolidation
 lifecycle: temporary
 createdAt: '2026-05-12T20:26:48.494Z'
-updatedAt: '2026-05-12T20:26:58.643Z'
+updatedAt: '2026-05-12T20:27:22.695Z'
 role: plan
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -37,6 +37,10 @@ The plan focuses on advisory memory-shaping signals: documentation guidance, mai
 
 ## Non-Negotiable Constraints
 
+- Preserve the recent compact MCP tool-description optimization: do not expand tool prose unless the added wording is load-bearing for routing or safe use.
+- Prefer structured output fields, Zod `.describe()`, and concise text rendering over verbose tool-description prose.
+- If tool descriptions change, keep `Use when`, `Do not use`, prerequisite guards, and `Typical next step` intact while using terse field-name lists and bracket-style mutation tags consistent with the compact-description pass.
+
 - No automatic forgetting, expiration, pruning, or lifecycle demotion.
 - No write I/O on read paths.
 - No access counters or retrieval reinforcement written during `recall`.
@@ -54,14 +58,21 @@ Microsoft's decay/forgetting ideas are useful as evidence for agent judgment, no
 
 ## Phase 1: Documentation And Workflow Guidance
 
+Token-budget constraint:
+
+- \[ ] Prefer AGENT/README/docs/prompt guidance over expanding every MCP tool description.
+- \[ ] If `consolidate`, `recall`, or `project_memory_summary` descriptions need updates, keep them to one compact clause or one terse field name.
+- \[ ] Measure description size if multiple tool descriptions change, and avoid regressing the compact MCP tool-description savings.
+- \[ ] MCP tool-description changes, if any, preserve the compact-description style from `apply-compact-mcp-tool-descriptions-02780260`.
+
 Goal: encode the safest research lesson before changing behavior.
 
 Tasks:
 
-- [ ] Update agent-facing guidance to say consolidation should deduplicate and preserve detail, not aggressively summarize.
-- [ ] Clarify that note creation is mnemonic's attention controller: store decisions, outcomes, corrections, durable context, and validated learnings; avoid low-signal routine chatter.
-- [ ] Clarify retrieval mode split: use `project_memory_summary` for broad orientation and `recall` for targeted questions.
-- [ ] Clarify that forgetting is explicit: temporary/permanent lifecycle, `supersedes`, `delete`, and `prune-superseded`; never hidden automatic deletion.
+- \[ ] Update agent-facing guidance to say consolidation should deduplicate and preserve detail, not aggressively summarize.
+- \[ ] Clarify that note creation is mnemonic's attention controller: store decisions, outcomes, corrections, durable context, and validated learnings; avoid low-signal routine chatter.
+- \[ ] Clarify retrieval mode split: use `project_memory_summary` for broad orientation and `recall` for targeted questions.
+- \[ ] Clarify that forgetting is explicit: temporary/permanent lifecycle, `supersedes`, `delete`, and `prune-superseded`; never hidden automatic deletion.
 
 Likely surfaces:
 
@@ -73,9 +84,9 @@ Likely surfaces:
 
 Validation:
 
-- [ ] Documentation stays concise and non-duplicative.
-- [ ] Tool/prompt guidance still preserves existing routing guards.
-- [ ] If prompt/tool prose changes, prompt/tool tests are updated where applicable.
+- \[ ] Documentation stays concise and non-duplicative.
+- \[ ] Tool/prompt guidance still preserves existing routing guards.
+- \[ ] If prompt/tool prose changes, prompt/tool tests are updated where applicable.
 
 ## Phase 2: Advisory Decay Evidence Model
 
@@ -111,12 +122,12 @@ decayInfo?: {
 
 Important design choices:
 
-- [ ] Keep field optional and fail-soft.
-- [ ] Compute from `updatedAt`, `lifecycle`, `role`, relationship count/type, and current time only.
-- [ ] Do not use access frequency.
-- [ ] Do not use content-language cues.
-- [ ] Do not change recall ranking in the first implementation.
-- [ ] Do not hide or demote notes automatically.
+- \[ ] Keep field optional and fail-soft.
+- \[ ] Compute from `updatedAt`, `lifecycle`, `role`, relationship count/type, and current time only.
+- \[ ] Do not use access frequency.
+- \[ ] Do not use content-language cues.
+- \[ ] Do not change recall ranking in the first implementation.
+- \[ ] Do not hide or demote notes automatically.
 
 Likely locations:
 
@@ -125,9 +136,9 @@ Likely locations:
 
 Open design questions:
 
-- [ ] Should `decayInfo` appear per recall result, consolidation evidence, project summary maintenance diagnostics, or only in one place initially?
-- [ ] Should half-life constants be fixed conservative defaults or project-policy configurable later?
-- [ ] Should permanent decisions ever receive a maintenance hint solely from age? Initial recommendation: no.
+- \[ ] Should `decayInfo` appear per recall result, consolidation evidence, project summary maintenance diagnostics, or only in one place initially?
+- \[ ] Should half-life constants be fixed conservative defaults or project-policy configurable later?
+- \[ ] Should permanent decisions ever receive a maintenance hint solely from age? Initial recommendation: no.
 
 ## Phase 3: Maintenance Pressure Diagnostics
 
@@ -149,9 +160,9 @@ Likely initial surface:
 
 Constraints:
 
-- [ ] No new full-vault embedding scans on ordinary read paths unless data is already loaded by the tool.
-- [ ] No duplicate detection inside `project_memory_summary` unless embeddings are already available cheaply; otherwise route users to `consolidate(dry-run)`.
-- [ ] Warnings must recommend explicit next actions, not imply automatic cleanup.
+- \[ ] No new full-vault embedding scans on ordinary read paths unless data is already loaded by the tool.
+- \[ ] No duplicate detection inside `project_memory_summary` unless embeddings are already available cheaply; otherwise route users to `consolidate(dry-run)`.
+- \[ ] Warnings must recommend explicit next actions, not imply automatic cleanup.
 
 Candidate warning examples:
 
@@ -163,9 +174,9 @@ Few anchor/summary/decision notes found; consider consolidating durable project 
 
 Validation:
 
-- [ ] Text output includes compact warnings.
-- [ ] Structured output includes machine-readable warning codes if added.
-- [ ] Existing project-summary tests cover no-warning and warning cases.
+- \[ ] Text output includes compact warnings.
+- \[ ] Structured output includes machine-readable warning codes if added.
+- \[ ] Existing project-summary tests cover no-warning and warning cases.
 
 ## Phase 4: Consolidation Evidence Refinement
 
@@ -182,16 +193,16 @@ Enhancements to consider:
 
 Constraints:
 
-- [ ] Do not auto-merge.
-- [ ] Keep merge risk conservative.
-- [ ] Avoid pushing agents to consolidate research notes that contain unique source evidence.
-- [ ] Preserve current idempotent `execute-merge` behavior.
+- \[ ] Do not auto-merge.
+- \[ ] Keep merge risk conservative.
+- \[ ] Avoid pushing agents to consolidate research notes that contain unique source evidence.
+- \[ ] Preserve current idempotent `execute-merge` behavior.
 
 Validation:
 
-- [ ] Unit tests for classification edge cases.
-- [ ] Existing consolidate tests still pass.
-- [ ] Dogfood on current vault confirms warnings are useful and not noisy.
+- \[ ] Unit tests for classification edge cases.
+- \[ ] Existing consolidate tests still pass.
+- \[ ] Dogfood on current vault confirms warnings are useful and not noisy.
 
 ## Phase 5: Stateful Dogfooding Before Behavior Changes
 
@@ -199,25 +210,25 @@ Goal: validate diagnostics over realistic memory evolution before changing ranki
 
 Dogfooding scenarios:
 
-- [ ] Research-heavy RPIR task with multiple temporary research notes.
-- [ ] Plan/apply/review workflow where overlap is expected lineage, not duplication.
-- [ ] Completed feature arc where temporary notes should consolidate into a permanent summary.
-- [ ] Superseded decision chain where pruning may be appropriate after review.
-- [ ] Broad orientation query versus targeted recall query.
+- \[ ] Research-heavy RPIR task with multiple temporary research notes.
+- \[ ] Plan/apply/review workflow where overlap is expected lineage, not duplication.
+- \[ ] Completed feature arc where temporary notes should consolidate into a permanent summary.
+- \[ ] Superseded decision chain where pruning may be appropriate after review.
+- \[ ] Broad orientation query versus targeted recall query.
 
 Measurements:
 
-- [ ] Did diagnostics identify real maintenance needs?
-- [ ] Did diagnostics create false pressure to merge unique evidence?
-- [ ] Did agents choose better next actions because of warnings?
-- [ ] Did recall remain precise and project summary remain useful?
-- [ ] Were there any hidden writes, ranking changes, or silent omissions? Expected answer: no.
+- \[ ] Did diagnostics identify real maintenance needs?
+- \[ ] Did diagnostics create false pressure to merge unique evidence?
+- \[ ] Did agents choose better next actions because of warnings?
+- \[ ] Did recall remain precise and project summary remain useful?
+- \[ ] Were there any hidden writes, ranking changes, or silent omissions? Expected answer: no.
 
 Exit criteria:
 
-- [ ] Advisory diagnostics are useful enough to keep.
-- [ ] No evidence supports automatic forgetting.
-- [ ] Any future ranking or lifecycle behavior change has separate plan/research evidence.
+- \[ ] Advisory diagnostics are useful enough to keep.
+- \[ ] No evidence supports automatic forgetting.
+- \[ ] Any future ranking or lifecycle behavior change has separate plan/research evidence.
 
 ## Recommended Implementation Order
 
