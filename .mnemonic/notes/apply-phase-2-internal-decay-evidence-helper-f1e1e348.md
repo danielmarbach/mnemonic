@@ -8,11 +8,14 @@ tags:
   - provenance
 lifecycle: temporary
 createdAt: '2026-05-12T20:47:07.651Z'
-updatedAt: '2026-05-12T20:47:07.651Z'
+updatedAt: '2026-05-12T20:47:15.395Z'
 role: context
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: plan-advisory-memory-health-diagnostics-from-microsoft-memor-a0aa3e62
+    type: follows
 memoryVersion: 1
 ---
 # Apply: Phase 2 Internal Decay Evidence Helper

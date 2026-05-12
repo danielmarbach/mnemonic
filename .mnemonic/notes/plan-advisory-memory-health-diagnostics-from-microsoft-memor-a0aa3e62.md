@@ -9,7 +9,7 @@ tags:
   - consolidation
 lifecycle: temporary
 createdAt: '2026-05-12T20:26:48.494Z'
-updatedAt: '2026-05-12T20:38:35.289Z'
+updatedAt: '2026-05-12T20:47:15.395Z'
 role: plan
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -20,6 +20,8 @@ relatedTo:
   - id: apply-compact-mcp-tool-descriptions-02780260
     type: related-to
   - id: apply-phase-1-advisory-memory-guidance-from-microsoft-memory-c5e347cc
+    type: follows
+  - id: apply-phase-2-internal-decay-evidence-helper-f1e1e348
     type: follows
 memoryVersion: 1
 ---
