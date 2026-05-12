@@ -9,7 +9,7 @@ tags:
   - consolidation
 lifecycle: temporary
 createdAt: '2026-05-12T20:26:48.494Z'
-updatedAt: '2026-05-12T20:27:22.695Z'
+updatedAt: '2026-05-12T20:30:30.124Z'
 role: plan
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -37,17 +37,30 @@ The plan focuses on advisory memory-shaping signals: documentation guidance, mai
 
 ## Non-Negotiable Constraints
 
+- Structured output and text output must align: every new structured diagnostic must have compact text rendering, and every new text diagnostic must be represented in structured output unless explicitly text-only with rationale.
+- Follow the structured-output principle for every new field: exported TypeScript type/interface, Zod schema with `.describe()`, tool description Returns mention when exposed through an MCP tool, text rendering, and integration tests that parse real MCP responses.
+- Any TypeScript implementation phase must be reviewed by a fresh subagent using the TypeScript code review skill, with attention to type safety, schema drift, output alignment, and maintainability.
+
 - Preserve the recent compact MCP tool-description optimization: do not expand tool prose unless the added wording is load-bearing for routing or safe use.
+
 - Prefer structured output fields, Zod `.describe()`, and concise text rendering over verbose tool-description prose.
+
 - If tool descriptions change, keep `Use when`, `Do not use`, prerequisite guards, and `Typical next step` intact while using terse field-name lists and bracket-style mutation tags consistent with the compact-description pass.
 
 - No automatic forgetting, expiration, pruning, or lifecycle demotion.
+
 - No write I/O on read paths.
+
 - No access counters or retrieval reinforcement written during `recall`.
+
 - No hidden LLM-generated relationships/entities.
+
 - No delayed visibility or maturation gate for new notes.
+
 - All new diagnostics must be advisory, fail-soft, and derived from already-loaded notes, relationships, metadata, embeddings, or session cache.
+
 - Any new structured output fields need Zod `.describe()`, tool description prose, text rendering, and integration tests.
+
 - Preserve `recall` as targeted retrieval and `project_memory_summary` as broad orientation.
 
 ## Design Principle
@@ -89,6 +102,14 @@ Validation:
 - \[ ] If prompt/tool prose changes, prompt/tool tests are updated where applicable.
 
 ## Phase 2: Advisory Decay Evidence Model
+
+Structured-output constraint if exposed beyond internal helpers:
+
+- \[ ] Add exported TypeScript types/interfaces for decay evidence.
+- \[ ] Add Zod schema fields with `.describe()` for every new field.
+- \[ ] Render the same diagnostic compactly in text output.
+- \[ ] Add integration tests that validate real MCP output against exported schemas.
+- \[ ] Keep tool prose compact and aligned with recent token-optimization constraints.
 
 Goal: design a metadata-only decay model that explains freshness/staleness without changing ranking or deleting notes.
 
@@ -141,6 +162,12 @@ Open design questions:
 - \[ ] Should permanent decisions ever receive a maintenance hint solely from age? Initial recommendation: no.
 
 ## Phase 3: Maintenance Pressure Diagnostics
+
+Output-alignment constraint:
+
+- \[ ] Warning codes/details in structured output must have matching compact text warnings.
+- \[ ] Text warnings must not contain information unavailable in structured output, unless documented as presentation-only phrasing.
+- \[ ] Tests must cover both structured warning data and text rendering.
 
 Goal: surface memory-health warnings that guide agents toward explicit maintenance tools.
 
@@ -205,6 +232,11 @@ Validation:
 - \[ ] Dogfood on current vault confirms warnings are useful and not noisy.
 
 ## Phase 5: Stateful Dogfooding Before Behavior Changes
+
+Review constraint:
+
+- \[ ] Before accepting TypeScript changes, dispatch a fresh-context TypeScript review subagent using the TypeScript code review skill.
+- \[ ] Reviewer must check structured/text output alignment, Zod schema descriptions, MCP tool description compactness, fail-soft behavior, and absence of read-path writes.
 
 Goal: validate diagnostics over realistic memory evolution before changing ranking/lifecycle behavior.
 
