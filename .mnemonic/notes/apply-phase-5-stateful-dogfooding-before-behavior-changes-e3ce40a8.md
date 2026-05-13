@@ -8,7 +8,7 @@ tags:
   - stateful
 lifecycle: temporary
 createdAt: '2026-05-13T04:27:57.116Z'
-updatedAt: '2026-05-13T04:36:22.077Z'
+updatedAt: '2026-05-13T04:36:49.406Z'
 role: context
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -28,7 +28,7 @@ Dogfooding against local build (`npm run build:fast`, then `MNEMONIC_ENTRYPOINT=
 
 Validate diagnostics over realistic memory evolution before changing ranking/lifecycle behavior. Using local build, not the installed MCP in session.
 
-## S1: Project summary maintenance warnings (Phase 3)
+Verdict: PASS — warnings are advisory, fail-soft, and only appear when genuine maintenance needs exist.
 
 Ran `project_memory_summary` against the local build. Result: **no maintenance warnings generated**.
 
@@ -36,43 +36,43 @@ This is correct: the mnemonic vault has no stale temporary notes, no superseded 
 
 **Verdict: PASS** — warnings are advisory, fail-soft, and only appear when genuine maintenance needs exist.
 
-## S2: Consolidate find-clusters (Phase 4)
+Verdict: PASS — clusters are useful and not noisy.
 
 Identified theme clusters correctly — `Other` (5 notes) and `Decisions` (3 notes). Useful, not noisy.
 
 **Verdict: PASS**
 
-## S3: Consolidate detect-duplicates (Phase 4 classification)
+Verdict: PASS — no false duplicate pressure on unique evidence.
 
 "No duplicates found above the similarity threshold." Correct — vault has no near-duplicate notes. All RPIR notes are distinct.
 
 **Verdict: PASS** — no false duplicate pressure on unique evidence.
 
-## S4: Consolidate suggest-merges (Phase 4 classification + evidence)
+Verdict: PASS — no false pressure to merge.
 
 "No merge suggestions found." Correct — vault notes are well-structured. Classification did not suggest merging unique evidence.
 
 **Verdict: PASS** — no false pressure to merge.
 
-## S5: Recall — decay NOT exposed (Phase 2 internal-only)
+Verdict: PASS — decay evidence is correctly internal-only.
 
 `decayInfo` is NOT present in recall structured output. The word "decay" appears only in note content, not in the output format. Phase 2 decay evidence remains internal-only as designed.
 
 **Verdict: PASS**
 
-## S6: Recall evidence — signalStrength present
+Verdict: PASS — signalStrength continues to work correctly.
 
 `signalStrength` values present in recall results with `evidence: "compact"` (0.18–0.33 range). Existing feature continues to work correctly.
 
 **Verdict: PASS**
 
-## S7: Plan/apply/review lineage — temporary notes
+Verdict: PASS — lineage notes are not flagged as duplicates.
 
 All temporary notes correctly returned with role tagging (plan, research, apply, review, context). No false pressure to merge lineage-related notes.
 
 **Verdict: PASS**
 
-## S8: Superseded decision chain
+Verdict: PASS — supersession-pressure classification works correctly.
 
 No superseded notes exist. Consolidation correctly handles this by not generating merge/prune suggestions.
 
@@ -109,11 +109,15 @@ Ran `scripts/run-dogfood-packs.mjs --isolated` with `MNEMONIC_ENTRYPOINT=build/i
 ## Exit Criteria
 
 - \[x] Advisory diagnostics are useful enough to keep
+
 - \[x] No evidence supports automatic forgetting
+
 - \[x] Any future ranking or lifecycle behavior change has separate plan/research evidence
 
 - Advisory diagnostics are useful enough to keep.
+
 - No evidence supports automatic forgetting.
+
 - Any future ranking or lifecycle behavior change has separate plan/research evidence.
 
 ## Conclusion
