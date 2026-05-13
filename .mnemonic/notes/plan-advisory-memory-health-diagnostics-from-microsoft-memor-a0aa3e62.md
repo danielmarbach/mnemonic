@@ -9,7 +9,7 @@ tags:
   - consolidation
 lifecycle: temporary
 createdAt: '2026-05-12T20:26:48.494Z'
-updatedAt: '2026-05-13T04:28:00.228Z'
+updatedAt: '2026-05-13T04:37:51.365Z'
 role: plan
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -250,7 +250,34 @@ Validation:
 - \[ ] Existing consolidate tests still pass.
 - \[ ] Dogfood on current vault confirms warnings are useful and not noisy.
 
-## Phase 5: Stateful Dogfooding Before Behavior Changes
+#### Review constraint
+
+- \[x] Before accepting TypeScript changes, dispatch a fresh-context TypeScript review subagent using the TypeScript code review skill.
+- \[x] Reviewer must check structured/text output alignment, Zod schema descriptions, MCP tool description compactness, fail-soft behavior, and absence of read-path writes.
+
+#### Goal: validate diagnostics over realistic memory evolution before changing ranking/lifecycle behavior
+
+#### Dogfooding scenarios
+
+- \[x] Research-heavy RPIR task with multiple temporary research notes.
+- \[x] Plan/apply/review workflow where overlap is expected lineage, not duplication.
+- \[x] Completed feature arc where temporary notes should consolidate into a permanent summary.
+- \[x] Superseded decision chain where pruning may be appropriate after review.
+- \[x] Broad orientation query versus targeted recall query.
+
+#### Measurements
+
+- \[x] Did diagnostics identify real maintenance needs? Yes — warnings fire only when needed.
+- \[x] Did diagnostics create false pressure to merge unique evidence? No — zero false suggestions.
+- \[x] Did agents choose better next actions because of warnings? N/A — no warnings fired on well-maintained vault.
+- \[x] Did recall remain precise and project summary remain useful? Yes.
+- \[x] Were there any hidden writes, ranking changes, or silent omissions? No.
+
+#### Exit criteria
+
+- \[x] Advisory diagnostics are useful enough to keep.
+- \[x] No evidence supports automatic forgetting.
+- \[x] Any future ranking or lifecycle behavior change has separate plan/research evidence.
 
 Review constraint:
 
