@@ -35,7 +35,7 @@ import { NOTE_LIFECYCLES, NOTE_ROLES, type Note } from "../storage.js";
 import {
   type UpdateResult,
   UpdateToolResultSchema,
-  type LintErrorResult,
+  type UpdateLintErrorResult,
   NoteIdSchema,
   type PersistenceStatus,
 } from "../structured-content.js";
@@ -61,7 +61,7 @@ export function registerUpdateTool(server: McpServer, ctx: ServerContext): void 
         "Do not use this when:\n" +
         "- No note exists yet; use `remember`\n" +
         "- Several notes need to be merged or retired together; use `consolidate`\n\n" +
-        "Returns: updated id, changed fields, persistence status.\n\n" +
+        "Returns: updated id, changed fields, persistence status. On lint failure, returns action=lint_error with the list of unfixable issues.\n\n" +
         "[mutating: rewrites note, refreshes embeddings, git commits, may push]\n\n" +
         "Typical next step:\n" +
         "- Use `relate` or `consolidate` if the update changes how this note connects to others.\n\n" +
@@ -197,7 +197,11 @@ export function registerUpdateTool(server: McpServer, ctx: ServerContext): void 
           const err = patchResult.error;
           if (err instanceof MarkdownLintError) {
             const message = `Semantic patch produced content with markdown lint issues. Fix the lint issues in your patch values and retry — do NOT fall back to full content rewrite.\n\n${err.message}`;
-            return { content: [{ type: "text", text: message }], isError: true };
+            return {
+              content: [{ type: "text" as const, text: message }],
+              structuredContent: { action: "lint_error", tool: "update", issues: err.issues } satisfies UpdateLintErrorResult,
+              isError: true,
+            };
           }
           const message = getErrorMessage(err);
           return { content: [{ type: "text", text: `Semantic patch failed: ${message}` }], isError: true };
@@ -214,7 +218,7 @@ export function registerUpdateTool(server: McpServer, ctx: ServerContext): void 
             const message = `Markdown lint issues prevented the update. Fix the specific lint errors in your content and retry — do NOT fall back to semanticPatch for this.\n\n${err.message}`;
             return {
               content: [{ type: "text" as const, text: message }],
-              structuredContent: { action: "lint_error", tool: "update", issues: err.issues } as LintErrorResult,
+              structuredContent: { action: "lint_error", tool: "update", issues: err.issues } satisfies UpdateLintErrorResult,
               isError: true,
             };
           }

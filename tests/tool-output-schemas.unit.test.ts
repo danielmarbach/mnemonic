@@ -21,6 +21,31 @@ describe("tool output schemas", () => {
       const parsed = RememberToolResultSchema.safeParse({ action: "remembered" });
       expect(parsed.success).toBe(false);
     });
+
+    it("rejects lint_error payload without tool field", () => {
+      const parsed = RememberToolResultSchema.safeParse({
+        action: "lint_error",
+        issues: ["some issue"],
+      });
+      expect(parsed.success).toBe(false);
+    });
+
+    it("rejects lint_error payload without issues field", () => {
+      const parsed = RememberToolResultSchema.safeParse({
+        action: "lint_error",
+        tool: "remember",
+      });
+      expect(parsed.success).toBe(false);
+    });
+
+    it("rejects lint_error payload with wrong tool", () => {
+      const parsed = RememberToolResultSchema.safeParse({
+        action: "lint_error",
+        tool: "update",
+        issues: ["some issue"],
+      });
+      expect(parsed.success).toBe(false);
+    });
   });
 
   describe("UpdateToolResultSchema", () => {
@@ -36,6 +61,31 @@ describe("tool output schemas", () => {
 
     it("rejects updated payload when required fields are missing", () => {
       const parsed = UpdateToolResultSchema.safeParse({ action: "updated" });
+      expect(parsed.success).toBe(false);
+    });
+
+    it("rejects lint_error payload without tool field", () => {
+      const parsed = UpdateToolResultSchema.safeParse({
+        action: "lint_error",
+        issues: ["some issue"],
+      });
+      expect(parsed.success).toBe(false);
+    });
+
+    it("rejects lint_error payload without issues field", () => {
+      const parsed = UpdateToolResultSchema.safeParse({
+        action: "lint_error",
+        tool: "update",
+      });
+      expect(parsed.success).toBe(false);
+    });
+
+    it("rejects lint_error payload with wrong tool", () => {
+      const parsed = UpdateToolResultSchema.safeParse({
+        action: "lint_error",
+        tool: "remember",
+        issues: ["some issue"],
+      });
       expect(parsed.success).toBe(false);
     });
   });

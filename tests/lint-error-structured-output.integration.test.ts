@@ -40,6 +40,7 @@ describe("lint error structured output", () => {
       expect(rememberLint.structuredContent?.tool).toBe("remember");
       expect(Array.isArray(rememberLint.structuredContent?.issues)).toBe(true);
       expect((rememberLint.structuredContent?.issues as unknown[]).length).toBeGreaterThan(0);
+      expect(rememberLint.text).toMatch(/fenced code blocks? (?:should have|require) a language/i);
 
       const rememberOk = await callLocalMcpResponse(
         vaultDir,
@@ -76,6 +77,7 @@ describe("lint error structured output", () => {
       expect(updateLint.structuredContent?.tool).toBe("update");
       expect(Array.isArray(updateLint.structuredContent?.issues)).toBe(true);
       expect((updateLint.structuredContent?.issues as unknown[]).length).toBeGreaterThan(0);
+      expect(updateLint.text).toMatch(/fenced code blocks? (?:should have|require) a language/i);
     } finally {
       await fakeEmbedding.close();
     }

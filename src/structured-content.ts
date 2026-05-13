@@ -83,11 +83,17 @@ export interface ProjectRef {
   name: string;
 }
 
-export interface LintErrorResult extends Record<string, unknown> {
+export type RememberLintErrorResult = {
   action: "lint_error";
-  tool: "remember" | "update";
+  tool: "remember";
   issues: string[];
-}
+};
+
+export type UpdateLintErrorResult = {
+  action: "lint_error";
+  tool: "update";
+  issues: string[];
+};
 
 export interface RememberResult extends Record<string, unknown> {
   action: "remembered";
@@ -644,12 +650,6 @@ export const PersistenceStatusSchema = z.object({
   durability: z.enum(["local-only", "committed", "pushed"]),
 });
 
-export const LintErrorResultSchema = z.object({
-  action: z.literal("lint_error"),
-  tool: z.enum(["remember", "update"]),
-  issues: z.array(z.string()),
-});
-
 export const RememberResultSchema = z.object({
   action: z.literal("remembered"),
   id: z.string(),
@@ -664,18 +664,18 @@ export const RememberResultSchema = z.object({
 });
 
 export const RememberToolResultSchema = z.object({
-  action: z.enum(["remembered", "lint_error"]),
-  tool: z.literal("remember").optional(),
-  id: z.string().optional(),
-  title: z.string().optional(),
-  project: ProjectRefSchema.optional(),
-  scope: z.enum(["project", "global"]).optional(),
-  vault: _VaultLabel.optional(),
-  tags: z.array(z.string()).optional(),
-  lifecycle: _NoteLifecycle.optional(),
-  timestamp: z.string().optional(),
-  persistence: PersistenceStatusSchema.optional(),
-  issues: z.array(z.string()).optional(),
+  action: z.enum(["remembered", "lint_error"]).describe("Result variant: 'remembered' for success, 'lint_error' when unfixable markdown lint errors prevented storage."),
+  tool: z.literal("remember").optional().describe("Present and set to 'remember' when action is lint_error."),
+  id: z.string().optional().describe("Note id, present when action is remembered."),
+  title: z.string().optional().describe("Note title, present when action is remembered."),
+  project: ProjectRefSchema.optional().describe("Project reference, present when action is remembered."),
+  scope: z.enum(["project", "global"]).optional().describe("Storage scope, present when action is remembered."),
+  vault: _VaultLabel.optional().describe("Vault label, present when action is remembered."),
+  tags: z.array(z.string()).optional().describe("Note tags, present when action is remembered."),
+  lifecycle: _NoteLifecycle.optional().describe("Note lifecycle, present when action is remembered."),
+  timestamp: z.string().optional().describe("ISO timestamp, present when action is remembered."),
+  persistence: PersistenceStatusSchema.optional().describe("Git and embedding persistence status, present when action is remembered."),
+  issues: z.array(z.string()).optional().describe("Unfixable markdown lint issues that prevented storage. Present when action is lint_error."),
 }).superRefine((value, ctx) => {
   if (value.action === "remembered") {
     if (!value.id) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["id"], message: "id is required when action=remembered" });
@@ -798,18 +798,18 @@ export const UpdateResultSchema = z.object({
 });
 
 export const UpdateToolResultSchema = z.object({
-  action: z.enum(["updated", "lint_error"]),
-  tool: z.literal("update").optional(),
-  id: z.string().optional(),
-  title: z.string().optional(),
-  fieldsModified: z.array(z.string()).optional(),
-  timestamp: z.string().optional(),
-  project: ProjectRefSchema.optional(),
-  lifecycle: _NoteLifecycle.optional(),
-  role: _NoteRole.optional(),
-  lintWarnings: z.array(z.string()).optional(),
-  persistence: PersistenceStatusSchema.optional(),
-  issues: z.array(z.string()).optional(),
+  action: z.enum(["updated", "lint_error"]).describe("Result variant: 'updated' for success, 'lint_error' when unfixable markdown lint errors prevented the update."),
+  tool: z.literal("update").optional().describe("Present and set to 'update' when action is lint_error."),
+  id: z.string().optional().describe("Note id, present when action is updated."),
+  title: z.string().optional().describe("Note title, present when action is updated."),
+  fieldsModified: z.array(z.string()).optional().describe("List of fields that changed, present when action is updated."),
+  timestamp: z.string().optional().describe("ISO timestamp, present when action is updated."),
+  project: ProjectRefSchema.optional().describe("Project reference, present when action is updated."),
+  lifecycle: _NoteLifecycle.optional().describe("Note lifecycle, present when action is updated."),
+  role: _NoteRole.optional().describe("Note role, present when action is updated."),
+  lintWarnings: z.array(z.string()).optional().describe("Auto-fixed lint warnings from semantic patch, present when action is updated."),
+  persistence: PersistenceStatusSchema.optional().describe("Git and embedding persistence status, present when action is updated."),
+  issues: z.array(z.string()).optional().describe("Unfixable markdown lint issues that prevented the update. Present when action is lint_error."),
 }).superRefine((value, ctx) => {
   if (value.action === "updated") {
     if (!value.id) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["id"], message: "id is required when action=updated" });
