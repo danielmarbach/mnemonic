@@ -8,11 +8,14 @@ tags:
   - phase-5
 lifecycle: temporary
 createdAt: '2026-05-13T04:43:35.036Z'
-updatedAt: '2026-05-13T04:43:35.036Z'
+updatedAt: '2026-05-13T04:43:41.448Z'
 role: review
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: plan-advisory-memory-health-diagnostics-from-microsoft-memor-a0aa3e62
+    type: follows
 memoryVersion: 1
 ---
 ## Constraint Checklist
