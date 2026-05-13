@@ -5,6 +5,8 @@ import {
   buildConsolidateNoteEvidence,
   buildGroupWarnings,
   buildNoteWarnings,
+  classifyConsolidationNote,
+  classifyConsolidationPair,
   deriveMergeRisk,
   filterRelationships,
   mergeRelationshipsFromNotes,
@@ -191,5 +193,221 @@ describe("consolidate helpers", () => {
     expect(evidence.mergeRisk).toBe("high");
     expect(evidence.warnings).toBeDefined();
     expect(evidence.warnings!.some((w) => w.includes("supersedes chain"))).toBe(true);
+  });
+
+  describe("classifyConsolidationPair", () => {
+    it("classifies lineage when notes have derives-from relationship", () => {
+      const plan = {
+        id: "plan-1",
+        title: "Implementation plan",
+        lifecycle: "temporary" as const,
+        role: "plan" as const,
+        updatedAt: "2026-04-10T00:00:00.000Z",
+        relatedTo: [{ id: "apply-1", type: "derives-from" as const }],
+      };
+      const apply = {
+        id: "apply-1",
+        title: "Apply implementation",
+        lifecycle: "temporary" as const,
+        role: "context" as const,
+        updatedAt: "2026-04-12T00:00:00.000Z",
+        relatedTo: [] as Array<{ id: string; type: string }>,
+      };
+      expect(classifyConsolidationPair(plan, apply)).toBe("lineage");
+    });
+
+    it("classifies lineage when notes have follows relationship", () => {
+      const research = {
+        id: "research-1",
+        title: "Research findings",
+        lifecycle: "temporary" as const,
+        role: "research" as const,
+        updatedAt: "2026-04-10T00:00:00.000Z",
+        relatedTo: [{ id: "plan-1", type: "follows" as const }],
+      };
+      const plan = {
+        id: "plan-1",
+        title: "Plan",
+        lifecycle: "temporary" as const,
+        role: "plan" as const,
+        updatedAt: "2026-04-12T00:00:00.000Z",
+        relatedTo: [] as Array<{ id: string; type: string }>,
+      };
+      expect(classifyConsolidationPair(research, plan)).toBe("lineage");
+    });
+
+    it("classifies supersession-pressure when one note supersedes another", () => {
+      const newer = {
+        id: "newer",
+        title: "Newer decision",
+        lifecycle: "permanent" as const,
+        role: "decision" as const,
+        updatedAt: "2026-04-12T00:00:00.000Z",
+        relatedTo: [{ id: "older", type: "supersedes" as const }],
+      };
+      const older = {
+        id: "older",
+        title: "Older decision",
+        lifecycle: "permanent" as const,
+        role: "decision" as const,
+        updatedAt: "2026-04-10T00:00:00.000Z",
+        relatedTo: [] as Array<{ id: string; type: string }>,
+      };
+      expect(classifyConsolidationPair(newer, older)).toBe("supersession-pressure");
+    });
+
+    it("classifies unique-evidence-risk for research notes without lineage", () => {
+      const researchA = {
+        id: "r1",
+        title: "Research A",
+        lifecycle: "temporary" as const,
+        role: "research" as const,
+        updatedAt: "2026-04-10T00:00:00.000Z",
+        relatedTo: [] as Array<{ id: string; type: string }>,
+      };
+      const researchB = {
+        id: "r2",
+        title: "Research B",
+        lifecycle: "temporary" as const,
+        role: "research" as const,
+        updatedAt: "2026-04-12T00:00:00.000Z",
+        relatedTo: [] as Array<{ id: string; type: string }>,
+      };
+      expect(classifyConsolidationPair(researchA, researchB)).toBe("unique-evidence-risk");
+    });
+
+    it("classifies lineage over research role when both apply", () => {
+      const researchWithLineage = {
+        id: "r1",
+        title: "Research with lineage",
+        lifecycle: "temporary" as const,
+        role: "research" as const,
+        updatedAt: "2026-04-10T00:00:00.000Z",
+        relatedTo: [{ id: "r2", type: "derives-from" as const }],
+      };
+      const researchB = {
+        id: "r2",
+        title: "Related research",
+        lifecycle: "temporary" as const,
+        role: "research" as const,
+        updatedAt: "2026-04-12T00:00:00.000Z",
+        relatedTo: [] as Array<{ id: string; type: string }>,
+      };
+      expect(classifyConsolidationPair(researchWithLineage, researchB)).toBe("lineage");
+    });
+
+    it("classifies duplicate-pressure for similar permanent notes without special conditions", () => {
+      const decisionA = {
+        id: "d1",
+        title: "Decision A",
+        lifecycle: "permanent" as const,
+        role: "decision" as const,
+        updatedAt: "2026-04-10T00:00:00.000Z",
+        relatedTo: [] as Array<{ id: string; type: string }>,
+      };
+      const decisionB = {
+        id: "d2",
+        title: "Decision B",
+        lifecycle: "permanent" as const,
+        role: "decision" as const,
+        updatedAt: "2026-04-12T00:00:00.000Z",
+        relatedTo: [] as Array<{ id: string; type: string }>,
+      };
+      expect(classifyConsolidationPair(decisionA, decisionB)).toBe("duplicate-pressure");
+    });
+  });
+
+  describe("classifyConsolidationNote", () => {
+    it("returns supersession-pressure for a note that supersedes another", () => {
+      const note = {
+        id: "newer",
+        title: "Newer decision",
+        lifecycle: "permanent" as const,
+        role: "decision" as const,
+        updatedAt: "2026-04-12T00:00:00.000Z",
+        relatedTo: [{ id: "older", type: "supersedes" as const }],
+      };
+      const allNotes = [note];
+      const contextIds = new Set([note.id, "older"]);
+      expect(classifyConsolidationNote(note, allNotes, contextIds)).toBe("supersession-pressure");
+    });
+
+    it("returns supersession-pressure for a note that is superseded", () => {
+      const note = {
+        id: "older",
+        title: "Older decision",
+        lifecycle: "permanent" as const,
+        role: "decision" as const,
+        updatedAt: "2026-04-10T00:00:00.000Z",
+        relatedTo: [] as Array<{ id: string; type: string }>,
+      };
+      const newer = {
+        id: "newer",
+        title: "Newer decision",
+        lifecycle: "permanent" as const,
+        role: "decision" as const,
+        updatedAt: "2026-04-12T00:00:00.000Z",
+        relatedTo: [{ id: "older", type: "supersedes" as const }],
+      };
+      const allNotes = [note, newer];
+      const contextIds = new Set([note.id, newer.id]);
+      expect(classifyConsolidationNote(note, allNotes, contextIds)).toBe("supersession-pressure");
+    });
+
+    it("returns lineage for a note with derives-from to a context note", () => {
+      const note = {
+        id: "apply-1",
+        title: "Apply plan",
+        lifecycle: "temporary" as const,
+        role: "context" as const,
+        updatedAt: "2026-04-12T00:00:00.000Z",
+        relatedTo: [{ id: "plan-1", type: "derives-from" as const }],
+      };
+      const allNotes = [note];
+      const contextIds = new Set([note.id, "plan-1"]);
+      expect(classifyConsolidationNote(note, allNotes, contextIds)).toBe("lineage");
+    });
+
+    it("returns unique-evidence-risk for research notes without lineage", () => {
+      const note = {
+        id: "r1",
+        title: "Research findings",
+        lifecycle: "temporary" as const,
+        role: "research" as const,
+        updatedAt: "2026-04-10T00:00:00.000Z",
+        relatedTo: [] as Array<{ id: string; type: string }>,
+      };
+      const allNotes = [note];
+      const contextIds = new Set([note.id]);
+      expect(classifyConsolidationNote(note, allNotes, contextIds)).toBe("unique-evidence-risk");
+    });
+
+    it("returns undefined for plain permanent notes without special conditions", () => {
+      const note = {
+        id: "d1",
+        title: "Decision",
+        lifecycle: "permanent" as const,
+        role: "decision" as const,
+        updatedAt: "2026-04-10T00:00:00.000Z",
+        relatedTo: [] as Array<{ id: string; type: string }>,
+      };
+      const allNotes = [note];
+      const contextIds = new Set([note.id]);
+      expect(classifyConsolidationNote(note, allNotes, contextIds)).toBeUndefined();
+    });
+
+    it("prefers lineage over research role when both conditions apply", () => {
+      const note = {
+        id: "r1",
+        title: "Research with lineage",
+        lifecycle: "temporary" as const,
+        role: "research" as const,
+        updatedAt: "2026-04-10T00:00:00.000Z",
+        relatedTo: [{ id: "plan-1", type: "derives-from" as const }],
+      };
+      const allNotes = [note];
+      const contextIds = new Set([note.id, "plan-1"]);
+      expect(classifyConsolidationNote(note, allNotes, contextIds)).toBe("lineage");
+    });
   });
 });

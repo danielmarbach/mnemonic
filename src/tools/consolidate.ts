@@ -35,7 +35,7 @@ export function registerConsolidateTool(server: McpServer, ctx: ServerContext): 
         "Do not use this when:\n" +
         "- You only need a small edit to one note; use `update`\n" +
         "- You only want to connect notes; use `relate`\n\n" +
-        "Returns: canonical memory id, source ids, relationships, persistence status.\n\n" +
+        "Returns: canonical memory id, source ids, relationships, persistence status, classification (lineage/duplicate-pressure/unique-evidence-risk/supersession-pressure), maintenance warnings.\n\n" +
         "[mutating: creates/updates canonical note, modifies/removes sources per mode, git commits, may push]\n\n" +
         "Typical next step:\n" +
         "- Use `get` to inspect the canonical note and `recall` to confirm duplication is reduced.\n" +

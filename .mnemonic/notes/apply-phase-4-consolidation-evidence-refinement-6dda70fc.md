@@ -8,8 +8,8 @@ tags:
   - classification
 lifecycle: temporary
 createdAt: '2026-05-12T21:13:59.496Z'
-updatedAt: '2026-05-12T21:14:03.056Z'
-role: plan
+updatedAt: '2026-05-12T21:53:27.295Z'
+role: context
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
@@ -22,40 +22,18 @@ memoryVersion: 1
 
 Implements Phase 4 of `plan-advisory-memory-health-diagnostics-from-microsoft-memor-a0aa3e62`.
 
-## Why Consolidate Evidence Refinement
-
-Current dogfood showed `consolidate(dry-run)` already finds high-similarity pairs and large connected clusters. The gap is interpretation. Evidence warnings should help agents distinguish expected workflow lineage from problematic duplication, and avoid merging research notes that contain unique source evidence.
-
 ## What Changed
 
-- Added `ConsolidateClassification` types: `lineage`, `duplicate-pressure`, `supersession-pressure`, `unique-evidence-risk`
-- Added `classifyConsolidationPair` and `classifyConsolidationWarning` helpers in `src/consolidate.ts`
-- Added classification to `ConsolidateNoteMergeEvidence` interface and Zod schema
-- Enhanced `buildConsolidateNoteEvidence` to include classification alongside existing warnings
-- Enhanced text output in `detectDuplicates`, `suggestMerges`, and `executeMerge` to show classification
-- Added `ConsolidateResult.maintenanceWarnings` for project-level consolidate warnings (stale temporary and superseded prune candidates)
-- Added unit tests for classification edge cases
-- Added integration test for dry-run classification output
-
-## Classification Logic
-
-- `lineage`: plan/apply/review notes in same similarity pair with derives-from or follows relationship — expected overlap, not duplication
-- `duplicate-pressure`: same role/lifecycle, high similarity, no clear derives-from/follows relationship
-- `unique-evidence-risk`: research notes without follows/derives-from links — merging risks losing unique source evidence
-- `supersession-pressure`: older notes with explicit supersedes relationship and high staleness
-
-## Constraints Preserved
-
-- No auto-merge.
-- Preserve current idempotent execute-merge behavior.
-- Keep merge risk conservative.
-- Classification is advisory — agents still make the final decision.
-- Structured output and text output aligned.
-- No new I/O on consolidate paths — classification derives from already-loaded note metadata and embeddings.
+- Added `ConsolidateClassification` type: `lineage`, `duplicate-pressure`, `unique-evidence-risk`, `supersession-pressure`
+- Added `classifyConsolidationPair` and `classifyConsolidationNote` helpers in `src/consolidate.ts`
+- Added `classification` field to `ConsolidateNoteMergeEvidence` with Zod `.describe()`
+- Added `ConsolidateMaintenanceWarning` type reusing project-maintenance warning pattern
+- Added `maintenanceWarnings` to `ConsolidateResult` for project-level warnings
+- Enhanced text output in `detectDuplicates`, `suggestMerges`, `executeMerge` for classification
+- Added maintenance warnings text output in `dryRunAll`
+- Added 12 unit tests for classification logic
+- Updated consolidate tool description
 
 ## Validation
 
-- `npm run build` — pass
-- `npm test` — pass
-- Existing consolidate tests still pass
-- Dogfood on current vault confirms warnings are useful and not noisy
+- build pass, 24 consolidate unit tests pass, 50 integration tests pass

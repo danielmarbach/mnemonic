@@ -5,6 +5,11 @@ import type { NoteLifecycle, NoteRole, RelationshipType } from "./storage.js";
 import { MERGE_RISKS } from "./consolidate.js";
 import type { MergeRisk } from "./consolidate.js";
 
+export const CONSOLIDATE_CLASSIFICATIONS = ["lineage", "duplicate-pressure", "unique-evidence-risk", "supersession-pressure"] as const;
+export type ConsolidateClassification = typeof CONSOLIDATE_CLASSIFICATIONS[number];
+
+export const CONSOLIDATE_MAINTENANCE_WARNING_CODES = ["stale-temporary-notes", "superseded-prune-candidates"] as const;
+
 export const PROJECT_MAINTENANCE_WARNING_CODES = ["stale-temporary-notes", "superseded-prune-candidates", "weak-orientation-anchors"] as const;
 export const PROJECT_MAINTENANCE_WARNING_SEVERITIES = ["info", "warning"] as const;
 
@@ -291,6 +296,7 @@ export interface ConsolidateResult extends Record<string, unknown> {
   notesProcessed: number;
   notesModified: number;
   warnings?: string[];
+  maintenanceWarnings?: ConsolidateMaintenanceWarning[];
   themeGroups?: Array<{ name: string; count: number; examples: string[] }>;
   relationshipClusters?: Array<{ hub: { id: string; title: string }; notes: { id: string; title: string }[] }>;
   duplicatePairs?: ConsolidateDuplicatePairEvidence[];
@@ -312,8 +318,18 @@ export interface ConsolidateNoteMergeEvidence {
   supersededBy?: string;
   supersededCount?: number;
   relatedCount: number;
+  classification?: ConsolidateClassification;
   warnings?: string[];
   mergeRisk: MergeRisk;
+}
+
+export interface ConsolidateMaintenanceWarning {
+  code: string;
+  severity: "info" | "warning";
+  message: string;
+  count?: number;
+  sampleNotes?: Array<{ id: string; title: string }>;
+  suggestedAction: string;
 }
 
 export interface ConsolidateDuplicatePairEvidence {
@@ -978,6 +994,43 @@ export const WhereIsResultSchema = z.object({
   relatedCount: z.number(),
 });
 
+export const ConsolidateClassificationSchema = z.enum(CONSOLIDATE_CLASSIFICATIONS)
+  .describe("Advisory classification for consolidation evidence: lineage (expected workflow overlap), duplicate-pressure (same role/lifecycle, no lineage), unique-evidence-risk (research with unique source), supersession-pressure (superseded and stale).");
+
+const ConsolidateNoteMergeEvidenceBaseSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  lifecycle: _NoteLifecycle,
+  role: _NoteRole.optional(),
+  ageDays: z.number(),
+  superseded: z.boolean(),
+  supersededBy: z.string().optional(),
+  supersededCount: z.number().int().optional(),
+  relatedCount: z.number(),
+  classification: ConsolidateClassificationSchema.optional()
+    .describe("Advisory classification for this note in the consolidation context."),
+  warnings: z.array(z.string()).optional(),
+  mergeRisk: _MergeRisk,
+});
+
+export const ConsolidateMaintenanceWarningSchema = z.object({
+  code: z.enum(CONSOLIDATE_MAINTENANCE_WARNING_CODES)
+    .describe("Stable warning code for a consolidation maintenance condition."),
+  severity: z.enum(PROJECT_MAINTENANCE_WARNING_SEVERITIES)
+    .describe("Advisory severity for the maintenance condition."),
+  message: z.string()
+    .describe("Compact human-readable maintenance warning."),
+  count: z.number().optional()
+    .describe("Number of notes or conditions represented by this warning."),
+  sampleNotes: z.array(z.object({
+    id: z.string().describe("Memory id for a bounded sample note."),
+    title: z.string().describe("Title for a bounded sample note."),
+  })).optional()
+    .describe("Bounded sample of notes that triggered this warning."),
+  suggestedAction: z.string()
+    .describe("Explicit next action for the agent; never an automatic cleanup action."),
+});
+
 export const ConsolidateResultSchema = z.object({
   action: z.literal("consolidated"),
   strategy: z.string(),
@@ -985,6 +1038,8 @@ export const ConsolidateResultSchema = z.object({
   notesProcessed: z.number(),
   notesModified: z.number(),
   warnings: z.array(z.string()).optional(),
+  maintenanceWarnings: z.array(ConsolidateMaintenanceWarningSchema).optional()
+    .describe("Advisory maintenance warnings derived from consolidate analysis."),
   themeGroups: z.array(z.object({
     name: z.string(),
     count: z.number(),
@@ -1002,32 +1057,8 @@ export const ConsolidateResultSchema = z.object({
   })).optional(),
   duplicatePairs: z.array(z.object({
     similarity: z.number(),
-    noteA: z.object({
-      id: z.string(),
-      title: z.string(),
-      lifecycle: _NoteLifecycle,
-      role: _NoteRole.optional(),
-      ageDays: z.number(),
-      superseded: z.boolean(),
-      supersededBy: z.string().optional(),
-      supersededCount: z.number().int().optional(),
-      relatedCount: z.number(),
-      warnings: z.array(z.string()).optional(),
-      mergeRisk: _MergeRisk,
-    }),
-    noteB: z.object({
-      id: z.string(),
-      title: z.string(),
-      lifecycle: _NoteLifecycle,
-      role: _NoteRole.optional(),
-      ageDays: z.number(),
-      superseded: z.boolean(),
-      supersededBy: z.string().optional(),
-      supersededCount: z.number().int().optional(),
-      relatedCount: z.number(),
-      warnings: z.array(z.string()).optional(),
-      mergeRisk: _MergeRisk,
-    }),
+    noteA: ConsolidateNoteMergeEvidenceBaseSchema,
+    noteB: ConsolidateNoteMergeEvidenceBaseSchema,
     warnings: z.array(z.string()).optional(),
     mergeRisk: _MergeRisk,
   })).optional(),
@@ -1035,36 +1066,12 @@ export const ConsolidateResultSchema = z.object({
     targetTitle: z.string(),
     sourceIds: z.array(z.string()),
     mode: z.enum(["supersedes", "delete"]),
-    notes: z.array(z.object({
-      id: z.string(),
-      title: z.string(),
-      lifecycle: _NoteLifecycle,
-      role: _NoteRole.optional(),
-      ageDays: z.number(),
-      superseded: z.boolean(),
-      supersededBy: z.string().optional(),
-      supersededCount: z.number().int().optional(),
-      relatedCount: z.number(),
-      warnings: z.array(z.string()).optional(),
-      mergeRisk: _MergeRisk,
-    })),
+    notes: z.array(ConsolidateNoteMergeEvidenceBaseSchema),
     warnings: z.array(z.string()).optional(),
     mergeRisk: _MergeRisk,
   })).optional(),
   executeMergeEvidence: z.object({
-    notes: z.array(z.object({
-      id: z.string(),
-      title: z.string(),
-      lifecycle: _NoteLifecycle,
-      role: _NoteRole.optional(),
-      ageDays: z.number(),
-      superseded: z.boolean(),
-      supersededBy: z.string().optional(),
-      supersededCount: z.number().int().optional(),
-      relatedCount: z.number(),
-      warnings: z.array(z.string()).optional(),
-      mergeRisk: _MergeRisk,
-    })),
+    notes: z.array(ConsolidateNoteMergeEvidenceBaseSchema),
     warnings: z.array(z.string()).optional(),
     mergeRisk: _MergeRisk,
   }).optional(),

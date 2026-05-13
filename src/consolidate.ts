@@ -1,5 +1,6 @@
 import type { Note, Relationship } from "./storage.js";
 import type { ConsolidationMode } from "./project-memory-policy.js";
+import type { ConsolidateClassification } from "./structured-content.js";
 import { daysSince } from "./date-utils.js";
 
 export const MERGE_RISKS = ["low", "medium", "high"] as const;
@@ -15,12 +16,78 @@ export interface ConsolidateNoteEvidence {
   supersededBy?: string;
   supersededCount?: number;
   relatedCount: number;
+  classification?: ConsolidateClassification;
   warnings?: string[];
   mergeRisk: MergeRisk;
 }
 
 function noteAgeDays(updatedAt: string, now: Date = new Date()): number {
   return daysSince(updatedAt, now);
+}
+
+const LINEAGE_RELATIONSHIP_TYPES = new Set(["derives-from", "follows"]);
+
+const WORKFLOW_ROLES = new Set(["plan", "research", "review"]);
+
+function hasLineageRelationship(note: NoteForWarnings, otherIds: Set<string>): boolean {
+  return (note.relatedTo ?? []).some(
+    (rel) => LINEAGE_RELATIONSHIP_TYPES.has(rel.type) && otherIds.has(rel.id),
+  );
+}
+
+export function classifyConsolidationNote(
+  note: NoteForWarnings,
+  allNotes: NoteForWarnings[],
+  contextIds: Set<string>,
+): ConsolidateClassification | undefined {
+  const supersededByMap = buildSupersededByMap(allNotes);
+  const supersedes = (note.relatedTo ?? []).filter((rel) => rel.type === "supersedes");
+  const isSupersededSource = supersedes.length > 0;
+  const isSupersededTarget = supersededByMap.has(note.id);
+
+  if (isSupersededSource || isSupersededTarget) {
+    return "supersession-pressure";
+  }
+
+  if (hasLineageRelationship(note, contextIds)) {
+    return "lineage";
+  }
+
+  if (note.role === "research" && !hasLineageRelationship(note, contextIds)) {
+    return "unique-evidence-risk";
+  }
+
+  return undefined;
+}
+
+export function classifyConsolidationPair(
+  noteA: NoteForWarnings,
+  noteB: NoteForWarnings,
+): ConsolidateClassification {
+  const contextIds = new Set([noteA.id, noteB.id]);
+
+  if (
+    hasLineageRelationship(noteA, contextIds)
+    || hasLineageRelationship(noteB, contextIds)
+  ) {
+    return "lineage";
+  }
+
+  const supersededByMap = buildSupersededByMap([noteA, noteB]);
+  if (
+    (noteA.relatedTo ?? []).some((rel) => rel.type === "supersedes")
+    || (noteB.relatedTo ?? []).some((rel) => rel.type === "supersedes")
+    || supersededByMap.has(noteA.id)
+    || supersededByMap.has(noteB.id)
+  ) {
+    return "supersession-pressure";
+  }
+
+  if (noteA.role === "research" || noteB.role === "research") {
+    return "unique-evidence-risk";
+  }
+
+  return "duplicate-pressure";
 }
 
 function buildSupersededByMap(notes: Array<Pick<Note, "id" | "relatedTo">>): Map<string, string> {
@@ -151,10 +218,14 @@ export function buildConsolidateNoteEvidence(
   allNotes: NoteForWarnings[],
   targetNote?: Pick<Note, "id" | "updatedAt">,
   now: Date = new Date(),
+  contextIds?: Set<string>,
 ): ConsolidateNoteEvidence {
   const supersededByMap = buildSupersededByMap(allNotes);
   const supersedes = (note.relatedTo ?? []).filter((rel) => rel.type === "supersedes");
   const noteWarnings = buildNoteWarnings(note, allNotes, targetNote);
+  const classification = contextIds
+    ? classifyConsolidationNote(note, allNotes, contextIds)
+    : undefined;
   return {
     id: note.id,
     title: note.title,
@@ -165,6 +236,7 @@ export function buildConsolidateNoteEvidence(
     supersededBy: supersededByMap.get(note.id),
     supersededCount: supersedes.length > 0 ? supersedes.length : undefined,
     relatedCount: note.relatedTo?.length ?? 0,
+    classification,
     warnings: noteWarnings.length > 0 ? noteWarnings : undefined,
     mergeRisk: deriveMergeRisk(noteWarnings),
   };
