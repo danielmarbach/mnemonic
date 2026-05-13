@@ -9,7 +9,7 @@ tags:
   - consolidation
 lifecycle: temporary
 createdAt: '2026-05-12T20:26:48.494Z'
-updatedAt: '2026-05-12T21:14:03.056Z'
+updatedAt: '2026-05-13T04:28:00.228Z'
 role: plan
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -26,6 +26,8 @@ relatedTo:
   - id: apply-phase-3-project-summary-maintenance-warnings-2b8b06e5
     type: follows
   - id: apply-phase-4-consolidation-evidence-refinement-6dda70fc
+    type: follows
+  - id: apply-phase-5-stateful-dogfooding-before-behavior-changes-e3ce40a8
     type: follows
 memoryVersion: 1
 ---

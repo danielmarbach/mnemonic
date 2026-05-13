@@ -8,11 +8,14 @@ tags:
   - stateful
 lifecycle: temporary
 createdAt: '2026-05-13T04:27:57.116Z'
-updatedAt: '2026-05-13T04:27:57.116Z'
+updatedAt: '2026-05-13T04:28:00.228Z'
 role: context
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: plan-advisory-memory-health-diagnostics-from-microsoft-memor-a0aa3e62
+    type: follows
 memoryVersion: 1
 ---
 # Apply: Phase 5 Stateful Dogfooding Before Behavior Changes
