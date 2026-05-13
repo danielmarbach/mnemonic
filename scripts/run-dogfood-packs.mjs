@@ -148,6 +148,8 @@ async function main() {
   const recallDiagnostics = await callTool("recall", { query: "key design decisions", cwd, limit: 5, scope: "all" });
   const recentTemporary = await callTool("recent_memories", { cwd, scope: "all", storedIn: "any", limit: 5, lifecycle: "temporary" });
   const recalledTemporary = await callTool("recall", { query: "phase 2 working-state continuity", cwd, limit: 5, scope: "all", lifecycle: "temporary" });
+  const consolidateDupes = await callTool("consolidate", { cwd, strategy: "detect-duplicates", evidence: true });
+  const consolidateDryRun = await callTool("consolidate", { cwd, strategy: "dry-run" });
 
   const recentNotes = getRecentMemoryNotes(recentTemporary.structured);
   const recentWithRelationships = [];
@@ -212,6 +214,13 @@ async function main() {
   const diagDiversityThemeCount = diagStructured?.diversity?.themeCount ?? null;
   const diagCoverageFraction = diagStructured?.retrievalCoverage?.fraction ?? null;
 
+  const summaryMaintenanceWarnings = Array.isArray(summary1.structured?.maintenanceWarnings);
+  const summaryHasMaintenanceField = "maintenanceWarnings" in (summary1.structured ?? {});
+  const summaryMaintenanceTextSection = summary1.text.includes("Maintenance:");
+  const consolidateDryRunHasMaintenanceKey = consolidateDryRun.structured?.maintenanceWarnings !== undefined || consolidateDryRun.text.includes("Maintenance:");
+  const consolidatePairsHaveClassification = (consolidateDupes.structured?.duplicatePairs ?? []).some((p) => typeof (p.noteA?.classification ?? p.noteB?.classification) === "string");
+  const recallNoDecayInfo = diagResults.every((r) => r.decayInfo === undefined);
+
   const packA = {
     advisory: [
       !canonicalDesignInTopEmbeddings && "recall answers canonical design questions",
@@ -222,6 +231,11 @@ async function main() {
       !diagHasRetrievalCoverage && "retrievalCoverage missing from structured output",
       !diagResultsHaveSignalStrength && "signalStrength missing from recall results",
       !diagResultsHaveConfidence && "confidence missing from recall results",
+      // Note: maintenanceWarnings may be undefined/absent on well-maintained vaults.
+      // This is expected behavior — the field only appears when warnings exist.
+      // Integration tests verify the positive path (warnings present when conditions trigger).
+      // consolidate classification is verified by consolidatePairsHaveClassification.
+      !recallNoDecayInfo && "decayInfo should not appear in recall structured output (internal-only)",
     ].filter(Boolean),
     themeCount: themeEntries.length,
     topEmbeddingResult: b1Top?.title,
@@ -243,6 +257,12 @@ async function main() {
       signalStrengthPresent: diagResultsHaveSignalStrength,
       confidencePresent: diagResultsHaveConfidence,
       confidenceTiers: diagConfidenceTiers,
+      summaryMaintenanceWarningsPresent: summaryMaintenanceWarnings,
+      summaryHasMaintenanceField,
+      summaryTextHasMaintenanceSection: summaryMaintenanceTextSection,
+      consolidateDryRunHasMaintenanceKey,
+      consolidatePairsHaveClassification,
+      recallDecayInfoInternalOnly: recallNoDecayInfo,
     },
   };
 
@@ -268,7 +288,7 @@ async function main() {
   const vaultLabel = useIsolated ? "isolated vault" : "installed mnemonic server";
 
   const diag = packA.diagnostics;
-  const packAContent = `Dogfooding results for the core enrichment/orientation pack on ${today} using the ${vaultLabel}.\n\nAdvisory findings:\n${packA.advisory.length === 0 ? "- none" : packA.advisory.map((item) => `- ${item}`).join("\n")}\n\nObservations:\n- Theme count: ${packA.themeCount}\n- Top embeddings recall hit: ${packA.topEmbeddingResult}\n- Recent navigation reaches architecture/decision notes within three steps: ${packA.reachesArchitectureWithinThreeSteps}\n- Working-state note count: ${packA.workingStateCount}\n- Temporal filter returns results: ${packA.temporalFilterNotOverExcluding}\n\nDiagnostics:\n- recallScopeNoteCount present: ${diag.scopeNoteCountPresent} (value: ${diag.scopeNoteCount})\n- diversity present: ${diag.diversityPresent} (themeCount: ${diag.diversityThemeCount})\n- retrievalCoverage present: ${diag.retrievalCoveragePresent} (fraction: ${diag.coverageFraction})\n- signalStrength on results: ${diag.signalStrengthPresent}\n- confidence on results: ${diag.confidencePresent} (tiers: ${diag.confidenceTiers.join(", ") || "none"})`;
+  const packAContent = `Dogfooding results for the core enrichment/orientation pack on ${today} using the ${vaultLabel}.\n\nAdvisory findings:\n${packA.advisory.length === 0 ? "- none" : packA.advisory.map((item) => `- ${item}`).join("\n")}\n\nObservations:\n- Theme count: ${packA.themeCount}\n- Top embeddings recall hit: ${packA.topEmbeddingResult}\n- Recent navigation reaches architecture/decision notes within three steps: ${packA.reachesArchitectureWithinThreeSteps}\n- Working-state note count: ${packA.workingStateCount}\n- Temporal filter returns results: ${packA.temporalFilterNotOverExcluding}\n\nDiagnostics:\n- recallScopeNoteCount present: ${diag.scopeNoteCountPresent} (value: ${diag.scopeNoteCount})\n- diversity present: ${diag.diversityPresent} (themeCount: ${diag.diversityThemeCount})\n- retrievalCoverage present: ${diag.retrievalCoveragePresent} (fraction: ${diag.coverageFraction})\n- signalStrength on results: ${diag.signalStrengthPresent}\n- confidence on results: ${diag.confidencePresent} (tiers: ${diag.confidenceTiers.join(", ") || "none"})\n- project_memory_summary maintenanceWarnings: ${diag.summaryMaintenanceWarnings ? "present" : "absent"} (field in schema: ${diag.summaryHasMaintenanceField}, text Maintenance section: ${diag.summaryTextHasMaintenanceSection})\n- consolidate dry-run maintenanceWarnings: ${diag.consolidateDryRunHasMaintenanceKey ? "present" : "absent"}\n- consolidate detect-duplicates classification on pairs: ${diag.consolidatePairsHaveClassification}\n- recall decayInfo internal-only (absent from output): ${diag.recallDecayInfoInternalOnly}`;
 
   const packBContent = `Dogfooding results for the working-state continuity pack on ${today} using the ${vaultLabel}.\n\nAdvisory findings:\n${packB.advisory.length === 0 ? "- none" : packB.advisory.map((item) => `- ${item}`).join("\n")}\n\nObservations:\n- Temporary recent titles: ${packB.recentTemporaryTitles.map((title) => `\`${title}\``).join(", ") || "none"}\n- Temporary recall titles: ${packB.recalledTemporaryTitles.map((title) => `\`${title}\``).join(", ") || "none"}`;
 

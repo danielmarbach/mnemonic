@@ -524,7 +524,7 @@ Imported notes are written to the main vault with `lifecycle: permanent` and `sc
 
 | Tool                        | Description                                                              |
 |-----------------------------|--------------------------------------------------------------------------|
-| `consolidate`               | Merge and analyze overlapping notes; evidence defaults `true` for analysis strategies and execute-merge (lifecycle, risk, warnings) |
+| `consolidate`               | Merge and analyze overlapping notes; evidence defaults `true` for analysis strategies and execute-merge (lifecycle, risk, classification, warnings) |
 | `detect_project`            | Resolve `cwd` to stable project id via git remote URL                   |
 | `discover_tags`            | Suggest canonical tags for a note using title/content/query context; `mode: "browse"` opts into broader inventory output |
 | `execute_migration`         | Execute a named migration (supports dry-run)                             |
@@ -536,7 +536,7 @@ Imported notes are written to the main vault with `lifecycle: permanent` and `sc
 | `list_migrations`           | List available migrations and pending count                              |
 | `memory_graph`              | Show compact adjacency list of relationships                             |
 | `move_memory`               | Move note between vaults without changing id                             |
-| `project_memory_summary`    | Session-start entrypoint: themed notes, anchors, and orientation for fast project orientation |
+| `project_memory_summary`    | Session-start entrypoint: themes, anchors, orientation, maintenance warnings, and working-state recovery hints |
 | `recall`                    | Semantic search with optional project boost, temporal/workflow modes, and optional `evidence: "compact"` rationale |
 | `recent_memories`           | Show most recently updated notes for scope                               |
 | `remember`                  | Write note + embedding; `cwd` sets context, `scope` picks storage, `lifecycle` picks temporary vs permanent |

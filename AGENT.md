@@ -299,7 +299,7 @@ Skills are loaded via the `skill` tool and extend agent capabilities with specia
 
 | Tool | Description |
 |------|-------------|
-| `consolidate` | Merge multiple notes into one with relationship to sources |
+| `consolidate` | Merge and analyze overlapping notes; classification (lineage/duplicate-pressure/unique-evidence-risk/supersession-pressure) and maintenance warnings |
 | `detect_project` | Resolve `cwd` to stable project id via git remote URL |
 | `discover_tags` | Suggest canonical tags for a note; `mode: "browse"` opts into broader inventory output |
 | `execute_migration` | Execute a named migration (supports dry-run) |
@@ -311,7 +311,7 @@ Skills are loaded via the `skill` tool and extend agent capabilities with specia
 | `list_migrations` | List available migrations and pending count |
 | `memory_graph` | Show compact adjacency list of relationships |
 | `move_memory` | Move note between vaults without changing id |
-| `project_memory_summary` | Session-start entrypoint: themed notes, anchors, and orientation for fast project orientation |
+| `project_memory_summary` | Session-start entrypoint: themes, anchors, orientation, maintenance warnings, and working-state recovery hints |
 | `recall` | Semantic search with optional project boost plus `temporal` and `workflow` modes |
 | `recent_memories` | Show most recently updated notes for scope |
 | `remember` | Write note + embedding; `cwd` sets context, `scope` picks storage, `lifecycle` picks temporary vs permanent |
