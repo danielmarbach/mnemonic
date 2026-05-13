@@ -35,7 +35,11 @@ import {
 } from "../helpers/persistence.js";
 import { storageLabel, ROLE_LIFECYCLE_DEFAULTS } from "../helpers/vault.js";
 import { makeId } from "../helpers/index.js";
-import { type RememberResult, RememberResultSchema, type LintErrorResult } from "../structured-content.js";
+import {
+  type RememberResult,
+  RememberToolResultSchema,
+  type LintErrorResult,
+} from "../structured-content.js";
 
 export function registerRememberTool(server: McpServer, ctx: ServerContext): void {
   server.registerTool(
@@ -122,7 +126,7 @@ export function registerRememberTool(server: McpServer, ctx: ServerContext): voi
             "Optional agent hint indicating that `recall` or `list` was already used to check for an existing memory on this topic."
           ),
       }),
-      outputSchema: RememberResultSchema,
+      outputSchema: RememberToolResultSchema,
     },
     async ({ title, content, tags, lifecycle, role, summary, alwaysLoad, cwd, scope, allowProtectedBranch = false }) => {
       await ensureBranchSynced(ctx, cwd);

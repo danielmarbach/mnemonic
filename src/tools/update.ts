@@ -34,7 +34,7 @@ import {
 import { NOTE_LIFECYCLES, NOTE_ROLES, type Note } from "../storage.js";
 import {
   type UpdateResult,
-  UpdateResultSchema,
+  UpdateToolResultSchema,
   type LintErrorResult,
   NoteIdSchema,
   type PersistenceStatus,
@@ -142,7 +142,7 @@ export function registerUpdateTool(server: McpServer, ctx: ServerContext): void 
             "When true, update can commit on a protected branch without changing project policy."
           ),
       }),
-      outputSchema: UpdateResultSchema,
+      outputSchema: UpdateToolResultSchema,
     },
     async ({ id, content, semanticPatch, title, tags, lifecycle, role, summary, alwaysLoad, cwd, allowProtectedBranch = false }) => {
       await ensureBranchSynced(ctx, cwd);

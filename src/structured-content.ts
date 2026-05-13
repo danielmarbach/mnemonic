@@ -663,6 +663,36 @@ export const RememberResultSchema = z.object({
   persistence: PersistenceStatusSchema,
 });
 
+export const RememberToolResultSchema = z.object({
+  action: z.enum(["remembered", "lint_error"]),
+  tool: z.literal("remember").optional(),
+  id: z.string().optional(),
+  title: z.string().optional(),
+  project: ProjectRefSchema.optional(),
+  scope: z.enum(["project", "global"]).optional(),
+  vault: _VaultLabel.optional(),
+  tags: z.array(z.string()).optional(),
+  lifecycle: _NoteLifecycle.optional(),
+  timestamp: z.string().optional(),
+  persistence: PersistenceStatusSchema.optional(),
+  issues: z.array(z.string()).optional(),
+}).superRefine((value, ctx) => {
+  if (value.action === "remembered") {
+    if (!value.id) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["id"], message: "id is required when action=remembered" });
+    if (!value.title) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["title"], message: "title is required when action=remembered" });
+    if (!value.scope) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["scope"], message: "scope is required when action=remembered" });
+    if (!value.vault) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["vault"], message: "vault is required when action=remembered" });
+    if (!value.tags) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["tags"], message: "tags is required when action=remembered" });
+    if (!value.lifecycle) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["lifecycle"], message: "lifecycle is required when action=remembered" });
+    if (!value.timestamp) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["timestamp"], message: "timestamp is required when action=remembered" });
+    if (!value.persistence) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["persistence"], message: "persistence is required when action=remembered" });
+  }
+  if (value.action === "lint_error") {
+    if (value.tool !== "remember") ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["tool"], message: "tool must be remember when action=lint_error" });
+    if (!value.issues) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["issues"], message: "issues is required when action=lint_error" });
+  }
+});
+
 export const RecallResultSchema = z.object({
   action: z.literal("recalled"),
   query: z.string(),
@@ -765,6 +795,34 @@ export const UpdateResultSchema = z.object({
   role: _NoteRole.optional(),
   lintWarnings: z.array(z.string()).optional(),
   persistence: PersistenceStatusSchema,
+});
+
+export const UpdateToolResultSchema = z.object({
+  action: z.enum(["updated", "lint_error"]),
+  tool: z.literal("update").optional(),
+  id: z.string().optional(),
+  title: z.string().optional(),
+  fieldsModified: z.array(z.string()).optional(),
+  timestamp: z.string().optional(),
+  project: ProjectRefSchema.optional(),
+  lifecycle: _NoteLifecycle.optional(),
+  role: _NoteRole.optional(),
+  lintWarnings: z.array(z.string()).optional(),
+  persistence: PersistenceStatusSchema.optional(),
+  issues: z.array(z.string()).optional(),
+}).superRefine((value, ctx) => {
+  if (value.action === "updated") {
+    if (!value.id) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["id"], message: "id is required when action=updated" });
+    if (!value.title) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["title"], message: "title is required when action=updated" });
+    if (!value.fieldsModified) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["fieldsModified"], message: "fieldsModified is required when action=updated" });
+    if (!value.timestamp) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["timestamp"], message: "timestamp is required when action=updated" });
+    if (!value.lifecycle) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["lifecycle"], message: "lifecycle is required when action=updated" });
+    if (!value.persistence) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["persistence"], message: "persistence is required when action=updated" });
+  }
+  if (value.action === "lint_error") {
+    if (value.tool !== "update") ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["tool"], message: "tool must be update when action=lint_error" });
+    if (!value.issues) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["issues"], message: "issues is required when action=lint_error" });
+  }
 });
 
 export const ForgetResultSchema = z.object({
