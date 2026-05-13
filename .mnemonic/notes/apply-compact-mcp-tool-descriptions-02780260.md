@@ -5,7 +5,7 @@ tags:
   - apply
 lifecycle: temporary
 createdAt: '2026-05-11T17:51:44.944Z'
-updatedAt: '2026-05-11T18:01:09.466Z'
+updatedAt: '2026-05-12T20:26:58.643Z'
 role: context
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -13,6 +13,8 @@ projectName: mnemonic
 relatedTo:
   - id: plan-compact-mcp-tool-descriptions-c35d8705
     type: derives-from
+  - id: plan-advisory-memory-health-diagnostics-from-microsoft-memor-a0aa3e62
+    type: related-to
 memoryVersion: 1
 ---
 # Apply: Compact MCP Tool Descriptions

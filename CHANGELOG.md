@@ -4,6 +4,18 @@ All notable changes to `mnemonic` will be documented in this file.
 
 The format is loosely based on Keep a Changelog and uses semver-style version headings.
 
+## [0.31.0] - 2026-05-13
+
+### Added
+
+- `project_memory_summary` now surfaces advisory `maintenanceWarnings` when projects have stale temporary notes, superseded cleanup candidates, or weak orientation anchors, with actionable next-step suggestions and matching text output.
+- `consolidate` now returns per-pair `classification` (lineage, duplicate-pressure, unique-evidence-risk, supersession-pressure) and project-level `maintenanceWarnings` in structured output and text rendering.
+- Advisory decay evidence model with role/lifecycle-aware half-life defaults, used internally for maintenance hint computation.
+
+### Fixed
+
+- `remember` and `update` now preserve both text and structured outputs on markdown lint failures by returning schema-valid `lint_error` structured content instead of triggering MCP output validation errors.
+
 ## [0.30.2] - 2026-05-11
 
 ### Changed

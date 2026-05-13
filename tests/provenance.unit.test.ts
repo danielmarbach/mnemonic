@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildTemporalHistoryEntry, computeSignalStrength, computeConfidence } from "../src/provenance.js";
+import { buildTemporalHistoryEntry, computeSignalStrength, computeConfidence, computeDecayInfo } from "../src/provenance.js";
 import { enrichTemporalHistory } from "../src/temporal-interpretation.js";
 import type { CommitStats, LastCommit } from "../src/git.js";
 
@@ -232,12 +232,123 @@ describe("computeSignalStrength fail-soft guards", () => {
     expect(result).toBeGreaterThan(0);
   });
 
-  it("returns 0 for NaN-producing negative centrality via NaN guard", () => {
+  it("clamps negative centrality while preserving other signal", () => {
     const result = computeSignalStrength({
       lifecycle: "temporary",
       updatedAt: new Date().toISOString(),
       centrality: -5,
     });
-    expect(result).toBe(0);
+    expect(result).toBeCloseTo(0.10, 2);
+  });
+});
+
+describe("computeDecayInfo", () => {
+  const now = new Date("2026-05-12T00:00:00.000Z");
+  const daysAgoIso = (days: number) => new Date(now.getTime() - days * 86_400_000).toISOString();
+
+  it("uses exponential half-life decay from updatedAt", () => {
+    const result = computeDecayInfo({
+      lifecycle: "temporary",
+      updatedAt: daysAgoIso(30),
+      role: "research",
+      now,
+    });
+
+    expect(result.ageDays).toBe(30);
+    expect(result.halfLifeDays).toBe(30);
+    expect(result.freshness).toBeCloseTo(0.5, 3);
+    expect(result.staleness).toBeCloseTo(0.5, 3);
+    expect(result.basis).toEqual(["temporary", "research"]);
+  });
+
+  it("suggests consolidation for stale temporary workflow notes", () => {
+    const result = computeDecayInfo({
+      lifecycle: "temporary",
+      updatedAt: daysAgoIso(31),
+      role: "plan",
+      now,
+    });
+
+    expect(result.maintenanceHint).toBe("consolidate");
+  });
+
+  it("suggests review for stale temporary context notes", () => {
+    const result = computeDecayInfo({
+      lifecycle: "temporary",
+      updatedAt: daysAgoIso(46),
+      role: "context",
+      now,
+    });
+
+    expect(result.halfLifeDays).toBe(45);
+    expect(result.maintenanceHint).toBe("review");
+  });
+
+  it("uses long half-life and no age-only hint for permanent core notes", () => {
+    const result = computeDecayInfo({
+      lifecycle: "permanent",
+      updatedAt: daysAgoIso(365),
+      role: "decision",
+      now,
+    });
+
+    expect(result.halfLifeDays).toBe(365);
+    expect(result.freshness).toBeCloseTo(0.5, 3);
+    expect(result.maintenanceHint).toBeUndefined();
+  });
+
+  it("extends half-life for central non-superseded notes", () => {
+    const result = computeDecayInfo({
+      lifecycle: "permanent",
+      updatedAt: daysAgoIso(180),
+      centrality: 20,
+      now,
+    });
+
+    expect(result.halfLifeDays).toBeGreaterThan(180);
+    expect(result.basis).toContain("centrality-extension");
+  });
+
+  it("suggests prune-superseded for stale superseded notes without centrality extension", () => {
+    const result = computeDecayInfo({
+      lifecycle: "permanent",
+      updatedAt: daysAgoIso(31),
+      role: "decision",
+      centrality: 20,
+      superseded: true,
+      now,
+    });
+
+    expect(result.halfLifeDays).toBe(30);
+    expect(result.basis).toEqual(["superseded"]);
+    expect(result.maintenanceHint).toBe("prune-superseded");
+  });
+
+  it("handles invalid dates and negative centrality fail-soft", () => {
+    const result = computeDecayInfo({
+      lifecycle: "temporary",
+      updatedAt: "not-a-date",
+      centrality: -5,
+      now,
+    });
+
+    expect(result.ageDays).toBe(0);
+    expect(result.freshness).toBe(1);
+    expect(result.staleness).toBe(0);
+    expect(result.maintenanceHint).toBeUndefined();
+  });
+
+  it("normalizes non-finite now and centrality fail-soft", () => {
+    const result = computeDecayInfo({
+      lifecycle: "permanent",
+      updatedAt: daysAgoIso(10),
+      centrality: Number.NaN,
+      now: new Date(Number.NaN),
+    });
+
+    expect(result.ageDays).toBe(0);
+    expect(result.halfLifeDays).toBe(180);
+    expect(result.freshness).toBe(1);
+    expect(result.staleness).toBe(0);
   });
 });

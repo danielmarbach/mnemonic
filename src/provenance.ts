@@ -30,6 +30,27 @@ const FALLBACK_HIGH_CONFIDENCE_DAYS = 30;
 const FALLBACK_MEDIUM_CONFIDENCE_DAYS = 90;
 const FALLBACK_HIGH_CONFIDENCE_CENTRALITY = 5;
 
+const DECAY_HALF_LIFE_TEMPORARY_WORK_DAYS = 30;
+const DECAY_HALF_LIFE_TEMPORARY_CONTEXT_DAYS = 45;
+const DECAY_HALF_LIFE_PERMANENT_CORE_DAYS = 365;
+const DECAY_HALF_LIFE_PERMANENT_DEFAULT_DAYS = 180;
+const DECAY_HALF_LIFE_SUPERSEDED_DAYS = 30;
+const DECAY_CENTRALITY_EXTENSION_FACTOR = 0.10;
+const DECAY_CENTRALITY_EXTENSION_MAX = 2;
+const DECAY_STALENESS_REVIEW_THRESHOLD = 0.5;
+
+export type DecayMaintenanceHint = "review" | "consolidate" | "prune-superseded";
+export type DecayBasis = "temporary" | "permanent" | "superseded" | "plan" | "research" | "review" | "decision" | "summary" | "reference" | "centrality-extension";
+
+export interface DecayInfo {
+  ageDays: number;
+  halfLifeDays: number;
+  freshness: number;
+  staleness: number;
+  basis: readonly DecayBasis[];
+  maintenanceHint?: DecayMaintenanceHint;
+}
+
 function classifyTemporalChange(
   commit: LastCommit,
   stats: CommitStats
@@ -130,9 +151,10 @@ export function computeSignalStrength(params: {
   const daysSinceUpdateNum = Math.floor(daysSince(params.updatedAt));
 
   const roleWeight = params.role ? SIGNAL_ROLE_WEIGHTS[params.role] ?? 0 : 0;
+  const centrality = Number.isFinite(params.centrality) ? Math.max(0, params.centrality) : 0;
   const centralityWeight = Math.min(
     SIGNAL_CENTRALITY_MAX,
-    Math.log(params.centrality + 1) * SIGNAL_CENTRALITY_LOG_FACTOR
+    Math.log(centrality + 1) * SIGNAL_CENTRALITY_LOG_FACTOR
   );
   const lifecycleWeight = params.lifecycle === "permanent" ? SIGNAL_LIFECYCLE_PERMANENT : 0;
   const recencyWeight =
@@ -140,6 +162,77 @@ export function computeSignalStrength(params: {
 
   const result = roleWeight + centralityWeight + lifecycleWeight + recencyWeight;
   return Number.isFinite(result) ? result : 0;
+}
+
+function baseDecayHalfLifeDays(params: {
+  lifecycle: NoteLifecycle;
+  role?: NoteRole;
+  superseded?: boolean;
+}): { halfLifeDays: number; basis: readonly DecayBasis[] } {
+  if (params.superseded) {
+    return { halfLifeDays: DECAY_HALF_LIFE_SUPERSEDED_DAYS, basis: ["superseded"] };
+  }
+
+  if (params.lifecycle === "temporary") {
+    if (params.role === "plan" || params.role === "research" || params.role === "review") {
+      return { halfLifeDays: DECAY_HALF_LIFE_TEMPORARY_WORK_DAYS, basis: ["temporary", params.role] };
+    }
+    return { halfLifeDays: DECAY_HALF_LIFE_TEMPORARY_CONTEXT_DAYS, basis: ["temporary"] };
+  }
+
+  if (params.role === "decision" || params.role === "summary" || params.role === "reference") {
+    return { halfLifeDays: DECAY_HALF_LIFE_PERMANENT_CORE_DAYS, basis: ["permanent", params.role] };
+  }
+
+  return { halfLifeDays: DECAY_HALF_LIFE_PERMANENT_DEFAULT_DAYS, basis: ["permanent"] };
+}
+
+export function computeDecayInfo(params: {
+  lifecycle: NoteLifecycle;
+  updatedAt: string;
+  role?: NoteRole;
+  centrality?: number;
+  superseded?: boolean;
+  now?: Date;
+}): DecayInfo {
+  const rawAgeDays = Math.floor(daysSince(params.updatedAt, params.now));
+  const ageDays = Number.isFinite(rawAgeDays) ? rawAgeDays : 0;
+  const base = baseDecayHalfLifeDays(params);
+  const rawCentrality = params.centrality ?? 0;
+  const centrality = Number.isFinite(rawCentrality) ? Math.max(0, rawCentrality) : 0;
+  const centralityMultiplier = params.superseded
+    ? 1
+    : Math.min(
+        DECAY_CENTRALITY_EXTENSION_MAX,
+        1 + Math.log(centrality + 1) * DECAY_CENTRALITY_EXTENSION_FACTOR,
+      );
+  const rawHalfLifeDays = base.halfLifeDays * centralityMultiplier;
+  const halfLifeDays = Number.isFinite(rawHalfLifeDays) && rawHalfLifeDays > 0
+    ? rawHalfLifeDays
+    : base.halfLifeDays;
+  const freshness = Math.exp(-Math.LN2 * ageDays / halfLifeDays);
+  const staleness = 1 - freshness;
+  const basis: readonly DecayBasis[] = centralityMultiplier > 1
+    ? [...base.basis, "centrality-extension"]
+    : base.basis;
+
+  let maintenanceHint: DecayMaintenanceHint | undefined;
+  if (params.superseded && staleness >= DECAY_STALENESS_REVIEW_THRESHOLD) {
+    maintenanceHint = "prune-superseded";
+  } else if (params.lifecycle === "temporary" && staleness >= DECAY_STALENESS_REVIEW_THRESHOLD) {
+    maintenanceHint = params.role === "plan" || params.role === "research" || params.role === "review"
+      ? "consolidate"
+      : "review";
+  }
+
+  return {
+    ageDays,
+    halfLifeDays,
+    freshness: Number.isFinite(freshness) ? freshness : 1,
+    staleness: Number.isFinite(staleness) ? staleness : 0,
+    basis,
+    maintenanceHint,
+  };
 }
 
 export function computeConfidence(

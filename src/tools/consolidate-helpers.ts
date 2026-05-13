@@ -4,10 +4,13 @@ import {
   aggregateMergeRisk,
   buildConsolidateNoteEvidence,
   buildGroupWarnings,
+  classifyConsolidationPair,
   mergeRelationshipsFromNotes,
   normalizeMergePlanSourceIds,
   resolveEffectiveConsolidationMode,
 } from "../consolidate.js";
+import { computeDecayInfo } from "../provenance.js";
+import type { EffectiveNoteMetadata } from "../role-suggestions.js";
 import { cosineSimilarity, embed, embedModel } from "../embeddings.js";
 import { classifyTheme, titleCaseTheme } from "../project-introspection.js";
 import { getErrorMessage, attempt } from "../error-utils.js";
@@ -22,7 +25,7 @@ import { embedTextForNote as embedTextForNoteFromModule } from "../helpers/embed
 import type { Note } from "../storage.js";
 import type { Vault } from "../vault.js";
 import type { ConsolidationMode, ProjectMemoryPolicy } from "../project-memory-policy.js";
-import type { ConsolidateResult, ConsolidateExecuteMergeEvidence } from "../structured-content.js";
+import type { ConsolidateResult, ConsolidateExecuteMergeEvidence, ConsolidateMaintenanceWarning } from "../structured-content.js";
 import type { CommitResult, PushResult } from "../git.js";
 import { UnknownConsolidationModeError } from "../domain-errors.js";
 
@@ -48,6 +51,72 @@ async function embedTextForNote(storage: import("../storage.js").Storage, note: 
 }
 
 // ── Consolidate helper functions ────────────────────────────────────────────
+
+function buildConsolidateMaintenanceWarnings(
+  entries: NoteEntry[],
+  noteContext?: Map<string, { metadata: EffectiveNoteMetadata; inbound: number; visibleOutbound: number }>,
+): ConsolidateMaintenanceWarning[] | undefined {
+  const staleTemporary: NoteEntry[] = [];
+  const supersededCandidates: NoteEntry[] = [];
+
+  for (const entry of entries) {
+    const superseded = (entry.note.relatedTo ?? []).some((rel) => rel.type === "supersedes");
+    const centrality = noteContext
+      ? ((noteContext.get(entry.note.id)?.inbound ?? 0) + (noteContext.get(entry.note.id)?.visibleOutbound ?? entry.note.relatedTo?.length ?? 0))
+      : (entry.note.relatedTo?.length ?? 0);
+    const decayInfo = computeDecayInfo({
+      lifecycle: entry.note.lifecycle,
+      role: noteContext?.get(entry.note.id)?.metadata.role ?? entry.note.role,
+      updatedAt: entry.note.updatedAt,
+      centrality,
+      superseded,
+    });
+
+    if (decayInfo.maintenanceHint === "consolidate" || decayInfo.maintenanceHint === "review") {
+      staleTemporary.push(entry);
+    } else if (decayInfo.maintenanceHint === "prune-superseded") {
+      supersededCandidates.push(entry);
+    }
+  }
+
+  const warnings: ConsolidateMaintenanceWarning[] = [];
+  if (staleTemporary.length > 0) {
+    warnings.push({
+      code: "stale-temporary-notes",
+      severity: "warning",
+      message: `${staleTemporary.length} stale temporary note${staleTemporary.length === 1 ? "" : "s"} may need review or consolidation.`,
+      count: staleTemporary.length,
+      sampleNotes: staleTemporary.slice(0, 3).map((e) => ({ id: e.note.id, title: e.note.title })),
+      suggestedAction: "Inspect temporary notes, then update, consolidate, or remove scaffolding explicitly.",
+    });
+  }
+
+  if (supersededCandidates.length > 0) {
+    warnings.push({
+      code: "superseded-prune-candidates",
+      severity: "info",
+      message: supersededCandidates.length === 1
+        ? "1 superseded note may be a prune candidate."
+        : `${supersededCandidates.length} superseded notes may be prune candidates.`,
+      count: supersededCandidates.length,
+      sampleNotes: supersededCandidates.slice(0, 3).map((e) => ({ id: e.note.id, title: e.note.title })),
+      suggestedAction: "Review sources, then use consolidate prune-superseded only when deletion is intentional.",
+    });
+  }
+
+  return warnings.length > 0 ? warnings : undefined;
+}
+
+function classificationLabel(classification: string | undefined): string {
+  if (!classification) return "";
+  const labels: Record<string, string> = {
+    "lineage": "lineage (expected overlap)",
+    "duplicate-pressure": "duplicate-pressure",
+    "unique-evidence-risk": "unique-evidence-risk",
+    "supersession-pressure": "supersession-pressure",
+  };
+  return labels[classification] ?? classification;
+}
 
 export async function detectDuplicates(
   entries: NoteEntry[],
@@ -82,17 +151,19 @@ export async function detectDuplicates(
 
       const similarity = cosineSimilarity(embeddingA, embeddingB);
       if (similarity >= threshold) {
-        const noteAEvidence = buildConsolidateNoteEvidence(entryA.note, allNotes, entryA.note);
-        const noteBEvidence = buildConsolidateNoteEvidence(entryB.note, allNotes, entryA.note);
+        const pairContextIds = new Set([entryA.note.id, entryB.note.id]);
+        const noteAEvidence = buildConsolidateNoteEvidence(entryA.note, allNotes, entryA.note, undefined, pairContextIds);
+        const noteBEvidence = buildConsolidateNoteEvidence(entryB.note, allNotes, entryA.note, undefined, pairContextIds);
+        const pairClassification = classifyConsolidationPair(entryA.note, entryB.note);
         const groupWarnings = buildGroupWarnings([entryA.note, entryB.note], entryA.note);
         const pairRisk = aggregateMergeRisk([noteAEvidence.mergeRisk, noteBEvidence.mergeRisk]);
         foundCount++;
         lines.push(`${foundCount}. ${entryA.note.title} (${entryA.note.id})`);
         lines.push(`   └── ${entryB.note.title} (${entryB.note.id})`);
-        lines.push(`   Similarity: ${similarity.toFixed(3)}`);
+        lines.push(`   Similarity: ${similarity.toFixed(3)} | ${classificationLabel(pairClassification)}`);
         if (evidence) {
-          lines.push(`   A: ${noteAEvidence.lifecycle}, ${noteAEvidence.role ?? "untyped"} | ${Math.round(noteAEvidence.ageDays)}d old | rel: ${noteAEvidence.relatedCount} | supersedes: ${noteAEvidence.supersededCount ?? 0} | risk: ${noteAEvidence.mergeRisk}`);
-          lines.push(`   B: ${noteBEvidence.lifecycle}, ${noteBEvidence.role ?? "untyped"} | ${Math.round(noteBEvidence.ageDays)}d old | rel: ${noteBEvidence.relatedCount} | supersedes: ${noteBEvidence.supersededCount ?? 0} | risk: ${noteBEvidence.mergeRisk}`);
+          lines.push(`   A: ${noteAEvidence.lifecycle}, ${noteAEvidence.role ?? "untyped"} | ${Math.round(noteAEvidence.ageDays)}d old | rel: ${noteAEvidence.relatedCount} | supersedes: ${noteAEvidence.supersededCount ?? 0} | risk: ${noteAEvidence.mergeRisk}${noteAEvidence.classification ? ` | ${classificationLabel(noteAEvidence.classification)}` : ""}`);
+          lines.push(`   B: ${noteBEvidence.lifecycle}, ${noteBEvidence.role ?? "untyped"} | ${Math.round(noteBEvidence.ageDays)}d old | rel: ${noteBEvidence.relatedCount} | supersedes: ${noteBEvidence.supersededCount ?? 0} | risk: ${noteBEvidence.mergeRisk}${noteBEvidence.classification ? ` | ${classificationLabel(noteBEvidence.classification)}` : ""}`);
           if (groupWarnings.length > 0) {
             lines.push(`   Warnings: ${groupWarnings.join("; ")}`);
           }
@@ -319,14 +390,19 @@ export async function suggestMerges(
         }
       })();
 
-      const noteEvidence = sources.map((source) => buildConsolidateNoteEvidence(source.note, allNotes, entryA.note));
+      const noteEvidence = sources.map((source) => buildConsolidateNoteEvidence(source.note, allNotes, entryA.note, undefined, new Set(sources.map((s) => s.note.id))));
       const mergeWarnings = buildGroupWarnings(sources.map((source) => source.note), entryA.note);
       const mergeRisk = aggregateMergeRisk(noteEvidence.map((e) => e.mergeRisk));
+      const groupClassification = noteEvidence.find((e) => e.classification)?.classification;
 
       lines.push(`   Mode: ${effectiveMode} (${modeDescription})`);
+      if (groupClassification) {
+        lines.push(`   Classification: ${classificationLabel(groupClassification)}`);
+      }
       if (evidence) {
         for (const note of noteEvidence) {
-          lines.push(`   Evidence: ${note.title} | ${note.lifecycle}, ${note.role ?? "untyped"} | ${Math.round(note.ageDays)}d | rel:${note.relatedCount} | risk:${note.mergeRisk}`);
+          const classStr = note.classification ? ` | ${classificationLabel(note.classification)}` : "";
+          lines.push(`   Evidence: ${note.title} | ${note.lifecycle}, ${note.role ?? "untyped"} | ${Math.round(note.ageDays)}d | rel:${note.relatedCount} | risk:${note.mergeRisk}${classStr}`);
         }
         if (mergeWarnings.length > 0) {
           lines.push(`   Warnings: ${mergeWarnings.join("; ")}`);
@@ -713,8 +789,9 @@ export async function executeMerge(
   let executeMergeEvidence: ConsolidateExecuteMergeEvidence | undefined;
   if (evidence) {
     const allNotes = entries.map((entry) => entry.note);
+    const sourceIdsSet = new Set(sourceIds);
     const noteEvidence = sourceEntries.map((entry) =>
-      buildConsolidateNoteEvidence(entry.note, allNotes, sourceEntries[0]?.note),
+      buildConsolidateNoteEvidence(entry.note, allNotes, sourceEntries[0]?.note, undefined, sourceIdsSet),
     );
     const mergeWarnings = buildGroupWarnings(
       sourceEntries.map((entry) => entry.note),
@@ -723,7 +800,8 @@ export async function executeMerge(
     const mergeRisk = aggregateMergeRisk(noteEvidence.map((e) => e.mergeRisk));
     lines.push("  Evidence:");
     for (const note of noteEvidence) {
-      lines.push(`    ${note.title} | ${note.lifecycle}, ${note.role ?? "untyped"} | ${Math.round(note.ageDays)}d | rel:${note.relatedCount} | risk:${note.mergeRisk}`);
+      const classStr = note.classification ? ` | ${classificationLabel(note.classification)}` : "";
+      lines.push(`    ${note.title} | ${note.lifecycle}, ${note.role ?? "untyped"} | ${Math.round(note.ageDays)}d | rel:${note.relatedCount} | risk:${note.mergeRisk}${classStr}`);
     }
     if (mergeWarnings.length > 0) {
       lines.push(`  Warnings: ${mergeWarnings.join("; ")}`);
@@ -956,6 +1034,15 @@ export async function dryRunAll(
   lines.push(`Mode: ${modeLabel} | Threshold: ${threshold}`);
   lines.push("");
 
+  const maintenanceWarningsResult = buildConsolidateMaintenanceWarnings(entries);
+  if (maintenanceWarningsResult && maintenanceWarningsResult.length > 0) {
+    lines.push("Maintenance:");
+    for (const warning of maintenanceWarningsResult) {
+      lines.push(`  - ${warning.message} Action: ${warning.suggestedAction}`);
+    }
+    lines.push("");
+  }
+
   // Run all analysis strategies
   const dupes = await detectDuplicates(entries, threshold, project, evidence);
   lines.push("=== DUPLICATE DETECTION ===");
@@ -977,6 +1064,7 @@ export async function dryRunAll(
     project: toProjectRef(project),
     notesProcessed: entries.length,
     notesModified: 0,
+    maintenanceWarnings: maintenanceWarningsResult,
     duplicatePairs: dupes.structuredContent.duplicatePairs,
     mergeSuggestions: merges.structuredContent.mergeSuggestions,
     themeGroups: clusters.structuredContent.themeGroups,

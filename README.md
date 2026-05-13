@@ -400,6 +400,8 @@ Each note carries a `lifecycle`:
 - `"permanent"` *(default)* — durable knowledge for future sessions
 - `"temporary"` — working-state scaffolding (plans, WIP checkpoints) that can be cleaned up once consolidated
 
+Store what should help future work: decisions, outcomes, corrections, constraints, and lessons learned. Leave routine chatter out. Cleanup stays explicit through lifecycle and consolidation choices; mnemonic does not auto-expire notes.
+
 ### Roles and lifecycle
 
 Roles are optional prioritization hints, not required schema. mnemonic infers a `role` and `importance` from structural signals (heading count, bullet density, inbound references, relationship types) — inference is language-independent and never overwrites explicit frontmatter. Valid roles: `summary`, `decision`, `plan`, `context`, `reference`, `research`, `review`. Valid importance values: `high`, `normal`, `low`.
@@ -416,7 +418,7 @@ For structured workflows, use the RPIR stages: research -> plan -> implement -> 
 - Keep one current plan note per request (`role: plan`) and update or supersede as the plan evolves.
 - For apply/task notes, do not add a new role: use `role: plan` for executable steps and `role: context` for execution observations; tag both with `apply`.
 - Keep relationships sparse and immediate-upstream only: research -> request, plan -> request/research, apply -> plan, review -> apply/plan, outcome -> plan (optionally request).
-- Consolidate at workflow end: promote durable outcomes into permanent decision/summary/reference notes; let temporary scaffolding expire.
+- Consolidate at workflow end: keep the durable outcome, preserve details that still matter, and explicitly remove temporary scaffolding when safe.
 
 ### Note format
 
@@ -516,13 +518,13 @@ Imported notes are written to the main vault with `lifecycle: permanent` and `sc
 | Prompt | Description |
 |--------|-------------|
 | `mnemonic-rpi-workflow` | Optional. Returns RPIR stage protocol and conventions: request root note pattern, stage checklists, apply/task split, sparse relationships, subagent handoff contract, and commit discipline. |
-| `mnemonic-workflow-hint` | Optional. Returns a compact decision protocol: use `recall` or `list` first, inspect with `get`, update existing memories, remember only when nothing matches, then organize with `relate`, `consolidate`, or `move_memory`. It also reinforces summary-first orientation via `project_memory_summary`, temporary-note recovery only after orientation, evidence on for safety during consolidation (lifecycle, risk, warnings), and that roles are optional prioritization hints while lifecycle stays separate. |
+| `mnemonic-workflow-hint` | Optional. Returns a compact decision protocol: recall/list first, inspect with `get`, update before remember, then organize. Reinforces summary-first orientation, attention-filter capture, evidence before consolidation, and lifecycle as durability. |
 
 ## Tools
 
 | Tool                        | Description                                                              |
 |-----------------------------|--------------------------------------------------------------------------|
-| `consolidate`               | Merge and analyze overlapping notes; evidence defaults `true` for analysis strategies and execute-merge (lifecycle, risk, warnings) |
+| `consolidate`               | Merge and analyze overlapping notes; evidence defaults `true` for analysis strategies and execute-merge (lifecycle, risk, classification, warnings) |
 | `detect_project`            | Resolve `cwd` to stable project id via git remote URL                   |
 | `discover_tags`            | Suggest canonical tags for a note using title/content/query context; `mode: "browse"` opts into broader inventory output |
 | `execute_migration`         | Execute a named migration (supports dry-run)                             |
@@ -534,7 +536,7 @@ Imported notes are written to the main vault with `lifecycle: permanent` and `sc
 | `list_migrations`           | List available migrations and pending count                              |
 | `memory_graph`              | Show compact adjacency list of relationships                             |
 | `move_memory`               | Move note between vaults without changing id                             |
-| `project_memory_summary`    | Session-start entrypoint: themed notes, anchors, and orientation for fast project orientation |
+| `project_memory_summary`    | Session-start entrypoint: themes, anchors, orientation, maintenance warnings, and working-state recovery hints |
 | `recall`                    | Semantic search with optional project boost, temporal/workflow modes, and optional `evidence: "compact"` rationale |
 | `recent_memories`           | Show most recently updated notes for scope                               |
 | `remember`                  | Write note + embedding; `cwd` sets context, `scope` picks storage, `lifecycle` picks temporary vs permanent |
@@ -660,7 +662,7 @@ Both tools are local-first and use markdown, but with different scoping models. 
 
 **What are temporary notes?**
 
-mnemonic distinguishes between two lifecycle states. `temporary` notes capture evolving working-state: hypotheses, in-progress plans, experiment results, draft reasoning. `permanent` notes capture durable knowledge: decisions, root cause explanations, architectural guidance, lessons learned. As an investigation progresses, a cluster of temporary notes is typically `consolidate`d into one or more permanent notes, and the scaffolding is discarded. This two-phase lifecycle keeps exploratory thinking from polluting long-term memory while still giving agents a place to reason incrementally before committing to a conclusion.
+mnemonic distinguishes between two lifecycle states. `temporary` notes capture evolving working-state: hypotheses, in-progress plans, experiment results, draft reasoning. `permanent` notes capture durable knowledge: decisions, root cause explanations, architectural guidance, lessons learned. As an investigation progresses, a cluster of temporary notes is typically `consolidate`d into one or more permanent notes, and the scaffolding is discarded. Consolidation should keep the useful outcome without flattening away details future work may need. This two-phase lifecycle keeps exploratory thinking from polluting long-term memory while still giving agents a place to reason incrementally before committing to a conclusion.
 
 Roles, when present, are separate from lifecycle: they help prioritization and retrieval, not retention policy. mnemonic still works without roles, and any inferred role metadata remains an internal hint rather than part of the user-facing note contract.
 

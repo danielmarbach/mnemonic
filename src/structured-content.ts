@@ -5,6 +5,14 @@ import type { NoteLifecycle, NoteRole, RelationshipType } from "./storage.js";
 import { MERGE_RISKS } from "./consolidate.js";
 import type { MergeRisk } from "./consolidate.js";
 
+export const CONSOLIDATE_CLASSIFICATIONS = ["lineage", "duplicate-pressure", "unique-evidence-risk", "supersession-pressure"] as const;
+export type ConsolidateClassification = typeof CONSOLIDATE_CLASSIFICATIONS[number];
+
+export const CONSOLIDATE_MAINTENANCE_WARNING_CODES = ["stale-temporary-notes", "superseded-prune-candidates"] as const;
+
+export const PROJECT_MAINTENANCE_WARNING_CODES = ["stale-temporary-notes", "superseded-prune-candidates", "weak-orientation-anchors"] as const;
+export const PROJECT_MAINTENANCE_WARNING_SEVERITIES = ["info", "warning"] as const;
+
 export interface PersistenceStatus {
   notePath: string;
   embeddingPath: string;
@@ -75,11 +83,17 @@ export interface ProjectRef {
   name: string;
 }
 
-export interface LintErrorResult extends Record<string, unknown> {
+export type RememberLintErrorResult = {
   action: "lint_error";
-  tool: "remember" | "update";
+  tool: "remember";
   issues: string[];
-}
+};
+
+export type UpdateLintErrorResult = {
+  action: "lint_error";
+  tool: "update";
+  issues: string[];
+};
 
 export interface RememberResult extends Record<string, unknown> {
   action: "remembered";
@@ -288,6 +302,7 @@ export interface ConsolidateResult extends Record<string, unknown> {
   notesProcessed: number;
   notesModified: number;
   warnings?: string[];
+  maintenanceWarnings?: ConsolidateMaintenanceWarning[];
   themeGroups?: Array<{ name: string; count: number; examples: string[] }>;
   relationshipClusters?: Array<{ hub: { id: string; title: string }; notes: { id: string; title: string }[] }>;
   duplicatePairs?: ConsolidateDuplicatePairEvidence[];
@@ -309,8 +324,18 @@ export interface ConsolidateNoteMergeEvidence {
   supersededBy?: string;
   supersededCount?: number;
   relatedCount: number;
+  classification?: ConsolidateClassification;
   warnings?: string[];
   mergeRisk: MergeRisk;
+}
+
+export interface ConsolidateMaintenanceWarning {
+  code: string;
+  severity: "info" | "warning";
+  message: string;
+  count?: number;
+  sampleNotes?: Array<{ id: string; title: string }>;
+  suggestedAction: string;
 }
 
 export interface ConsolidateDuplicatePairEvidence {
@@ -491,6 +516,18 @@ export interface WorkingState {
   notes: WorkingStateNote[];
 }
 
+export type ProjectMaintenanceWarningCode = typeof PROJECT_MAINTENANCE_WARNING_CODES[number];
+export type ProjectMaintenanceWarningSeverity = typeof PROJECT_MAINTENANCE_WARNING_SEVERITIES[number];
+
+export interface ProjectMaintenanceWarning {
+  code: ProjectMaintenanceWarningCode;
+  severity: ProjectMaintenanceWarningSeverity;
+  message: string;
+  count?: number;
+  sampleNotes?: Array<{ id: string; title: string }>;
+  suggestedAction: string;
+}
+
 export interface ProjectSummaryNotes {
   total: number;
   projectVault: number;
@@ -518,6 +555,7 @@ export interface ProjectSummaryResult extends Record<string, unknown> {
   recent: RecentNote[];
   anchors: AnchorNote[];
   orientation: Orientation;
+  maintenanceWarnings?: ProjectMaintenanceWarning[];
   workingState?: WorkingState;
   relatedGlobal?: {
     notes: RelatedGlobalNote[];
@@ -612,12 +650,6 @@ export const PersistenceStatusSchema = z.object({
   durability: z.enum(["local-only", "committed", "pushed"]),
 });
 
-export const LintErrorResultSchema = z.object({
-  action: z.literal("lint_error"),
-  tool: z.enum(["remember", "update"]),
-  issues: z.array(z.string()),
-});
-
 export const RememberResultSchema = z.object({
   action: z.literal("remembered"),
   id: z.string(),
@@ -629,6 +661,36 @@ export const RememberResultSchema = z.object({
   lifecycle: _NoteLifecycle,
   timestamp: z.string(),
   persistence: PersistenceStatusSchema,
+});
+
+export const RememberToolResultSchema = z.object({
+  action: z.enum(["remembered", "lint_error"]).describe("Result variant: 'remembered' for success, 'lint_error' when unfixable markdown lint errors prevented storage."),
+  tool: z.literal("remember").optional().describe("Present and set to 'remember' when action is lint_error."),
+  id: z.string().optional().describe("Note id, present when action is remembered."),
+  title: z.string().optional().describe("Note title, present when action is remembered."),
+  project: ProjectRefSchema.optional().describe("Project reference, present when action is remembered."),
+  scope: z.enum(["project", "global"]).optional().describe("Storage scope, present when action is remembered."),
+  vault: _VaultLabel.optional().describe("Vault label, present when action is remembered."),
+  tags: z.array(z.string()).optional().describe("Note tags, present when action is remembered."),
+  lifecycle: _NoteLifecycle.optional().describe("Note lifecycle, present when action is remembered."),
+  timestamp: z.string().optional().describe("ISO timestamp, present when action is remembered."),
+  persistence: PersistenceStatusSchema.optional().describe("Git and embedding persistence status, present when action is remembered."),
+  issues: z.array(z.string()).optional().describe("Unfixable markdown lint issues that prevented storage. Present when action is lint_error."),
+}).superRefine((value, ctx) => {
+  if (value.action === "remembered") {
+    if (!value.id) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["id"], message: "id is required when action=remembered" });
+    if (!value.title) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["title"], message: "title is required when action=remembered" });
+    if (!value.scope) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["scope"], message: "scope is required when action=remembered" });
+    if (!value.vault) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["vault"], message: "vault is required when action=remembered" });
+    if (!value.tags) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["tags"], message: "tags is required when action=remembered" });
+    if (!value.lifecycle) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["lifecycle"], message: "lifecycle is required when action=remembered" });
+    if (!value.timestamp) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["timestamp"], message: "timestamp is required when action=remembered" });
+    if (!value.persistence) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["persistence"], message: "persistence is required when action=remembered" });
+  }
+  if (value.action === "lint_error") {
+    if (value.tool !== "remember") ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["tool"], message: "tool must be remember when action=lint_error" });
+    if (!value.issues) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["issues"], message: "issues is required when action=lint_error" });
+  }
 });
 
 export const RecallResultSchema = z.object({
@@ -733,6 +795,34 @@ export const UpdateResultSchema = z.object({
   role: _NoteRole.optional(),
   lintWarnings: z.array(z.string()).optional(),
   persistence: PersistenceStatusSchema,
+});
+
+export const UpdateToolResultSchema = z.object({
+  action: z.enum(["updated", "lint_error"]).describe("Result variant: 'updated' for success, 'lint_error' when unfixable markdown lint errors prevented the update."),
+  tool: z.literal("update").optional().describe("Present and set to 'update' when action is lint_error."),
+  id: z.string().optional().describe("Note id, present when action is updated."),
+  title: z.string().optional().describe("Note title, present when action is updated."),
+  fieldsModified: z.array(z.string()).optional().describe("List of fields that changed, present when action is updated."),
+  timestamp: z.string().optional().describe("ISO timestamp, present when action is updated."),
+  project: ProjectRefSchema.optional().describe("Project reference, present when action is updated."),
+  lifecycle: _NoteLifecycle.optional().describe("Note lifecycle, present when action is updated."),
+  role: _NoteRole.optional().describe("Note role, present when action is updated."),
+  lintWarnings: z.array(z.string()).optional().describe("Auto-fixed lint warnings from semantic patch, present when action is updated."),
+  persistence: PersistenceStatusSchema.optional().describe("Git and embedding persistence status, present when action is updated."),
+  issues: z.array(z.string()).optional().describe("Unfixable markdown lint issues that prevented the update. Present when action is lint_error."),
+}).superRefine((value, ctx) => {
+  if (value.action === "updated") {
+    if (!value.id) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["id"], message: "id is required when action=updated" });
+    if (!value.title) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["title"], message: "title is required when action=updated" });
+    if (!value.fieldsModified) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["fieldsModified"], message: "fieldsModified is required when action=updated" });
+    if (!value.timestamp) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["timestamp"], message: "timestamp is required when action=updated" });
+    if (!value.lifecycle) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["lifecycle"], message: "lifecycle is required when action=updated" });
+    if (!value.persistence) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["persistence"], message: "persistence is required when action=updated" });
+  }
+  if (value.action === "lint_error") {
+    if (value.tool !== "update") ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["tool"], message: "tool must be update when action=lint_error" });
+    if (!value.issues) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["issues"], message: "issues is required when action=lint_error" });
+  }
 });
 
 export const ForgetResultSchema = z.object({
@@ -868,6 +958,24 @@ export const WorkingStateSchema = z.object({
   notes: z.array(WorkingStateNoteSchema),
 });
 
+export const ProjectMaintenanceWarningSchema = z.object({
+  code: z.enum(PROJECT_MAINTENANCE_WARNING_CODES)
+    .describe("Stable warning code for a project memory maintenance condition."),
+  severity: z.enum(PROJECT_MAINTENANCE_WARNING_SEVERITIES)
+    .describe("Advisory severity for the maintenance condition; warnings still require explicit user action."),
+  message: z.string()
+    .describe("Compact human-readable maintenance warning matching the text output."),
+  count: z.number().optional()
+    .describe("Number of notes or conditions represented by this warning when applicable."),
+  sampleNotes: z.array(z.object({
+    id: z.string().describe("Memory id for a bounded sample note that triggered this warning."),
+    title: z.string().describe("Title for a bounded sample note that triggered this warning."),
+  })).optional()
+    .describe("Bounded sample of notes that triggered this warning."),
+  suggestedAction: z.string()
+    .describe("Explicit next action the agent can take; never an automatic cleanup action."),
+});
+
 export const ProjectSummaryResultSchema = z.object({
   action: z.literal("project_summary_shown"),
   project: ProjectRefSchema,
@@ -876,6 +984,8 @@ export const ProjectSummaryResultSchema = z.object({
   recent: z.array(RecentNoteSchema),
   anchors: z.array(AnchorNoteSchema),
   orientation: OrientationSchema,
+  maintenanceWarnings: z.array(ProjectMaintenanceWarningSchema).optional()
+    .describe("Advisory project memory health warnings derived from loaded metadata only."),
   workingState: WorkingStateSchema.optional(),
   relatedGlobal: z.object({
     notes: z.array(RelatedGlobalNoteSchema),
@@ -942,6 +1052,43 @@ export const WhereIsResultSchema = z.object({
   relatedCount: z.number(),
 });
 
+export const ConsolidateClassificationSchema = z.enum(CONSOLIDATE_CLASSIFICATIONS)
+  .describe("Advisory classification for consolidation evidence: lineage (expected workflow overlap), duplicate-pressure (same role/lifecycle, no lineage), unique-evidence-risk (research with unique source), supersession-pressure (superseded and stale).");
+
+const ConsolidateNoteMergeEvidenceBaseSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  lifecycle: _NoteLifecycle,
+  role: _NoteRole.optional(),
+  ageDays: z.number(),
+  superseded: z.boolean(),
+  supersededBy: z.string().optional(),
+  supersededCount: z.number().int().optional(),
+  relatedCount: z.number(),
+  classification: ConsolidateClassificationSchema.optional()
+    .describe("Advisory classification for this note in the consolidation context."),
+  warnings: z.array(z.string()).optional(),
+  mergeRisk: _MergeRisk,
+});
+
+export const ConsolidateMaintenanceWarningSchema = z.object({
+  code: z.enum(CONSOLIDATE_MAINTENANCE_WARNING_CODES)
+    .describe("Stable warning code for a consolidation maintenance condition."),
+  severity: z.enum(PROJECT_MAINTENANCE_WARNING_SEVERITIES)
+    .describe("Advisory severity for the maintenance condition."),
+  message: z.string()
+    .describe("Compact human-readable maintenance warning."),
+  count: z.number().optional()
+    .describe("Number of notes or conditions represented by this warning."),
+  sampleNotes: z.array(z.object({
+    id: z.string().describe("Memory id for a bounded sample note."),
+    title: z.string().describe("Title for a bounded sample note."),
+  })).optional()
+    .describe("Bounded sample of notes that triggered this warning."),
+  suggestedAction: z.string()
+    .describe("Explicit next action for the agent; never an automatic cleanup action."),
+});
+
 export const ConsolidateResultSchema = z.object({
   action: z.literal("consolidated"),
   strategy: z.string(),
@@ -949,6 +1096,8 @@ export const ConsolidateResultSchema = z.object({
   notesProcessed: z.number(),
   notesModified: z.number(),
   warnings: z.array(z.string()).optional(),
+  maintenanceWarnings: z.array(ConsolidateMaintenanceWarningSchema).optional()
+    .describe("Advisory maintenance warnings derived from consolidate analysis."),
   themeGroups: z.array(z.object({
     name: z.string(),
     count: z.number(),
@@ -966,32 +1115,8 @@ export const ConsolidateResultSchema = z.object({
   })).optional(),
   duplicatePairs: z.array(z.object({
     similarity: z.number(),
-    noteA: z.object({
-      id: z.string(),
-      title: z.string(),
-      lifecycle: _NoteLifecycle,
-      role: _NoteRole.optional(),
-      ageDays: z.number(),
-      superseded: z.boolean(),
-      supersededBy: z.string().optional(),
-      supersededCount: z.number().int().optional(),
-      relatedCount: z.number(),
-      warnings: z.array(z.string()).optional(),
-      mergeRisk: _MergeRisk,
-    }),
-    noteB: z.object({
-      id: z.string(),
-      title: z.string(),
-      lifecycle: _NoteLifecycle,
-      role: _NoteRole.optional(),
-      ageDays: z.number(),
-      superseded: z.boolean(),
-      supersededBy: z.string().optional(),
-      supersededCount: z.number().int().optional(),
-      relatedCount: z.number(),
-      warnings: z.array(z.string()).optional(),
-      mergeRisk: _MergeRisk,
-    }),
+    noteA: ConsolidateNoteMergeEvidenceBaseSchema,
+    noteB: ConsolidateNoteMergeEvidenceBaseSchema,
     warnings: z.array(z.string()).optional(),
     mergeRisk: _MergeRisk,
   })).optional(),
@@ -999,36 +1124,12 @@ export const ConsolidateResultSchema = z.object({
     targetTitle: z.string(),
     sourceIds: z.array(z.string()),
     mode: z.enum(["supersedes", "delete"]),
-    notes: z.array(z.object({
-      id: z.string(),
-      title: z.string(),
-      lifecycle: _NoteLifecycle,
-      role: _NoteRole.optional(),
-      ageDays: z.number(),
-      superseded: z.boolean(),
-      supersededBy: z.string().optional(),
-      supersededCount: z.number().int().optional(),
-      relatedCount: z.number(),
-      warnings: z.array(z.string()).optional(),
-      mergeRisk: _MergeRisk,
-    })),
+    notes: z.array(ConsolidateNoteMergeEvidenceBaseSchema),
     warnings: z.array(z.string()).optional(),
     mergeRisk: _MergeRisk,
   })).optional(),
   executeMergeEvidence: z.object({
-    notes: z.array(z.object({
-      id: z.string(),
-      title: z.string(),
-      lifecycle: _NoteLifecycle,
-      role: _NoteRole.optional(),
-      ageDays: z.number(),
-      superseded: z.boolean(),
-      supersededBy: z.string().optional(),
-      supersededCount: z.number().int().optional(),
-      relatedCount: z.number(),
-      warnings: z.array(z.string()).optional(),
-      mergeRisk: _MergeRisk,
-    })),
+    notes: z.array(ConsolidateNoteMergeEvidenceBaseSchema),
     warnings: z.array(z.string()).optional(),
     mergeRisk: _MergeRisk,
   }).optional(),

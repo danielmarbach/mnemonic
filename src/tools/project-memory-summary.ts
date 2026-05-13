@@ -5,7 +5,7 @@ import { performance } from "perf_hooks";
 
 import { memoryId } from "../brands.js";
 import { cosineSimilarity } from "../embeddings.js";
-import { getNoteProvenance, computeConfidence } from "../provenance.js";
+import { getNoteProvenance, computeConfidence, computeDecayInfo } from "../provenance.js";
 import { getRelationshipPreview } from "../relationships.js";
 import { formatRelationshipPreview } from "../helpers/index.js";
 import { resolveProject, ensureBranchSynced } from "../helpers/project.js";
@@ -27,7 +27,7 @@ import {
   workingStateScore,
   extractNextAction,
 } from "../project-introspection.js";
-import { getEffectiveMetadata } from "../role-suggestions.js";
+import { getEffectiveMetadata, type EffectiveNoteMetadata } from "../role-suggestions.js";
 import type { Vault } from "../vault.js";
 import {
   ProjectSummaryResultSchema,
@@ -36,7 +36,83 @@ import {
   type AnchorNote,
   type Confidence,
   type RelationshipPreview,
+  type ProjectMaintenanceWarning,
 } from "../structured-content.js";
+
+function sampleWarningNotes(entries: NoteEntry[]): Array<{ id: string; title: string }> {
+  return entries.slice(0, 3).map((entry) => ({ id: entry.note.id, title: entry.note.title }));
+}
+
+function buildMaintenanceWarnings(
+  entries: NoteEntry[],
+  anchors: AnchorNote[],
+  noteContext: Map<string, { metadata: EffectiveNoteMetadata; inbound: number; visibleOutbound: number }>,
+): ProjectMaintenanceWarning[] | undefined {
+  const staleTemporary: NoteEntry[] = [];
+  const supersededCandidates: NoteEntry[] = [];
+
+  for (const entry of entries) {
+    const context = noteContext.get(entry.note.id);
+    const centrality = (context?.inbound ?? 0) + (context?.visibleOutbound ?? entry.note.relatedTo?.length ?? 0);
+    const superseded = (entry.note.relatedTo ?? []).some((rel) => rel.type === "supersedes");
+    const decayInfo = computeDecayInfo({
+      lifecycle: entry.note.lifecycle,
+      role: context?.metadata.role,
+      updatedAt: entry.note.updatedAt,
+      centrality,
+      superseded,
+    });
+
+    if (decayInfo.maintenanceHint === "consolidate" || decayInfo.maintenanceHint === "review") {
+      staleTemporary.push(entry);
+    } else if (decayInfo.maintenanceHint === "prune-superseded") {
+      supersededCandidates.push(entry);
+    }
+  }
+
+  const warnings: ProjectMaintenanceWarning[] = [];
+  if (staleTemporary.length > 0) {
+    warnings.push({
+      code: "stale-temporary-notes",
+      severity: "warning",
+      message: `${staleTemporary.length} stale temporary note${staleTemporary.length === 1 ? "" : "s"} may need review or consolidation.`,
+      count: staleTemporary.length,
+      sampleNotes: sampleWarningNotes(staleTemporary),
+      suggestedAction: "Inspect temporary notes, then update, consolidate, or remove scaffolding explicitly.",
+    });
+  }
+
+  if (supersededCandidates.length > 0) {
+    warnings.push({
+      code: "superseded-prune-candidates",
+      severity: "info",
+      message: supersededCandidates.length === 1
+        ? "1 superseded note may be a prune candidate."
+        : `${supersededCandidates.length} superseded notes may be prune candidates.`,
+      count: supersededCandidates.length,
+      sampleNotes: sampleWarningNotes(supersededCandidates),
+      suggestedAction: "Review sources, then use consolidate prune-superseded only when deletion is intentional.",
+    });
+  }
+
+  const hasOrientationCandidate = entries.some((entry) => {
+    const metadata = noteContext.get(entry.note.id)?.metadata;
+    return entry.note.lifecycle === "permanent" &&
+      (metadata?.alwaysLoad === true || metadata?.role === "summary" || metadata?.role === "decision");
+  });
+
+  if (anchors.length === 0 && entries.length >= 3 && !hasOrientationCandidate) {
+    warnings.push({
+      code: "weak-orientation-anchors",
+      severity: "info",
+      message: "No strong anchor notes found; project orientation may depend on recent notes.",
+      count: entries.length,
+      suggestedAction: "Consider consolidating durable decisions or summaries so future sessions have stable entry points.",
+    });
+  }
+
+  return warnings.length > 0 ? warnings : undefined;
+}
 
 export function registerProjectMemorySummaryTool(server: McpServer, ctx: ServerContext): void {
   server.registerTool(
@@ -50,7 +126,7 @@ export function registerProjectMemorySummaryTool(server: McpServer, ctx: ServerC
         "Do not use this when:\n" +
         "- You need exact note contents; use `get`\n" +
         "- You need direct semantic matches for a query; use `recall`\n\n" +
-        "Returns: synthesized project summary, themes, anchors, orientation entry points with 1-hop previews, optional working-state recovery hints.\n\n" +
+        "Returns: synthesized project summary, themes, anchors, orientation entry points with 1-hop previews, maintenance warnings, optional working-state recovery hints.\n\n" +
         "Typical next step:\n" +
         "- Use `recall` or `list` to drill down into specific areas.",
       annotations: {
@@ -312,6 +388,8 @@ export function registerProjectMemorySummaryTool(server: McpServer, ctx: ServerC
         ));
       }
 
+      const maintenanceWarnings = buildMaintenanceWarnings(projectEntries, anchors, effectiveMetadataById);
+
       // Compute orientation after anchors are computed (for text output)
       let relatedGlobal: ProjectSummaryResult["relatedGlobal"];
       
@@ -522,6 +600,13 @@ export function registerProjectMemorySummaryTool(server: McpServer, ctx: ServerC
         }
       }
 
+      if (maintenanceWarnings && maintenanceWarnings.length > 0) {
+        sections.push(`Maintenance:`);
+        for (const warning of maintenanceWarnings) {
+          sections.push(`  - ${warning.message} Action: ${warning.suggestedAction}`);
+        }
+      }
+
       if (workingState) {
         sections.push(`\nWorking state:`);
         sections.push(workingState.summary);
@@ -555,6 +640,7 @@ export function registerProjectMemorySummaryTool(server: McpServer, ctx: ServerC
         })),
         anchors,
         orientation,
+        maintenanceWarnings,
         workingState,
         relatedGlobal,
       };

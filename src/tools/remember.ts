@@ -35,7 +35,11 @@ import {
 } from "../helpers/persistence.js";
 import { storageLabel, ROLE_LIFECYCLE_DEFAULTS } from "../helpers/vault.js";
 import { makeId } from "../helpers/index.js";
-import { type RememberResult, RememberResultSchema, type LintErrorResult } from "../structured-content.js";
+import {
+  type RememberResult,
+  RememberToolResultSchema,
+  type RememberLintErrorResult,
+} from "../structured-content.js";
 
 export function registerRememberTool(server: McpServer, ctx: ServerContext): void {
   server.registerTool(
@@ -51,7 +55,7 @@ export function registerRememberTool(server: McpServer, ctx: ServerContext): voi
         "- A memory may already exist; use `recall` first to check\n" +
         "- You need to change an existing memory; use `update`\n" +
         "- Several overlapping notes should be merged; use `consolidate`\n\n" +
-        "Returns: created id, scope, vault label, lifecycle, persistence status.\n\n" +
+        "Returns: created id, scope, vault label, lifecycle, persistence status. On lint failure, returns action=lint_error with the list of unfixable issues.\n\n" +
         "[mutating: writes note, embeddings, git commits, may push]\n\n" +
         "Typical next step:\n" +
         "- Use `relate` if this new memory connects to something recalled earlier.",
@@ -122,7 +126,7 @@ export function registerRememberTool(server: McpServer, ctx: ServerContext): voi
             "Optional agent hint indicating that `recall` or `list` was already used to check for an existing memory on this topic."
           ),
       }),
-      outputSchema: RememberResultSchema,
+      outputSchema: RememberToolResultSchema,
     },
     async ({ title, content, tags, lifecycle, role, summary, alwaysLoad, cwd, scope, allowProtectedBranch = false }) => {
       await ensureBranchSynced(ctx, cwd);
@@ -136,7 +140,7 @@ export function registerRememberTool(server: McpServer, ctx: ServerContext): voi
           const message = `Markdown lint issues prevented this note from being stored. Fix the specific lint errors listed below in your content and retry the remember call — the note was NOT stored.\n\n${err.message}`;
           return {
             content: [{ type: "text" as const, text: message }],
-            structuredContent: { action: "lint_error", tool: "remember", issues: err.issues } as LintErrorResult,
+            structuredContent: { action: "lint_error", tool: "remember", issues: err.issues } satisfies RememberLintErrorResult,
             isError: true,
           };
         }
