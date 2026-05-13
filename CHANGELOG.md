@@ -4,6 +4,16 @@ All notable changes to `mnemonic` will be documented in this file.
 
 The format is loosely based on Keep a Changelog and uses semver-style version headings.
 
+## [0.31.0] - Unreleased
+
+### Fixed
+
+- `remember` and `update` now preserve both text and structured outputs on markdown lint failures by returning schema-valid `lint_error` structured content instead of triggering MCP output validation errors.
+
+### Added
+
+- Added unit and integration coverage for lint-error output contracts so `remember` and `update` both enforce structured `lint_error` payloads alongside human-readable text responses in the regular test suite.
+
 ## [0.30.2] - 2026-05-11
 
 ### Changed
