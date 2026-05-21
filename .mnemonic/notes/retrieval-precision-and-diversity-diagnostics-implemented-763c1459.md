@@ -13,8 +13,6 @@ updatedAt: '2026-05-09T21:03:51.512Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
-  - id: review-retrieval-precision-and-diversity-diagnostics-1a3a9e1d
-    type: derives-from
   - id: research-cag-bench-paper-analysis-gaps-and-applications-for--8dbf8467
     type: derives-from
   - id: implementation-principles-for-mnemonic-mcp-2e178bba
