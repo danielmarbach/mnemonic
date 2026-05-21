@@ -9,7 +9,7 @@ tags:
   - documentation
 lifecycle: permanent
 createdAt: '2026-05-09T12:54:02.094Z'
-updatedAt: '2026-05-09T21:16:14.015Z'
+updatedAt: '2026-05-21T10:37:47.076Z'
 role: summary
 alwaysLoad: true
 project: https-github-com-danielmarbach-mnemonic
@@ -37,6 +37,8 @@ relatedTo:
     type: related-to
   - id: dogfooding-test-suite-reusable-prompt-for-phases-1-8-validat-c7c702d8
     type: related-to
+  - id: plan-multi-provider-embedding-support-for-mnemonic-fa944256
+    type: derives-from
 memoryVersion: 1
 ---
 ## Implementation principles for mnemonic MCP
