@@ -7,7 +7,7 @@ tags:
   - architecture
 lifecycle: temporary
 createdAt: '2026-05-21T10:30:50.766Z'
-updatedAt: '2026-05-21T10:31:43.524Z'
+updatedAt: '2026-05-21T10:33:09.794Z'
 role: research
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -36,6 +36,15 @@ Mnemonic currently treats embeddings as a single Ollama-backed capability. Suppo
 - README and `compose.yaml` assume Ollama as a prerequisite and runtime service.
 
 ## Provider API Findings
+
+### OpenAI-Compatible Endpoints
+
+- The user's proposed "de facto standard" is substantially accurate: many embedding systems expose or proxy an OpenAI-style embeddings API with `POST /v1/embeddings`, `{ model, input }`, and `data[].embedding` responses.
+- This is not a formal standard, but it is a practical interoperability shape used by OpenAI-compatible local/proxy servers and gateways.
+- LiteLLM explicitly supports `/embeddings` and `/v1/embeddings`, OpenAI-compatible custom endpoints via `api_base`, Gemini embeddings through a normalized API, and provider-specific pass-through params such as `dimensions` and `input_type`.
+- OpenAI-compatible shape should be treated as a transport/schema compatibility layer only. It does not make embedding spaces interchangeable.
+- The compatibility boundary should include provider/endpoint mode, model, dimensions, metric, and any provider-specific retrieval mode/task input semantics that affect vector space.
+- This suggests adding an `openai-compatible` provider mode, separate from native `openai`, so Mnemonic can target LiteLLM, LM Studio, vLLM, Ollama OpenAI compatibility, or other compatible servers via a configurable base URL.
 
 ### Ollama
 
