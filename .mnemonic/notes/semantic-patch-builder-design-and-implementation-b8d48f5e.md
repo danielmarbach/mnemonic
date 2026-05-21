@@ -15,8 +15,6 @@ projectName: mnemonic
 relatedTo:
   - id: theme-semantic-patch-improvements-lint-error-handling-headin-f2c4ced1
     type: explains
-  - id: research-semanticpatch-failure-patterns-analysis-43e810a6
-    type: derives-from
   - id: mnemonic-key-design-decisions-3f2a6273
     type: related-to
 memoryVersion: 1
