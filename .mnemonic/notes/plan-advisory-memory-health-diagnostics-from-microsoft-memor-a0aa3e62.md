@@ -15,8 +15,6 @@ alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
-  - id: research-microsoft-human-inspired-memory-architecture-applic-3eeefced
-    type: derives-from
   - id: apply-compact-mcp-tool-descriptions-02780260
     type: related-to
   - id: apply-phase-1-advisory-memory-guidance-from-microsoft-memory-c5e347cc
