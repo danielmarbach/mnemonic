@@ -16,8 +16,6 @@ alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
-  - id: research-semvec-analysis-applicability-and-alignment-with-mn-7a42ac50
-    type: derives-from
   - id: reference-mnemonic-ranking-signals-inventory-all-scoring-for-27ae79dc
     type: derives-from
   - id: enriched-confidence-scoring-with-signal-strength-composite-i-06563116
