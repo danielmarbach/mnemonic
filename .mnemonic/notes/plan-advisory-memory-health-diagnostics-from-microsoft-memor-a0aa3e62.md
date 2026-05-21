@@ -21,8 +21,6 @@ relatedTo:
     type: related-to
   - id: apply-phase-1-advisory-memory-guidance-from-microsoft-memory-c5e347cc
     type: follows
-  - id: apply-phase-2-internal-decay-evidence-helper-f1e1e348
-    type: follows
   - id: apply-phase-3-project-summary-maintenance-warnings-2b8b06e5
     type: follows
   - id: apply-phase-4-consolidation-evidence-refinement-6dda70fc
