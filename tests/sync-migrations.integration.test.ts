@@ -11,6 +11,7 @@ import {
   initTestRepo,
   initTestVaultRepo,
   startFakeEmbeddingServer,
+  startFakeOpenAICompatibleEmbeddingServer,
   tempDirs,
 } from "./helpers/mcp.js";
 
@@ -290,6 +291,42 @@ describe("sync-migrations", () => {
       expect(before).not.toBe("");
     } finally {
       await embeddingServer.close();
+    }
+  }, 15000);
+
+  it("sync force rebuilds embeddings after switching providers", async () => {
+    const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-vault-"));
+    tempDirs.push(vaultDir);
+    const ollamaServer = await startFakeEmbeddingServer();
+    const openAICompatibleServer = await startFakeOpenAICompatibleEmbeddingServer();
+
+    try {
+      const rememberText = await callLocalMcp(vaultDir, "remember", {
+        title: "Provider switch rebuild note",
+        content: "This note changes embedding providers during sync force mode.",
+        scope: "global",
+        summary: "Seed provider switch rebuild test",
+      }, ollamaServer.url);
+
+      const noteId = extractRememberedId(rememberText);
+      const embeddingPath = path.join(vaultDir, "embeddings", `${noteId}.json`);
+      const before = JSON.parse(await readFile(embeddingPath, "utf-8")) as Record<string, unknown>;
+      expect(before["provider"]).toBe("ollama");
+
+      const response = await callLocalMcpResponse(vaultDir, "sync", { force: true }, {
+        env: {
+          EMBED_PROVIDER: "openai-compatible",
+          EMBED_BASE_URL: openAICompatibleServer.url,
+          EMBED_MODEL: "fake-openai-compatible-model",
+        },
+      });
+
+      expect(response.text).toContain("main vault: embedded 1 note(s) (force rebuild).");
+      const after = JSON.parse(await readFile(embeddingPath, "utf-8")) as Record<string, unknown>;
+      expect(after["provider"]).toBe("openai-compatible");
+      expect(after["compatibilityKey"]).not.toBe(before["compatibilityKey"]);
+    } finally {
+      await Promise.all([ollamaServer.close(), openAICompatibleServer.close()]);
     }
   }, 15000);
 
