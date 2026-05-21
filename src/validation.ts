@@ -19,7 +19,7 @@ export const EmbeddingRecordSchema = z.object({
   metric: z.string().optional(),
   inputMode: z.string().optional(),
   compatibilityKey: z.string().optional(),
-  embedding: z.array(z.number()),
+  embedding: z.array(z.number()).nonempty(),
   updatedAt: z.string(),
 });
 

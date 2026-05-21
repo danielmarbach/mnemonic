@@ -451,6 +451,20 @@ describe("embedding compatibility", () => {
     expect(() => cosineSimilarity([1, 0], [1, 0, 0])).toThrow(/dimensions must match/i);
     expect(safeCosineSimilarity([1, 0], [1, 0, 0])).toBeUndefined();
   });
+
+  it("rejects empty provider vectors before they can be written", async () => {
+    const server = await startOpenAICompatibleServer({
+      expectedModel: "local-model",
+      embedding: [],
+    });
+    const config = resolveEmbeddingProviderConfig({
+      EMBED_PROVIDER: "openai-compatible",
+      EMBED_BASE_URL: server.url,
+      EMBED_MODEL: "local-model",
+    });
+
+    await expect(createEmbeddingProvider(config).embed("hello")).rejects.toThrow(/unexpected shape/i);
+  });
 });
 
 describe("Embedding consistency scenarios", () => {

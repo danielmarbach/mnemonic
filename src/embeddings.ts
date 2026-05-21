@@ -63,12 +63,13 @@ const DEFAULT_GEMINI_BASE_URL = "https://generativelanguage.googleapis.com";
 const DEFAULT_OLLAMA_BASE_URL = "http://localhost:11434";
 const COSINE_METRIC = embeddingMetric("cosine");
 
-const OllamaEmbedResponseSchema = z.object({ embeddings: z.array(z.array(z.number())).optional() });
+const EmbeddingVectorSchema = z.array(z.number()).nonempty();
+const OllamaEmbedResponseSchema = z.object({ embeddings: z.array(EmbeddingVectorSchema).optional() });
 const OpenAIEmbeddingResponseSchema = z.object({
-  data: z.array(z.object({ embedding: z.array(z.number()) })),
+  data: z.array(z.object({ embedding: EmbeddingVectorSchema })),
 });
 const GeminiEmbeddingResponseSchema = z.object({
-  embedding: z.object({ values: z.array(z.number()) }),
+  embedding: z.object({ values: EmbeddingVectorSchema }),
 });
 
 function validateOllamaUrl(url: string): string {
@@ -385,11 +386,11 @@ export function checkEmbeddingCompatibility(
   identity: EmbeddingIdentity = currentEmbeddingIdentity,
   expectedDimensions?: number,
 ): EmbeddingCompatibility {
-  if (record.compatibilityKey !== undefined && identity.dimensions !== undefined) {
-    if (record.compatibilityKey !== identity.compatibilityKey) {
-      return { status: "skipped", reason: "provider-mismatch" };
-    }
-  } else if (record.provider !== undefined) {
+  if (record.compatibilityKey !== undefined && identity.dimensions !== undefined && record.compatibilityKey !== identity.compatibilityKey) {
+    return { status: "skipped", reason: "provider-mismatch" };
+  }
+
+  if (record.provider !== undefined) {
     if (record.provider !== identity.provider || record.model !== identity.model) {
       return { status: "skipped", reason: "provider-mismatch" };
     }
