@@ -2,7 +2,7 @@
 
 ⚠️ **WHEN WORKING ON MNEMONIC: Always test changes with local MCP server first (`npm run mcp:local` or `scripts/mcp-local.sh`)**
 
-A personal MCP memory server. Stores LLM memories as plain markdown in a git repo with local embeddings via Ollama. No database or permanent services required.
+A personal MCP memory server. Stores LLM memories as plain markdown in a git repo with gitignored embeddings via configurable providers. Ollama is the local default; OpenAI-compatible, OpenAI, and Gemini providers are environment-configured. No database or permanent services required.
 
 ## Dogfooding protocol
 
@@ -133,7 +133,7 @@ Themes in `project_memory_summary` are hints, not fixed categories:
 - `docs/index.html` is the GitHub Pages landing page; keep it current whenever tools, features, or the dogfooding notes change:
   - Tools table in the **Tools** section must reflect the current tool inventory (same as README.md and AGENT.md)
   - The **Dogfooding** section shows real notes from `.mnemonic/notes/` — refresh card content if those notes are updated or replaced
-  - Configuration table (`VAULT_PATH`, `OLLAMA_URL`, `EMBED_MODEL`, `DISABLE_GIT`) must match env vars in code and README.md
+  - Configuration table (`VAULT_PATH`, embedding provider variables, `DISABLE_GIT`) must match env vars in code and README.md
   - The setup snippets must stay in sync with README.md
   - The hero terminal shows a real `recall` result — update if the note it references changes significantly
 
@@ -184,8 +184,10 @@ Human-readable summary.
 
 ### Embeddings gitignored
 - Derived data, recomputable; avoids binary merge conflicts
-- `sync` backfills missing local embeddings on every run
-- `sync { force: true }` rebuilds all embeddings when needed
+- The `sync` MCP tool backfills missing local embeddings on every run
+- Calling `sync` with `force: true` rebuilds all embeddings when needed
+- Provider configuration is environment-only; API keys must never be stored in notes, embedding records, vault config, or git
+- Changing provider/model/dimensions requires calling the `sync` MCP tool with `force: true`; incompatible vectors are skipped rather than compared
 
 ### Project scoping via git remote URL
 ```
@@ -236,7 +238,7 @@ When `recall` called with `cwd`, project notes get a small **tiebreaker boost** 
 Machine-local settings in `~/mnemonic-vault/config.json`. Survives sessions without becoming memory notes. Includes `reindexEmbedConcurrency`, `mutationPushMode` (`all` | `main-only` | `none`), per-project policy defaults (write scope, consolidation mode, protected-branch behavior/patterns), and optional project-identity remote overrides for fork workflows.
 
 ### Bidirectional sync
-`sync` does: fetch/pull/push when a remote exists, plus embedding backfill on every run. `sync { force: true }` rebuilds all embeddings. Single call, linear history. Syncs main vault; pass `cwd` for project vault too. Mutating tools may skip auto-push based on `mutationPushMode`, but `sync` remains the explicit catch-up path.
+The `sync` MCP tool does: fetch/pull/push when a remote exists, plus embedding backfill on every run. Passing `force: true` rebuilds all embeddings. Single call, linear history. Syncs main vault; pass `cwd` for project vault too. Mutating tools may skip auto-push based on `mutationPushMode`, but `sync` remains the explicit catch-up path.
 
 ### MCP output style
 Optimized for LLM consumption:
@@ -318,7 +320,7 @@ Skills are loaded via the `skill` tool and extend agent capabilities with specia
 | `relate` | Create typed relationship between notes (bidirectional) |
 | `set_project_identity` | Save which git remote defines project identity |
 | `set_project_memory_policy` | Save project policy defaults (scope, consolidation mode, protected-branch behavior/patterns) |
-| `sync` | Git sync when remote exists plus embedding backfill always; `force=true` rebuilds all embeddings |
+| `sync` | MCP tool for git sync when remote exists plus embedding backfill always; `force: true` rebuilds all embeddings |
 | `unrelate` | Remove relationship between notes |
 | `update` | Update note content/title/tags/lifecycle; re-embeds when content changes |
 | `where_is_memory` | Show note's project association and storage location |
@@ -484,5 +486,5 @@ Run `npm run lint:ast` to check. Violations fail CI. Rules live in `rules/` — 
 
 - **Bounded parallel embedding** — small concurrency limit during sync embedding backfill
 - **No full-text fallback** — fails if Ollama down (could add keyword search)
-- **Embedding model mismatch** — `sync --force` fixes; no auto-detection
+- **Embedding provider/model mismatch** — call the `sync` MCP tool with `force: true` to rebuild local embeddings
 - **No web UI** — vault is just files; use any markdown editor

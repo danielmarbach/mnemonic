@@ -24,6 +24,18 @@ export type ProjectId = Brand<string, "ProjectId">;
 /** Identifier for the embedding model used (e.g. "nomic-embed-text-v2-moe"). */
 export type EmbeddingModelId = Brand<string, "EmbeddingModelId">;
 
+/** Embedding provider identifier (e.g. "ollama", "openai-compatible"). */
+export type EmbeddingProviderId = Brand<string, "EmbeddingProviderId">;
+
+/** Stable key identifying compatible embedding vector spaces. */
+export type EmbeddingCompatibilityKey = Brand<string, "EmbeddingCompatibilityKey">;
+
+/** Embedding vector dimensionality. */
+export type EmbeddingDimensions = Brand<number, "EmbeddingDimensions">;
+
+/** Similarity metric used for embedding comparisons. */
+export type EmbeddingMetric = Brand<string, "EmbeddingMetric">;
+
 /** ISO 8601 date string used for timestamps (createdAt, updatedAt). */
 export type ISO8601DateString = Brand<string, "ISO8601DateString">;
 
@@ -74,6 +86,26 @@ export function projectId(id: string): ProjectId {
 /** Create an `EmbeddingModelId` from a plain string. */
 export function embeddingModelId(id: string): EmbeddingModelId {
   return id as EmbeddingModelId;
+}
+
+/** Create an `EmbeddingProviderId` from a plain string. */
+export function embeddingProviderId(id: string): EmbeddingProviderId {
+  return id as EmbeddingProviderId;
+}
+
+/** Create an `EmbeddingCompatibilityKey` from a plain string. */
+export function embeddingCompatibilityKey(key: string): EmbeddingCompatibilityKey {
+  return key as EmbeddingCompatibilityKey;
+}
+
+/** Create an `EmbeddingDimensions` from a plain number. */
+export function embeddingDimensions(dimensions: number): EmbeddingDimensions {
+  return dimensions as EmbeddingDimensions;
+}
+
+/** Create an `EmbeddingMetric` from a plain string. */
+export function embeddingMetric(metric: string): EmbeddingMetric {
+  return metric as EmbeddingMetric;
 }
 
 /** Create an `ISO8601DateString` from a plain ISO date string. */

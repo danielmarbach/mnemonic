@@ -21,7 +21,7 @@ import { embedTextForNote } from "../helpers/embed.js";
 import { memoryId, isoDateString } from "../brands.js";
 import { cleanMarkdown, MarkdownLintError } from "../markdown.js";
 import { getErrorMessage, attempt, attemptSync } from "../error-utils.js";
-import { embed, embedModel } from "../embeddings.js";
+import { embed, embedModel, embeddingMetadata } from "../embeddings.js";
 import { applySemanticPatches, type SemanticPatch } from "../semantic-patch.js";
 import { hasActualChanges, computeFieldsModified } from "../update-detect-changes.js";
 import { suggestAutoRelationships } from "../auto-relate.js";
@@ -358,7 +358,7 @@ export function registerUpdateTool(server: McpServer, ctx: ServerContext): void 
         const embedResult = await attempt("update:re-embed", async () => {
           const text = await embedTextForNote(vault.storage, updated);
           const vector = await embed(text);
-          await vault.storage.writeEmbedding({ id: noteId, model: embedModel, embedding: vector, updatedAt: now });
+          await vault.storage.writeEmbedding({ id: noteId, ...embeddingMetadata(vector), embedding: vector, updatedAt: now });
         });
         if (embedResult.ok) {
           embeddingStatus = { status: "written" };

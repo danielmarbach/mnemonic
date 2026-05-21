@@ -73,14 +73,14 @@ export async function ensureBranchSynced(ctx: ServerContext, cwd?: string): Prom
     ctx.vaultManager.main.git.sync().then(async (result) => {
       console.error(`[branch] Main vault sync: ${JSON.stringify(result)}`);
       const backfill = await backfillEmbeddingsAfterSync(ctx, ctx.vaultManager.main.storage, "main vault", [], true);
-      console.error(`[branch] Main vault embedded ${backfill.embedded} notes`);
+      console.error(`[branch] Main vault embedded ${backfill.embedded} notes${backfill.failed.length > 0 ? `, ${backfill.failed.length} failed (e.g. "${backfill.failed[0]!.error}")` : ""}`);
       return result;
     }),
     projectVault
       ? projectVault.git.sync().then(async (result) => {
           console.error(`[branch] Project vault sync: ${JSON.stringify(result)}`);
           const backfill = await backfillEmbeddingsAfterSync(ctx, projectVault.storage, "project vault", [], true);
-          console.error(`[branch] Project vault embedded ${backfill.embedded} notes`);
+          console.error(`[branch] Project vault embedded ${backfill.embedded} notes${backfill.failed.length > 0 ? `, ${backfill.failed.length} failed (e.g. "${backfill.failed[0]!.error}")` : ""}`);
           return result;
         })
       : Promise.resolve(undefined),

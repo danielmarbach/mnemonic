@@ -1,12 +1,25 @@
 import { z } from "zod";
 import type { Relationship } from "./storage.js";
 import type { NoteProjection } from "./structured-content.js";
-import { memoryId, embeddingModelId, isoDateString } from "./brands.js";
+import {
+  embeddingCompatibilityKey,
+  embeddingDimensions,
+  embeddingMetric,
+  embeddingModelId,
+  embeddingProviderId,
+  isoDateString,
+  memoryId,
+} from "./brands.js";
 
 export const EmbeddingRecordSchema = z.object({
   id: z.string(),
   model: z.string(),
-  embedding: z.array(z.number()),
+  provider: z.string().optional(),
+  dimensions: z.number().int().positive().optional(),
+  metric: z.string().optional(),
+  inputMode: z.string().optional(),
+  compatibilityKey: z.string().optional(),
+  embedding: z.array(z.number()).nonempty(),
   updatedAt: z.string(),
 });
 
@@ -48,6 +61,11 @@ export function validateEmbeddingRecord(raw: unknown): import("./storage.js").Em
     return {
       id: memoryId(result.data.id),
       model: embeddingModelId(result.data.model),
+      provider: result.data.provider !== undefined ? embeddingProviderId(result.data.provider) : undefined,
+      dimensions: result.data.dimensions !== undefined ? embeddingDimensions(result.data.dimensions) : undefined,
+      metric: result.data.metric !== undefined ? embeddingMetric(result.data.metric) : undefined,
+      inputMode: result.data.inputMode,
+      compatibilityKey: result.data.compatibilityKey !== undefined ? embeddingCompatibilityKey(result.data.compatibilityKey) : undefined,
       embedding: result.data.embedding,
       updatedAt: isoDateString(result.data.updatedAt),
     };

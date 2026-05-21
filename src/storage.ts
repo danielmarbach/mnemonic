@@ -4,7 +4,15 @@ import { randomUUID } from "crypto";
 import matter from "gray-matter";
 import type { NoteProjection } from "./structured-content.js";
 import { validateEmbeddingRecord, validateNoteProjection, validateRelatedTo } from "./validation.js";
-import type { MemoryId, EmbeddingModelId, ISO8601DateString } from "./brands.js";
+import type {
+  EmbeddingCompatibilityKey,
+  EmbeddingDimensions,
+  EmbeddingMetric,
+  EmbeddingModelId,
+  EmbeddingProviderId,
+  ISO8601DateString,
+  MemoryId,
+} from "./brands.js";
 import { memoryId, isoDateString, isValidMemoryId } from "./brands.js";
 import { attempt } from "./error-utils.js";
 import { AtomicWriteInProgressError, MalformedNoteError, InvalidNoteIdError } from "./domain-errors.js";
@@ -46,6 +54,11 @@ export interface Note {
 export interface EmbeddingRecord {
   id: MemoryId;
   model: EmbeddingModelId;
+  provider?: EmbeddingProviderId;
+  dimensions?: EmbeddingDimensions;
+  metric?: EmbeddingMetric;
+  inputMode?: string;
+  compatibilityKey?: EmbeddingCompatibilityKey;
   embedding: number[];
   updatedAt: ISO8601DateString;
 }

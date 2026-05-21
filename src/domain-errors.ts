@@ -45,6 +45,27 @@ export class OllamaEmbeddingError extends Error {
   }
 }
 
+export class EmbeddingConfigurationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "EmbeddingConfigurationError";
+  }
+}
+
+export class EmbeddingProviderError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "EmbeddingProviderError";
+  }
+}
+
+export class EmbeddingDimensionMismatchError extends Error {
+  constructor(left: number, right: number) {
+    super(`Embedding dimensions must match: ${left} !== ${right}`);
+    this.name = "EmbeddingDimensionMismatchError";
+  }
+}
+
 export class UnknownConsolidationModeError extends Error {
   constructor(mode: never) {
     super(`Unknown consolidation mode: ${mode}`);

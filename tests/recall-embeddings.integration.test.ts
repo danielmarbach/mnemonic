@@ -10,6 +10,8 @@ import {
   initTestRepo,
   initTestVaultRepo,
   startFakeEmbeddingServer,
+  startFakeGeminiEmbeddingServer,
+  startFakeOpenAICompatibleEmbeddingServer,
   tempDirs,
 } from "./helpers/mcp.js";
 
@@ -85,6 +87,80 @@ This note has no embedding yet and should be found via recall.`,
 
       expect(recallText).toContain("Lazy backfill recall note");
       await expect(stat(path.join(vaultDir, "embeddings", "backfill-recall-note.json"))).resolves.toBeDefined();
+    } finally {
+      await embeddingServer.close();
+    }
+  }, 15000);
+
+  it("remember and recall work with an OpenAI-compatible embedding provider", async () => {
+    const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-vault-"));
+    tempDirs.push(vaultDir);
+
+    const embeddingServer = await startFakeOpenAICompatibleEmbeddingServer();
+
+    try {
+      await callLocalMcp(vaultDir, "remember", {
+        title: "OpenAI compatible recall note",
+        content: "This note uses the OpenAI compatible embedding transport.",
+        tags: ["integration"],
+        scope: "global",
+        summary: "Seed OpenAI compatible provider test",
+      }, {
+        env: {
+          EMBED_PROVIDER: "openai-compatible",
+          EMBED_BASE_URL: embeddingServer.url,
+          EMBED_MODEL: "fake-openai-compatible-model",
+        },
+      });
+
+      const recallText = await callLocalMcp(vaultDir, "recall", {
+        query: "OpenAI compatible recall",
+      }, {
+        env: {
+          EMBED_PROVIDER: "openai-compatible",
+          EMBED_BASE_URL: embeddingServer.url,
+          EMBED_MODEL: "fake-openai-compatible-model",
+        },
+      });
+
+      expect(recallText).toContain("OpenAI compatible recall note");
+    } finally {
+      await embeddingServer.close();
+    }
+  }, 15000);
+
+  it("remember and recall work with a Gemini embedding provider", async () => {
+    const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-vault-"));
+    tempDirs.push(vaultDir);
+
+    const embeddingServer = await startFakeGeminiEmbeddingServer();
+
+    try {
+      await callLocalMcp(vaultDir, "remember", {
+        title: "Gemini recall note",
+        content: "This note uses the Gemini embedding transport.",
+        tags: ["integration"],
+        scope: "global",
+        summary: "Seed Gemini provider test",
+      }, {
+        env: {
+          EMBED_PROVIDER: "gemini",
+          GEMINI_BASE_URL: embeddingServer.url,
+          GEMINI_API_KEY: "fake-gemini-key",
+        },
+      });
+
+      const recallText = await callLocalMcp(vaultDir, "recall", {
+        query: "Gemini recall",
+      }, {
+        env: {
+          EMBED_PROVIDER: "gemini",
+          GEMINI_BASE_URL: embeddingServer.url,
+          GEMINI_API_KEY: "fake-gemini-key",
+        },
+      });
+
+      expect(recallText).toContain("Gemini recall note");
     } finally {
       await embeddingServer.close();
     }

@@ -4,7 +4,7 @@ import type { ServerContext } from "../server-context.js";
 import { NOTE_LIFECYCLES, NOTE_ROLES, type Note } from "../storage.js";
 import { isoDateString } from "../brands.js";
 import { getErrorMessage, attempt } from "../error-utils.js";
-import { embed, embedModel } from "../embeddings.js";
+import { embed, embeddingMetadata } from "../embeddings.js";
 import {
   invalidateActiveProjectCache,
   getRecentSessionNoteAccesses,
@@ -210,7 +210,7 @@ export function registerRememberTool(server: McpServer, ctx: ServerContext): voi
       const embedResult = await attempt("remember:embed", async () => {
         const text = await embedTextForNote(vault.storage, note);
         const vector = await embed(text);
-        await vault.storage.writeEmbedding({ id, model: embedModel, embedding: vector, updatedAt: now });
+        await vault.storage.writeEmbedding({ id, ...embeddingMetadata(vector), embedding: vector, updatedAt: now });
       });
       if (!embedResult.ok) {
         embeddingStatus = { status: "skipped", reason: getErrorMessage(embedResult.error) };

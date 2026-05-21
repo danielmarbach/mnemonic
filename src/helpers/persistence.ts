@@ -3,7 +3,7 @@ import type { MutationPushMode } from "../config.js";
 import type { PersistenceStatus, MutationRetryContract } from "../structured-content.js";
 import type { Vault } from "../vault.js";
 import type { ServerContext } from "../server-context.js";
-import { embedModel } from "../embeddings.js";
+import { currentEmbeddingIdentity } from "../embeddings.js";
 import { memoryId } from "../brands.js";
 import { storageLabel } from "./vault.js";
 import { UnknownRecoveryKindError, UnknownMutationPushModeError } from "../domain-errors.js";
@@ -35,7 +35,7 @@ export function buildPersistenceStatus(args: {
     embeddingPath: args.storage.embeddingPath(memoryId(args.id)),
     embedding: {
       status: args.embedding.status,
-      model: embedModel,
+      model: currentEmbeddingIdentity.model,
       reason: args.embedding.reason,
     },
     git: {
