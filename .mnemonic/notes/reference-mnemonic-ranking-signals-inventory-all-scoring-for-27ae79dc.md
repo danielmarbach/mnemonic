@@ -16,8 +16,6 @@ alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
-  - id: research-semvec-retention-formula-deep-dive-applicability-to-a5a31ecd
-    type: derives-from
   - id: enriched-confidence-scoring-with-signal-strength-composite-i-06563116
     type: derives-from
 memoryVersion: 1
