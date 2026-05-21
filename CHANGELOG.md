@@ -6,6 +6,8 @@ The format is loosely based on Keep a Changelog and uses semver-style version he
 
 ## [Unreleased]
 
+## [0.32.0] - 2026-05-21
+
 ### Added
 
 - Embeddings can now use Ollama, OpenAI-compatible endpoints, native OpenAI, or Gemini through environment configuration while keeping API keys out of vault files and git.
