@@ -7,11 +7,14 @@ tags:
   - providers
 lifecycle: temporary
 createdAt: '2026-05-21T11:10:06.885Z'
-updatedAt: '2026-05-21T11:10:06.885Z'
+updatedAt: '2026-05-21T11:10:12.915Z'
 role: context
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: plan-multi-provider-embedding-support-for-mnemonic-fa944256
+    type: follows
 memoryVersion: 1
 ---
 # Apply: Multi-provider Embedding Support Implementation

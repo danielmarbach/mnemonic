@@ -7,7 +7,7 @@ tags:
   - architecture
 lifecycle: temporary
 createdAt: '2026-05-21T10:31:35.612Z'
-updatedAt: '2026-05-21T11:09:14.171Z'
+updatedAt: '2026-05-21T11:10:12.915Z'
 role: plan
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -21,6 +21,8 @@ relatedTo:
     type: related-to
   - id: typescript-code-review-mnemonic-project-961d984b
     type: related-to
+  - id: apply-multi-provider-embedding-support-implementation-f55f935a
+    type: follows
 memoryVersion: 1
 ---
 # Plan: Multi-provider Embedding Support For Mnemonic
