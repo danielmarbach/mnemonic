@@ -64,6 +64,9 @@ const DEFAULT_OLLAMA_BASE_URL = "http://localhost:11434";
 const COSINE_METRIC = embeddingMetric("cosine");
 
 const OllamaEmbedResponseSchema = z.object({ embeddings: z.array(z.array(z.number())).optional() });
+const OpenAIEmbeddingResponseSchema = z.object({
+  data: z.array(z.object({ embedding: z.array(z.number()) })),
+});
 
 function validateOllamaUrl(url: string): string {
   let parsed: URL;
@@ -222,12 +225,61 @@ class OllamaEmbeddingProvider implements EmbeddingProvider {
   }
 }
 
+class OpenAICompatibleEmbeddingProvider implements EmbeddingProvider {
+  readonly identity: EmbeddingIdentity;
+
+  constructor(private readonly config: Extract<EmbeddingProviderConfig, { kind: "openai-compatible" | "openai" }>) {
+    this.identity = createIdentity(config);
+  }
+
+  async embed(text: string): Promise<EmbeddingResult> {
+    const endpoint = new URL("/v1/embeddings", this.config.baseUrl);
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (this.config.apiKey) {
+      headers["Authorization"] = "Bearer " + this.config.apiKey;
+    }
+
+    const body: Record<string, unknown> = {
+      model: this.config.model,
+      input: text,
+      encoding_format: "float",
+    };
+    if (this.config.dimensions !== undefined) {
+      body["dimensions"] = this.config.dimensions;
+    }
+
+    const res = await fetch(endpoint, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(body),
+    });
+
+    if (!res.ok) {
+      throw new EmbeddingProviderError(
+        `${this.config.kind} embedding failed: ${res.status} ${res.statusText} at ${endpoint.host} with model '${this.config.model}'`,
+      );
+    }
+
+    const parseResult = OpenAIEmbeddingResponseSchema.safeParse(await res.json());
+    if (!parseResult.success) {
+      throw new EmbeddingProviderError(`${this.config.kind} embedding response had unexpected shape: ${parseResult.error.message}`);
+    }
+    const embedding = parseResult.data.data[0]?.embedding;
+    if (!embedding) {
+      throw new EmbeddingProviderError(`${this.config.kind} embedding response did not include an embedding for model '${this.config.model}'`);
+    }
+
+    return { embedding, identity: { ...this.identity, dimensions: embeddingDimensions(embedding.length) } };
+  }
+}
+
 export function createEmbeddingProvider(config: EmbeddingProviderConfig = resolveEmbeddingProviderConfig()): EmbeddingProvider {
   switch (config.kind) {
     case "ollama":
       return new OllamaEmbeddingProvider(config);
     case "openai-compatible":
     case "openai":
+      return new OpenAICompatibleEmbeddingProvider(config);
     case "gemini":
       throw new EmbeddingConfigurationError(`Embedding provider '${config.kind}' is configured but not implemented yet`);
     default: {

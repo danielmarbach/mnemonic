@@ -134,6 +134,46 @@ export async function startFakeEmbeddingServer(): Promise<{ url: string; close: 
   };
 }
 
+export async function startFakeOpenAICompatibleEmbeddingServer(): Promise<{ url: string; close: () => Promise<void> }> {
+  const server = http.createServer((req, res) => {
+    if (req.method !== "POST" || req.url !== "/v1/embeddings") {
+      res.writeHead(404).end();
+      return;
+    }
+
+    let raw = "";
+    req.setEncoding("utf-8");
+    req.on("data", (chunk) => { raw += chunk; });
+    req.on("end", () => {
+      const body = JSON.parse(raw) as Record<string, unknown>;
+      if (body["encoding_format"] !== "float" || typeof body["model"] !== "string") {
+        res.writeHead(400).end();
+        return;
+      }
+
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ data: [{ embedding: [0.1, 0.2, 0.3] }] }));
+    });
+  });
+
+  await new Promise<void>((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", () => resolve());
+  });
+
+  const address = server.address();
+  if (!address || typeof address === "string") {
+    throw new Error("Could not determine fake OpenAI-compatible embedding server address");
+  }
+
+  return {
+    url: `http://127.0.0.1:${address.port}`,
+    close: () => new Promise<void>((resolve, reject) => {
+      server.close((err) => err ? reject(err) : resolve());
+    }),
+  };
+}
+
 export function extractRememberedId(text: string): string {
   const match = text.match(/`([^`]+)`/);
   if (!match) {
@@ -148,7 +188,7 @@ export async function callLocalMcpMethod(
   id: number,
   method: string,
   params: Record<string, unknown>,
-  options?: { ollamaUrl?: string; disableGit?: boolean },
+  options?: { ollamaUrl?: string; disableGit?: boolean; env?: Record<string, string> },
 ): Promise<{ id?: number; result?: Record<string, unknown> }> {
   const messages = [
     {
@@ -177,6 +217,7 @@ export async function callLocalMcpMethod(
         DISABLE_GIT: options?.disableGit === false ? "false" : "true",
         VAULT_PATH: vaultDir,
         ...(options?.ollamaUrl ? { OLLAMA_URL: options.ollamaUrl } : {}),
+        ...options?.env,
       },
       stdio: ["pipe", "pipe", "pipe"],
     });
@@ -222,7 +263,7 @@ export async function callLocalMcp(
   vaultDir: string,
   toolName: string,
   arguments_: Record<string, unknown>,
-  options?: string | { ollamaUrl?: string; disableGit?: boolean },
+  options?: string | { ollamaUrl?: string; disableGit?: boolean; env?: Record<string, string> },
 ): Promise<string> {
   const response = await callLocalMcpResponse(vaultDir, toolName, arguments_, options);
   return response.text;
@@ -232,7 +273,7 @@ export async function callLocalMcpResponse(
   vaultDir: string,
   toolName: string,
   arguments_: Record<string, unknown>,
-  options?: string | { ollamaUrl?: string; disableGit?: boolean },
+  options?: string | { ollamaUrl?: string; disableGit?: boolean; env?: Record<string, string> },
 ): Promise<{ text: string; structuredContent?: Record<string, unknown> }> {
   const resolvedOptions = typeof options === "string" ? { ollamaUrl: options } : options;
   const response = await callLocalMcpMethod(vaultDir, 1, "tools/call", {
@@ -260,7 +301,7 @@ export async function callLocalMcpPrompt(vaultDir: string, promptName: string): 
 
 export async function createPersistentMcpSession(
   vaultDir: string,
-  options?: { ollamaUrl?: string; disableGit?: boolean },
+  options?: { ollamaUrl?: string; disableGit?: boolean; env?: Record<string, string> },
 ): Promise<{
   callTool: (toolName: string, arguments_: Record<string, unknown>) => Promise<{ text: string; structuredContent?: Record<string, unknown> }>;
   close: () => Promise<void>;
@@ -272,6 +313,7 @@ export async function createPersistentMcpSession(
       DISABLE_GIT: options?.disableGit === false ? "false" : "true",
       VAULT_PATH: vaultDir,
       ...(options?.ollamaUrl ? { OLLAMA_URL: options.ollamaUrl } : {}),
+      ...options?.env,
     },
     stdio: ["pipe", "pipe", "pipe"],
   });

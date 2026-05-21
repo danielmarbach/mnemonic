@@ -1,4 +1,5 @@
 import fs from "fs/promises";
+import http from "http";
 import os from "os";
 import path from "path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -6,6 +7,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { Storage, type Note } from "../src/storage.js";
 import {
   checkEmbeddingCompatibility,
+  createEmbeddingProvider,
   cosineSimilarity,
   currentEmbeddingIdentity,
   embeddingMetadata,
@@ -14,10 +16,64 @@ import {
 } from "../src/embeddings.js";
 
 const tempDirs: string[] = [];
+const closeServers: Array<() => Promise<void>> = [];
 
 afterEach(async () => {
   await Promise.all(tempDirs.splice(0).map((dir) => fs.rm(dir, { recursive: true, force: true })));
+  await Promise.all(closeServers.splice(0).map((close) => close()));
 });
+
+async function startOpenAICompatibleServer(options: {
+  expectedAuth?: string;
+  expectedModel: string;
+  expectedDimensions?: number;
+  embedding?: number[];
+}): Promise<{ url: string }> {
+  const server = http.createServer((req, res) => {
+    if (req.method !== "POST" || req.url !== "/v1/embeddings") {
+      res.writeHead(404).end();
+      return;
+    }
+
+    if (options.expectedAuth !== undefined && req.headers.authorization !== `Bearer ${options.expectedAuth}`) {
+      res.writeHead(401).end(JSON.stringify({ error: "missing auth" }));
+      return;
+    }
+
+    let raw = "";
+    req.setEncoding("utf-8");
+    req.on("data", (chunk) => { raw += chunk; });
+    req.on("end", () => {
+      const body = JSON.parse(raw) as Record<string, unknown>;
+      if (
+        body["model"] !== options.expectedModel
+        || body["encoding_format"] !== "float"
+        || (options.expectedDimensions !== undefined && body["dimensions"] !== options.expectedDimensions)
+      ) {
+        res.writeHead(400).end(JSON.stringify({ error: "unexpected body" }));
+        return;
+      }
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ data: [{ embedding: options.embedding ?? [0.2, 0.4, 0.6] }] }));
+    });
+  });
+
+  await new Promise<void>((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", () => resolve());
+  });
+
+  const address = server.address();
+  if (!address || typeof address === "string") {
+    throw new Error("Could not determine fake OpenAI-compatible server address");
+  }
+
+  closeServers.push(() => new Promise<void>((resolve, reject) => {
+    server.close((err) => err ? reject(err) : resolve());
+  }));
+
+  return { url: `http://127.0.0.1:${address.port}` };
+}
 
 async function createTempStorage(): Promise<Storage> {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), "mnemonic-embeddings-"));
@@ -224,6 +280,58 @@ describe("embedding provider configuration", () => {
 
     expect(openai.model).toBe("text-embedding-3-small");
     expect(gemini.model).toBe("gemini-embedding-2");
+  });
+});
+
+describe("OpenAI-compatible embedding provider", () => {
+  it("posts OpenAI-compatible request shape with optional bearer auth", async () => {
+    const server = await startOpenAICompatibleServer({
+      expectedAuth: "secret-key",
+      expectedModel: "local-model",
+      expectedDimensions: 3,
+      embedding: [0.3, 0.2, 0.1],
+    });
+    const config = resolveEmbeddingProviderConfig({
+      EMBED_PROVIDER: "openai-compatible",
+      EMBED_BASE_URL: server.url,
+      EMBED_API_KEY: "secret-key",
+      EMBED_MODEL: "local-model",
+      EMBED_DIMENSIONS: "3",
+    });
+
+    const result = await createEmbeddingProvider(config).embed("hello");
+
+    expect(result.embedding).toEqual([0.3, 0.2, 0.1]);
+    expect(result.identity.provider).toBe("openai-compatible");
+  });
+
+  it("uses native OpenAI defaults on the same transport", async () => {
+    const server = await startOpenAICompatibleServer({
+      expectedAuth: "openai-secret",
+      expectedModel: "text-embedding-3-small",
+    });
+    const config = resolveEmbeddingProviderConfig({
+      EMBED_PROVIDER: "openai",
+      OPENAI_BASE_URL: server.url,
+      OPENAI_API_KEY: "openai-secret",
+    });
+
+    const result = await createEmbeddingProvider(config).embed("hello");
+
+    expect(result.embedding).toEqual([0.2, 0.4, 0.6]);
+    expect(result.identity.provider).toBe("openai");
+  });
+
+  it("does not include API keys in provider error messages", async () => {
+    const server = await startOpenAICompatibleServer({ expectedAuth: "expected-key", expectedModel: "local-model" });
+    const config = resolveEmbeddingProviderConfig({
+      EMBED_PROVIDER: "openai-compatible",
+      EMBED_BASE_URL: server.url,
+      EMBED_API_KEY: "wrong-secret-key",
+      EMBED_MODEL: "local-model",
+    });
+
+    await expect(createEmbeddingProvider(config).embed("hello")).rejects.not.toThrow(/wrong-secret-key/);
   });
 });
 
