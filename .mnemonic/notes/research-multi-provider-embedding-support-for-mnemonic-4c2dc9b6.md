@@ -7,13 +7,15 @@ tags:
   - architecture
 lifecycle: temporary
 createdAt: '2026-05-21T10:30:50.766Z'
-updatedAt: '2026-05-21T10:30:54.982Z'
+updatedAt: '2026-05-21T10:31:43.524Z'
 role: research
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
   - id: research-request-multi-provider-embedding-support-for-mnemon-a4a5d2fa
+    type: derives-from
+  - id: plan-multi-provider-embedding-support-for-mnemonic-fa944256
     type: derives-from
 memoryVersion: 1
 ---
