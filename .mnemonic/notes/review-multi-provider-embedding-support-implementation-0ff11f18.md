@@ -8,11 +8,14 @@ tags:
   - security
 lifecycle: temporary
 createdAt: '2026-05-21T11:10:33.111Z'
-updatedAt: '2026-05-21T11:10:33.111Z'
+updatedAt: '2026-05-21T11:10:39.974Z'
 role: review
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: apply-multi-provider-embedding-support-implementation-f55f935a
+    type: derives-from
 memoryVersion: 1
 ---
 # Review: Multi-provider Embedding Support Implementation
