@@ -7,7 +7,7 @@ tags:
   - architecture
 lifecycle: temporary
 createdAt: '2026-05-21T10:31:35.612Z'
-updatedAt: '2026-05-21T10:48:18.922Z'
+updatedAt: '2026-05-21T10:50:35.462Z'
 role: plan
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -115,15 +115,23 @@ Use hermetic fake HTTP providers and real local MCP integration tests. Manual ve
 Provider configuration is process environment only, not persisted in mnemonic vaults, notes, project memory policy, or committed config files.
 
 - Secrets such as `OPENAI_API_KEY`, `EMBED_API_KEY`, and `GEMINI_API_KEY` must only come from environment variables.
+
 - Non-secret provider identity metadata is stored in local gitignored embedding records so compatibility can be checked: provider, model, dimensions, metric, optional input mode, and compatibility key.
+
 - Changing provider configuration requires rebuilding local embeddings via `sync(force: true)` or equivalent backfill; mnemonic does not store the chosen provider as shared project state.
+
 - Documentation should make this explicit so users do not expect provider settings to travel with the vault.
 
 - Preserve Ollama as the default provider for existing users.
+
 - Treat provider/endpoint mode, model, dimensions, metric, and optional task/input mode as the embedding compatibility boundary.
+
 - Never compare query embeddings against note embeddings from a different compatibility key.
+
 - OpenAI-compatible `/v1/embeddings` is a transport/schema interoperability layer, not a semantic compatibility guarantee.
+
 - Provider implementations should remain SDK-free initially unless direct REST becomes brittle.
+
 - Changing provider, model, dimensions, metric, or input mode requires rebuilding embeddings with `sync(force: true)` or equivalent backfill.
 
 ## Phase 0: Baseline Validation
@@ -352,7 +360,18 @@ Validation after Phase 7:
 - \[ ] Integration tests for provider switch and `sync(force: true)` rebuild behavior.
 - \[ ] Tests proving incompatible existing embeddings are skipped or rebuilt safely.
 
-## Phase 8: Full Validation And Type Review
+## Phase 8: Full Validation, Type Review, And Security Audit
+
+- \[ ] Run `npm run build`.
+- \[ ] Run `npm test`.
+- \[ ] Run focused embedding/provider tests separately if failures need isolation.
+- \[ ] Perform TypeScript review using `.agents/skills/typescript-code-review/SKILL.md` checklist.
+- \[ ] Perform a security audit/review focused on provider configuration, secret handling, outbound request behavior, error messages, structured/text output, and compatibility isolation.
+- \[ ] Verify no unsafe casts, no `any`, no unvalidated HTTP response bodies, no secret-bearing outputs, no missing exhaustive provider cases, and no structured/text output drift.
+- \[ ] Verify API keys are never persisted to notes, embedding records, project memory policy, committed config, structured output, text output, logs, or thrown error messages.
+- \[ ] Verify documentation clearly states that non-Ollama providers send projection text to external endpoints.
+- \[ ] If code changes are substantial, dispatch a fresh TypeScript review subagent before finalizing.
+- \[ ] If security-sensitive behavior changes are substantial, dispatch or perform a fresh-context security review before finalizing.
 
 - \[ ] Run `npm run build`.
 - \[ ] Run `npm test`.
