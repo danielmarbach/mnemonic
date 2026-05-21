@@ -7,7 +7,7 @@ tags:
   - architecture
 lifecycle: temporary
 createdAt: '2026-05-21T10:31:35.612Z'
-updatedAt: '2026-05-21T10:33:30.762Z'
+updatedAt: '2026-05-21T10:35:09.237Z'
 role: plan
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -66,8 +66,8 @@ Support Ollama, OpenAI, and Gemini embedding providers without comparing incompa
 
 ## Phase 4: OpenAI And OpenAI-Compatible Providers
 
-- \[ ] Add native `openai` provider selected by `EMBED_PROVIDER=openai`.
 - \[ ] Add `openai-compatible` provider selected by `EMBED_PROVIDER=openai-compatible` for LiteLLM, LM Studio, vLLM, Ollama OpenAI compatibility, and similar servers.
+- \[ ] Add native `openai` provider selected by `EMBED_PROVIDER=openai`, layered on the same OpenAI-compatible transport where practical.
 - \[ ] Support `OPENAI_API_KEY`, `OPENAI_BASE_URL`, `EMBED_MODEL`, and optional `EMBED_DIMENSIONS` for native OpenAI.
 - \[ ] Support provider-neutral compatible vars such as `EMBED_BASE_URL` and `EMBED_API_KEY`, or document use of `OPENAI_BASE_URL`/`OPENAI_API_KEY` for compatible endpoints.
 - \[ ] Default OpenAI model should be `text-embedding-3-small` when provider is OpenAI and no model is specified.
@@ -77,12 +77,38 @@ Support Ollama, OpenAI, and Gemini embedding providers without comparing incompa
 - \[ ] Include non-secret error context: provider, model, status code, and endpoint host, but never API key.
 - \[ ] Add unit tests using fake OpenAI-compatible servers validating headers, body, response parsing, base URL behavior, optional auth, and failure messages.
 
-- \[ ] Add `openai` provider selected by `EMBED_PROVIDER=openai`.
-- \[ ] Support `OPENAI_API_KEY`, `OPENAI_BASE_URL`, `EMBED_MODEL`, and optional `EMBED_DIMENSIONS`.
+- \[ ] Add native `openai` provider selected by `EMBED_PROVIDER=openai`.
+
+- \[ ] Add `openai-compatible` provider selected by `EMBED_PROVIDER=openai-compatible` for LiteLLM, LM Studio, vLLM, Ollama OpenAI compatibility, and similar servers.
+
+- \[ ] Support `OPENAI_API_KEY`, `OPENAI_BASE_URL`, `EMBED_MODEL`, and optional `EMBED_DIMENSIONS` for native OpenAI.
+
+- \[ ] Support provider-neutral compatible vars such as `EMBED_BASE_URL` and `EMBED_API_KEY`, or document use of `OPENAI_BASE_URL`/`OPENAI_API_KEY` for compatible endpoints.
+
 - \[ ] Default OpenAI model should be `text-embedding-3-small` when provider is OpenAI and no model is specified.
-- \[ ] Request `POST /v1/embeddings` with `Authorization: Bearer`, `input`, `model`, `encoding_format: "float"`, and `dimensions` when set.
+
+- \[ ] Do not assume a default model for `openai-compatible`; require `EMBED_MODEL` because local/proxy model names vary.
+
+- \[ ] Request `POST /v1/embeddings` with `Authorization: Bearer` when an API key is set, `input`, `model`, `encoding_format: "float"`, and `dimensions` when set.
+
 - \[ ] Parse `data[0].embedding` and validate numeric vector output.
+
 - \[ ] Include non-secret error context: provider, model, status code, and endpoint host, but never API key.
+
+- \[ ] Add unit tests using fake OpenAI-compatible servers validating headers, body, response parsing, base URL behavior, optional auth, and failure messages.
+
+- \[ ] Add `openai` provider selected by `EMBED_PROVIDER=openai`.
+
+- \[ ] Support `OPENAI_API_KEY`, `OPENAI_BASE_URL`, `EMBED_MODEL`, and optional `EMBED_DIMENSIONS`.
+
+- \[ ] Default OpenAI model should be `text-embedding-3-small` when provider is OpenAI and no model is specified.
+
+- \[ ] Request `POST /v1/embeddings` with `Authorization: Bearer`, `input`, `model`, `encoding_format: "float"`, and `dimensions` when set.
+
+- \[ ] Parse `data[0].embedding` and validate numeric vector output.
+
+- \[ ] Include non-secret error context: provider, model, status code, and endpoint host, but never API key.
+
 - \[ ] Add unit tests using a fake OpenAI-compatible server validating headers, body, response parsing, and failure messages.
 
 ## Phase 5: Gemini Provider
@@ -133,11 +159,15 @@ Support Ollama, OpenAI, and Gemini embedding providers without comparing incompa
 ## Open Decisions Before Implementation
 
 - Should `openai-compatible` become the recommended advanced path, with native `gemini` documented mainly for users who do not want to run LiteLLM or another proxy? Initial recommendation: yes.
+
 - Should compatibility metadata include task/input mode, e.g. `search_document` versus `search_query`, for providers that support asymmetric embeddings? Initial recommendation: include an optional `inputMode`/`taskType` field in the compatibility key once exposed.
 
 - Should `EMBED_MODEL` remain provider-neutral, or should provider-specific env vars like `OPENAI_EMBED_MODEL` override it?
+
 - Should incompatible embeddings be immediately rebuilt during `recall`, or only skipped with a warning and rebuilt by `sync`? Initial recommendation: allow existing `embedMissingNotes` to rebuild before recall, but still skip any incompatible records that remain.
+
 - Should `compatibilityKey` include provider base URL? Initial recommendation: include provider, model, and dimensions, but not base URL, because OpenAI-compatible endpoints may intentionally serve the same model identity from different hosts.
+
 - Should `dimensions` be required in records? Initial recommendation: optional for legacy reads, required for new writes.
 
 ## Implementation Order Recommendation
@@ -152,7 +182,15 @@ Support Ollama, OpenAI, and Gemini embedding providers without comparing incompa
 
 1) Provider abstraction while preserving current Ollama behavior.
 2) Compatibility metadata and comparison guards.
-3) OpenAI provider.
-4) Gemini provider.
-5) Documentation and provider-switch UX.
-6) Full integration coverage and dogfood with `sync(force: true)`.
+3) OpenAI-compatible provider using `/v1/embeddings`.
+4) Native OpenAI defaults layered on the same transport.
+5) Native Gemini provider for direct Gemini API users.
+6) Documentation and provider-switch UX.
+7) Full integration coverage and dogfood with `sync(force: true)`.
+
+1. Provider abstraction while preserving current Ollama behavior.
+2. Compatibility metadata and comparison guards.
+3. OpenAI provider.
+4. Gemini provider.
+5. Documentation and provider-switch UX.
+6. Full integration coverage and dogfood with `sync(force: true)`.
