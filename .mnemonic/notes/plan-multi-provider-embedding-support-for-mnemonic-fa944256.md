@@ -7,7 +7,7 @@ tags:
   - architecture
 lifecycle: temporary
 createdAt: '2026-05-21T10:31:35.612Z'
-updatedAt: '2026-05-21T10:55:18.584Z'
+updatedAt: '2026-05-21T11:09:14.171Z'
 role: plan
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -432,14 +432,21 @@ Validation after Phase 7:
 When users change `EMBED_PROVIDER`, `EMBED_MODEL`, `EMBED_DIMENSIONS`, metric, or future input mode, old local embeddings may no longer be comparable with new query vectors.
 
 - Mnemonic skips incompatible embedding records rather than comparing vectors across embedding spaces.
+
 - Users may see fewer or no semantic recall results until local embeddings are rebuilt.
+
 - `sync(force: true)` is the documented explicit rebuild path after provider configuration changes.
+
 - Notes are not lost; only local gitignored embedding JSON files are replaced.
+
 - The first implementation does not add read-path warnings because that would introduce new structured/text output fields and tests. Documentation must make the rebuild requirement visible.
 
 - \[ ] Make `sync(force: true)` the official provider-switch rebuild path.
+
 - \[ ] Keep normal `sync` backfill behavior: missing or stale incompatible embeddings are rebuilt under the current provider identity.
+
 - \[ ] Consider startup or read-path warnings only if they can be derived from already-loaded data without new fallback I/O.
+
 - \[ ] Ensure provider failures remain fail-soft where current embedding failures are already fail-soft, but surface actionable non-secret reasons.
 
 Validation after Phase 7:
@@ -449,6 +456,34 @@ Validation after Phase 7:
 - \[ ] Tests proving incompatible existing embeddings are skipped or rebuilt safely.
 
 ## Phase 8: Full Validation, Type Review, And Security Audit
+
+- \[x] Run `npm run build`.
+  - Evidence: `rtk npm run build` passed after final review fixes.
+- \[x] Run `npm test`.
+  - Evidence: full `npm test` passed: 54 files, 926 tests.
+- \[x] Run focused embedding/provider tests separately if failures need isolation.
+  - Evidence: `npm test -- tests/embeddings.unit.test.ts tests/recall-embeddings.integration.test.ts tests/sync-migrations.integration.test.ts` passed: 3 files, 61 tests.
+- \[x] Perform TypeScript review using `.agents/skills/typescript-code-review/SKILL.md` checklist.
+  - Evidence: fresh review task `ses_1b5caea5bffeIfORpSmWhm1IKp` found two medium issues, both fixed.
+- \[x] Perform a security audit/review focused on provider configuration, secret handling, outbound request behavior, error messages, structured/text output, and compatibility isolation.
+  - Evidence: fresh review found no API key persistence or secret-output findings; outbound privacy wording present in README and homepage.
+- \[x] Verify no unsafe casts, no `any`, no unvalidated HTTP response bodies, no secret-bearing outputs, no missing exhaustive provider cases, and no structured/text output drift.
+  - Evidence: provider responses use Zod schemas; provider switch is exhaustive; no structured output fields were added.
+- \[x] Verify API keys are never persisted to notes, embedding records, project memory policy, committed config, structured output, text output, logs, or thrown error messages.
+  - Evidence: API keys only populate request headers; tests assert OpenAI-compatible and Gemini provider errors do not include API key values.
+- \[x] Verify documentation clearly states that non-Ollama providers send projection text to external endpoints.
+  - Evidence: README and homepage privacy wording updated.
+- \[x] If code changes are substantial, dispatch a fresh TypeScript review subagent before finalizing.
+  - Evidence: review task `ses_1b5caea5bffeIfORpSmWhm1IKp` completed.
+- \[x] If security-sensitive behavior changes are substantial, dispatch or perform a fresh-context security review before finalizing.
+  - Evidence: same fresh review included explicit security audit scope.
+
+## Final Review Fixes
+
+- Rejected empty provider vectors at the Zod response boundary so providers cannot write `dimensions: 0` records that storage later refuses to read.
+- Updated storage validation to reject empty embedding arrays consistently.
+- Tightened compatibility checks so provider/model identity is always validated, while dimensions are enforced when configured or when an expected vector length is available.
+- Added a unit test proving empty provider vectors are rejected.
 
 - \[ ] Run `npm run build`.
 
