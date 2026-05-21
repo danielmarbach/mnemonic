@@ -11,8 +11,6 @@ updatedAt: '2026-05-21T21:17:30.202Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
-  - id: research-request-multi-provider-embedding-support-for-mnemon-a4a5d2fa
-    type: derives-from
   - id: implementation-principles-for-mnemonic-mcp-2e178bba
     type: related-to
   - id: typescript-code-review-mnemonic-project-961d984b
@@ -51,3 +49,4 @@ All 8 phases completed: provider abstraction (branded types, discriminated union
 - Changing provider/model/dimensions requires `sync(force: true)`.
 - SDK-free: uses direct `fetch` to avoid mandatory dependencies.
 - No vector DB, no multimodal, no batching, no background reindex daemon.
+dex daemon.
