@@ -7,7 +7,7 @@ tags:
   - architecture
 lifecycle: temporary
 createdAt: '2026-05-21T10:31:35.612Z'
-updatedAt: '2026-05-21T10:50:35.462Z'
+updatedAt: '2026-05-21T10:51:35.550Z'
 role: plan
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -296,6 +296,28 @@ Validation after Phase 3:
 
 ## Phase 4: OpenAI-Compatible And Native OpenAI Providers
 
+- \[x] Add `openai-compatible` provider selected by `EMBED_PROVIDER=openai-compatible` for LiteLLM, LM Studio, vLLM, Ollama OpenAI compatibility, and similar servers.
+- \[x] Add native `openai` provider selected by `EMBED_PROVIDER=openai`, layered on the same OpenAI-compatible transport where practical.
+- \[x] Support `OPENAI_API_KEY`, `OPENAI_BASE_URL`, `EMBED_MODEL`, and optional `EMBED_DIMENSIONS` for native OpenAI.
+- \[x] Support provider-neutral compatible vars such as `EMBED_BASE_URL` and `EMBED_API_KEY`, or explicitly document reusing `OPENAI_BASE_URL`/`OPENAI_API_KEY` for compatible endpoints.
+  - Evidence: `openai-compatible` accepts neutral `EMBED_BASE_URL`/`EMBED_API_KEY` and falls back to OpenAI vars.
+- \[x] Default OpenAI model to `text-embedding-3-small` when provider is `openai` and no model is specified.
+- \[x] Require `EMBED_MODEL` for `openai-compatible` because local/proxy model names vary.
+- \[x] Request `POST /v1/embeddings` with `Authorization: Bearer` only when an API key is set, `input`, `model`, `encoding_format: "float"`, and `dimensions` when set.
+- \[x] Validate response shape with Zod and parse `data[0].embedding` as a numeric vector.
+- \[x] Include non-secret error context: provider, model, status code, and endpoint host, but never API key.
+
+Validation after Phase 4:
+
+- \[x] `npm run build`
+  - Evidence: `rtk npm run build` passed.
+- \[x] Fake OpenAI-compatible server tests for headers, optional auth, body, base URL behavior, response parsing, malformed response handling, and failure messages.
+  - Evidence: `tests/embeddings.unit.test.ts` covers request path/body/auth, native OpenAI defaults, response parsing, and no API key in provider error messages.
+- \[x] Integration test proving `remember` and `recall` work with `EMBED_PROVIDER=openai-compatible` using a fake server.
+  - Evidence: `tests/recall-embeddings.integration.test.ts` adds an OpenAI-compatible remember/recall flow.
+- \[x] Type/security review checklist: no secret output, no unvalidated response, no unsafe casts.
+  - Evidence: response body uses Zod validation; errors include provider/model/status/host but not API key. Final full TypeScript and security reviews remain scheduled in Phase 8.
+
 - \[ ] Add `openai-compatible` provider selected by `EMBED_PROVIDER=openai-compatible` for LiteLLM, LM Studio, vLLM, Ollama OpenAI compatibility, and similar servers.
 - \[ ] Add native `openai` provider selected by `EMBED_PROVIDER=openai`, layered on the same OpenAI-compatible transport where practical.
 - \[ ] Support `OPENAI_API_KEY`, `OPENAI_BASE_URL`, `EMBED_MODEL`, and optional `EMBED_DIMENSIONS` for native OpenAI.
@@ -363,21 +385,35 @@ Validation after Phase 7:
 ## Phase 8: Full Validation, Type Review, And Security Audit
 
 - \[ ] Run `npm run build`.
+
 - \[ ] Run `npm test`.
+
 - \[ ] Run focused embedding/provider tests separately if failures need isolation.
+
 - \[ ] Perform TypeScript review using `.agents/skills/typescript-code-review/SKILL.md` checklist.
+
 - \[ ] Perform a security audit/review focused on provider configuration, secret handling, outbound request behavior, error messages, structured/text output, and compatibility isolation.
+
 - \[ ] Verify no unsafe casts, no `any`, no unvalidated HTTP response bodies, no secret-bearing outputs, no missing exhaustive provider cases, and no structured/text output drift.
+
 - \[ ] Verify API keys are never persisted to notes, embedding records, project memory policy, committed config, structured output, text output, logs, or thrown error messages.
+
 - \[ ] Verify documentation clearly states that non-Ollama providers send projection text to external endpoints.
+
 - \[ ] If code changes are substantial, dispatch a fresh TypeScript review subagent before finalizing.
+
 - \[ ] If security-sensitive behavior changes are substantial, dispatch or perform a fresh-context security review before finalizing.
 
 - \[ ] Run `npm run build`.
+
 - \[ ] Run `npm test`.
+
 - \[ ] Run focused embedding/provider tests separately if failures need isolation.
+
 - \[ ] Perform TypeScript review using `.agents/skills/typescript-code-review/SKILL.md` checklist.
+
 - \[ ] Verify no unsafe casts, no `any`, no unvalidated HTTP response bodies, no secret-bearing outputs, no missing exhaustive provider cases, and no structured/text output drift.
+
 - \[ ] If code changes are substantial, dispatch a fresh TypeScript review subagent before finalizing.
 
 ## Non-goals For First Implementation
