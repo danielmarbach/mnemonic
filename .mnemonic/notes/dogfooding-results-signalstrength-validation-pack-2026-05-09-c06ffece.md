@@ -18,8 +18,6 @@ relatedTo:
     type: related-to
   - id: mnemonic-key-design-decisions-3f2a6273
     type: related-to
-  - id: review-signal-strength-confidence-scoring-implementation-9710c108
-    type: derives-from
   - id: enriched-confidence-scoring-with-signal-strength-composite-i-06563116
     type: example-of
 memoryVersion: 1
