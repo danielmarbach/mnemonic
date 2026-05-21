@@ -9,7 +9,7 @@ tags:
   - documentation
 lifecycle: permanent
 createdAt: '2026-05-09T12:54:02.094Z'
-updatedAt: '2026-05-21T10:37:47.076Z'
+updatedAt: '2026-05-21T21:18:49.244Z'
 role: summary
 alwaysLoad: true
 project: https-github-com-danielmarbach-mnemonic
@@ -37,8 +37,6 @@ relatedTo:
     type: related-to
   - id: dogfooding-test-suite-reusable-prompt-for-phases-1-8-validat-c7c702d8
     type: related-to
-  - id: plan-multi-provider-embedding-support-for-mnemonic-fa944256
-    type: derives-from
 memoryVersion: 1
 ---
 ## Implementation principles for mnemonic MCP
@@ -48,6 +46,12 @@ These principles constrain every code change. They are hard requirements, not su
 ### Root design principle
 
 Mnemonic is a file-first, git-backed MCP memory server. No database, no daemon, no always-on service. One `.md` file per note. Embeddings gitignored and always recomputable. Git history is the source of truth for note evolution; markdown frontmatter is the source of truth for note content and metadata.
+
+### Architectural framing
+
+Mnemonic is a **memory-shaping system**, not a memory-governance system. Its job is to provide explicit, addressable, versioned memory artifacts that the consuming agent decides how to use. The server shapes and retrieves memory; the agent decides what to use; humans remain the ultimate validation authority. Attempting to collapse these layers into the MCP server (uptake enforcement, hidden validation gates, opaque memory arbitration, server-side behavioral measurement) violates the file-first, local-first, fail-soft constraints. See CAG-Bench research for evidence that memory uptake is a client-side concern that no amount of server-side retrieval quality can fully solve.
+
+This framing explains several design decisions: no access counters (would require write I/O on read paths), no automatic entity extraction (explicit relationships only), no automatic TTL or decay (lifecycle is explicit and agent-managed), no hidden validation or maturation gate (notes are immediately retrievable after creation).
 
 ### I/O and performance principles
 

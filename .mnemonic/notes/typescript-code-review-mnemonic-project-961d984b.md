@@ -18,8 +18,6 @@ relatedTo:
     type: related-to
   - id: parallel-consolidate-operations-can-leave-staged-local-only--e8c33780
     type: related-to
-  - id: plan-multi-provider-embedding-support-for-mnemonic-fa944256
-    type: derives-from
 memoryVersion: 1
 ---
 ## Review Workflow
