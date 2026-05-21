@@ -7,7 +7,7 @@ tags:
   - architecture
 lifecycle: temporary
 createdAt: '2026-05-21T10:31:35.612Z'
-updatedAt: '2026-05-21T10:35:09.237Z'
+updatedAt: '2026-05-21T10:37:40.399Z'
 role: plan
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -17,135 +17,190 @@ relatedTo:
     type: derives-from
   - id: research-multi-provider-embedding-support-for-mnemonic-4c2dc9b6
     type: derives-from
+  - id: implementation-principles-for-mnemonic-mcp-2e178bba
+    type: related-to
+  - id: typescript-code-review-mnemonic-project-961d984b
+    type: related-to
 memoryVersion: 1
 ---
 # Plan: Multi-provider Embedding Support For Mnemonic
 
 ## Intent
 
-Support Ollama, OpenAI, and Gemini embedding providers without comparing incompatible embedding spaces or leaking API secrets into committed vault files.
+Support Ollama, OpenAI-compatible endpoints, native OpenAI, and native Gemini embedding providers without comparing incompatible embedding spaces, adding hidden I/O regressions, or leaking API secrets into committed files.
 
 ## Research Inputs
 
 - Request: `research-request-multi-provider-embedding-support-for-mnemon-a4a5d2fa`
 - Research: `research-multi-provider-embedding-support-for-mnemonic-4c2dc9b6`
+- Design constraints: `implementation-principles-for-mnemonic-mcp-2e178bba`
+- TypeScript review constraints: `typescript-code-review-mnemonic-project-961d984b` and `.agents/skills/typescript-code-review/SKILL.md`
 
-## Guiding Constraints
+## Hard Project Constraints
+
+- Preserve mnemonic as a file-first, git-backed MCP memory server: no database, no daemon, no always-on embedding service requirement.
+- Keep embeddings local-only files under `embeddings/`, gitignored, and always recomputable.
+- Do not store API keys in notes, embedding records, project vaults, or git-committed config.
+- Do not add new I/O to cold/fallback diagnostic paths. If needed data is not already in memory, omit the diagnostic or reuse existing cache-loading paths intentionally.
+- Fail soft for optional diagnostics and compatibility warnings: return optional fields or compact warnings instead of throwing from read paths.
+- New structured output fields require exported TypeScript types, Zod schema fields with `.describe()`, tool `Returns` description updates, text rendering, and integration tests parsing real MCP responses through exported schemas.
+- When tool behavior/docs change, keep AGENT.md, README.md, and `docs/index.html` synchronized.
+- Preserve compact tool-description style; add only load-bearing wording.
+
+## Hard TypeScript Constraints
+
+- Make invalid states unrepresentable where practical.
+- Use branded types for domain primitives: provider ids, compatibility keys, embedding dimensions, model ids, and metric values should not be interchangeable raw strings/numbers in core logic.
+- Use discriminated unions for provider config and provider errors instead of boolean flags or partially optional objects.
+- Use `as const` plus derived union types, or Zod schemas plus `z.infer`, to avoid runtime/type drift.
+- Validate every external boundary with Zod: environment-derived config, HTTP provider responses, and embedding JSON records.
+- Avoid unsafe `as` casts on parsed JSON and API responses.
+- Use exhaustive `never` checks for provider switches.
+- Keep explicit return types on exported functions and provider implementations.
+- Use `unknown` in catch blocks and `getErrorMessage` or typed domain errors for formatting.
+- No hardcoded secrets, no secret-bearing error messages, and no API keys in structured/text output.
+
+## Guiding Compatibility Constraints
 
 - Preserve Ollama as the default provider for existing users.
-- Do not store API keys in notes, embeddings, project vaults, or git-committed config.
-- Treat provider/model/dimensions as the embedding compatibility boundary.
+- Treat provider/endpoint mode, model, dimensions, metric, and optional task/input mode as the embedding compatibility boundary.
 - Never compare query embeddings against note embeddings from a different compatibility key.
-- Keep provider implementations SDK-free initially unless a direct REST integration becomes brittle.
-- Keep external-provider docs explicit about privacy, cost, and rate-limit tradeoffs.
+- OpenAI-compatible `/v1/embeddings` is a transport/schema interoperability layer, not a semantic compatibility guarantee.
+- Provider implementations should remain SDK-free initially unless direct REST becomes brittle.
+- Changing provider, model, dimensions, metric, or input mode requires rebuilding embeddings with `sync(force: true)` or equivalent backfill.
+
+## Phase 0: Baseline Validation
+
+- [ ] Inspect `tsconfig.json` and confirm `strict`, `noUncheckedIndexedAccess`, `noImplicitReturns`, and `noFallthroughCasesInSwitch` are enabled.
+- [ ] Run `npm run build` before code changes to establish baseline type health.
+- [ ] Run targeted existing embedding tests before code changes if fast enough.
+- [ ] Confirm no unrelated dirty worktree files will be touched.
 
 ## Phase 1: Provider Abstraction And Identity
 
-- \[ ] Add `EmbeddingProvider` and `EmbeddingResult` types.
-- \[ ] Add `EmbeddingIdentity` with provider, model, dimensions, and compatibility key.
-- \[ ] Refactor `src/embeddings.ts` so Ollama is one provider behind the abstraction.
-- \[ ] Preserve exported `embed(...)` and `embedModel`-equivalent facade initially, or replace with minimal call-site changes if cleaner.
-- \[ ] Rename generic errors away from Ollama-only names where behavior is no longer provider-specific.
-- \[ ] Keep Ollama URL private-network validation only in the Ollama provider.
+- [ ] Add provider constants as `as const`: `ollama`, `openai-compatible`, `openai`, `gemini`.
+- [ ] Add branded/domain types for `EmbeddingProviderId`, `EmbeddingCompatibilityKey`, `EmbeddingDimensions`, `EmbeddingMetric`, and reuse `EmbeddingModelId`.
+- [ ] Add `EmbeddingIdentity` with provider, model, dimensions, metric, optional input mode, and compatibility key.
+- [ ] Add `EmbeddingProvider` interface with explicit return types and readonly identity metadata.
+- [ ] Model provider config as a discriminated union, e.g. `{ kind: "ollama" } | { kind: "openai-compatible" } | ...`, not a bag of optional fields.
+- [ ] Refactor current Ollama logic behind the abstraction while preserving default behavior.
+- [ ] Keep Ollama URL private-network validation only in the Ollama provider.
+- [ ] Rename generic embedding errors away from Ollama-only names where behavior is no longer provider-specific.
+- [ ] Add exhaustive `never` checks for provider config resolution and provider creation.
+
+Validation after Phase 1:
+
+- [ ] `npm run build`
+- [ ] Unit tests for provider config resolution and Ollama default behavior.
+- [ ] Type review checklist: no unsafe casts, no unvalidated env config, exhaustive provider switch.
 
 ## Phase 2: Embedding Record Compatibility Metadata
 
-- \[ ] Extend `EmbeddingRecord` and `EmbeddingRecordSchema` with optional `provider`, `dimensions`, and `compatibilityKey` fields.
-- \[ ] Treat records without provider metadata as legacy Ollama records using model-only compatibility.
-- \[ ] Store the vector length as `dimensions` when writing embeddings.
-- \[ ] Update skip logic in `embedMissingNotes` from `existing.model === embedModel` to compatibility-key match plus timestamp freshness.
-- \[ ] Update persistence status to report provider/model/dimensions compactly.
-- \[ ] Decide whether to bump vault schema. Initial recommendation: no required migration because embeddings are local-only and optional fields can be backfilled on rebuild.
+- [ ] Extend `EmbeddingRecord` and `EmbeddingRecordSchema` with optional `provider`, `dimensions`, `metric`, `inputMode`, and `compatibilityKey` fields.
+- [ ] Use Zod validation and smart constructors/normalizers at the storage boundary; do not cast JSON parse results.
+- [ ] Treat records without provider metadata as legacy Ollama records using model-only compatibility rules.
+- [ ] Store vector length as branded `dimensions` when writing embeddings.
+- [ ] Update skip logic in `embedMissingNotes` from `existing.model === embedModel` to compatibility-key match plus timestamp freshness.
+- [ ] Update persistence status only if necessary. If new persistence structured fields are added, apply the full structured-output contract: exported type, Zod `.describe()`, tool `Returns`, text rendering, and integration tests.
+- [ ] No required vault schema migration initially because embeddings are local-only and optional fields can be backfilled on rebuild.
+
+Validation after Phase 2:
+
+- [ ] `npm run build`
+- [ ] Storage validation tests for legacy and new embedding records.
+- [ ] Tests proving new writes include provider, dimensions, metric, and compatibility key.
+- [ ] Type review checklist: no type/runtime drift, no unsafe `as`, branded dimensions not raw numbers in core comparisons.
 
 ## Phase 3: Safe Similarity Comparisons
 
-- \[ ] Add a compatibility guard used by `recall`, `consolidate`, and `project_memory_summary` before cosine similarity.
-- \[ ] Skip incompatible embeddings and surface compact warnings such as `3 embeddings skipped: provider/model/dimensions mismatch; run sync(force: true)`.
-- \[ ] Make cosine similarity dimension-safe: either throw on mismatch in low-level helper or return a typed skip result in callers. Initial recommendation: low-level helper should require equal lengths; callers handle skip.
-- \[ ] Add tests that prove mixed-provider and mixed-dimension embeddings are not compared.
+- [ ] Add a compatibility guard used by `recall`, `consolidate`, and `project_memory_summary` before cosine similarity.
+- [ ] Make `cosineSimilarity` require equal vector lengths and avoid silent zero-padding.
+- [ ] Represent compatibility outcomes as a discriminated union, e.g. compatible versus skipped with typed reason.
+- [ ] Skip incompatible embeddings and surface compact warnings where the tool already has an output surface.
+- [ ] If warnings become structured output, apply full structured-output contract: exported types, Zod `.describe()`, tool `Returns`, text rendering, and integration tests.
+- [ ] Avoid adding extra storage reads only to compute warnings. Use embeddings already loaded by the tool or omit warning counts.
 
-## Phase 4: OpenAI And OpenAI-Compatible Providers
+Validation after Phase 3:
 
-- \[ ] Add `openai-compatible` provider selected by `EMBED_PROVIDER=openai-compatible` for LiteLLM, LM Studio, vLLM, Ollama OpenAI compatibility, and similar servers.
-- \[ ] Add native `openai` provider selected by `EMBED_PROVIDER=openai`, layered on the same OpenAI-compatible transport where practical.
-- \[ ] Support `OPENAI_API_KEY`, `OPENAI_BASE_URL`, `EMBED_MODEL`, and optional `EMBED_DIMENSIONS` for native OpenAI.
-- \[ ] Support provider-neutral compatible vars such as `EMBED_BASE_URL` and `EMBED_API_KEY`, or document use of `OPENAI_BASE_URL`/`OPENAI_API_KEY` for compatible endpoints.
-- \[ ] Default OpenAI model should be `text-embedding-3-small` when provider is OpenAI and no model is specified.
-- \[ ] Do not assume a default model for `openai-compatible`; require `EMBED_MODEL` because local/proxy model names vary.
-- \[ ] Request `POST /v1/embeddings` with `Authorization: Bearer` when an API key is set, `input`, `model`, `encoding_format: "float"`, and `dimensions` when set.
-- \[ ] Parse `data[0].embedding` and validate numeric vector output.
-- \[ ] Include non-secret error context: provider, model, status code, and endpoint host, but never API key.
-- \[ ] Add unit tests using fake OpenAI-compatible servers validating headers, body, response parsing, base URL behavior, optional auth, and failure messages.
+- [ ] `npm run build`
+- [ ] Unit tests for compatibility guard and dimension mismatch behavior.
+- [ ] Recall/consolidate/project-summary tests proving mixed-provider and mixed-dimension vectors are not compared.
+- [ ] Type review checklist: skipped/compatible states are discriminated, impossible states unrepresentable.
 
-- \[ ] Add native `openai` provider selected by `EMBED_PROVIDER=openai`.
+## Phase 4: OpenAI-Compatible And Native OpenAI Providers
 
-- \[ ] Add `openai-compatible` provider selected by `EMBED_PROVIDER=openai-compatible` for LiteLLM, LM Studio, vLLM, Ollama OpenAI compatibility, and similar servers.
+- [ ] Add `openai-compatible` provider selected by `EMBED_PROVIDER=openai-compatible` for LiteLLM, LM Studio, vLLM, Ollama OpenAI compatibility, and similar servers.
+- [ ] Add native `openai` provider selected by `EMBED_PROVIDER=openai`, layered on the same OpenAI-compatible transport where practical.
+- [ ] Support `OPENAI_API_KEY`, `OPENAI_BASE_URL`, `EMBED_MODEL`, and optional `EMBED_DIMENSIONS` for native OpenAI.
+- [ ] Support provider-neutral compatible vars such as `EMBED_BASE_URL` and `EMBED_API_KEY`, or explicitly document reusing `OPENAI_BASE_URL`/`OPENAI_API_KEY` for compatible endpoints.
+- [ ] Default OpenAI model to `text-embedding-3-small` when provider is `openai` and no model is specified.
+- [ ] Require `EMBED_MODEL` for `openai-compatible` because local/proxy model names vary.
+- [ ] Request `POST /v1/embeddings` with `Authorization: Bearer` only when an API key is set, `input`, `model`, `encoding_format: "float"`, and `dimensions` when set.
+- [ ] Validate response shape with Zod and parse `data[0].embedding` as a numeric vector.
+- [ ] Include non-secret error context: provider, model, status code, and endpoint host, but never API key.
 
-- \[ ] Support `OPENAI_API_KEY`, `OPENAI_BASE_URL`, `EMBED_MODEL`, and optional `EMBED_DIMENSIONS` for native OpenAI.
+Validation after Phase 4:
 
-- \[ ] Support provider-neutral compatible vars such as `EMBED_BASE_URL` and `EMBED_API_KEY`, or document use of `OPENAI_BASE_URL`/`OPENAI_API_KEY` for compatible endpoints.
+- [ ] `npm run build`
+- [ ] Fake OpenAI-compatible server tests for headers, optional auth, body, base URL behavior, response parsing, malformed response handling, and failure messages.
+- [ ] Integration test proving `remember` and `recall` work with `EMBED_PROVIDER=openai-compatible` using a fake server.
+- [ ] Type/security review checklist: no secret output, no unvalidated response, no unsafe casts.
 
-- \[ ] Default OpenAI model should be `text-embedding-3-small` when provider is OpenAI and no model is specified.
+## Phase 5: Native Gemini Provider
 
-- \[ ] Do not assume a default model for `openai-compatible`; require `EMBED_MODEL` because local/proxy model names vary.
+- [ ] Add `gemini` provider selected by `EMBED_PROVIDER=gemini`.
+- [ ] Support `GEMINI_API_KEY`, `GEMINI_BASE_URL`, `EMBED_MODEL`, and optional `EMBED_DIMENSIONS`.
+- [ ] Default Gemini model to `gemini-embedding-2` when provider is `gemini` and no model is specified.
+- [ ] Request `POST /v1beta/models/{model}:embedContent` with `x-goog-api-key`.
+- [ ] For text-only mnemonic projections, send content parts as text and do not expose multimodal support initially.
+- [ ] Pass provider-specific output dimension parameter when configured.
+- [ ] Validate response shape with Zod and parse the documented embedding values vector.
+- [ ] Include non-secret error context and never include the Gemini API key in errors or outputs.
 
-- \[ ] Request `POST /v1/embeddings` with `Authorization: Bearer` when an API key is set, `input`, `model`, `encoding_format: "float"`, and `dimensions` when set.
+Validation after Phase 5:
 
-- \[ ] Parse `data[0].embedding` and validate numeric vector output.
-
-- \[ ] Include non-secret error context: provider, model, status code, and endpoint host, but never API key.
-
-- \[ ] Add unit tests using fake OpenAI-compatible servers validating headers, body, response parsing, base URL behavior, optional auth, and failure messages.
-
-- \[ ] Add `openai` provider selected by `EMBED_PROVIDER=openai`.
-
-- \[ ] Support `OPENAI_API_KEY`, `OPENAI_BASE_URL`, `EMBED_MODEL`, and optional `EMBED_DIMENSIONS`.
-
-- \[ ] Default OpenAI model should be `text-embedding-3-small` when provider is OpenAI and no model is specified.
-
-- \[ ] Request `POST /v1/embeddings` with `Authorization: Bearer`, `input`, `model`, `encoding_format: "float"`, and `dimensions` when set.
-
-- \[ ] Parse `data[0].embedding` and validate numeric vector output.
-
-- \[ ] Include non-secret error context: provider, model, status code, and endpoint host, but never API key.
-
-- \[ ] Add unit tests using a fake OpenAI-compatible server validating headers, body, response parsing, and failure messages.
-
-## Phase 5: Gemini Provider
-
-- \[ ] Add `gemini` provider selected by `EMBED_PROVIDER=gemini`.
-- \[ ] Support `GEMINI_API_KEY`, `GEMINI_BASE_URL`, `EMBED_MODEL`, and optional `EMBED_DIMENSIONS`.
-- \[ ] Default Gemini model should be `gemini-embedding-2` when provider is Gemini and no model is specified.
-- \[ ] Request `POST /v1beta/models/{model}:embedContent` with `x-goog-api-key`.
-- \[ ] For text-only mnemonic projections, send content parts as text and do not expose multimodal support initially.
-- \[ ] Pass provider-specific output dimension parameter when configured.
-- \[ ] Parse `embedding.values` or documented equivalent response shape, with tests pinned to the REST shape used.
-- \[ ] Add tests using a fake Gemini server validating headers, model path, body, response parsing, and failure messages.
+- [ ] `npm run build`
+- [ ] Fake Gemini server tests for headers, model path, body, dimensions parameter, response parsing, malformed response handling, and failure messages.
+- [ ] Integration test proving `remember` and `recall` work with `EMBED_PROVIDER=gemini` using a fake server.
+- [ ] Type/security review checklist: provider switch exhaustive, no secret output, no unvalidated response.
 
 ## Phase 6: Configuration And Documentation
 
-- \[ ] Update README prerequisites so Ollama is the default local path, not the only path.
-- \[ ] Update configuration table with `EMBED_PROVIDER`, provider-specific API key vars, provider base URL vars, `EMBED_MODEL`, and `EMBED_DIMENSIONS`.
-- \[ ] Update privacy FAQ: Ollama is local; OpenAI/Gemini send projection text to external APIs.
-- \[ ] Update `compose.yaml` comments or env examples without forcing external API keys into compose defaults.
-- \[ ] Document provider switching: run `sync(force: true)` after changing provider/model/dimensions.
-- \[ ] Document recommended concurrency for external APIs and rate-limit/cost implications.
+- [ ] Update README prerequisites so Ollama is the default local path, not the only path.
+- [ ] Update configuration table with `EMBED_PROVIDER`, provider-specific API key vars, provider base URL vars, `EMBED_MODEL`, and `EMBED_DIMENSIONS`.
+- [ ] Update privacy FAQ: Ollama is local; OpenAI-compatible cloud proxies, OpenAI, and Gemini send projection text externally.
+- [ ] Update `compose.yaml` comments or env examples without forcing external API keys into compose defaults.
+- [ ] Document provider switching: run `sync(force: true)` after changing provider/model/dimensions/metric/input mode.
+- [ ] Document recommended lower concurrency for external APIs and rate-limit/cost implications.
+- [ ] If tool descriptions or structured outputs changed, synchronize AGENT.md, README.md, and `docs/index.html`.
+
+Validation after Phase 6:
+
+- [ ] `npm run build`
+- [ ] Documentation checks or targeted tests affected by tool descriptions.
+- [ ] Manual docs review for privacy and secret-handling wording.
 
 ## Phase 7: Reindex And Operational UX
 
-- \[ ] Make `sync(force: true)` the official provider-switch rebuild path.
-- \[ ] Consider a startup or read-path warning when many embeddings exist but no compatible embeddings are found.
-- \[ ] Keep normal `sync` backfill behavior: missing or stale incompatible embeddings are rebuilt under the current provider identity.
-- \[ ] Ensure provider failures remain fail-soft where they are already fail-soft, but surface actionable reasons.
+- [ ] Make `sync(force: true)` the official provider-switch rebuild path.
+- [ ] Keep normal `sync` backfill behavior: missing or stale incompatible embeddings are rebuilt under the current provider identity.
+- [ ] Consider startup or read-path warnings only if they can be derived from already-loaded data without new fallback I/O.
+- [ ] Ensure provider failures remain fail-soft where current embedding failures are already fail-soft, but surface actionable non-secret reasons.
 
-## Phase 8: Validation
+Validation after Phase 7:
 
-- \[ ] Add focused unit tests for provider config resolution.
-- \[ ] Add provider HTTP tests for Ollama, OpenAI, and Gemini.
-- \[ ] Add storage validation tests for old and new embedding record shapes.
-- \[ ] Add recall/consolidate/project summary tests for compatibility filtering.
-- \[ ] Add integration tests proving `remember`, `update`, `sync`, and `recall` work under each provider using fake servers.
-- \[ ] Run `npm run build` and `npm test`.
+- [ ] `npm run build`
+- [ ] Integration tests for provider switch and `sync(force: true)` rebuild behavior.
+- [ ] Tests proving incompatible existing embeddings are skipped or rebuilt safely.
+
+## Phase 8: Full Validation And Type Review
+
+- [ ] Run `npm run build`.
+- [ ] Run `npm test`.
+- [ ] Run focused embedding/provider tests separately if failures need isolation.
+- [ ] Perform TypeScript review using `.agents/skills/typescript-code-review/SKILL.md` checklist.
+- [ ] Verify no unsafe casts, no `any`, no unvalidated HTTP response bodies, no secret-bearing outputs, no missing exhaustive provider cases, and no structured/text output drift.
+- [ ] If code changes are substantial, dispatch a fresh TypeScript review subagent before finalizing.
 
 ## Non-goals For First Implementation
 
@@ -155,42 +210,26 @@ Support Ollama, OpenAI, and Gemini embedding providers without comparing incompa
 - No API key storage in mnemonic config files.
 - No cross-model vector translation or partial reuse of old vectors.
 - No batching API integration in the first pass.
+- No hidden background reindex daemon.
 
 ## Open Decisions Before Implementation
 
 - Should `openai-compatible` become the recommended advanced path, with native `gemini` documented mainly for users who do not want to run LiteLLM or another proxy? Initial recommendation: yes.
-
-- Should compatibility metadata include task/input mode, e.g. `search_document` versus `search_query`, for providers that support asymmetric embeddings? Initial recommendation: include an optional `inputMode`/`taskType` field in the compatibility key once exposed.
-
-- Should `EMBED_MODEL` remain provider-neutral, or should provider-specific env vars like `OPENAI_EMBED_MODEL` override it?
-
+- Should compatible endpoint configuration use neutral vars (`EMBED_BASE_URL`, `EMBED_API_KEY`) or reuse OpenAI vars (`OPENAI_BASE_URL`, `OPENAI_API_KEY`)? Initial recommendation: neutral vars for `openai-compatible`, OpenAI vars for native `openai`.
+- Should compatibility metadata include task/input mode immediately, even if no first-pass provider exposes asymmetric query/document modes? Initial recommendation: include optional metadata now so future provider support does not require another record-shape change.
 - Should incompatible embeddings be immediately rebuilt during `recall`, or only skipped with a warning and rebuilt by `sync`? Initial recommendation: allow existing `embedMissingNotes` to rebuild before recall, but still skip any incompatible records that remain.
-
-- Should `compatibilityKey` include provider base URL? Initial recommendation: include provider, model, and dimensions, but not base URL, because OpenAI-compatible endpoints may intentionally serve the same model identity from different hosts.
-
+- Should `compatibilityKey` include provider base URL? Initial recommendation: do not include base URL by default; include provider mode, model, dimensions, metric, and input mode. Document that users must force rebuild if a compatible endpoint changes model semantics behind the same alias.
 - Should `dimensions` be required in records? Initial recommendation: optional for legacy reads, required for new writes.
 
 ## Implementation Order Recommendation
 
-1. Provider abstraction while preserving current Ollama behavior.
-2. Compatibility metadata and comparison guards.
-3. OpenAI-compatible provider using `/v1/embeddings`.
-4. Native OpenAI defaults layered on the same transport.
-5. Native Gemini provider for direct Gemini API users.
-6. Documentation and provider-switch UX.
-7. Full integration coverage and dogfood with `sync(force: true)`.
-
-1) Provider abstraction while preserving current Ollama behavior.
-2) Compatibility metadata and comparison guards.
-3) OpenAI-compatible provider using `/v1/embeddings`.
-4) Native OpenAI defaults layered on the same transport.
-5) Native Gemini provider for direct Gemini API users.
-6) Documentation and provider-switch UX.
-7) Full integration coverage and dogfood with `sync(force: true)`.
-
-1. Provider abstraction while preserving current Ollama behavior.
-2. Compatibility metadata and comparison guards.
-3. OpenAI provider.
-4. Gemini provider.
-5. Documentation and provider-switch UX.
-6. Full integration coverage and dogfood with `sync(force: true)`.
+1. Baseline validation.
+2. Provider abstraction and strongly typed identity.
+3. Embedding record compatibility metadata.
+4. Safe comparison guards.
+5. OpenAI-compatible provider.
+6. Native OpenAI defaults on the same transport.
+7. Native Gemini provider.
+8. Documentation and provider-switch UX.
+9. Reindex UX.
+10. Full validation and TypeScript review.
