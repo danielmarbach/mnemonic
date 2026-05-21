@@ -75,6 +75,59 @@ async function startOpenAICompatibleServer(options: {
   return { url: `http://127.0.0.1:${address.port}` };
 }
 
+async function startGeminiServer(options: {
+  expectedApiKey: string;
+  expectedModel: string;
+  expectedDimensions?: number;
+  embedding?: number[];
+}): Promise<{ url: string }> {
+  const server = http.createServer((req, res) => {
+    if (req.method !== "POST" || req.url !== `/v1beta/models/${options.expectedModel}:embedContent`) {
+      res.writeHead(404).end();
+      return;
+    }
+
+    if (req.headers["x-goog-api-key"] !== options.expectedApiKey) {
+      res.writeHead(401).end(JSON.stringify({ error: "missing api key" }));
+      return;
+    }
+
+    let raw = "";
+    req.setEncoding("utf-8");
+    req.on("data", (chunk) => { raw += chunk; });
+    req.on("end", () => {
+      const body = JSON.parse(raw) as Record<string, unknown>;
+      const content = body["content"] as { parts?: Array<{ text?: string }> } | undefined;
+      if (
+        body["model"] !== `models/${options.expectedModel}`
+        || typeof content?.parts?.[0]?.text !== "string"
+        || (options.expectedDimensions !== undefined && body["outputDimensionality"] !== options.expectedDimensions)
+      ) {
+        res.writeHead(400).end(JSON.stringify({ error: "unexpected body" }));
+        return;
+      }
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ embedding: { values: options.embedding ?? [0.7, 0.8, 0.9] } }));
+    });
+  });
+
+  await new Promise<void>((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", () => resolve());
+  });
+
+  const address = server.address();
+  if (!address || typeof address === "string") {
+    throw new Error("Could not determine fake Gemini server address");
+  }
+
+  closeServers.push(() => new Promise<void>((resolve, reject) => {
+    server.close((err) => err ? reject(err) : resolve());
+  }));
+
+  return { url: `http://127.0.0.1:${address.port}` };
+}
+
 async function createTempStorage(): Promise<Storage> {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), "mnemonic-embeddings-"));
   tempDirs.push(dir);
@@ -332,6 +385,39 @@ describe("OpenAI-compatible embedding provider", () => {
     });
 
     await expect(createEmbeddingProvider(config).embed("hello")).rejects.not.toThrow(/wrong-secret-key/);
+  });
+});
+
+describe("Gemini embedding provider", () => {
+  it("posts Gemini embedContent request shape with API key header", async () => {
+    const server = await startGeminiServer({
+      expectedApiKey: "gemini-secret",
+      expectedModel: "gemini-embedding-2",
+      expectedDimensions: 768,
+      embedding: [0.9, 0.8, 0.7],
+    });
+    const config = resolveEmbeddingProviderConfig({
+      EMBED_PROVIDER: "gemini",
+      GEMINI_BASE_URL: server.url,
+      GEMINI_API_KEY: "gemini-secret",
+      EMBED_DIMENSIONS: "768",
+    });
+
+    const result = await createEmbeddingProvider(config).embed("hello");
+
+    expect(result.embedding).toEqual([0.9, 0.8, 0.7]);
+    expect(result.identity.provider).toBe("gemini");
+  });
+
+  it("does not include Gemini API keys in provider error messages", async () => {
+    const server = await startGeminiServer({ expectedApiKey: "expected-key", expectedModel: "gemini-embedding-2" });
+    const config = resolveEmbeddingProviderConfig({
+      EMBED_PROVIDER: "gemini",
+      GEMINI_BASE_URL: server.url,
+      GEMINI_API_KEY: "wrong-gemini-secret",
+    });
+
+    await expect(createEmbeddingProvider(config).embed("hello")).rejects.not.toThrow(/wrong-gemini-secret/);
   });
 });
 

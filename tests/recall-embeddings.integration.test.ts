@@ -10,6 +10,7 @@ import {
   initTestRepo,
   initTestVaultRepo,
   startFakeEmbeddingServer,
+  startFakeGeminiEmbeddingServer,
   startFakeOpenAICompatibleEmbeddingServer,
   tempDirs,
 } from "./helpers/mcp.js";
@@ -123,6 +124,43 @@ This note has no embedding yet and should be found via recall.`,
       });
 
       expect(recallText).toContain("OpenAI compatible recall note");
+    } finally {
+      await embeddingServer.close();
+    }
+  }, 15000);
+
+  it("remember and recall work with a Gemini embedding provider", async () => {
+    const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-vault-"));
+    tempDirs.push(vaultDir);
+
+    const embeddingServer = await startFakeGeminiEmbeddingServer();
+
+    try {
+      await callLocalMcp(vaultDir, "remember", {
+        title: "Gemini recall note",
+        content: "This note uses the Gemini embedding transport.",
+        tags: ["integration"],
+        scope: "global",
+        summary: "Seed Gemini provider test",
+      }, {
+        env: {
+          EMBED_PROVIDER: "gemini",
+          GEMINI_BASE_URL: embeddingServer.url,
+          GEMINI_API_KEY: "fake-gemini-key",
+        },
+      });
+
+      const recallText = await callLocalMcp(vaultDir, "recall", {
+        query: "Gemini recall",
+      }, {
+        env: {
+          EMBED_PROVIDER: "gemini",
+          GEMINI_BASE_URL: embeddingServer.url,
+          GEMINI_API_KEY: "fake-gemini-key",
+        },
+      });
+
+      expect(recallText).toContain("Gemini recall note");
     } finally {
       await embeddingServer.close();
     }

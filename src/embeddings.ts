@@ -67,6 +67,9 @@ const OllamaEmbedResponseSchema = z.object({ embeddings: z.array(z.array(z.numbe
 const OpenAIEmbeddingResponseSchema = z.object({
   data: z.array(z.object({ embedding: z.array(z.number()) })),
 });
+const GeminiEmbeddingResponseSchema = z.object({
+  embedding: z.object({ values: z.array(z.number()) }),
+});
 
 function validateOllamaUrl(url: string): string {
   let parsed: URL;
@@ -273,6 +276,49 @@ class OpenAICompatibleEmbeddingProvider implements EmbeddingProvider {
   }
 }
 
+class GeminiEmbeddingProvider implements EmbeddingProvider {
+  readonly identity: EmbeddingIdentity;
+
+  constructor(private readonly config: Extract<EmbeddingProviderConfig, { kind: "gemini" }>) {
+    this.identity = createIdentity(config);
+  }
+
+  async embed(text: string): Promise<EmbeddingResult> {
+    const modelPath = this.config.model.startsWith("models/") ? this.config.model : `models/${this.config.model}`;
+    const endpoint = new URL(`/v1beta/${modelPath}:embedContent`, this.config.baseUrl);
+    const body: Record<string, unknown> = {
+      model: modelPath,
+      content: { parts: [{ text }] },
+    };
+    if (this.config.dimensions !== undefined) {
+      body["outputDimensionality"] = this.config.dimensions;
+    }
+
+    const res = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": this.config.apiKey,
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (!res.ok) {
+      throw new EmbeddingProviderError(
+        `gemini embedding failed: ${res.status} ${res.statusText} at ${endpoint.host} with model '${this.config.model}'`,
+      );
+    }
+
+    const parseResult = GeminiEmbeddingResponseSchema.safeParse(await res.json());
+    if (!parseResult.success) {
+      throw new EmbeddingProviderError(`gemini embedding response had unexpected shape: ${parseResult.error.message}`);
+    }
+
+    const embedding = parseResult.data.embedding.values;
+    return { embedding, identity: { ...this.identity, dimensions: embeddingDimensions(embedding.length) } };
+  }
+}
+
 export function createEmbeddingProvider(config: EmbeddingProviderConfig = resolveEmbeddingProviderConfig()): EmbeddingProvider {
   switch (config.kind) {
     case "ollama":
@@ -281,7 +327,7 @@ export function createEmbeddingProvider(config: EmbeddingProviderConfig = resolv
     case "openai":
       return new OpenAICompatibleEmbeddingProvider(config);
     case "gemini":
-      throw new EmbeddingConfigurationError(`Embedding provider '${config.kind}' is configured but not implemented yet`);
+      return new GeminiEmbeddingProvider(config);
     default: {
       const exhaustive: never = config;
       throw new EmbeddingConfigurationError(`Unhandled embedding provider: ${JSON.stringify(exhaustive)}`);

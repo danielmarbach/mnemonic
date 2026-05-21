@@ -174,6 +174,52 @@ export async function startFakeOpenAICompatibleEmbeddingServer(): Promise<{ url:
   };
 }
 
+export async function startFakeGeminiEmbeddingServer(): Promise<{ url: string; close: () => Promise<void> }> {
+  const server = http.createServer((req, res) => {
+    if (req.method !== "POST" || !req.url?.startsWith("/v1beta/models/") || !req.url.endsWith(":embedContent")) {
+      res.writeHead(404).end();
+      return;
+    }
+
+    if (typeof req.headers["x-goog-api-key"] !== "string") {
+      res.writeHead(401).end();
+      return;
+    }
+
+    let raw = "";
+    req.setEncoding("utf-8");
+    req.on("data", (chunk) => { raw += chunk; });
+    req.on("end", () => {
+      const body = JSON.parse(raw) as Record<string, unknown>;
+      const content = body["content"] as { parts?: Array<{ text?: string }> } | undefined;
+      if (typeof body["model"] !== "string" || typeof content?.parts?.[0]?.text !== "string") {
+        res.writeHead(400).end();
+        return;
+      }
+
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ embedding: { values: [0.1, 0.2, 0.3] } }));
+    });
+  });
+
+  await new Promise<void>((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", () => resolve());
+  });
+
+  const address = server.address();
+  if (!address || typeof address === "string") {
+    throw new Error("Could not determine fake Gemini embedding server address");
+  }
+
+  return {
+    url: `http://127.0.0.1:${address.port}`,
+    close: () => new Promise<void>((resolve, reject) => {
+      server.close((err) => err ? reject(err) : resolve());
+    }),
+  };
+}
+
 export function extractRememberedId(text: string): string {
   const match = text.match(/`([^`]+)`/);
   if (!match) {
