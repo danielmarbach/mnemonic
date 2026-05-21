@@ -23,8 +23,6 @@ relatedTo:
     type: related-to
   - id: research-semvec-retention-formula-deep-dive-applicability-to-a5a31ecd
     type: related-to
-  - id: plan-advisory-memory-health-diagnostics-from-microsoft-memor-a0aa3e62
-    type: derives-from
 memoryVersion: 1
 ---
 # Research: Microsoft Human-Inspired Memory Architecture Applicability to Mnemonic
