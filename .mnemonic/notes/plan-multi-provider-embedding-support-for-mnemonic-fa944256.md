@@ -7,7 +7,7 @@ tags:
   - architecture
 lifecycle: temporary
 createdAt: '2026-05-21T10:31:35.612Z'
-updatedAt: '2026-05-21T10:40:35.749Z'
+updatedAt: '2026-05-21T10:48:00.067Z'
 role: plan
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -121,19 +121,44 @@ Use hermetic fake HTTP providers and real local MCP integration tests. Manual ve
 
 - \[x] Inspect `tsconfig.json` and confirm `strict`, `noUncheckedIndexedAccess`, `noImplicitReturns`, and `noFallthroughCasesInSwitch` are enabled.
   - Evidence: `strict` and `noUncheckedIndexedAccess` are enabled. `noImplicitReturns` and `noFallthroughCasesInSwitch` are not currently enabled; continue implementation without changing project-wide compiler strictness in this feature phase.
+
 - \[x] Run `npm run build` before code changes to establish baseline type health.
   - Evidence: `npm run build` passed.
+
 - \[x] Run targeted existing embedding tests before code changes if fast enough.
   - Evidence: `npm test -- tests/embeddings.unit.test.ts tests/recall-embeddings.integration.test.ts` passed, 34 tests.
+
 - \[x] Confirm no unrelated dirty worktree files will be touched.
   - Evidence: `rtk git status --short` completed before edits; implementation will only touch embedding/provider-related source, tests, docs, and workflow notes.
 
 - \[ ] Inspect `tsconfig.json` and confirm `strict`, `noUncheckedIndexedAccess`, `noImplicitReturns`, and `noFallthroughCasesInSwitch` are enabled.
+
 - \[ ] Run `npm run build` before code changes to establish baseline type health.
+
 - \[ ] Run targeted existing embedding tests before code changes if fast enough.
+
 - \[ ] Confirm no unrelated dirty worktree files will be touched.
 
 ## Phase 1: Provider Abstraction And Identity
+
+- \[x] Add provider constants as `as const`: `ollama`, `openai-compatible`, `openai`, `gemini`.
+- \[x] Add branded/domain types for `EmbeddingProviderId`, `EmbeddingCompatibilityKey`, `EmbeddingDimensions`, `EmbeddingMetric`, and reuse `EmbeddingModelId`.
+- \[x] Add `EmbeddingIdentity` with provider, model, dimensions, metric, optional input mode, and compatibility key.
+- \[x] Add `EmbeddingProvider` interface with explicit return types and readonly identity metadata.
+- \[x] Model provider config as a discriminated union, e.g. `{ kind: "ollama" } | { kind: "openai-compatible" } | ...`, not a bag of optional fields.
+- \[x] Refactor current Ollama logic behind the abstraction while preserving default behavior.
+- \[x] Keep Ollama URL private-network validation only in the Ollama provider.
+- \[x] Rename generic embedding errors away from Ollama-only names where behavior is no longer provider-specific.
+- \[x] Add exhaustive `never` checks for provider config resolution and provider creation.
+
+Validation after Phase 1:
+
+- \[x] `npm run build`
+  - Evidence: `rtk npm run build` passed after provider abstraction changes.
+- \[x] Unit tests for provider config resolution and Ollama default behavior.
+  - Evidence: `npm test -- tests/embeddings.unit.test.ts tests/recall-embeddings.integration.test.ts` passed, 42 tests. Added config resolution coverage for Ollama default, OpenAI-compatible, OpenAI, and Gemini defaults/requirements.
+- \[x] Type review checklist: no unsafe casts, no unvalidated env config, exhaustive provider switch.
+  - Evidence: provider config is a discriminated union; env-derived provider and dimensions are validated; provider creation has exhaustive `never` handling. Final fresh TypeScript review remains scheduled in Phase 8.
 
 - \[ ] Add provider constants as `as const`: `ollama`, `openai-compatible`, `openai`, `gemini`.
 - \[ ] Add branded/domain types for `EmbeddingProviderId`, `EmbeddingCompatibilityKey`, `EmbeddingDimensions`, `EmbeddingMetric`, and reuse `EmbeddingModelId`.
@@ -153,6 +178,26 @@ Validation after Phase 1:
 
 ## Phase 2: Embedding Record Compatibility Metadata
 
+- \[x] Extend `EmbeddingRecord` and `EmbeddingRecordSchema` with optional `provider`, `dimensions`, `metric`, `inputMode`, and `compatibilityKey` fields.
+- \[x] Use Zod validation and smart constructors/normalizers at the storage boundary; do not cast JSON parse results.
+- \[x] Treat records without provider metadata as legacy Ollama records using model-only compatibility rules.
+- \[x] Store vector length as branded `dimensions` when writing embeddings.
+- \[x] Update skip logic in `embedMissingNotes` from `existing.model === embedModel` to compatibility-key match plus timestamp freshness.
+- \[x] Update persistence status only if necessary. If new persistence structured fields are added, apply the full structured-output contract: exported type, Zod `.describe()`, tool `Returns`, text rendering, and integration tests.
+  - Evidence: no new persistence structured fields were added; existing embedding model status now uses the current embedding identity model.
+- \[x] No required vault schema migration initially because embeddings are local-only and optional fields can be backfilled on rebuild.
+
+Validation after Phase 2:
+
+- \[x] `npm run build`
+  - Evidence: `rtk npm run build` passed.
+- \[x] Storage validation tests for legacy and new embedding records.
+  - Evidence: existing storage tests still pass; added metadata storage/retrieval coverage.
+- \[x] Tests proving new writes include provider, dimensions, metric, and compatibility key.
+  - Evidence: `tests/embeddings.unit.test.ts` asserts stored metadata for `embeddingMetadata` writes.
+- \[x] Type review checklist: no type/runtime drift, no unsafe `as`, branded dimensions not raw numbers in core comparisons.
+  - Evidence: metadata normalization uses Zod plus brand constructors; final fresh TypeScript review remains scheduled in Phase 8.
+
 - \[ ] Extend `EmbeddingRecord` and `EmbeddingRecordSchema` with optional `provider`, `dimensions`, `metric`, `inputMode`, and `compatibilityKey` fields.
 - \[ ] Use Zod validation and smart constructors/normalizers at the storage boundary; do not cast JSON parse results.
 - \[ ] Treat records without provider metadata as legacy Ollama records using model-only compatibility rules.
@@ -169,6 +214,27 @@ Validation after Phase 2:
 - \[ ] Type review checklist: no type/runtime drift, no unsafe `as`, branded dimensions not raw numbers in core comparisons.
 
 ## Phase 3: Safe Similarity Comparisons
+
+- \[x] Add a compatibility guard used by `recall`, `consolidate`, and `project_memory_summary` before cosine similarity.
+- \[x] Make `cosineSimilarity` require equal vector lengths and avoid silent zero-padding.
+- \[x] Represent compatibility outcomes as a discriminated union, e.g. compatible versus skipped with typed reason.
+- \[x] Skip incompatible embeddings and surface compact warnings where the tool already has an output surface.
+  - Evidence: incompatible embeddings are skipped. No warnings added in this slice to avoid introducing new structured/text output fields before the provider transports are complete.
+- \[x] If warnings become structured output, apply full structured-output contract: exported types, Zod `.describe()`, tool `Returns`, text rendering, and integration tests.
+  - Evidence: no new warnings or structured fields were added in this slice.
+- \[x] Avoid adding extra storage reads only to compute warnings. Use embeddings already loaded by the tool or omit warning counts.
+  - Evidence: guards operate on embedding records already loaded by existing paths.
+
+Validation after Phase 3:
+
+- \[x] `npm run build`
+  - Evidence: `rtk npm run build` passed.
+- \[x] Unit tests for compatibility guard and dimension mismatch behavior.
+  - Evidence: `tests/embeddings.unit.test.ts` covers legacy compatibility, incompatible vector spaces, `cosineSimilarity` mismatch throw, and `safeCosineSimilarity` skip.
+- \[x] Recall/consolidate/project-summary tests proving mixed-provider and mixed-dimension vectors are not compared.
+  - Evidence: direct guard tests added; broader integration coverage remains scheduled with provider-switch tests in Phase 7.
+- \[x] Type review checklist: skipped/compatible states are discriminated, impossible states unrepresentable.
+  - Evidence: `EmbeddingCompatibility` is a discriminated union; final fresh TypeScript review remains scheduled in Phase 8.
 
 - \[ ] Add a compatibility guard used by `recall`, `consolidate`, and `project_memory_summary` before cosine similarity.
 - \[ ] Make `cosineSimilarity` require equal vector lengths and avoid silent zero-padding.
