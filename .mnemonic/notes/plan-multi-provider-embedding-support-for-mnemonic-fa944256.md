@@ -7,7 +7,7 @@ tags:
   - architecture
 lifecycle: temporary
 createdAt: '2026-05-21T10:31:35.612Z'
-updatedAt: '2026-05-21T10:53:38.095Z'
+updatedAt: '2026-05-21T10:55:18.584Z'
 role: plan
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -361,20 +361,30 @@ Validation after Phase 5:
 
 - \[x] `npm run build`
   - Evidence: `rtk npm run build` passed.
+
 - \[x] Fake Gemini server tests for headers, model path, body, dimensions parameter, response parsing, malformed response handling, and failure messages.
   - Evidence: `tests/embeddings.unit.test.ts` covers Gemini API key header, model path, body, output dimensionality, response parsing, and no API key in provider error messages.
+
 - \[x] Integration test proving `remember` and `recall` work with `EMBED_PROVIDER=gemini` using a fake server.
   - Evidence: `tests/recall-embeddings.integration.test.ts` adds a Gemini remember/recall flow.
+
 - \[x] Type/security review checklist: provider switch exhaustive, no secret output, no unvalidated response.
   - Evidence: response body uses Zod validation; provider switch now returns Gemini implementation. Final full TypeScript and security reviews remain scheduled in Phase 8.
 
 - \[ ] Add `gemini` provider selected by `EMBED_PROVIDER=gemini`.
+
 - \[ ] Support `GEMINI_API_KEY`, `GEMINI_BASE_URL`, `EMBED_MODEL`, and optional `EMBED_DIMENSIONS`.
+
 - \[ ] Default Gemini model to `gemini-embedding-2` when provider is `gemini` and no model is specified.
+
 - \[ ] Request `POST /v1beta/models/{model}:embedContent` with `x-goog-api-key`.
+
 - \[ ] For text-only mnemonic projections, send content parts as text and do not expose multimodal support initially.
+
 - \[ ] Pass provider-specific output dimension parameter when configured.
+
 - \[ ] Validate response shape with Zod and parse the documented embedding values vector.
+
 - \[ ] Include non-secret error context and never include the Gemini API key in errors or outputs.
 
 Validation after Phase 5:
@@ -401,6 +411,31 @@ Validation after Phase 6:
 - \[ ] Manual docs review for privacy and secret-handling wording.
 
 ## Phase 7: Reindex And Operational UX
+
+- \[x] Make `sync(force: true)` the official provider-switch rebuild path.
+- \[x] Keep normal `sync` backfill behavior: missing or stale incompatible embeddings are rebuilt under the current provider identity.
+- \[x] Consider startup or read-path warnings only if they can be derived from already-loaded data without new fallback I/O.
+  - Decision: do not add warning fields in the initial implementation. Incompatible records are skipped silently in read paths and docs will explicitly tell users to run `sync(force: true)` after provider/model/dimension changes.
+- \[x] Ensure provider failures remain fail-soft where current embedding failures are already fail-soft, but surface actionable non-secret reasons.
+
+Validation after Phase 7:
+
+- \[x] `npm run build`
+  - Evidence: `rtk npm run build` passed.
+- \[x] Integration tests for provider switch and `sync(force: true)` rebuild behavior.
+  - Evidence: `tests/sync-migrations.integration.test.ts` verifies an Ollama embedding is rewritten as `openai-compatible` after `sync(force: true)`.
+- \[x] Tests proving incompatible existing embeddings are skipped or rebuilt safely.
+  - Evidence: compatibility guard tests cover skipping incompatible records; provider-switch sync integration proves rebuild updates provider metadata and compatibility key.
+
+## Provider-Switch User Experience
+
+When users change `EMBED_PROVIDER`, `EMBED_MODEL`, `EMBED_DIMENSIONS`, metric, or future input mode, old local embeddings may no longer be comparable with new query vectors.
+
+- Mnemonic skips incompatible embedding records rather than comparing vectors across embedding spaces.
+- Users may see fewer or no semantic recall results until local embeddings are rebuilt.
+- `sync(force: true)` is the documented explicit rebuild path after provider configuration changes.
+- Notes are not lost; only local gitignored embedding JSON files are replaced.
+- The first implementation does not add read-path warnings because that would introduce new structured/text output fields and tests. Documentation must make the rebuild requirement visible.
 
 - \[ ] Make `sync(force: true)` the official provider-switch rebuild path.
 - \[ ] Keep normal `sync` backfill behavior: missing or stale incompatible embeddings are rebuilt under the current provider identity.
