@@ -7,7 +7,7 @@ tags:
   - architecture
 lifecycle: temporary
 createdAt: '2026-05-21T10:31:35.612Z'
-updatedAt: '2026-05-21T10:38:19.178Z'
+updatedAt: '2026-05-21T10:40:35.749Z'
 role: plan
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -76,15 +76,23 @@ Use hermetic fake HTTP providers and real local MCP integration tests. Manual ve
 ### Manual Dogfood
 
 - After automated tests pass, manually dogfood one local provider path, preferably Ollama or an OpenAI-compatible local proxy if available.
+
 - Treat dogfood as confidence building for docs and UX, not as a substitute for hermetic automated tests.
 
 - Preserve mnemonic as a file-first, git-backed MCP memory server: no database, no daemon, no always-on embedding service requirement.
+
 - Keep embeddings local-only files under `embeddings/`, gitignored, and always recomputable.
+
 - Do not store API keys in notes, embedding records, project vaults, or git-committed config.
+
 - Do not add new I/O to cold/fallback diagnostic paths. If needed data is not already in memory, omit the diagnostic or reuse existing cache-loading paths intentionally.
+
 - Fail soft for optional diagnostics and compatibility warnings: return optional fields or compact warnings instead of throwing from read paths.
+
 - New structured output fields require exported TypeScript types, Zod schema fields with `.describe()`, tool `Returns` description updates, text rendering, and integration tests parsing real MCP responses through exported schemas.
+
 - When tool behavior/docs change, keep AGENT.md, README.md, and `docs/index.html` synchronized.
+
 - Preserve compact tool-description style; add only load-bearing wording.
 
 ## Hard TypeScript Constraints
@@ -110,6 +118,15 @@ Use hermetic fake HTTP providers and real local MCP integration tests. Manual ve
 - Changing provider, model, dimensions, metric, or input mode requires rebuilding embeddings with `sync(force: true)` or equivalent backfill.
 
 ## Phase 0: Baseline Validation
+
+- \[x] Inspect `tsconfig.json` and confirm `strict`, `noUncheckedIndexedAccess`, `noImplicitReturns`, and `noFallthroughCasesInSwitch` are enabled.
+  - Evidence: `strict` and `noUncheckedIndexedAccess` are enabled. `noImplicitReturns` and `noFallthroughCasesInSwitch` are not currently enabled; continue implementation without changing project-wide compiler strictness in this feature phase.
+- \[x] Run `npm run build` before code changes to establish baseline type health.
+  - Evidence: `npm run build` passed.
+- \[x] Run targeted existing embedding tests before code changes if fast enough.
+  - Evidence: `npm test -- tests/embeddings.unit.test.ts tests/recall-embeddings.integration.test.ts` passed, 34 tests.
+- \[x] Confirm no unrelated dirty worktree files will be touched.
+  - Evidence: `rtk git status --short` completed before edits; implementation will only touch embedding/provider-related source, tests, docs, and workflow notes.
 
 - \[ ] Inspect `tsconfig.json` and confirm `strict`, `noUncheckedIndexedAccess`, `noImplicitReturns`, and `noFallthroughCasesInSwitch` are enabled.
 - \[ ] Run `npm run build` before code changes to establish baseline type health.
