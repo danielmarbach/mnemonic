@@ -7,7 +7,7 @@ tags:
   - architecture
 lifecycle: temporary
 createdAt: '2026-05-21T10:31:35.612Z'
-updatedAt: '2026-05-21T10:48:00.067Z'
+updatedAt: '2026-05-21T10:48:18.922Z'
 role: plan
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -110,6 +110,15 @@ Use hermetic fake HTTP providers and real local MCP integration tests. Manual ve
 
 ## Guiding Compatibility Constraints
 
+## Provider Configuration Storage
+
+Provider configuration is process environment only, not persisted in mnemonic vaults, notes, project memory policy, or committed config files.
+
+- Secrets such as `OPENAI_API_KEY`, `EMBED_API_KEY`, and `GEMINI_API_KEY` must only come from environment variables.
+- Non-secret provider identity metadata is stored in local gitignored embedding records so compatibility can be checked: provider, model, dimensions, metric, optional input mode, and compatibility key.
+- Changing provider configuration requires rebuilding local embeddings via `sync(force: true)` or equivalent backfill; mnemonic does not store the chosen provider as shared project state.
+- Documentation should make this explicit so users do not expect provider settings to travel with the vault.
+
 - Preserve Ollama as the default provider for existing users.
 - Treat provider/endpoint mode, model, dimensions, metric, and optional task/input mode as the embedding compatibility boundary.
 - Never compare query embeddings against note embeddings from a different compatibility key.
@@ -155,19 +164,29 @@ Validation after Phase 1:
 
 - \[x] `npm run build`
   - Evidence: `rtk npm run build` passed after provider abstraction changes.
+
 - \[x] Unit tests for provider config resolution and Ollama default behavior.
   - Evidence: `npm test -- tests/embeddings.unit.test.ts tests/recall-embeddings.integration.test.ts` passed, 42 tests. Added config resolution coverage for Ollama default, OpenAI-compatible, OpenAI, and Gemini defaults/requirements.
+
 - \[x] Type review checklist: no unsafe casts, no unvalidated env config, exhaustive provider switch.
   - Evidence: provider config is a discriminated union; env-derived provider and dimensions are validated; provider creation has exhaustive `never` handling. Final fresh TypeScript review remains scheduled in Phase 8.
 
 - \[ ] Add provider constants as `as const`: `ollama`, `openai-compatible`, `openai`, `gemini`.
+
 - \[ ] Add branded/domain types for `EmbeddingProviderId`, `EmbeddingCompatibilityKey`, `EmbeddingDimensions`, `EmbeddingMetric`, and reuse `EmbeddingModelId`.
+
 - \[ ] Add `EmbeddingIdentity` with provider, model, dimensions, metric, optional input mode, and compatibility key.
+
 - \[ ] Add `EmbeddingProvider` interface with explicit return types and readonly identity metadata.
+
 - \[ ] Model provider config as a discriminated union, e.g. `{ kind: "ollama" } | { kind: "openai-compatible" } | ...`, not a bag of optional fields.
+
 - \[ ] Refactor current Ollama logic behind the abstraction while preserving default behavior.
+
 - \[ ] Keep Ollama URL private-network validation only in the Ollama provider.
+
 - \[ ] Rename generic embedding errors away from Ollama-only names where behavior is no longer provider-specific.
+
 - \[ ] Add exhaustive `never` checks for provider config resolution and provider creation.
 
 Validation after Phase 1:
@@ -191,19 +210,28 @@ Validation after Phase 2:
 
 - \[x] `npm run build`
   - Evidence: `rtk npm run build` passed.
+
 - \[x] Storage validation tests for legacy and new embedding records.
   - Evidence: existing storage tests still pass; added metadata storage/retrieval coverage.
+
 - \[x] Tests proving new writes include provider, dimensions, metric, and compatibility key.
   - Evidence: `tests/embeddings.unit.test.ts` asserts stored metadata for `embeddingMetadata` writes.
+
 - \[x] Type review checklist: no type/runtime drift, no unsafe `as`, branded dimensions not raw numbers in core comparisons.
   - Evidence: metadata normalization uses Zod plus brand constructors; final fresh TypeScript review remains scheduled in Phase 8.
 
 - \[ ] Extend `EmbeddingRecord` and `EmbeddingRecordSchema` with optional `provider`, `dimensions`, `metric`, `inputMode`, and `compatibilityKey` fields.
+
 - \[ ] Use Zod validation and smart constructors/normalizers at the storage boundary; do not cast JSON parse results.
+
 - \[ ] Treat records without provider metadata as legacy Ollama records using model-only compatibility rules.
+
 - \[ ] Store vector length as branded `dimensions` when writing embeddings.
+
 - \[ ] Update skip logic in `embedMissingNotes` from `existing.model === embedModel` to compatibility-key match plus timestamp freshness.
+
 - \[ ] Update persistence status only if necessary. If new persistence structured fields are added, apply the full structured-output contract: exported type, Zod `.describe()`, tool `Returns`, text rendering, and integration tests.
+
 - \[ ] No required vault schema migration initially because embeddings are local-only and optional fields can be backfilled on rebuild.
 
 Validation after Phase 2:
@@ -229,18 +257,26 @@ Validation after Phase 3:
 
 - \[x] `npm run build`
   - Evidence: `rtk npm run build` passed.
+
 - \[x] Unit tests for compatibility guard and dimension mismatch behavior.
   - Evidence: `tests/embeddings.unit.test.ts` covers legacy compatibility, incompatible vector spaces, `cosineSimilarity` mismatch throw, and `safeCosineSimilarity` skip.
+
 - \[x] Recall/consolidate/project-summary tests proving mixed-provider and mixed-dimension vectors are not compared.
   - Evidence: direct guard tests added; broader integration coverage remains scheduled with provider-switch tests in Phase 7.
+
 - \[x] Type review checklist: skipped/compatible states are discriminated, impossible states unrepresentable.
   - Evidence: `EmbeddingCompatibility` is a discriminated union; final fresh TypeScript review remains scheduled in Phase 8.
 
 - \[ ] Add a compatibility guard used by `recall`, `consolidate`, and `project_memory_summary` before cosine similarity.
+
 - \[ ] Make `cosineSimilarity` require equal vector lengths and avoid silent zero-padding.
+
 - \[ ] Represent compatibility outcomes as a discriminated union, e.g. compatible versus skipped with typed reason.
+
 - \[ ] Skip incompatible embeddings and surface compact warnings where the tool already has an output surface.
+
 - \[ ] If warnings become structured output, apply full structured-output contract: exported types, Zod `.describe()`, tool `Returns`, text rendering, and integration tests.
+
 - \[ ] Avoid adding extra storage reads only to compute warnings. Use embeddings already loaded by the tool or omit warning counts.
 
 Validation after Phase 3:
