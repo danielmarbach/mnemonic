@@ -4,6 +4,16 @@ All notable changes to `mnemonic` will be documented in this file.
 
 The format is loosely based on Keep a Changelog and uses semver-style version headings.
 
+## [Unreleased]
+
+### Added
+
+- Embeddings can now use Ollama, OpenAI-compatible endpoints, native OpenAI, or Gemini through environment configuration while keeping API keys out of vault files and git.
+
+### Changed
+
+- Embedding records now store non-secret compatibility metadata and skip incompatible vector spaces until local embeddings are rebuilt by calling the `sync` MCP tool with `force: true`.
+
 ## [0.31.0] - 2026-05-13
 
 ### Added
