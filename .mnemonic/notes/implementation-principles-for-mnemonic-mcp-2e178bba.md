@@ -37,8 +37,6 @@ relatedTo:
     type: related-to
   - id: dogfooding-test-suite-reusable-prompt-for-phases-1-8-validat-c7c702d8
     type: related-to
-  - id: plan-multi-provider-embedding-support-for-mnemonic-fa944256
-    type: derives-from
 memoryVersion: 1
 ---
 ## Implementation principles for mnemonic MCP

@@ -13,8 +13,6 @@ alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
-  - id: plan-multi-provider-embedding-support-for-mnemonic-fa944256
-    type: follows
   - id: review-multi-provider-embedding-support-implementation-0ff11f18
     type: derives-from
 memoryVersion: 1

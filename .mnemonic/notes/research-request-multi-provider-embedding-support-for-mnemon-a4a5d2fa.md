@@ -11,11 +11,6 @@ role: context
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
-relatedTo:
-  - id: research-multi-provider-embedding-support-for-mnemonic-4c2dc9b6
-    type: derives-from
-  - id: plan-multi-provider-embedding-support-for-mnemonic-fa944256
-    type: derives-from
 memoryVersion: 1
 ---
 # Research Request: Multi-provider Embedding Support For Mnemonic
