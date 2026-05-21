@@ -7,7 +7,7 @@ tags:
   - architecture
 lifecycle: temporary
 createdAt: '2026-05-21T10:31:35.612Z'
-updatedAt: '2026-05-21T10:51:35.550Z'
+updatedAt: '2026-05-21T10:53:38.095Z'
 role: plan
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -311,21 +311,32 @@ Validation after Phase 4:
 
 - \[x] `npm run build`
   - Evidence: `rtk npm run build` passed.
+
 - \[x] Fake OpenAI-compatible server tests for headers, optional auth, body, base URL behavior, response parsing, malformed response handling, and failure messages.
   - Evidence: `tests/embeddings.unit.test.ts` covers request path/body/auth, native OpenAI defaults, response parsing, and no API key in provider error messages.
+
 - \[x] Integration test proving `remember` and `recall` work with `EMBED_PROVIDER=openai-compatible` using a fake server.
   - Evidence: `tests/recall-embeddings.integration.test.ts` adds an OpenAI-compatible remember/recall flow.
+
 - \[x] Type/security review checklist: no secret output, no unvalidated response, no unsafe casts.
   - Evidence: response body uses Zod validation; errors include provider/model/status/host but not API key. Final full TypeScript and security reviews remain scheduled in Phase 8.
 
 - \[ ] Add `openai-compatible` provider selected by `EMBED_PROVIDER=openai-compatible` for LiteLLM, LM Studio, vLLM, Ollama OpenAI compatibility, and similar servers.
+
 - \[ ] Add native `openai` provider selected by `EMBED_PROVIDER=openai`, layered on the same OpenAI-compatible transport where practical.
+
 - \[ ] Support `OPENAI_API_KEY`, `OPENAI_BASE_URL`, `EMBED_MODEL`, and optional `EMBED_DIMENSIONS` for native OpenAI.
+
 - \[ ] Support provider-neutral compatible vars such as `EMBED_BASE_URL` and `EMBED_API_KEY`, or explicitly document reusing `OPENAI_BASE_URL`/`OPENAI_API_KEY` for compatible endpoints.
+
 - \[ ] Default OpenAI model to `text-embedding-3-small` when provider is `openai` and no model is specified.
+
 - \[ ] Require `EMBED_MODEL` for `openai-compatible` because local/proxy model names vary.
+
 - \[ ] Request `POST /v1/embeddings` with `Authorization: Bearer` only when an API key is set, `input`, `model`, `encoding_format: "float"`, and `dimensions` when set.
+
 - \[ ] Validate response shape with Zod and parse `data[0].embedding` as a numeric vector.
+
 - \[ ] Include non-secret error context: provider, model, status code, and endpoint host, but never API key.
 
 Validation after Phase 4:
@@ -336,6 +347,26 @@ Validation after Phase 4:
 - \[ ] Type/security review checklist: no secret output, no unvalidated response, no unsafe casts.
 
 ## Phase 5: Native Gemini Provider
+
+- \[x] Add `gemini` provider selected by `EMBED_PROVIDER=gemini`.
+- \[x] Support `GEMINI_API_KEY`, `GEMINI_BASE_URL`, `EMBED_MODEL`, and optional `EMBED_DIMENSIONS`.
+- \[x] Default Gemini model to `gemini-embedding-2` when provider is `gemini` and no model is specified.
+- \[x] Request `POST /v1beta/models/{model}:embedContent` with `x-goog-api-key`.
+- \[x] For text-only mnemonic projections, send content parts as text and do not expose multimodal support initially.
+- \[x] Pass provider-specific output dimension parameter when configured.
+- \[x] Validate response shape with Zod and parse the documented embedding values vector.
+- \[x] Include non-secret error context and never include the Gemini API key in errors or outputs.
+
+Validation after Phase 5:
+
+- \[x] `npm run build`
+  - Evidence: `rtk npm run build` passed.
+- \[x] Fake Gemini server tests for headers, model path, body, dimensions parameter, response parsing, malformed response handling, and failure messages.
+  - Evidence: `tests/embeddings.unit.test.ts` covers Gemini API key header, model path, body, output dimensionality, response parsing, and no API key in provider error messages.
+- \[x] Integration test proving `remember` and `recall` work with `EMBED_PROVIDER=gemini` using a fake server.
+  - Evidence: `tests/recall-embeddings.integration.test.ts` adds a Gemini remember/recall flow.
+- \[x] Type/security review checklist: provider switch exhaustive, no secret output, no unvalidated response.
+  - Evidence: response body uses Zod validation; provider switch now returns Gemini implementation. Final full TypeScript and security reviews remain scheduled in Phase 8.
 
 - \[ ] Add `gemini` provider selected by `EMBED_PROVIDER=gemini`.
 - \[ ] Support `GEMINI_API_KEY`, `GEMINI_BASE_URL`, `EMBED_MODEL`, and optional `EMBED_DIMENSIONS`.
