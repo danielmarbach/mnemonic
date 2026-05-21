@@ -13,8 +13,6 @@ alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
-  - id: review-semanticpatch-llm-usability-fixes-4d4022ce
-    type: derives-from
   - id: mnemonic-key-design-decisions-3f2a6273
     type: related-to
   - id: theme-semantic-patch-improvements-lint-error-handling-headin-f2c4ced1
