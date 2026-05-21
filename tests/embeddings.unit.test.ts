@@ -4,6 +4,14 @@ import path from "path";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { Storage, type Note } from "../src/storage.js";
+import {
+  checkEmbeddingCompatibility,
+  cosineSimilarity,
+  currentEmbeddingIdentity,
+  embeddingMetadata,
+  resolveEmbeddingProviderConfig,
+  safeCosineSimilarity,
+} from "../src/embeddings.js";
 
 const tempDirs: string[] = [];
 
@@ -64,6 +72,25 @@ describe("Storage embedding lifecycle", () => {
     expect(retrieved).not.toBeNull();
     expect(retrieved?.model).toBe("test-model");
     expect(retrieved?.embedding).toEqual([0.1, 0.2, 0.3]);
+  });
+
+  it("stores and retrieves provider compatibility metadata", async () => {
+    const storage = await createTempStorage();
+    const vector = [0.1, 0.2, 0.3];
+
+    await storage.writeEmbedding({
+      id: "test-note",
+      ...embeddingMetadata(vector),
+      embedding: vector,
+      updatedAt: new Date().toISOString(),
+    });
+
+    const retrieved = await storage.readEmbedding("test-note");
+    expect(retrieved).not.toBeNull();
+    expect(retrieved?.provider).toBe("ollama");
+    expect(retrieved?.dimensions).toBe(3);
+    expect(retrieved?.metric).toBe("cosine");
+    expect(retrieved?.compatibilityKey).toContain("provider=ollama");
   });
 
   it("deletes both note and embedding on deleteNote", async () => {
@@ -158,6 +185,77 @@ describe("Storage embedding lifecycle", () => {
     const retrieved = await storage.readEmbedding("test-note");
     expect(retrieved?.model).toBe("model-v2");
     expect(retrieved?.embedding).toEqual([0.3, 0.4]);
+  });
+});
+
+describe("embedding provider configuration", () => {
+  it("defaults to Ollama with the existing model", () => {
+    const config = resolveEmbeddingProviderConfig({});
+
+    expect(config.kind).toBe("ollama");
+    expect(config.baseUrl).toBe("http://localhost:11434");
+    expect(config.model).toBe("nomic-embed-text-v2-moe");
+  });
+
+  it("resolves OpenAI-compatible configuration from neutral environment variables", () => {
+    const config = resolveEmbeddingProviderConfig({
+      EMBED_PROVIDER: "openai-compatible",
+      EMBED_BASE_URL: "http://127.0.0.1:4000",
+      EMBED_API_KEY: "secret-key",
+      EMBED_MODEL: "local-embedding-model",
+      EMBED_DIMENSIONS: "768",
+    });
+
+    expect(config.kind).toBe("openai-compatible");
+    expect(config.baseUrl).toBe("http://127.0.0.1:4000");
+    expect(config.model).toBe("local-embedding-model");
+    expect(config.dimensions).toBe(768);
+  });
+
+  it("requires a model for OpenAI-compatible providers", () => {
+    expect(() => resolveEmbeddingProviderConfig({ EMBED_PROVIDER: "openai-compatible" })).toThrow(
+      /EMBED_MODEL is required/,
+    );
+  });
+
+  it("defaults the native OpenAI and Gemini models", () => {
+    const openai = resolveEmbeddingProviderConfig({ EMBED_PROVIDER: "openai", OPENAI_API_KEY: "secret" });
+    const gemini = resolveEmbeddingProviderConfig({ EMBED_PROVIDER: "gemini", GEMINI_API_KEY: "secret" });
+
+    expect(openai.model).toBe("text-embedding-3-small");
+    expect(gemini.model).toBe("gemini-embedding-2");
+  });
+});
+
+describe("embedding compatibility", () => {
+  it("treats legacy Ollama records with the current model as compatible", () => {
+    const compatibility = checkEmbeddingCompatibility({
+      id: "legacy-note",
+      model: currentEmbeddingIdentity.model,
+      embedding: [0.1, 0.2, 0.3],
+      updatedAt: new Date().toISOString(),
+    });
+
+    expect(compatibility.status).toBe("compatible");
+  });
+
+  it("skips records from incompatible vector spaces", () => {
+    const vector = [0.1, 0.2, 0.3];
+    const record = {
+      id: "other-note",
+      ...embeddingMetadata(vector),
+      provider: "openai",
+      compatibilityKey: "provider=openai|model=text-embedding-3-small|dimensions=3|metric=cosine|inputMode=default",
+      embedding: vector,
+      updatedAt: new Date().toISOString(),
+    };
+
+    expect(checkEmbeddingCompatibility(record).status).toBe("skipped");
+  });
+
+  it("does not silently compare mismatched vector lengths", () => {
+    expect(() => cosineSimilarity([1, 0], [1, 0, 0])).toThrow(/dimensions must match/i);
+    expect(safeCosineSimilarity([1, 0], [1, 0, 0])).toBeUndefined();
   });
 });
 

@@ -1,5 +1,5 @@
 import { promises as fs } from "fs";
-import { embed, embedModel } from "../embeddings.js";
+import { checkEmbeddingCompatibility, currentEmbeddingIdentity, embed, embeddingMetadata } from "../embeddings.js";
 import { memoryId, isoDateString } from "../brands.js";
 import { getOrBuildProjection } from "../projections.js";
 import { attempt } from "../error-utils.js";
@@ -36,7 +36,11 @@ export async function embedMissingNotes(
 
       if (!force) {
         const existing = await storage.readEmbedding(note.id);
-        if (existing?.model === embedModel && existing.updatedAt >= note.updatedAt) {
+        if (
+          existing
+          && checkEmbeddingCompatibility(existing, currentEmbeddingIdentity).status === "compatible"
+          && existing.updatedAt >= note.updatedAt
+        ) {
           continue;
         }
       }
@@ -46,7 +50,7 @@ export async function embedMissingNotes(
         const vector = await embed(text);
         await storage.writeEmbedding({
           id: note.id,
-          model: embedModel,
+          ...embeddingMetadata(vector),
           embedding: vector,
           updatedAt: isoDateString(new Date().toISOString()),
         });

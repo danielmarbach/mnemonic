@@ -14,7 +14,7 @@ import {
   ProjectRef,
   type RecallRetrievalCoverage,
 } from "../structured-content.js";
-import { embed, cosineSimilarity } from "../embeddings.js";
+import { checkEmbeddingCompatibility, currentEmbeddingIdentity, embed, safeCosineSimilarity } from "../embeddings.js";
 import {
   detectTemporalQueryHint,
   shouldApplyTemporalFiltering,
@@ -183,7 +183,9 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
           : await vault.storage.listEmbeddings();
 
         for (const rec of embeddings) {
-          const rawScore = cosineSimilarity(queryVec, rec.embedding);
+          if (checkEmbeddingCompatibility(rec, currentEmbeddingIdentity, queryVec.length).status !== "compatible") continue;
+          const rawScore = safeCosineSimilarity(queryVec, rec.embedding);
+          if (rawScore === undefined) continue;
           if (rawScore < minSimilarity) continue;
 
           const note = await readCachedNote(vault, rec.id);

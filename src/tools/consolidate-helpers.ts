@@ -11,7 +11,7 @@ import {
 } from "../consolidate.js";
 import { computeDecayInfo } from "../provenance.js";
 import type { EffectiveNoteMetadata } from "../role-suggestions.js";
-import { cosineSimilarity, embed, embedModel } from "../embeddings.js";
+import { checkEmbeddingCompatibility, currentEmbeddingIdentity, embed, embeddingMetadata, safeCosineSimilarity } from "../embeddings.js";
 import { classifyTheme, titleCaseTheme } from "../project-introspection.js";
 import { getErrorMessage, attempt } from "../error-utils.js";
 import { makeId, slugify } from "../helpers/index.js";
@@ -22,7 +22,7 @@ import type { MutationRetryContract } from "../structured-content.js";
 import { type NoteEntry, storageLabel, addVaultChange, removeRelationshipsToNoteIds as removeRelationshipsToNoteIdsFromModule } from "../helpers/vault.js";
 import { toProjectRef } from "../helpers/project.js";
 import { embedTextForNote as embedTextForNoteFromModule } from "../helpers/embed.js";
-import type { Note } from "../storage.js";
+import type { EmbeddingRecord, Note } from "../storage.js";
 import type { Vault } from "../vault.js";
 import type { ConsolidationMode, ProjectMemoryPolicy } from "../project-memory-policy.js";
 import type { ConsolidateResult, ConsolidateExecuteMergeEvidence, ConsolidateMaintenanceWarning } from "../structured-content.js";
@@ -149,7 +149,8 @@ export async function detectDuplicates(
       const embeddingB = embeddings.get(entryB.note.id);
       if (!embeddingB) continue;
 
-      const similarity = cosineSimilarity(embeddingA, embeddingB);
+      const similarity = safeCosineSimilarity(embeddingA.embedding, embeddingB.embedding);
+      if (similarity === undefined) continue;
       if (similarity >= threshold) {
         const pairContextIds = new Set([entryA.note.id, entryB.note.id]);
         const noteAEvidence = buildConsolidateNoteEvidence(entryA.note, allNotes, entryA.note, undefined, pairContextIds);
@@ -354,7 +355,8 @@ export async function suggestMerges(
       const embeddingB = embeddings.get(entryB.note.id);
       if (!embeddingB) continue;
 
-      const similarity = cosineSimilarity(embeddingA, embeddingB);
+      const similarity = safeCosineSimilarity(embeddingA.embedding, embeddingB.embedding);
+      if (similarity === undefined) continue;
       if (similarity >= threshold) {
         similar.push({ entry: entryB, similarity });
       }
@@ -455,13 +457,13 @@ export async function suggestMerges(
   return { content: [{ type: "text", text: lines.join("\n") }], structuredContent };
 }
 
-async function loadEmbeddingsByNoteId(entries: NoteEntry[]): Promise<Map<string, number[]>> {
-  const embeddings = new Map<string, number[]>();
+async function loadEmbeddingsByNoteId(entries: NoteEntry[]): Promise<Map<string, EmbeddingRecord>> {
+  const embeddings = new Map<string, EmbeddingRecord>();
 
   await Promise.all(entries.map(async (entry) => {
     const record = await entry.vault.storage.readEmbedding(entry.note.id);
-    if (record) {
-      embeddings.set(entry.note.id, record.embedding);
+    if (record && checkEmbeddingCompatibility(record, currentEmbeddingIdentity).status === "compatible") {
+      embeddings.set(entry.note.id, record);
     }
   }));
 
@@ -629,7 +631,7 @@ export async function executeMerge(
     const vector = await embed(text);
     await targetVault.storage.writeEmbedding({
       id: targetId,
-      model: embedModel,
+      ...embeddingMetadata(vector),
       embedding: vector,
       updatedAt: now,
     });

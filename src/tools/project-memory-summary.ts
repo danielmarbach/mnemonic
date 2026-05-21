@@ -4,7 +4,7 @@ import type { ServerContext } from "../server-context.js";
 import { performance } from "perf_hooks";
 
 import { memoryId } from "../brands.js";
-import { cosineSimilarity } from "../embeddings.js";
+import { checkEmbeddingCompatibility, currentEmbeddingIdentity, safeCosineSimilarity } from "../embeddings.js";
 import { getNoteProvenance, computeConfidence, computeDecayInfo } from "../provenance.js";
 import { getRelationshipPreview } from "../relationships.js";
 import { formatRelationshipPreview } from "../helpers/index.js";
@@ -418,7 +418,9 @@ export function registerProjectMemorySummaryTool(server: McpServer, ctx: ServerC
             // Find max similarity to any anchor
             let maxSim = 0;
             for (const anchor of validAnchors) {
-              const sim = cosineSimilarity(anchor.embedding, emb.embedding);
+              if (checkEmbeddingCompatibility(emb, currentEmbeddingIdentity, anchor.embedding.length).status !== "compatible") continue;
+              const sim = safeCosineSimilarity(anchor.embedding, emb.embedding);
+              if (sim === undefined) continue;
               if (sim > maxSim) maxSim = sim;
             }
             
