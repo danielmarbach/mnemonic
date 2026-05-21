@@ -13,6 +13,7 @@ The format is loosely based on Keep a Changelog and uses semver-style version he
 ### Changed
 
 - Embedding records now store non-secret compatibility metadata and skip incompatible vector spaces until local embeddings are rebuilt by calling the `sync` MCP tool with `force: true`.
+- Embedding failures during `sync` and backfill now surface the actual error reason (e.g. quota exceeded, network error) in both text output and structured content instead of only the note ID.
 
 ## [0.31.0] - 2026-05-13
 

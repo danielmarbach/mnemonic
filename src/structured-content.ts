@@ -279,8 +279,8 @@ export interface SyncResult extends Record<string, unknown> {
     deleted: number;
     pushed: number;
     embedded: number;
-    /** Embedding failures — note ids that could not be re-embedded */
-    failed: string[];
+    /** Embedding failures — note ids that could not be re-embedded, with error reasons */
+    failed: Array<{ id: string; error: string }>;
     /** Set when a git operation (fetch/pull/push) failed during sync */
     gitError?: SyncVaultGitError;
   }>;
@@ -291,7 +291,7 @@ export interface ReindexResult extends Record<string, unknown> {
   vaults: Array<{
     vault: "main" | "project";
     rebuilt: number;
-    failed: string[];
+    failed: Array<{ id: string; error: string }>;
   }>;
 }
 
@@ -1002,7 +1002,10 @@ export const SyncResultSchema = z.object({
     deleted: z.number(),
     pushed: z.number(),
     embedded: z.number(),
-    failed: z.array(z.string()),
+    failed: z.array(z.object({
+      id: z.string().describe("Note id that failed to embed"),
+      error: z.string().describe("Error message from the embedding provider"),
+    })),
     gitError: z.object({
       phase: z.enum(["fetch", "pull", "push"]),
       message: z.string(),
@@ -1017,7 +1020,10 @@ export const ReindexResultSchema = z.object({
   vaults: z.array(z.object({
     vault: z.enum(["main", "project"]),
     rebuilt: z.number(),
-    failed: z.array(z.string()),
+    failed: z.array(z.object({
+      id: z.string().describe("Note id that failed to embed"),
+      error: z.string().describe("Error message from the embedding provider"),
+    })),
   })),
 });
 

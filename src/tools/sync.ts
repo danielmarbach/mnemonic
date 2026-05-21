@@ -6,6 +6,7 @@ import {
   type SyncResult as StructuredSyncResult,
 } from "../structured-content.js";
 import type { SyncResult } from "../git.js";
+import type { FailedEmbedding } from "../helpers/embed.js";
 import { projectParam } from "../helpers/project.js";
 import { invalidateActiveProjectCache } from "../cache.js";
 import {
@@ -57,7 +58,7 @@ export function registerSyncTool(server: McpServer, ctx: ServerContext): void {
         "- You suspect another machine or collaborator updated the vaults\n\n" +
         "Do not use this when:\n" +
         "- You only need to inspect or edit a single memory\n\n" +
-        "Returns: per-vault pull/push results, deletions, additions, embedding rebuild info.\n\n" +
+        "Returns: per-vault pull/push results, deletions, additions, embedding rebuild info. Embedding failures include the error reason (e.g. quota exceeded, network error).\n\n" +
         "[mutating: git sync, may rebuild embeddings]\n\n" +
         "Typical next step:\n" +
         "- Use `recent_memories`, `list`, or `recall` to inspect newly synced changes.",
@@ -82,7 +83,7 @@ export function registerSyncTool(server: McpServer, ctx: ServerContext): void {
       const mainResult = await ctx.vaultManager.main.git.sync();
       lines.push(...formatSyncResult(mainResult, "main vault", mainVaultPath));
       let mainEmbedded = 0;
-      let mainFailed: string[] = [];
+      let mainFailed: FailedEmbedding[] = [];
       const mainBackfill = await backfillEmbeddingsAfterSync(ctx, ctx.vaultManager.main.storage, "main vault", lines, force);
       mainEmbedded = mainBackfill.embedded;
       mainFailed = mainBackfill.failed;
@@ -108,7 +109,7 @@ export function registerSyncTool(server: McpServer, ctx: ServerContext): void {
           const projectResult = await projectVault.git.sync();
           lines.push(...formatSyncResult(projectResult, "project vault", projectVaultPath));
           let projEmbedded = 0;
-          let projFailed: string[] = [];
+          let projFailed: FailedEmbedding[] = [];
           const projectBackfill = await backfillEmbeddingsAfterSync(ctx, projectVault.storage, "project vault", lines, force);
           projEmbedded = projectBackfill.embedded;
           projFailed = projectBackfill.failed;
