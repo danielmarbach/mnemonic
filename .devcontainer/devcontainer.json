@@ -8,14 +8,13 @@
     }
   },
 
-  "postCreateCommand": "curl -fsSL https://ollama.com/install.sh | sh && npm ci",
-  "postStartCommand": "ollama serve &",
-  "postAttachCommand": "ollama pull nomic-embed-text-v2-moe",
+  "postCreateCommand": "sudo apt-get update && sudo apt-get install -y zstd && curl -fsSL https://ollama.com/install.sh | sh && npm ci",
+  "postAttachCommand": "bash -c 'ollama serve > /tmp/ollama.log 2>&1 & for i in $(seq 1 30); do curl -sf http://127.0.0.1:11434/api/tags >/dev/null && break; sleep 1; done; ollama list | grep -q nomic-embed-text-v2-moe || ollama pull nomic-embed-text-v2-moe'",
 
   "customizations": {
     "vscode": {
       "settings": {
-        "typescript.tsdk": "node_modules/typescript/lib"
+        "js/ts.tsdk.path": "node_modules…/typescript/lib"
       },
       "extensions": [
         "vitest.explorer",
