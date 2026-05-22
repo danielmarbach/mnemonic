@@ -8,7 +8,9 @@
     }
   },
 
-  "postCreateCommand": "npm ci",
+  "postCreateCommand": "curl -fsSL https://ollama.com/install.sh | sh && npm ci",
+  "postStartCommand": "ollama serve &",
+  "postAttachCommand": "ollama pull nomic-embed-text-v2-moe",
 
   "customizations": {
     "vscode": {
