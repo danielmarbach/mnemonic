@@ -1,0 +1,23 @@
+{
+  "name": "mnemonic",
+  "image": "mcr.microsoft.com/devcontainers/base:noble",
+  "remoteUser": "vscode",
+  "features": {
+    "ghcr.io/devcontainers/features/node:2": {
+      "version": "24"
+    }
+  },
+
+  "postCreateCommand": "npm ci",
+
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "js/ts.tsdk.path": "node_modules/typescript/lib"
+      },
+      "extensions": [
+        "vitest.explorer"
+      ]
+    }
+  }
+}

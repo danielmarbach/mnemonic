@@ -23,6 +23,8 @@ Thank you for contributing to mnemonic. This guide covers the conventions, workf
 ollama pull nomic-embed-text-v2-moe
 ```
 
+**Devcontainer:** Open the repository in a devcontainer to get the Node.js toolchain used by CI. The container runs `npm ci` after creation, so you can skip the install step below once setup finishes.
+
 **Install and build:**
 
 ```bash
