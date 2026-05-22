@@ -6,7 +6,7 @@ tags:
   - development-setup
 lifecycle: permanent
 createdAt: '2026-05-22T20:41:43.350Z'
-updatedAt: '2026-05-22T22:04:13.274Z'
+updatedAt: '2026-05-22T22:16:59.488Z'
 role: decision
 alwaysLoad: false
 project: github-com-boblangley-mnemonic
@@ -15,7 +15,7 @@ memoryVersion: 1
 ---
 The repository devcontainer should use `ghcr.io/devcontainers/features/node:2` with `version: "24"`, matching CI's Node 24 runtime while staying on the current major version of the official Node feature.
 
-The devcontainer should run `npm ci` from `postCreateCommand` so the workspace uses the committed `package-lock.json` and avoids reinstalling on every attach. Ollama is installed via the official install script in `postCreateCommand`, started as a background service in `postStartCommand`, and the `nomic-embed-text-v2-moe` embedding model is pulled in `postAttachCommand` so MCP tools work out of the box.
+The devcontainer should run `npm ci` from `postCreateCommand` so the workspace uses the committed `package-lock.json` and avoids reinstalling on every attach. Ollama is installed via the official install script in `postCreateCommand` (after installing `zstd` which the Ollama installer requires). The Ollama server is started and the `nomic-embed-text-v2-moe` embedding model is pulled in `postAttachCommand` — starting the server and pulling are combined in one hook to avoid race conditions between lifecycle events. The model pull is skipped if already present to avoid re-downloading on reattach.
 
 VS Code customization should use `typescript.tsdk` (not `js/ts.tsdk.path`) for the workspace TypeScript SDK path, since `typescript.tsdk` has broader compatibility across VS Code versions.
 
