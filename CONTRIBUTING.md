@@ -23,7 +23,9 @@ Thank you for contributing to mnemonic. This guide covers the conventions, workf
 ollama pull nomic-embed-text-v2-moe
 ```
 
-**Devcontainer:** Open the repository in a devcontainer to get the Node.js toolchain used by CI. The container runs `npm ci` after creation, so you can skip the install step below once setup finishes.
+**Devcontainer:** Open the repository in a devcontainer to get the Node.js toolchain used by CI. The container runs `npm ci` after creation, so the workspace is ready to use once setup finishes — you can skip the `npm install` step below.
+
+> **Note:** Ollama is not included in the devcontainer. You must have Ollama running on the host (or another accessible machine) with the embedding model pulled for MCP tools to work.
 
 **Install and build:**
 

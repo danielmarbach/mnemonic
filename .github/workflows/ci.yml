@@ -9,7 +9,30 @@ on:
       - "Formula/**"
 
 jobs:
+  check-toolchain-sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Verify Node version in sync across CI and devcontainer
+        run: |
+          node -e "
+            const fs = require('fs');
+            const ci = fs.readFileSync('.github/workflows/ci.yml', 'utf8');
+            const devcontainer = require('./.devcontainer/devcontainer.json');
+            const ciVersions = [...ci.matchAll(/node-version:\s*(\d+)/g)].map(m => m[1]);
+            const ciVersion = [...new Set(ciVersions)].sort().join(',');
+            const devcontainerVersion = devcontainer.features['ghcr.io/devcontainers/features/node:2'].version;
+            if (ciVersion !== devcontainerVersion) {
+              console.error('Node version mismatch: CI=' + ciVersion + ' devcontainer=' + devcontainerVersion);
+              process.exit(1);
+            }
+            console.log('Node version in sync: ' + ciVersion);
+          "
+
   build-and-test:
+    needs: check-toolchain-sync
     runs-on: ubuntu-latest
 
     steps:

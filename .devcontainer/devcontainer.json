@@ -13,10 +13,11 @@
   "customizations": {
     "vscode": {
       "settings": {
-        "js/ts.tsdk.path": "node_modules/typescript/lib"
+        "typescript.tsdk": "node_modules/typescript/lib"
       },
       "extensions": [
-        "vitest.explorer"
+        "vitest.explorer",
+        "davidanson.vscode-markdownlint"
       ]
     }
   }
