@@ -5,13 +5,15 @@ tags:
   - plan
 lifecycle: temporary
 createdAt: '2026-05-22T19:04:08.973Z'
-updatedAt: '2026-05-22T19:18:24.818Z'
+updatedAt: '2026-05-22T19:25:50.493Z'
 role: plan
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
   - id: multi-repo-federated-reads-codebase-research-626b102b
+    type: derives-from
+  - id: multi-repository-attachment-plan-critical-review-795b9192
     type: derives-from
 memoryVersion: 1
 ---

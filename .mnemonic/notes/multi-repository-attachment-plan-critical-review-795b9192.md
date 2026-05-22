@@ -7,11 +7,14 @@ tags:
   - architecture
 lifecycle: temporary
 createdAt: '2026-05-22T19:25:44.922Z'
-updatedAt: '2026-05-22T19:25:44.922Z'
+updatedAt: '2026-05-22T19:25:50.493Z'
 role: review
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: multi-repository-attachment-support-implementation-plan-b6423f79
+    type: derives-from
 memoryVersion: 1
 ---
 # Multi-repository attachment plan — critical review
