@@ -5,7 +5,7 @@ tags:
   - plan
 lifecycle: temporary
 createdAt: '2026-05-22T19:04:08.973Z'
-updatedAt: '2026-05-22T19:06:53.775Z'
+updatedAt: '2026-05-22T19:08:34.076Z'
 role: plan
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -29,7 +29,7 @@ Federated read-only project attachments: link external repositories as knowledge
 - **Max 5 attachments per project**, configurable.
 - **Read-only Phase 1** (except explicit sync). No writes to external repos. Consolidate and prune never touch attached vaults.
 - **Explicit sync for attachments** included — too impactful to defer. No auto-sync on branch change.
-- **Branch tracking**: capture `lastKnownBranch` on attach/sync; surface mismatch warnings in `list_attachments`.
+- **Branch model: default reads from `main` via git ref**, configurable per-attachment. Working-tree mode as escape hatch.
 - **Fail-soft when attached repo not checked out**. Debug-log, skip.
 
 ## Type design
@@ -60,6 +60,7 @@ interface AttachmentRef {
   projectSlug: string;
   projectName: string;
   localPath: string;
+  branch: string; // branch to read from via git; empty = working-tree mode
 }
 ```
 
@@ -72,7 +73,7 @@ interface ProjectAttachmentConfig {
   localPath: string;
   vaultFolder: string; // default ".mnemonic"
   enabled: boolean;
-  lastKnownBranch?: string; // captured on add_attachment, updated on sync
+  branch: string; // default "main" — branch to read from via git show/ls-tree
   addedAt: string;
   updatedAt: string;
 }
@@ -116,6 +117,17 @@ Includes attached vaults for relationship expansion and forget.
 ### searchOrderMutable(cwd) — new method
 
 Excludes attached vaults. Used by mutation paths (consolidate, prune, remember, update, move_memory, forget, relate/unrelate).
+
+## Storage layer: attached vault reads via git ref
+
+Unlike project-local vaults (which read from filesystem), attached vault notes are read from a git branch ref to decouple from the working tree state.
+
+- `listNoteIds`: `git ls-tree --name-only <branch> .mnemonic/notes/` to enumerate .md files
+- `readNote`: `git show <branch>:<relpath>` to read individual note content
+- Embeddings: stored locally in consuming project's `.mnemonic/attachments/<slug>/embeddings/` (filesystem, not git)
+- Working-tree fallback (`branch: ""`): reads from filesystem using existing Storage paths
+- Sync: `git fetch` in the attached repo to update branch refs
+- The attached repo's working tree is never touched — the user can have any branch checked out
 
 ## storageLabel update
 
@@ -161,15 +173,16 @@ Explicit attachment sync is included in Phase 1.
 - `SyncResultSchema.vault` enum becomes `"main" | "project" | "attached"` with `projectSlug` field
 - `ensureBranchSynced` does NOT auto-sync attached vaults (cold-path I/O violation)
 - Each attached vault sync is independent; failure in one doesn't block others
-- Stale attachments are acceptable for reads — sync is opt-in
+- Sync for attached vaults: `git fetch` to update branch ref, re-embed changed notes
+- No checkout needed — notes are read from branch ref via git, not working tree
 
-### Branch tracking for attached repos
+### Branch model
 
-- `ProjectAttachmentConfig.lastKnownBranch` — captured on `add_attachment`, updated on sync
-- `list_attachments` output includes `currentBranch` and `lastKnownBranch`
-- `list_attachments` shows warning when `currentBranch !== lastKnownBranch`: "Attached repo may have changed branches — notes may differ from last sync. Run sync to reconcile."
-- No auto-detection on read paths (recall, summary, etc.)
-- Branch change in consuming project triggers auto-sync for main + project vault only
+- Default branch: `main` (auto-detected on `add_attachment`; falls back to `master` if `main` doesn't exist)
+- Configurable per-attachment via `branch` field
+- Empty string = working-tree mode (reads from filesystem instead of git ref)
+- No runtime branch detection, no mismatch warnings, no cold-path I/O
+- `list_attachments` shows configured branch — simple display
 
 ## Performance constraints compliance
 
@@ -190,18 +203,19 @@ Explicit attachment sync is included in Phase 1.
 - [ ] 7. VaultManager.searchOrder: add attachments segment
 - [ ] 8. VaultManager.searchOrderMutable: new method excluding attachments
 - [ ] 9. VaultManager.allKnownVaults: include attachments
-- [ ] 10. storageLabel: add `attached:<slug>/<folder>` case
-- [ ] 11. _VaultLabel regex: accept `attached:*` pattern
-- [ ] 12. Embeddings path: `attachments/<slug>/embeddings/` in consuming project root
-- [ ] 13. New tools: `add_attachment`, `remove_attachment`, `list_attachments`, `set_attachment_enabled`
-- [ ] 14. Tool descriptions + schema `.describe()` for new output fields
-- [ ] 15. collectVisibleNotes: `includeAttached` param (default true for reads, false for mutations)
-- [ ] 16. recall, project_memory_summary, list, get, memory_graph, recent_memories: verify
-- [ ] 17. findNote: verify attached vaults searched via searchOrder
-- [ ] 18. Consolidate/prune: verify no attached vault notes touched
-- [ ] 19. Sync: add `vault: "attached"` with branch tracking
-- [ ] 20. ensureBranchSynced: skip attached vaults
-- [ ] 21. Update AGENT.md, README.md, CHANGELOG.md
+- [ ] 10. Storage: add git-ref-based reading for attached vaults (StorageAttached variant or mode)
+- [ ] 11. storageLabel: add `attached:<slug>/<folder>` case
+- [ ] 12. _VaultLabel regex: accept `attached:*` pattern
+- [ ] 13. Embeddings path: `attachments/<slug>/embeddings/` in consuming project root
+- [ ] 14. New tools: `add_attachment`, `remove_attachment`, `list_attachments`, `set_attachment_enabled`, `set_attachment_branch`
+- [ ] 15. Tool descriptions + schema `.describe()` for new output fields
+- [ ] 16. collectVisibleNotes: `includeAttached` param (default true for reads, false for mutations)
+- [ ] 17. recall, project_memory_summary, list, get, memory_graph, recent_memories: verify
+- [ ] 18. findNote: verify attached vaults searched via searchOrder
+- [ ] 19. Consolidate/prune: verify no attached vault notes touched
+- [ ] 20. Sync: add `vault: "attached"` with git fetch-based sync
+- [ ] 21. ensureBranchSynced: skip attached vaults
+- [ ] 22. Update AGENT.md, README.md, CHANGELOG.md
 
 ## Test plan
 
@@ -209,20 +223,22 @@ Explicit attachment sync is included in Phase 1.
 - [ ] vault.unit.test.ts: VaultProvenance discrimination, attachment vault creation, search order
 - [ ] storageLabel + _VaultLabel unit tests: `attached:<slug>/.mnemonic` format
 - [ ] tool-output-schemas.unit.test.ts: _VaultLabel regex accepts new pattern
+- [ ] storage.unit.test.ts: git-ref-based note reading for attached vaults
 - [ ] attached-vault.integration.test.ts:
   - Add/remove/list attachment lifecycle
+  - Default branch auto-detection (main/master fallback)
   - recall returns notes from attached repo
   - project_memory_summary includes attached notes in themes
-  - list shows `attached:<slug>/.mnemonic` label
+  - list shows `attached:<slug>/.mnemonic` label with branch info
   - get resolves note from attached vault
-  - sync explicitly syncs attached vaults
+  - sync explicitly syncs attached vaults via git fetch
   - fail-soft when attached path doesn't exist
   - dedup: project-local note wins over same-id attached note
   - max attachment count enforcement
   - embeddings written to consuming project's attachment embeddings dir
   - consolidate/prune never touch attached vault notes
-  - branch change does NOT auto-sync attached vaults
-  - list_attachments branch mismatch warning
+  - working-tree mode (branch: "") reads from filesystem
+  - set_attachment_branch changes branch and notes update accordingly
 - [ ] recall-pipeline.integration.test.ts: attached vault notes score/rank correctly
 - [ ] Existing tests: no regressions from isProject → provenance migration
 
@@ -230,9 +246,9 @@ Explicit attachment sync is included in Phase 1.
 
 ### add_attachment
 
-- Input: `cwd`, `localPath`, `projectSlug?` (auto-detect from remote if omitted)
-- Validates: path exists, contains `.mnemonic/notes/`, not same repo, count < max
-- Captures current branch as `lastKnownBranch`
+- Input: `cwd`, `localPath`, `projectSlug?` (auto-detect from remote if omitted), `branch?` (auto-detect main/master if omitted)
+- Validates: path exists, contains `.mnemonic/notes/`, not same repo, count < max, branch exists in attached repo
+- Auto-detects default branch: `main` → `master` fallback
 - Returns: attachment config + vault label
 
 ### remove_attachment
@@ -244,13 +260,18 @@ Explicit attachment sync is included in Phase 1.
 ### list_attachments
 
 - Input: `cwd`
-- Returns: all attachment configs with status (enabled, path-exists, note count, currentBranch, lastKnownBranch)
-- Shows branch mismatch warning when detected
+- Returns: all attachment configs with status (enabled, path-exists, note count, branch)
 
 ### set_attachment_enabled
 
 - Input: `cwd`, `projectSlug`, `enabled: boolean`
 - Toggles without removing config
+
+### set_attachment_branch
+
+- Input: `cwd`, `projectSlug`, `branch: string`
+- Changes the branch to read from (empty string = working-tree mode)
+- Validates branch exists in attached repo (unless empty string)
 
 ## Open decisions (deferred)
 
