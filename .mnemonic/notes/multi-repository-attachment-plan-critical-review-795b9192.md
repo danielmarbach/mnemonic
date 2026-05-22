@@ -7,7 +7,7 @@ tags:
   - architecture
 lifecycle: temporary
 createdAt: '2026-05-22T19:25:44.922Z'
-updatedAt: '2026-05-22T19:25:50.493Z'
+updatedAt: '2026-05-22T19:57:05.220Z'
 role: review
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -19,94 +19,56 @@ memoryVersion: 1
 ---
 # Multi-repository attachment plan — critical review
 
-Review of `multi-repository-attachment-support-implementation-plan-b6423f79` against codebase reality. Found **5 Critical, 8 High, 6 Medium** issues.
+Review of `multi-repository-attachment-support-implementation-plan-b6423f79` against codebase reality. Found **5 Critical, 8 High, 10+ Medium** issues.
 
-## P0: Critical (blocks ship)
+**STATUS**: All issues addressed in the updated plan (2026-05-22 revision).
 
-### C1: `scope: "project"` excludes ALL attached notes
+## P0: Critical (blocks ship) — RESOLVED
 
-`collectVisibleNotes` (helpers/vault.ts:44-46) filters by `note.project === project.id`. Attached notes retain their original project ID, so `scope: "project"` (the most common scope) renders the feature invisible. Recall, list, recent_memories all filter them out.
-**Fix**: Either assign a synthetic project-ID override or add an `isAttachment` flag so scope-logic treats attachments as project-extended.
+### C1: `scope: "project"` excludes ALL attached notes — RESOLVED
 
-### C2: `findNote` + `searchOrder` enables writes to read-only attached vaults
+`collectVisibleNotes` filters by `note.project === project.id`. Plan now uses attachment-extended scope semantics: attached notes pass `scope: "project"` because they are explicitly attached.
 
-All mutation tools (`forget`, `update`, `relate`, `unrelate`, `move_memory`, `consolidate`) use `findNote` which calls `searchOrder(cwd)`. If `searchOrder` includes attached vaults, these tools find and modify notes in read-only repos. The plan's `searchOrderMutable` approach is correct but `findNote` needs a routing parameter.
-**Fix**: Add `mutable?: boolean` param to `findNote` (or separate `findNoteMutable`) that uses `searchOrderMutable`.
+### C2: `findNote` + `searchOrder` enables writes to read-only vaults — RESOLVED
 
-### C3: `removeRelationshipsToNoteIds` iterates ALL vaults including attached
+`findNote` gains `mutable?: boolean` parameter. Mutation tools pass `mutable: true` which uses `searchOrderMutable`. Two-step lookup produces specific error for attached note IDs.
 
-`helpers/vault.ts:212-236` iterates `allKnownVaults()` and writes to every vault. With attached vaults included, this would **write to read-only repos**.
-**Fix**: Must use `allKnownVaultsMutable()` (excluding attached) or skip `provenance === "project-attached"` vaults.
+### C3: `removeRelationshipsToNoteIds` writes to ALL vaults — RESOLVED
 
-### C4: `writeEmbedding`/`writeProjection` throwing breaks read paths
+Uses `allKnownVaultsMutable()` which excludes attached vaults.
 
-The plan says "write methods throw (read-only)". But `embedMissingNotes` calls `storage.writeEmbedding()` and `getOrBuildProjection` calls `storage.writeProjection()`. If these throw for attached vaults, embedding pipelines fail silently (caught but skipped), making semantic search non-functional for attached notes.
-**Fix**: `writeEmbedding` and `writeProjection` must write to the **local cache** directory (`.mnemonic/attachments/<slug>/`), not throw. Only `writeNote`, `deleteNote`, and atomic write methods should throw.
+### C4: `writeEmbedding`/`writeProjection` throwing breaks read paths — RESOLVED
 
-### C5: No session cache invalidation after sync
+`writeEmbedding` and `writeProjection` write to local cache directory. Only `writeNote`, `deleteNote`, and atomic write methods throw.
 
-After `mnemonic_sync`, the session cache holds stale note lists and embeddings for attached vaults. Mutations invalidate the cache, but sync does not. Users will see outdated content until session restart.
-**Fix**: After sync, call `invalidateActiveProjectCache()` (or a targeted variant for attached vault caches only).
+### C5: No session cache invalidation after sync — RESOLVED
 
-## P1: High (functional bugs / significant gaps)
+Sync calls `invalidateActiveProjectCache()` or targeted `invalidateAttachedVaultCaches()`.
 
-### H1: `vaultMatchesStorageScope` includes attached vaults in `"project-vault"`
+## P1: High (functional bugs) — RESOLVED
 
-Current `vault.isProject` boolean covers both local and attached vaults. With `VaultProvenance`, the `"project-vault"` scope check must be `provenance === "project-local"`, NOT `provenance !== "main"`.
+- H1: `provenance === "project-local"` for `project-vault` scope — RESOLVED
+- H2: Composite dedup `(noteId, vaultPath)` — RESOLVED
+- H3: `writable` computed property replaces `isProject` dual semantics — RESOLVED
+- H4: Session-scoped note cache + batch git reads — RESOLVED
+- H5: Two-step lookup with specific error message — RESOLVED
+- H6: Documented as known limitation (machine-specific `localPath`) — RESOLVED
+- H7: `branchTipHash` staleness detection — RESOLVED
+- H8: `pushAfterMutation` skips `vault.writable === false` — RESOLVED
 
-### H2: Note ID collisions across repos — silent data loss
+## P2: Medium (design gaps) — RESOLVED
 
-`collectVisibleNotes` deduplicates by `note.id` (line 70). Note IDs are slug-derived — `architecture-decisions` is common. First-wins dedup silently drops attached notes.
-**Fix**: Change dedup key to `noteId + vaultPath` or display both with vault disambiguation.
+- M1: `storedIn: "attached"` enum value added — RESOLVED
+- M2: `ProjectSummaryNotesSchema.attachedVault` field added — RESOLVED
+- M3: `where_is_memory`, `detect_project`, `discover_tags` updated — RESOLVED
+- M4: `maxAttachmentsPerProject` exposed via policy tools — RESOLVED
+- M5: Working-tree mode warning — RESOLVED
+- M6: Require `origin` remote on attached repos — RESOLVED
+- M7: `git symbolic-ref` for branch detection — RESOLVED
+- M8: Config concurrency documented as known limitation — RESOLVED
+- M9: Shallow clones documented as known limitation — RESOLVED
+- M10: `SyncResultSchema` updated with `"attached"` variant — RESOLVED
 
-### H3: `isProject` → `VaultProvenance` migration misses dual semantics
+## Test plan gaps — RESOLVED
 
-`isProject` means both "provenance category" AND "is writable" at different call sites. The plan must add a computed `writable` property. Call sites needing write-ability (pushAfterMutation, protected branch, consolidate) need `!writable` not just `provenance !== "global"`.
-
-### H4: `git show` spawns N subprocesses per recall
-
-Each note read in an attached vault calls `git show <branch>:path`. A 50-candidate recall spawns 50 subprocesses (~250ms-5s). Graph spreading adds discovered candidates beyond session cache.
-**Fix**: Batch git reads or pre-populate session cache via `git ls-tree` + bulk read.
-
-### H5: Mutation tools return confusing "not found" for attached notes
-
-If an agent does `list` → sees note `abc123` → `update id="abc123"` → gets "No memory found" because `searchOrderMutable` excludes it.
-**Fix**: Two-step lookup — check full `searchOrder` first, then if found in attached vault, return specific error.
-
-### H6: `localPath` in config is machine-specific
-
-Storing absolute paths in `config.json` means configs are not portable across machines.
-**Fix**: Consider relative paths or a separate machine-local mapping.
-
-### H7: Stale embeddings after branch update
-
-No mechanism to detect when the attached branch has moved. After `git fetch`, local embeddings don't match current note content.
-**Fix**: Store branch tip commit hash alongside embeddings. Compare stored vs. current tip on cache build.
-
-### H8: `pushAfterMutation` must skip attached vaults
-
-`helpers/persistence.ts:212` uses `vault.isProject` to decide push behavior. Must skip `provenance === "project-attached"`.
-
-## P2: Medium (design gaps / edge cases)
-
-- **M1**: No `storedIn` filter for attached-only — add `"attached"` enum or document Phase 1 limitation
-- **M2**: `ProjectSummaryNotesSchema` missing `attachedVault` count — `total ≠ projectVault + mainVault + privateProject` breaks
-- **M3**: `where_is_memory`, `detect_project`, `discover_tags` not updated for attachment awareness
-- **M4**: `maxAttachmentsPerProject` not settable via policy tools
-- **M5**: Working-tree mode security risk — uncommitted content with no audit trail
-- **M6**: Attached repo with no git remote produces unstable identity
-- **M7**: Branch auto-detection only checks `origin/main`/`origin/master` — misses custom defaults
-- **M8**: Config writes not concurrency-safe (last-writer-wins)
-- **M9**: Shallow clones and `git show` — document as known limitation
-- **M10**: `SyncResultSchema.vault` needs `"attached"` variant with projectSlug/branch fields
-
-## Test plan gaps
-
-- No tests for `where_is_memory` with attached vault notes
-- No tests for `discover_tags` with attached vaults
-- No mutation error-message tests (attached note ID → `update`/`forget`/`relate`)
-- No output-rendering tests for `attached:<slug>/.mnemonic` vault labels
-- No unit tests for `collectVisibleNotes` with `includeAttached` parameter
-- No unit tests for `projectScopeBoost` exclusion of attached vault notes
-- No first-recall latency characterization for attached vault cold start
-- No test for stale-embedding detection after branch update
+All gaps addressed in the updated plan: `where_is_memory` tests, `discover_tags` tests, mutation error-message tests, output-rendering tests, `collectVisibleNotes` with `includeAttached`, attachment boost unit tests, stale-embedding detection tests.
