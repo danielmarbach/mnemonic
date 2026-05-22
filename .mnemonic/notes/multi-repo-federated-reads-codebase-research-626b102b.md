@@ -5,11 +5,14 @@ tags:
   - research
 lifecycle: temporary
 createdAt: '2026-05-22T18:44:34.351Z'
-updatedAt: '2026-05-22T18:44:34.351Z'
+updatedAt: '2026-05-22T18:44:39.214Z'
 role: research
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: multi-repository-attachment-support-request-root-151ad76c
+    type: derives-from
 memoryVersion: 1
 ---
 # Multi-repo federated reads — codebase research
