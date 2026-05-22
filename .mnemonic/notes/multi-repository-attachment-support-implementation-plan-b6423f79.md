@@ -5,7 +5,7 @@ tags:
   - plan
 lifecycle: temporary
 createdAt: '2026-05-22T19:04:08.973Z'
-updatedAt: '2026-05-22T19:05:37.466Z'
+updatedAt: '2026-05-22T19:06:00.327Z'
 role: plan
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -63,6 +63,19 @@ interface AttachmentRef {
 ```
 
 ### ProjectAttachmentConfig — config shape
+
+```typescript
+interface ProjectAttachmentConfig {
+  projectSlug: string;
+  projectName: string;
+  localPath: string;
+  vaultFolder: string; // default ".mnemonic"
+  enabled: boolean;
+  lastKnownBranch?: string; // captured on add_attachment, updated on sync
+  addedAt: string;
+  updatedAt: string;
+}
+```
 
 ```typescript
 interface ProjectAttachmentConfig {
@@ -186,8 +199,32 @@ Explicit attachment sync is included in Phase 1 — it is too impactful to defer
 - Each attached vault sync is independent; failure in one doesn't block others
 - Stale attachments are still acceptable for reads — sync is opt-in, not blocking
 
+### Branch tracking for attached repos
+
+Attached repo notes are git-tracked and branch-dependent. The consuming project must not auto-detect branch changes on external repos (cold-path violation), but should surface branch state explicitly.
+
+- `ProjectAttachmentConfig` gains `lastKnownBranch?: string` — captured on `add_attachment` and updated on each explicit sync
+- `list_attachments` output includes `currentBranch` (read from attached repo on explicit call only) and `lastKnownBranch`
+- `list_attachments` shows a warning when `currentBranch !== lastKnownBranch`: "Attached repo may have changed branches — notes may differ from last sync. Run sync to reconcile."
+- No auto-detection on read paths (recall, summary, etc.) — cold-path I/O violation
+- Branch change in the consuming project's own repo triggers auto-sync for main + project vault only; attached vaults are never auto-synced
+
+Explicit attachment sync is included in Phase 1 — it is too impactful to defer. Agents need a way to refresh attached repo knowledge. Scope: explicit sync only, no auto-sync on branch change.
+
+- `sync` tool adds third vault type: `vault: "attached"` for each enabled attachment that has a path and remote
+
+- `SyncResultSchema.vault` enum becomes `"main" | "project" | "attached"` with attached slug in a `projectSlug` field
+
+- `ensureBranchSynced` does NOT auto-sync attached vaults (avoids cold-path I/O)
+
+- Each attached vault sync is independent; failure in one doesn't block others
+
+- Stale attachments are still acceptable for reads — sync is opt-in, not blocking
+
 - Attached vaults never auto-synced in Phase 1
+
 - `sync` tool skips attached vaults
+
 - `ensureBranchSynced` does not enumerate attached vaults
 
 ## Performance constraints compliance
@@ -202,46 +239,85 @@ Explicit attachment sync is included in Phase 1 — it is too impactful to defer
 ## Implementation order
 
 - \[ ] 1. Types: `VaultProvenance`, `AttachmentRef`, `ProjectAttachmentConfig`
+
 - \[ ] 2. Convert `Vault.isProject` → `Vault.provenance` across all call sites
+
 - \[ ] 3. Config: extend `MnemonicConfig` with `projectAttachments`, `maxAttachmentsPerProject`
+
 - \[ ] 4. Config normalization: `normalizeProjectAttachments()` in config.ts
+
 - \[ ] 5. Config schema migration: bump `schemaVersion` to "1.2"
+
 - \[ ] 6. VaultManager: `attachedVaults`, `loadAttachmentsForProject`, CRUD helpers
+
 - \[ ] 7. VaultManager.searchOrder: add attachments segment
+
 - \[ ] 8. VaultManager.allKnownVaults: include attachments (for relationship expansion)
+
 - \[ ] 9. VaultManager.searchOrderMutable: excludes attachments (for mutation paths)
+
 - \[ ] 10. storageLabel: add `attached:<slug>/<folder>` case
+
 - \[ ] 11. \_VaultLabel regex: accept `attached:*` pattern
+
 - \[ ] 12. Embeddings path: `attachments/<slug>/embeddings/` in consuming project root
+
 - \[ ] 13. New tools: `add_attachment`, `remove_attachment`, `list_attachments`, `set_attachment_enabled`
+
 - \[ ] 14. Tool descriptions + schema `.describe()` for all new output fields
+
 - \[ ] 15. collectVisibleNotes: ensure attached vaults participate in reads but not mutations
+
 - \[ ] 16. recall, project\_memory\_summary, list, get, memory\_graph, recent\_memories: verify attached notes appear
+
 - \[ ] 17. findNote: works via searchOrder — verify attached vaults searched
+
 - \[ ] 18. Consolidate/prune: verify NO attached vault notes touched
+
 - \[ ] 19. Sync: add `vault: "attached"` support for explicit attached vault sync
+
 - \[ ] 20. ensureBranchSynced: explicitly skip attached vaults
+
 - \[ ] 21. Update AGENT.md, README.md, CHANGELOG.md
 
 - \[ ] 1. Types: `VaultProvenance`, `AttachmentRef`, `ProjectAttachmentConfig`
+
 - \[ ] 2. Convert `Vault.isProject` → `Vault.provenance` across all call sites
+
 - \[ ] 3. Config: extend `MnemonicConfig` with `projectAttachments`, `maxAttachmentsPerProject`
+
 - \[ ] 4. Config normalization: `normalizeProjectAttachments()` in config.ts
+
 - \[ ] 5. Config schema migration: bump `schemaVersion` to "1.2"
+
 - \[ ] 6. VaultManager: `attachedVaults`, `loadAttachmentsForProject`, CRUD helpers
+
 - \[ ] 7. VaultManager.searchOrder: add attachments segment
+
 - \[ ] 8. VaultManager.allKnownVaults: include attachments (for relationship expansion)
+
 - \[ ] 9. VaultManager.searchOrderMutable: excludes attachments (for mutation paths)
+
 - \[ ] 10. storageLabel: add `attached:<slug>/<folder>` case
+
 - \[ ] 11. \_VaultLabel regex: accept `attached:*` pattern
+
 - \[ ] 12. Embeddings path: `attachments/<slug>/embeddings/` in consuming project root
+
 - \[ ] 13. New tools: `add_attachment`, `remove_attachment`, `list_attachments`, `set_attachment_enabled`
+
 - \[ ] 14. Tool descriptions + schema `.describe()` for all new output fields
+
 - \[ ] 15. collectVisibleNotes: ensure attached vaults participate in reads but not mutations
+
 - \[ ] 16. recall, project\_memory\_summary, list, get, memory\_graph, recent\_memories: verify attached notes appear
+
 - \[ ] 17. findNote: works via searchOrder — verify attached vaults searched
+
 - \[ ] 18. Consolidate/prune: verify NO attached vault notes touched (use searchOrderMutable / exclude-attached path)
+
 - \[ ] 19. Sync + ensureBranchSynced: skip attached vaults
+
 - \[ ] 20. Update AGENT.md, README.md, CHANGELOG.md
 
 ## Test plan
@@ -268,14 +344,21 @@ Explicit attachment sync is included in Phase 1 — it is too impactful to defer
 ## Open decisions (deferred)
 
 - Phase 2: Write support for attached repos (remember, update) — needs separate design pass
+
 - Phase 3: External sub-vault support (vaultFolder != ".mnemonic" in attached repos)
+
 - Composite dedup key (vault-source + noteId)
+
 - Cross-repo relationship behavior (shared relationship targets across repos)
+
 - Auto-sync on branch change for attached vaults (investigate after Phase 1)
 
 - \[ ] config.unit.test.ts: attachment config parsing, normalization, count validation, max cap
+
 - \[ ] vault.unit.test.ts: VaultProvenance discrimination, attachment vault creation, search order with attachments
+
 - \[ ] storageLabel + \_VaultLabel unit tests: `attached:<slug>/.mnemonic` format acceptance
+
 - \[ ] attached-vault.integration.test.ts:
   - Add/remove/list attachment lifecycle
   - recall returns notes from attached repo
@@ -287,5 +370,7 @@ Explicit attachment sync is included in Phase 1 — it is too impactful to defer
   - Max attachment count enforcement
   - Embeddings written to consuming project's attachment embeddings dir
   - Consolidate/prune never touch attached vault notes
+
 - \[ ] recall-pipeline.integration.test.ts: attached vault notes score/rank correctly
+
 - \[ ] Existing tests: no regressions from isProject → provenance migration
