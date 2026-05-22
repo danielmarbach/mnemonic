@@ -5,11 +5,14 @@ tags:
   - plan
 lifecycle: temporary
 createdAt: '2026-05-22T19:04:08.973Z'
-updatedAt: '2026-05-22T19:05:29.549Z'
+updatedAt: '2026-05-22T19:05:37.466Z'
 role: plan
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: multi-repo-federated-reads-codebase-research-626b102b
+    type: derives-from
 memoryVersion: 1
 ---
 # Multi-repository attachment support — implementation plan
