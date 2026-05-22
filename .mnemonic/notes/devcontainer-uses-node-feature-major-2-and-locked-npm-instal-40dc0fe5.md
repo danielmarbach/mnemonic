@@ -6,7 +6,7 @@ tags:
   - development-setup
 lifecycle: permanent
 createdAt: '2026-05-22T20:41:43.350Z'
-updatedAt: '2026-05-22T21:53:18.374Z'
+updatedAt: '2026-05-22T22:04:13.274Z'
 role: decision
 alwaysLoad: false
 project: github-com-boblangley-mnemonic
@@ -15,11 +15,9 @@ memoryVersion: 1
 ---
 The repository devcontainer should use `ghcr.io/devcontainers/features/node:2` with `version: "24"`, matching CI's Node 24 runtime while staying on the current major version of the official Node feature.
 
-The devcontainer should run `npm ci` from `postCreateCommand` so the workspace uses the committed `package-lock.json` and avoids reinstalling on every attach.
+The devcontainer should run `npm ci` from `postCreateCommand` so the workspace uses the committed `package-lock.json` and avoids reinstalling on every attach. Ollama is installed via the official install script in `postCreateCommand`, started as a background service in `postStartCommand`, and the `nomic-embed-text-v2-moe` embedding model is pulled in `postAttachCommand` so MCP tools work out of the box.
 
 VS Code customization should use `typescript.tsdk` (not `js/ts.tsdk.path`) for the workspace TypeScript SDK path, since `typescript.tsdk` has broader compatibility across VS Code versions.
-
-Ollama is not included in the devcontainer; contributors must have Ollama running on the host (or another accessible machine) with the embedding model pulled for MCP tools to work. This is documented in CONTRIBUTING.md.
 
 A CI `check-toolchain-sync` job validates that the Node version in `.devcontainer/devcontainer.json` matches the `node-version` in `.github/workflows/ci.yml`. This prevents the versions from drifting apart and gates the `build-and-test` job.
 
