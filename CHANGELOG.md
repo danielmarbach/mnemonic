@@ -6,6 +6,11 @@ The format is loosely based on Keep a Changelog and uses semver-style version he
 
 ## [Unreleased]
 
+### Added
+
+- Devcontainer configuration for Node 24 development with Ollama and the `nomic-embed-text-v2-moe` embedding model pre-installed ([@boblangley](https://github.com/boblangley)).
+- CI `check-toolchain-sync` job that validates the Node version in the devcontainer matches CI workflows ([@boblangley](https://github.com/boblangley)).
+
 ## [0.32.0] - 2026-05-21
 
 ### Added
