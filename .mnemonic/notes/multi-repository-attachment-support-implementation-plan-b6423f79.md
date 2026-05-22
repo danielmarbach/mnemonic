@@ -3,9 +3,10 @@ title: Multi-repository attachment support — implementation plan
 tags:
   - workflow
   - plan
+  - attachments
 lifecycle: temporary
 createdAt: '2026-05-22T19:04:08.973Z'
-updatedAt: '2026-05-22T19:25:50.493Z'
+updatedAt: '2026-05-22T19:56:44.140Z'
 role: plan
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -21,9 +22,24 @@ memoryVersion: 1
 
 ## Summary
 
-Federated read-only project attachments: link external repositories as knowledge sources. Attached repo notes participate in recall, summaries, list, get, memory_graph, and relationship previews. No writes, no auto-discovery, explicit add/remove tools. Explicit attachment sync included in Phase 1 (justified below).
+Federated read-only project attachments: link external repositories as knowledge sources. Attached repo notes participate in recall, summaries, list, get, memory\_graph, and relationship previews. No writes, no auto-discovery, explicit add/remove tools. Explicit attachment sync included in Phase 1 (justified below).
 
 ## Design decisions (confirmed)
+
+- **Discriminated `provenance` field on Vault** instead of `isProject` boolean. Prevents impossible states. Includes computed `writable` property for write-ability checks.
+- **Embeddings in consuming project's cache** at `.mnemonic/attachments/<slug>/embeddings/`. Local, disposable, no cross-repo sync. Explicitly gitignored.
+- **Label format: `attached:<project-slug>/.mnemonic`**. Consistent with `sub-vault:<folder>`.
+- **Max 5 attachments per project**, configurable via `maxAttachmentsPerProject` config field (default 5).
+- **Read-only Phase 1** (except explicit sync). No writes to external repos. Consolidate and prune never touch attached vaults.
+- **Explicit sync for attachments included in Phase 1**. Justification: without sync, attached repos become stale and agents make decisions on outdated knowledge. Sync is the minimum viable mechanism to refresh attached knowledge. Scope: explicit tool call only, no auto-sync on branch change.
+- **Branch model**: default reads from a configured branch via git ref, configurable per-attachment. Working-tree mode as escape hatch with explicit opt-in warning.
+- **Fail-soft**: when attached repo not checked out, branch doesn't exist, or git commands fail — debug-log, skip that vault's notes, continue with others.
+- **Embeddings built lazily** on first recall, consistent with existing same-repo vault behavior.
+- **`storedIn: "project-vault"` matches only project-local vaults**. New `storedIn: "attached"` enum value for filtering attached-only. `storedIn: "any"` includes all vaults.
+- **Scope semantics: attached notes are project-extended**. Attached notes pass `scope: "project"` filtering because they are explicitly attached by the user. They carry their original `Note.project` but `collectVisibleNotes` treats them as project-scoped for the consuming project.
+- **Attachment boost**: attached notes receive half of `projectScopeBoost` (0.015) to reflect explicit user intent while keeping project-local notes ranked higher.
+- **Composite dedup key**: `(noteId, vaultPath)` instead of `noteId` alone, preventing cross-repo collisions.
+- **Write methods on AttachedStorage**: `writeEmbedding` and `writeProjection` write to local cache (not throw). Only `writeNote`, `deleteNote`, and atomic write methods throw (read-only mutations).
 
 - **Discriminated `provenance` field on Vault** instead of `isProject` boolean. Prevents impossible states.
 - **Embeddings in consuming project's cache** at `.mnemonic/attachments/<slug>/embeddings/`. Local, disposable, no cross-repo sync. Explicitly gitignored.
@@ -37,6 +53,76 @@ Federated read-only project attachments: link external repositories as knowledge
 - **`storedIn: "project-vault"` matches only project-local vaults**. Attached vaults visible only with `storedIn: "any"`. No new enum value needed for Phase 1.
 
 ## Type design
+
+### VaultProvenance — discriminated type
+
+```typescript
+type VaultProvenance = "main" | "project-local" | "project-attached";
+```
+
+Replaces `isProject: boolean`. Vault interface gains a computed `writable` property:
+
+```typescript
+interface Vault {
+  storage: Storage;
+  git: GitOps;
+  notesRelDir: string;
+  provenance: VaultProvenance;
+  vaultFolderName: string;
+  attachmentRef?: AttachmentRef; // only present when provenance === "project-attached"
+  readonly writable: boolean;    // computed: provenance !== "project-attached"
+}
+```
+
+The `writable` property replaces all call sites that previously checked `isProject` for write-ability (pushAfterMutation, protected branch checks, consolidate, etc.). `provenance` replaces call sites that used `isProject` for categorization (storageLabel, vaultMatchesStorageScope, etc.).
+
+### AttachmentRef
+
+```typescript
+interface AttachmentRef {
+  projectSlug: string;   // from attached repo's git remote URL, normalized
+  projectName: string;   // human-readable name from attached repo's remote
+  localPath: string;     // absolute path to attached repo's git root
+  branch: string;        // branch to read from via git; empty = working-tree mode
+  branchTipHash: string; // last known commit hash of the branch tip, for staleness detection
+}
+```
+
+### ProjectAttachmentConfig — config shape
+
+```typescript
+interface ProjectAttachmentConfig {
+  projectSlug: string;   // stable identifier from attached repo's remote URL
+  projectName: string;   // human-readable display name
+  localPath: string;     // absolute path on this machine
+  vaultFolder: string;   // default ".mnemonic"
+  enabled: boolean;
+  branch: string;        // default "main" — auto-detected on add
+  addedAt: string;
+  updatedAt: string;
+  branchTipHash: string; // last synced commit hash for staleness detection
+}
+```
+
+### Config extension
+
+```typescript
+interface MnemonicConfig {
+  // ... existing fields ...
+  projectAttachments: Record<string, ProjectAttachmentConfig[]>;
+  maxAttachmentsPerProject: number; // default 5
+}
+```
+
+`maxAttachmentsPerProject` is exposed via `get_project_memory_policy` / `set_project_memory_policy` tools alongside existing policy fields.
+
+### StorageScope extension
+
+```typescript
+type StorageScope = "project-vault" | "main-vault" | "any" | "attached";
+```
+
+`"attached"` matches only vaults with `provenance === "project-attached"`. This enables agents to audit knowledge from external sources.
 
 ### VaultProvenance — discriminated type
 
@@ -107,6 +193,60 @@ interface MnemonicConfig {
 - `addAttachmentConfig(projectSlug, config)` — validates count <= max, writes config, reloads
 - `removeAttachmentConfig(projectSlug, targetSlug)` — removes by attached slug, cleans up embeddings dir
 - `setAttachmentEnabled(projectSlug, targetSlug, enabled)` — toggles
+- `setAttachmentBranch(projectSlug, targetSlug, branch)` — updates branch, updates `branchTipHash`, invalidates cached vault
+
+### Modified searchOrder(cwd)
+
+Resolution chain:
+
+1. `findGitRoot(cwd)` → git root
+2. `loadAllVaultsForRoot(gitRoot, false)` → project-local vaults (existing)
+3. `detectProject(cwd)` → project identity
+4. `loadAttachmentsForProject(projectId)` → cached after first call
+5. Append main vault
+
+If step 3 fails (no git repo, no remote), skip step 4. If step 4 finds a missing path, skip silently.
+
+Search order: primary project vault → same-repo sub-vaults → enabled attached vaults → main vault.
+
+### searchOrderMutable(cwd) — new method
+
+Excludes attached vaults (returns only `provenance === "main" | "project-local"`). Used by all mutation paths: consolidate, prune, remember, update, move\_memory, forget, relate, unrelate. Also used by `findNote` when called from a mutation context.
+
+### findNote routing
+
+`findNote` gains a `mutable?: boolean` parameter (default `false`). When `mutable: true`, uses `searchOrderMutable(cwd)` excluding attached vaults. When `mutable: false` (default, read lookups), uses full `searchOrder(cwd)`. All mutation tools pass `mutable: true`.
+
+When a mutation tool receives a note ID that exists in an attached vault (found via full `searchOrder` lookup but not in `searchOrderMutable`), it returns a specific error: *"Note is in an attached vault (attached:\<slug>/\<folder>) and cannot be modified. Remove the attachment if you need to modify this note directly."*
+
+### allKnownVaultsMutable() — new method
+
+Excludes `provenance === "project-attached"` vaults. Used by:
+
+- `forget` — relationship cleanup across all vaults
+- `relate`/`unrelate` — note modification across all vaults
+- `removeRelationshipsToNoteIds` — cross-vault relationship cleanup
+- `wouldRelationshipCleanupTouchProjectVault` — branch protection scope
+- `pushAfterMutation` — git push decisions
+- `consolidate` — only mutates project-local vaults
+- `migration.ts` — must not migrate attached vault storage
+
+### Modified allKnownVaults()
+
+Includes attached vaults. Used only in read paths: `getRelationshipPreview`, `project_memory_summary` orientation enrichment, `get` (session cache scan), `discover_tags`.
+
+### New data structures
+
+- `attachedVaults: Map<string, Vault[]>` — keyed by consuming project slug. Session-scoped: loaded once per project slug per session.
+- `attachmentConfigs: Map<string, ProjectAttachmentConfig[]>` — keyed by consuming project slug
+
+### New methods
+
+- `loadAttachmentsForProject(projectSlug: string): Promise<void>` — resolves enabled attachments from config. For each: validates path exists (fail-soft skip), creates Vault with `provenance: "project-attached"` and `AttachedStorage`. Caches result.
+- `getAttachmentsConfig(projectSlug)` — reads from config
+- `addAttachmentConfig(projectSlug, config)` — validates count <= max, writes config, reloads
+- `removeAttachmentConfig(projectSlug, targetSlug)` — removes by attached slug, cleans up embeddings dir
+- `setAttachmentEnabled(projectSlug, targetSlug, enabled)` — toggles
 - `setAttachmentBranch(projectSlug, targetSlug, branch)` — updates branch, invalidates cached vault
 
 ### Modified searchOrder(cwd)
@@ -125,7 +265,7 @@ Search order: primary project vault → same-repo sub-vaults → enabled attache
 
 ### searchOrderMutable(cwd) — new method
 
-Excludes attached vaults. Used by mutation paths: consolidate, prune, remember, update, move_memory, forget, relate, unrelate.
+Excludes attached vaults. Used by mutation paths: consolidate, prune, remember, update, move\_memory, forget, relate, unrelate.
 
 ### allKnownVaultsMutable() — new method
 
@@ -136,6 +276,82 @@ Excludes `provenance === "project-attached"` vaults. Used by `forget` (relations
 Includes attached vaults. Used only in read paths: `getRelationshipPreview`, `project_memory_summary` orientation enrichment.
 
 ## Storage layer: AttachedStorage class
+
+A wrapper around `Storage` that overrides `listNoteIds()`, `readNote()`, and uses local cache paths for embeddings and projections. Note-mutation methods throw. Embedding/projection writes go to local cache.
+
+```typescript
+class AttachedStorage {
+  private baseStorage: Storage;   // at consuming project's attachment path (local cache)
+  private repoPath: string;       // attached repo's git root
+  private branch: string;         // configured branch (or "" for working-tree)
+  private noteCache: Map<string, Note>; // session-scoped note content cache
+
+  async listNoteIds(): Promise<MemoryId[]> {
+    if (this.branch === "") return this.baseStorage.listNoteIds();
+    // git ls-tree --name-only <branch> .mnemonic/notes/
+    // fail-soft: return [] on error
+  }
+
+  async readNote(id: MemoryId): Promise<Note | null> {
+    // Session cache first
+    if (this.noteCache.has(id)) return this.noteCache.get(id)!;
+    let note: Note | null;
+    if (this.branch === "") {
+      note = await this.baseStorage.readNote(id);
+    } else {
+      // git show <branch>:.mnemonic/notes/<id>.md
+      // fail-soft: return null on error
+    }
+    if (note) this.noteCache.set(id, note);
+    return note;
+  }
+
+  async listNotes(): Promise<Note[]> {
+    // Use listNoteIds + cached reads, populating noteCache
+    if (this.branch === "") return this.baseStorage.listNotes();
+    const ids = await this.listNoteIds();
+    const notes: Note[] = [];
+    for (const id of ids) {
+      const note = await this.readNote(id);
+      if (note) notes.push(note);
+    }
+    return notes;
+  }
+
+  // Write methods — NOTE mutations throw (read-only vault)
+  async writeNote(note: Note): Promise<void> { throw new Error("Cannot write to attached vault"); }
+  async deleteNote(id: MemoryId): Promise<void> { throw new Error("Cannot delete from attached vault"); }
+  async beginAtomicNotesWrite(): Promise<void> { throw new Error("Cannot write to attached vault"); }
+  async commitAtomicNotesWrite(): Promise<void> { throw new Error("Cannot write to attached vault"); }
+  async rollbackAtomicNotesWrite(): Promise<void> { throw new Error("Cannot write to attached vault"); }
+
+  // Embedding/projection writes — go to LOCAL CACHE (read-write for pipeline)
+  async readEmbedding(id: MemoryId): Promise<EmbeddingRecord | undefined> {
+    return this.baseStorage.readEmbedding(id);
+  }
+  async writeEmbedding(record: EmbeddingRecord): Promise<void> {
+    return this.baseStorage.writeEmbedding(record);
+  }
+  async readProjection(id: MemoryId): Promise<ProjectionRecord | undefined> {
+    return this.baseStorage.readProjection(id);
+  }
+  async writeProjection(projection: ProjectionRecord): Promise<void> {
+    return this.baseStorage.writeProjection(projection);
+  }
+}
+```
+
+Key design decision: `writeEmbedding` and `writeProjection` write to the **local cache** directory (`.mnemonic/attachments/<slug>/`), not throw. This ensures `embedMissingNotes` and `getOrBuildProjection` work correctly for attached vaults. Only `writeNote`, `deleteNote`, and atomic write methods throw — these represent user-facing mutations that should never reach an attached vault.
+
+**Vault creation** in `loadAttachmentsForProject`:
+
+- Base Storage: `new Storage(attachmentsDir)` where `attachmentsDir = <project-root>/.mnemonic/attachments/<slug>/`
+- This sets `vaultPath` to a guaranteed-unique path (no collision with any local vault path)
+- The `notesDir` portion is overridden in AttachedStorage to read from git refs instead of filesystem
+- GitOps: `new GitOps(repoPath, ".mnemonic/notes")` — points to the attached repo's git root
+- `notesRelDir: ".mnemonic/notes"`
+- `provenance: "project-attached"`
+- `attachmentRef`: populated with slug (from remote), name (from remote), localPath, branch, branchTipHash
 
 A wrapper around `Storage` that overrides `listNoteIds()` and `readNote()` with git-ref reads. All other methods (embeddings, projections) delegate to the base filesystem `Storage` at the consuming project's attachment path. Write methods throw (read-only).
 
@@ -170,7 +386,20 @@ class AttachedStorage {
 - `provenance: "project-attached"`
 - `attachmentRef`: populated with slug (from remote), name (from remote), localPath, branch
 
-## Session cache integration
+## Batch git reads and session caching
+
+To avoid spawning N git subprocesses per recall, `AttachedStorage` uses batch operations:
+
+1. **`listNoteIds`**: Single `git ls-tree --name-only <branch> .mnemonic/notes/` call. Result cached in session-scoped `noteIdCache: MemoryId[] | null`.
+2. **`readNote`**: Session-scoped `noteCache: Map<string, Note>`. Misses go to `git show <branch>:<path>`. First recall warms the cache for all candidate IDs.
+3. **`listNotes`**: Calls `listNoteIds` then iterates with `readNote`. Since `readNote` caches, subsequent calls for the same note are O(1).
+4. **Staleness detection**: On cache build, compare `attachmentRef.branchTipHash` against `git rev-parse <branch>`. If they differ, invalidate caches and update `branchTipHash`.
+
+Session cache integration:
+
+- `getOrBuildVaultNoteList` and `getOrBuildVaultEmbeddings` work unchanged — keyed by `vault.storage.vaultPath`.
+- `invalidateActiveProjectCache()` clears attached vault caches alongside all others.
+- **Sync-triggered invalidation**: After `mnemonic_sync` for an attached vault, call `invalidateActiveProjectCache()` (or a targeted variant `invalidateAttachedVaultCaches()` that only clears caches for the synced attachment).
 
 Attached vaults participate in `getOrBuildVaultNoteList(projectId, vault)` and `getOrBuildVaultEmbeddings(projectId, vault)` exactly like same-repo vaults. Cache keyed by `vault.storage.vaultPath` (the consuming project's attachment path). First read per session warms the cache; subsequent reads are cached. Same I/O pattern as existing vaults — no new cold-path violation. Cache invalidation via `invalidateActiveProjectCache()` clears attached vault caches alongside all others.
 
@@ -187,7 +416,7 @@ function storageLabel(vault: Vault): string {
 }
 ```
 
-## _VaultLabel schema update
+## \_VaultLabel schema update
 
 ```typescript
 const _VaultLabel = z.string().regex(
@@ -203,6 +432,18 @@ All output schemas referencing `_VaultLabel` (RecallResultSchema, ListResultSche
 function vaultMatchesStorageScope(vault: Vault, storedIn: StorageScope): boolean {
   if (storedIn === "any") return true;
   if (storedIn === "main-vault") return vault.provenance === "main";
+  if (storedIn === "attached") return vault.provenance === "project-attached";
+  // "project-vault" matches only project-local vaults (not attached)
+  return vault.provenance === "project-local";
+}
+```
+
+New `storedIn: "attached"` enum value enables agents to filter for only attached vault notes. `storedIn: "any"` includes all vaults.
+
+```typescript
+function vaultMatchesStorageScope(vault: Vault, storedIn: StorageScope): boolean {
+  if (storedIn === "any") return true;
+  if (storedIn === "main-vault") return vault.provenance === "main";
   // "project-vault" matches only project-local vaults (not attached)
   return vault.provenance === "project-local";
 }
@@ -210,7 +451,22 @@ function vaultMatchesStorageScope(vault: Vault, storedIn: StorageScope): boolean
 
 Attached vault notes are only visible with `storedIn: "any"`. No new enum value needed. `list_attachments` is the dedicated tool for attachment enumeration.
 
-## Note.project field and filtering
+## Note.project field and filtering — attachment-extended scope
+
+Attached notes retain their **original** `Note.project` value (the attached repo's project ID), but `collectVisibleNotes` treats them as project-scoped for the consuming project:
+
+```typescript
+// In collectVisibleNotes:
+const isProjectScoped = note.project === currentProjectId || 
+  (vault.provenance === "project-attached" && scope === "project");
+```
+
+This means:
+
+- `scope: "project"` → attached notes ARE included (they are project-extended, explicitly attached by the user)
+- `scope: "all"` → attached notes appear with own project ref and `attached:<slug>/.mnemonic` vault label
+- `scope: "global"` → attached notes excluded (they have a project field)
+- `project_memory_summary` uses `scope: "all"` → attached notes appear in themes and orientation
 
 Attached notes retain their original `Note.project` value (the attached repo's project ID).
 
@@ -221,21 +477,62 @@ Attached notes retain their original `Note.project` value (the attached repo's p
 
 ## Recall boost behavior
 
+Attached notes receive an **attachment boost** of half the `projectScopeBoost`:
+
+```typescript
+const boost = (isCurrentProject ? ctx.projectScopeBoost : 0) + 
+  (isAttachedVault ? ctx.projectScopeBoost / 2 : 0) + 
+  context.metadataBoost + temporalBoost;
+```
+
+This reflects explicit user intent (they attached the repo because it's relevant) while keeping project-local notes ranked higher. The constant `ATTACHMENT_BOOST = PROJECT_SCOPE_BOOST / 2 = 0.015`.
+
 - `projectScopeBoost` applies only to notes with `note.project === currentProjectId`. Attached repo notes have different project IDs → no boost. They compete on semantic similarity alone with global notes for ranking.
 
 ## Embeddings path and gitignore
 
+Attached vault Storage gets `embeddingsDirOverride` pointing to `.mnemonic/attachments/<attached-slug>/embeddings/` and `projectionsDirOverride` pointing to `.mnemonic/attachments/<attached-slug>/projections/` under consuming project root. Add `attachments/` to `.mnemonic/.gitignore` (alongside existing `embeddings/` and `projections/` entries) during vault initialization.
+
+The base Storage path (`vaultPath`) for attached vaults is `<project-root>/.mnemonic/attachments/<slug>/`. This guarantees uniqueness — no collision with any local vault path (`<project-root>/.mnemonic/`, `<project-root>/.mnemonic-lib/`, etc.).
+
 Attached vault Storage gets `embeddingsDirOverride` pointing to `.mnemonic/attachments/<attached-slug>/embeddings/` under consuming project root. Add `attachments/` to `.mnemonic/.gitignore` (alongside existing `embeddings/` and `projections/` entries) during vault initialization.
 
-## Dedup strategy (Phase 1)
+## Composite dedup key
+
+`collectVisibleNotes` deduplicates by `(noteId, vaultPath)` instead of `noteId` alone. This prevents cross-repo note ID collisions from silently dropping attached notes. When two repos have a note with the same ID, both surface with their vault labels for disambiguation.
 
 `collectVisibleNotes` deduplicates by noteId with first-wins. Project-local vaults first in search order, so attached notes only surface on unique ids. Correct for Phase 1.
 
-## Mutating tools: explicit exclusion
+## Mutating tools: two-step lookup with specific error messages
+
+All mutation tools (`remember`, `update`, `forget`, `move_memory`, `consolidate`, `relate`, `unrelate`) use `searchOrderMutable` and `allKnownVaultsMutable`. If a note ID resolves in `searchOrder` (full lookup) but not in `searchOrderMutable`, the tool returns a specific error:
+
+> *"Note 'abc123' is in an attached vault (attached:org/repo/.mnemonic) and cannot be modified. Remove the attachment if you need to modify this note directly."*
+
+This prevents the confusing "not found" error when an agent can see the note via `list`/`recall` but can't mutate it.
 
 All mutation tools (`remember`, `update`, `forget`, `move_memory`, `consolidate`, `relate`, `unrelate`) use `searchOrderMutable` and `allKnownVaultsMutable`. Attached vaults are completely invisible. If a user passes an attached vault note ID to `update`/`forget`, `findNote` fails to find it and returns an appropriate error — no special handling needed beyond the existing "not found" code path.
 
 ## Sync and branch-change handling
+
+Explicit attachment sync is included in Phase 1.
+
+- `sync` tool adds third vault type: `vault: "attached"` for each enabled attachment with path and remote
+- `SyncResultSchema.vault` enum becomes `"main" | "project" | "attached"` with `projectSlug` and `branch` fields
+- Attached vault sync entries always have `pushed: 0` (read-only); this is documented in the schema `.describe()`
+- `ensureBranchSynced` does NOT auto-sync attached vaults (cold-path I/O)
+- Each attached vault sync is independent; failure in one doesn't block others
+- Sync for attached vaults: `git fetch` to update branch ref, compare `branchTipHash` with new tip, reconcile embeddings (remove deleted, embed new/changed), update `branchTipHash` in config
+- After sync, call `invalidateActiveProjectCache()` (or targeted `invalidateAttachedVaultCaches()`)
+- No checkout needed — notes are read from branch ref via git
+
+### Branch model
+
+- Default branch auto-detection: use `git symbolic-ref refs/remotes/origin/HEAD` to resolve the default branch. Fall back to `origin/main`, then `origin/master`.
+- Configurable per-attachment via `branch` field
+- Empty string = working-tree mode (reads from filesystem via base Storage). **Opt-in with explicit warning**: tool returns a warning that working-tree mode reads uncommitted content with no audit trail.
+- Attached repo must have an `origin` remote for stable identity. `add_attachment` rejects repos without `origin` remote (with clear error message suggesting to add one).
+- `list_attachments` shows configured branch — display only
 
 Explicit attachment sync is included in Phase 1.
 
@@ -256,6 +553,15 @@ Explicit attachment sync is included in Phase 1.
 
 ## Performance constraints compliance
 
+- **No new I/O on cold paths**: session cache warms lazily (same pattern as existing same-repo vaults). First read per session is cold; subsequent reads cached. `AttachedStorage.readNote` uses session-scoped `noteCache` to avoid repeated git subprocess calls. No additional I/O when no attachments configured.
+- **Fail-soft**: missing attached repo → debug-log, skip. Git command failure → skip that vault's notes, continue. Failed embedding read → undefined (skip note).
+- **Session cache reuse**: attached vaults use same `getOrBuildVaultNoteList`/`getOrBuildVaultEmbeddings` path. Cache keyed by `vault.storage.vaultPath` (guaranteed unique).
+- **Derive from in-memory data**: config cached on first `loadAttachmentsForProject` per session.
+- **Explicit enablement**: `enabled` field; only enabled attachments participate.
+- **Bounded counts**: `maxAttachmentsPerProject` config field (default 5). Cap enforced in `addAttachmentConfig`.
+- **Batch git reads**: `listNoteIds` uses single `git ls-tree`. `readNote` uses session-scoped note cache. `listNotes` populates cache in one pass.
+- **Staleness detection**: `branchTipHash` stored in config and `AttachmentRef`. On cache build, compared against current tip. Invalidates caches when stale.
+
 - **No new I/O on cold paths**: session cache warms lazily (same pattern as existing same-repo vaults). First read per session is cold; subsequent reads cached. No additional I/O when no attachments configured.
 - **Fail-soft**: missing attached repo → debug-log, skip. Git command failure → skip that vault's notes, continue. Failed embedding read → undefined (skip note).
 - **Session cache reuse**: attached vaults use same `getOrBuildVaultNoteList`/`getOrBuildVaultEmbeddings` path. Cache keyed by `vault.storage.vaultPath`.
@@ -267,80 +573,222 @@ Explicit attachment sync is included in Phase 1.
 
 ### Phase 1a: Type migration
 
-- [ ] 1. Define `VaultProvenance`, `AttachmentRef`, `ProjectAttachmentConfig` types
-- [ ] 2. Convert `Vault.isProject` → `Vault.provenance` across all call sites:
+- \[ ] 1. Define `VaultProvenance`, `AttachmentRef`, `ProjectAttachmentConfig` types; add `StorageScope: "attached"` value
+- \[ ] 2. Add `writable` computed property to `Vault` interface
+- \[ ] 3. Convert all `Vault.isProject` → `Vault.provenance` / `Vault.writable` across ALL call sites (see migration table above)
+- \[ ] 4. Run full test suite to confirm no regressions
+
+### Phase 1b: Config + VaultManager
+
+- \[ ] 5. Config: extend `MnemonicConfig` with `projectAttachments`, `maxAttachmentsPerProject`
+- \[ ] 6. Config normalization: `normalizeProjectAttachments()` in config.ts
+- \[ ] 7. Config schema migration: bump `schemaVersion` to "1.2", add migration in `migration.ts`
+- \[ ] 8. Expose `maxAttachmentsPerProject` via `get_project_memory_policy` / `set_project_memory_policy`
+- \[ ] 9. VaultManager: `attachedVaults` map, `attachmentConfigs` map
+- \[ ] 10. VaultManager: `loadAttachmentsForProject`, `getAttachmentsConfig`, `addAttachmentConfig`, `removeAttachmentConfig`, `setAttachmentEnabled`, `setAttachmentBranch`
+
+### Phase 1c: Storage layer
+
+- \[ ] 11. `AttachedStorage` class: `listNoteIds`/`readNote` with git-ref reads, session-scoped `noteCache`, local cache for embeddings/projections, mutation methods that throw
+- \[ ] 12. Git command helpers for `git ls-tree`, `git show`, `git symbolic-ref`, `git rev-parse` with fail-soft error handling
+- \[ ] 13. Embeddings path: `attachments/<slug>/embeddings/` and projections path: `attachments/<slug>/projections/` in consuming project root
+- \[ ] 14. Gitignore: add `attachments/` to `.mnemonic/.gitignore`
+- \[ ] 15. Staleness detection: compare `branchTipHash` on cache build, invalidate and reconcile when stale
+
+### Phase 1d: Vault routing
+
+- \[ ] 16. `searchOrder`: add attachment resolution (git root → project identity → attachment configs → attached vaults)
+- \[ ] 17. `searchOrderMutable`: new method excluding `project-attached` vaults
+- \[ ] 18. `allKnownVaultsMutable`: new method excluding `project-attached` vaults
+- \[ ] 19. `findNote`: add `mutable?: boolean` parameter; `mutable: true` uses `searchOrderMutable`
+- \[ ] 20. Update mutation callers: `forget` → `allKnownVaultsMutable` + `findNote(id, cwd, { mutable: true })`, same for `relate`/`unrelate`, `update`, `move_memory`, `consolidate`, `remember`
+- \[ ] 21. Two-step lookup in mutation tools: if note found in `searchOrder` but not `searchOrderMutable`, return specific error about attached vault read-only status
+- \[ ] 22. `removeRelationshipsToNoteIds`: use `allKnownVaultsMutable()` instead of `allKnownVaults()`
+- \[ ] 23. `wouldRelationshipCleanupTouchProjectVault`: exclude attached vaults
+- \[ ] 24. `pushAfterMutation`: exclude attached vaults (`vault.writable === false`)
+- \[ ] 25. `storageLabel`: add `attached:<slug>/<folder>` case
+- \[ ] 26. `vaultMatchesStorageScope`: `provenance === "project-local"` for `project-vault` filter, new `"attached"` case
+- \[ ] 27. `collectVisibleNotes`: composite dedup key `(noteId, vaultPath)`, attachment-extended scope logic for `scope: "project"`, attachment boost in scoring
+- \[ ] 28. `_VaultLabel` regex: accept `attached:*` pattern
+- \[ ] 29. `ProjectSummaryNotesSchema`: add `attachedVault` count field
+- \[ ] 30. All output schema `.describe()` updates for new vault label pattern
+- \[ ] 31. All text output rendering updates for `attached:` vault labels
+
+### Phase 1e: Tools
+
+- \[ ] 32. New tools: `add_attachment`, `remove_attachment`, `list_attachments`, `set_attachment_enabled`, `set_attachment_branch`
+- \[ ] 33. `add_attachment`: require `origin` remote on attached repo, auto-detect default branch via `git symbolic-ref`, warn on working-tree mode
+- \[ ] 34. Tool description Returns sections: bullets for all new output fields
+- \[ ] 35. Sync tool: add `vault: "attached"` with `projectSlug`, `branch` fields; git fetch + embed reconciliation + `branchTipHash` update; `pushed` always 0 for attached entries
+- \[ ] 36. `ensureBranchSynced`: skip attached vaults (no auto-sync)
+- \[ ] 37. After sync: call `invalidateActiveProjectCache()` (or `invalidateAttachedVaultCaches()`)
+- \[ ] 38. Expose `maxAttachmentsPerProject` via `get_project_memory_policy` / `set_project_memory_policy`
+
+### Phase 1f: Read path verification
+
+- \[ ] 39. Verify: recall, project\_memory\_summary, list, get, memory\_graph, recent\_memories include attached notes with `scope: "all"` and `scope: "project"` (attachment-extended)
+- \[ ] 40. Verify: `findNote` with `mutable: true` never resolves attached vault notes
+- \[ ] 41. Verify: consolidate, prune, remember, update, forget, move\_memory, relate, unrelate never touch attached vaults; produce specific error for attached note IDs
+- \[ ] 42. Verify: `removeRelationshipsToNoteIds` skips attached vaults
+- \[ ] 43. Verify: `pushAfterMutation` skips attached vaults
+- \[ ] 44. Verify: contextual metrics (recallScopeNoteCount, diversity, retrievalCoverage) include attached notes
+- \[ ] 45. Verify: `where_is_memory`, `detect_project`, `discover_tags` handle attached vault notes correctly
+
+### Phase 1g: Documentation
+
+- \[ ] 46. Update AGENT.md — tool table for 5 new tools + `maxAttachmentsPerProject` policy + updated `storedIn` values + `SyncResultSchema` changes
+- \[ ] 47. Update README.md — attachment feature documentation
+- \[ ] 48. Update CHANGELOG.md — curated entry
+
+### Phase 1a: Type migration
+
+- \[ ] 1. Define `VaultProvenance`, `AttachmentRef`, `ProjectAttachmentConfig` types
+- \[ ] 2. Convert `Vault.isProject` → `Vault.provenance` across all call sites:
   - `storageLabel` — `vault.isProject` → `vault.provenance === "project-local"`
   - `vaultMatchesStorageScope` — `vault.isProject` → `vault.provenance === "project-local"`
   - `vault.ts` `makeVault` — add `provenance` parameter
   - `vault.ts` `loadAllVaultsForRoot` — set `provenance: "project-local"` on sub-vaults
   - All tests referencing `.isProject`
-- [ ] 3. Run full test suite to confirm no regressions
+- \[ ] 3. Run full test suite to confirm no regressions
 
 ### Phase 1b: Config + VaultManager
 
-- [ ] 4. Config: extend `MnemonicConfig` with `projectAttachments`, `maxAttachmentsPerProject`
-- [ ] 5. Config normalization: `normalizeProjectAttachments()` in config.ts
-- [ ] 6. Config schema migration: bump `schemaVersion` to "1.2"
-- [ ] 7. VaultManager: `attachedVaults` map, `attachmentConfigs` map
-- [ ] 8. VaultManager: `loadAttachmentsForProject`, `getAttachmentsConfig`, `addAttachmentConfig`, `removeAttachmentConfig`, `setAttachmentEnabled`, `setAttachmentBranch`
+- \[ ] 4. Config: extend `MnemonicConfig` with `projectAttachments`, `maxAttachmentsPerProject`
+- \[ ] 5. Config normalization: `normalizeProjectAttachments()` in config.ts
+- \[ ] 6. Config schema migration: bump `schemaVersion` to "1.2"
+- \[ ] 7. VaultManager: `attachedVaults` map, `attachmentConfigs` map
+- \[ ] 8. VaultManager: `loadAttachmentsForProject`, `getAttachmentsConfig`, `addAttachmentConfig`, `removeAttachmentConfig`, `setAttachmentEnabled`, `setAttachmentBranch`
 
 ### Phase 1c: Storage layer
 
-- [ ] 9. `AttachedStorage` class wrapping `Storage` with git-ref `listNoteIds`/`readNote` overrides
-- [ ] 10. Git command helpers for `git ls-tree` and `git show` with fail-soft error handling
-- [ ] 11. Embeddings path: `attachments/<slug>/embeddings/` in consuming project root
-- [ ] 12. Gitignore: add `attachments/` to `.mnemonic/.gitignore`
+- \[ ] 9. `AttachedStorage` class wrapping `Storage` with git-ref `listNoteIds`/`readNote` overrides
+- \[ ] 10. Git command helpers for `git ls-tree` and `git show` with fail-soft error handling
+- \[ ] 11. Embeddings path: `attachments/<slug>/embeddings/` in consuming project root
+- \[ ] 12. Gitignore: add `attachments/` to `.mnemonic/.gitignore`
 
 ### Phase 1d: Vault routing
 
-- [ ] 13. `searchOrder`: add attachment resolution (git root → project identity → attachment configs → attached vaults)
-- [ ] 14. `searchOrderMutable`: new method excluding `project-attached` vaults
-- [ ] 15. `allKnownVaultsMutable`: new method excluding `project-attached` vaults
-- [ ] 16. Update mutation callers: `forget` → `allKnownVaultsMutable`, `relate`/`unrelate` → `allKnownVaultsMutable`
-- [ ] 17. Update mutation callers: all write tools → `searchOrderMutable`
-- [ ] 18. `storageLabel`: add `attached:<slug>/<folder>` case
-- [ ] 19. `vaultMatchesStorageScope`: `provenance === "project-local"` for `project-vault` filter
-- [ ] 20. `_VaultLabel` regex: accept `attached:*` pattern
-- [ ] 21. All output schema `.describe()` updates for new vault label pattern
+- \[ ] 13. `searchOrder`: add attachment resolution (git root → project identity → attachment configs → attached vaults)
+- \[ ] 14. `searchOrderMutable`: new method excluding `project-attached` vaults
+- \[ ] 15. `allKnownVaultsMutable`: new method excluding `project-attached` vaults
+- \[ ] 16. Update mutation callers: `forget` → `allKnownVaultsMutable`, `relate`/`unrelate` → `allKnownVaultsMutable`
+- \[ ] 17. Update mutation callers: all write tools → `searchOrderMutable`
+- \[ ] 18. `storageLabel`: add `attached:<slug>/<folder>` case
+- \[ ] 19. `vaultMatchesStorageScope`: `provenance === "project-local"` for `project-vault` filter
+- \[ ] 20. `_VaultLabel` regex: accept `attached:*` pattern
+- \[ ] 21. All output schema `.describe()` updates for new vault label pattern
 
 ### Phase 1e: Tools
 
-- [ ] 22. New tools: `add_attachment`, `remove_attachment`, `list_attachments`, `set_attachment_enabled`, `set_attachment_branch`
-- [ ] 23. Tool description Returns sections: bullets for all new output fields
-- [ ] 24. Sync tool: add `vault: "attached"` with `projectSlug`, `branch` fields; git fetch + embed reconciliation
-- [ ] 25. `ensureBranchSynced`: skip attached vaults (no auto-sync)
+- \[ ] 22. New tools: `add_attachment`, `remove_attachment`, `list_attachments`, `set_attachment_enabled`, `set_attachment_branch`
+- \[ ] 23. Tool description Returns sections: bullets for all new output fields
+- \[ ] 24. Sync tool: add `vault: "attached"` with `projectSlug`, `branch` fields; git fetch + embed reconciliation
+- \[ ] 25. `ensureBranchSynced`: skip attached vaults (no auto-sync)
 
 ### Phase 1f: Read path verification
 
-- [ ] 26. `collectVisibleNotes`: `includeAttached` param (default true for reads, false for mutations)
-- [ ] 27. Verify: recall, project_memory_summary, list, get, memory_graph, recent_memories include attached notes
-- [ ] 28. Verify: `findNote` via `searchOrder` resolves attached vault notes
-- [ ] 29. Verify: consolidate, prune, remember, update, forget, move_memory, relate, unrelate never touch attached vaults
-- [ ] 30. Verify: contextual metrics (recallScopeNoteCount, diversity, retrievalCoverage) include attached notes
+- \[ ] 26. `collectVisibleNotes`: `includeAttached` param (default true for reads, false for mutations)
+- \[ ] 27. Verify: recall, project\_memory\_summary, list, get, memory\_graph, recent\_memories include attached notes
+- \[ ] 28. Verify: `findNote` via `searchOrder` resolves attached vault notes
+- \[ ] 29. Verify: consolidate, prune, remember, update, forget, move\_memory, relate, unrelate never touch attached vaults
+- \[ ] 30. Verify: contextual metrics (recallScopeNoteCount, diversity, retrievalCoverage) include attached notes
 
 ### Phase 1g: Documentation
 
-- [ ] 31. Update AGENT.md — tool table for 5 new tools + updated sync schema
-- [ ] 32. Update README.md — attachment feature documentation
-- [ ] 33. Update CHANGELOG.md — curated entry
+- \[ ] 31. Update AGENT.md — tool table for 5 new tools + updated sync schema
+- \[ ] 32. Update README.md — attachment feature documentation
+- \[ ] 33. Update CHANGELOG.md — curated entry
 
 ## Test plan
 
 ### Unit tests
 
-- [ ] `config.unit.test.ts`: attachment config parsing, normalization, count validation, max cap, branch validation
-- [ ] `vault.unit.test.ts`: VaultProvenance discrimination, attachment vault creation, search order with/without attachments
-- [ ] `vault.unit.test.ts`: `allKnownVaults` vs `allKnownVaultsMutable` — attached vaults excluded from mutable
-- [ ] `vault.unit.test.ts`: `searchOrder` vs `searchOrderMutable` — attached vaults excluded from mutable
-- [ ] `storageLabel` unit tests: all provenance types, `attached:<slug>/.mnemonic` format
-- [ ] `vaultMatchesStorageScope` unit tests: `project-vault` filter excludes attached vaults
-- [ ] `tool-output-schemas.unit.test.ts`: `_VaultLabel` regex accepts `attached:*` pattern
-- [ ] `storage.unit.test.ts`: `AttachedStorage` git-ref reads, working-tree fallback, fail-soft on git errors
-- [ ] `recall.unit.test.ts`: `projectScopeBoost` NOT applied to attached vault notes
+- \[ ] `config.unit.test.ts`: attachment config parsing, normalization, count validation, max cap, branch validation, schema migration from 1.1 to 1.2
+- \[ ] `vault.unit.test.ts`: VaultProvenance discrimination, `writable` computed property, attachment vault creation, search order with/without attachments
+- \[ ] `vault.unit.test.ts`: `allKnownVaults` vs `allKnownVaultsMutable` — attached vaults excluded from mutable
+- \[ ] `vault.unit.test.ts`: `searchOrder` vs `searchOrderMutable` — attached vaults excluded from mutable
+- \[ ] `vault.unit.test.ts`: `findNote` with `mutable: true` excludes attached vault notes
+- \[ ] `storageLabel` unit tests: all provenance types, `attached:<slug>/.mnemonic` format
+- \[ ] `vaultMatchesStorageScope` unit tests: `project-vault` filter excludes attached vaults, `"attached"` filter includes only attached vaults
+- \[ ] `tool-output-schemas.unit.test.ts`: `_VaultLabel` regex accepts `attached:*` pattern
+- \[ ] `tool-output-schemas.unit.test.ts`: `ProjectSummaryNotesSchema` has `attachedVault` field
+- \[ ] `AttachedStorage.unit.test.ts`: dedicated tests for git-ref reads, working-tree fallback, fail-soft on git errors, note caching, `writeEmbedding`/`writeProjection` write to local cache, `writeNote`/`deleteNote` throw
+- \[ ] `recall.unit.test.ts`: attachment boost applied (0.015) to attached vault notes, projectScopeBoost NOT applied to attached vault notes
+- \[ ] `collectVisibleNotes.unit.test.ts`: composite dedup `(noteId, vaultPath)`, `includeAttached` parameter behavior, attachment-extended scope for `scope: "project"`
+- \[ ] `isProject-migration.test.ts`: verify all former `isProject` call sites correctly use `provenance` or `writable`
 
 ### Integration tests
 
-- [ ] `attached-vault.integration.test.ts`:
+- \[ ] `attached-vault.integration.test.ts`:
+  - `add_attachment` with default branch auto-detection via `git symbolic-ref`
+  - `add_attachment` with explicit branch
+  - `add_attachment` rejects invalid path, missing notes dir, same repo, count > max, no `origin` remote
+  - `add_attachment` warns on working-tree mode (`branch: ""`)
+  - `list_attachments` shows enabled status, branch, path-exists, note count
+  - `set_attachment_enabled` toggles without removing config
+  - `set_attachment_branch` changes branch; notes update accordingly; `branchTipHash` updates
+  - `remove_attachment` removes config, cleans up embeddings dir
+  - `recall` returns notes from attached repo with `attached:<slug>/.mnemonic` label
+  - `recall` includes attached notes with `scope: "project"` (attachment-extended)
+  - `recall` includes attached notes with `scope: "all"`
+  - `recall` excludes attached notes with `scope: "global"`
+  - `project_memory_summary` includes attached notes in themes when `scope: "all"`, `attachedVault` count correct
+  - `list` shows attached notes with correct vault label
+  - `list` with `storedIn: "attached"` shows only attached vault notes
+  - `list` with `storedIn: "project-vault"` excludes attached vault notes
+  - `get` resolves note from attached vault
+  - `memory_graph` nodes include attached vault provenance
+  - `recent_memories` includes attached notes
+  - `where_is_memory` shows attached vault label, notes read-only status
+  - `discover_tags` includes tags from attached vaults, counts vaults correctly
+  - `detect_project` shows attachment count and status
+  - `sync` explicitly syncs attached vaults via `git fetch`, updates `branchTipHash`
+  - `sync` triggers cache invalidation for attached vaults
+  - `storedIn: "project-vault"` excludes attached notes (only project-local)
+  - `storedIn: "any"` includes attached notes
+  - Fail-soft when attached path doesn't exist (notes absent)
+  - Fail-soft when branch doesn't exist on attached repo
+  - Fail-soft when git commands fail (notes absent for that vault)
+  - Composite dedup: notes with same ID in different repos both surface with vault disambiguation
+  - Max attachment count enforcement
+  - Embeddings written to consuming project's `.mnemonic/attachments/<slug>/embeddings/`
+  - Projections written to consuming project's `.mnemonic/attachments/<slug>/projections/`
+  - Consolidate never touches attached vault notes
+  - Forget never touches attached vault notes (uses `allKnownVaultsMutable`)
+  - Relate/unrelate never modify attached vault notes (uses `allKnownVaultsMutable`)
+  - Remember/update/move\_memory return specific error for attached note IDs (not generic "not found")
+  - Working-tree mode (`branch: ""`) reads from filesystem, warning issued
+  - Staleness detection: changed branch tip invalidates note cache and reconciles embeddings
+  - Attachment boost scoring: attached notes score between project-local and global notes
+  - `ProjectSummaryNotesSchema.attachedVault` count correct
+  - `removeRelationshipsToNoteIds` skips attached vaults
+  - `pushAfterMutation` skips attached vaults
+
+- \[ ] `recall-pipeline.integration.test.ts`: attached vault notes score/rank correctly with attachment boost, dedup by composite key
+
+- \[ ] `tool-descriptions.integration.test.ts`: new tool descriptions match schema, existing tool descriptions updated for `storedIn: "attached"` and vault label formats
+
+- \[ ] `output-rendering.integration.test.ts`: text output for `attached:<slug>/.mnemonic` vault labels in recall, list, get, where\_is\_memory, recent\_memories, project\_memory\_summary, memory\_graph
+
+- \[ ] `mutation-error.integration.test.ts`: specific error messages when attempting to mutate attached vault notes (update, forget, move\_memory, relate, unrelate, consolidate)
+
+- \[ ] Existing tests: no regressions from `isProject` → `provenance` + `writable` migration (full suite)
+
+### Unit tests
+
+- \[ ] `config.unit.test.ts`: attachment config parsing, normalization, count validation, max cap, branch validation
+- \[ ] `vault.unit.test.ts`: VaultProvenance discrimination, attachment vault creation, search order with/without attachments
+- \[ ] `vault.unit.test.ts`: `allKnownVaults` vs `allKnownVaultsMutable` — attached vaults excluded from mutable
+- \[ ] `vault.unit.test.ts`: `searchOrder` vs `searchOrderMutable` — attached vaults excluded from mutable
+- \[ ] `storageLabel` unit tests: all provenance types, `attached:<slug>/.mnemonic` format
+- \[ ] `vaultMatchesStorageScope` unit tests: `project-vault` filter excludes attached vaults
+- \[ ] `tool-output-schemas.unit.test.ts`: `_VaultLabel` regex accepts `attached:*` pattern
+- \[ ] `storage.unit.test.ts`: `AttachedStorage` git-ref reads, working-tree fallback, fail-soft on git errors
+- \[ ] `recall.unit.test.ts`: `projectScopeBoost` NOT applied to attached vault notes
+
+### Integration tests
+
+- \[ ] `attached-vault.integration.test.ts`:
   - `add_attachment` with default branch auto-detection (main/master)
   - `add_attachment` with explicit branch
   - `add_attachment` rejects invalid path, missing notes dir, same repo, count > max
@@ -366,16 +814,55 @@ Explicit attachment sync is included in Phase 1.
   - Consolidate never touches attached vault notes
   - Forget never touches attached vault notes (uses `allKnownVaultsMutable`)
   - Relate/unrelate never modify attached vault notes (uses `allKnownVaultsMutable`)
-  - Remember/update/move_memory return "not found" for attached note IDs
+  - Remember/update/move\_memory return "not found" for attached note IDs
   - Working-tree mode (`branch: ""`) reads from filesystem
 
-- [ ] `recall-pipeline.integration.test.ts`: attached vault notes score/rank correctly, projectScopeBoost not applied
-- [ ] `tool-descriptions.integration.test.ts`: new tool descriptions match schema
-- [ ] Existing tests: no regressions from `isProject` → `provenance` migration (full suite)
+- \[ ] `recall-pipeline.integration.test.ts`: attached vault notes score/rank correctly, projectScopeBoost not applied
+
+- \[ ] `tool-descriptions.integration.test.ts`: new tool descriptions match schema
+
+- \[ ] Existing tests: no regressions from `isProject` → `provenance` migration (full suite)
 
 ## New MCP tools
 
-### add_attachment
+### add\_attachment
+
+- Input: `cwd`, `localPath` (absolute), `projectSlug?` (auto-detect from attached repo's remote), `branch?` (auto-detect via `git symbolic-ref`)
+- Behavior:
+  - Resolve attached repo's project identity from git remote URL (NOT from local path)
+  - **Require `origin` remote on attached repo** — reject with clear error if missing
+  - Auto-detect default branch: `git symbolic-ref refs/remotes/origin/HEAD`, fall back `origin/main`, then `origin/master`
+  - Validate: path exists, contains `<vaultFolder>/notes/`, not same repo, count < max
+  - Warn if `branch: ""` (working-tree mode): reads uncommitted content with no audit trail
+  - Write config, reload attachments
+  - Compute initial `branchTipHash` via `git rev-parse <branch>`
+- Returns: `{ projectSlug, projectName, localPath, vaultFolder, branch, enabled, noteCount }`
+
+### remove\_attachment
+
+- Input: `cwd`, `projectSlug`
+- Removes from config, cleans up `.mnemonic/attachments/<slug>/` (embeddings + projections dirs), invalidates cache
+- Returns: confirmation
+
+### list\_attachments
+
+- Input: `cwd`
+- Returns: array of `{ projectSlug, projectName, localPath, vaultFolder, branch, enabled, pathExists, noteCount, addedAt, updatedAt }`
+
+### set\_attachment\_enabled
+
+- Input: `cwd`, `projectSlug`, `enabled: boolean`
+- Toggles without removing config
+- Returns: updated config entry
+
+### set\_attachment\_branch
+
+- Input: `cwd`, `projectSlug`, `branch: string`
+- Validates branch exists in attached repo (unless empty string for working-tree). Warn on working-tree mode.
+- Updates config, updates `branchTipHash`, invalidates cached vault, reloads
+- Returns: updated config entry
+
+### add\_attachment
 
 - Input: `cwd`, `localPath` (absolute), `projectSlug?` (auto-detect from attached repo's remote), `branch?` (auto-detect main/master)
 - Behavior:
@@ -385,24 +872,24 @@ Explicit attachment sync is included in Phase 1.
   - Write config, reload attachments
 - Returns: `{ projectSlug, projectName, localPath, vaultFolder, branch, enabled, noteCount }`
 
-### remove_attachment
+### remove\_attachment
 
 - Input: `cwd`, `projectSlug`
 - Removes from config, cleans up `.mnemonic/attachments/<slug>/embeddings/`, invalidates cache
 - Returns: confirmation
 
-### list_attachments
+### list\_attachments
 
 - Input: `cwd`
 - Returns: array of `{ projectSlug, projectName, localPath, vaultFolder, branch, enabled, pathExists, noteCount, addedAt, updatedAt }`
 
-### set_attachment_enabled
+### set\_attachment\_enabled
 
 - Input: `cwd`, `projectSlug`, `enabled: boolean`
 - Toggles without removing config
 - Returns: updated config entry
 
-### set_attachment_branch
+### set\_attachment\_branch
 
 - Input: `cwd`, `projectSlug`, `branch: string`
 - Validates branch exists in attached repo (unless empty string for working-tree)
@@ -410,6 +897,19 @@ Explicit attachment sync is included in Phase 1.
 - Returns: updated config entry
 
 ## Open decisions (deferred)
+
+- Phase 2: Write support for attached repos (remember, update) — needs separate design pass
+- Phase 3: External sub-vault support (vaultFolder != ".mnemonic" in attached repos)
+- Cross-repo relationship behavior (shared relationship targets across repos)
+- Auto-sync on branch change for attached vaults (investigate after Phase 1)
+- Background warm-up of attached vault embeddings after `loadAttachmentsForProject`
+- Concurrency-safe config writes for attachment mutations
+
+## Known limitations
+
+- Shallow clones: `git show` may fail if the target ref is beyond the shallow boundary. Document as known limitation.
+- Config portability: `localPath` in config is machine-specific. Configs are not portable across machines (consistent with existing `projectIdentityOverrides` design).
+- First-recall latency: newly attached repos experience a cold-start delay for embedding computation. Mitigated by session caching after first recall.
 
 - Phase 2: Write support for attached repos (remember, update) — needs separate design pass
 - Phase 3: External sub-vault support (vaultFolder != ".mnemonic" in attached repos)
