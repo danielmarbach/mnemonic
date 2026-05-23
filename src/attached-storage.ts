@@ -5,6 +5,14 @@ import { Storage, type Note, type NoteStorage, type EmbeddingRecord } from "./st
 import type { NoteProjection } from "./structured-content.js";
 import { attempt, debugLog, getErrorMessage } from "./error-utils.js";
 
+const VALID_BRANCH_PATTERN = /^[a-zA-Z0-9._/-]+$/;
+
+function validateBranch(branch: string): void {
+  if (!VALID_BRANCH_PATTERN.test(branch)) {
+    throw new Error(`Invalid branch name: "${branch}". Branch names must match ${VALID_BRANCH_PATTERN.source}`);
+  }
+}
+
 export class AttachedStorage implements NoteStorage {
   private baseStorage: Storage;
   private repoPath: string;
@@ -37,6 +45,8 @@ export class AttachedStorage implements NoteStorage {
       return this.noteIdCache;
     }
 
+    validateBranch(this.branch);
+
     const result = await attempt("attached-storage:list-note-ids", async () => {
       const git = simpleGit(this.repoPath);
       const output = await git.raw(["ls-tree", "--name-only", this.branch, this.notesRelDir + "/"]);
@@ -68,6 +78,8 @@ export class AttachedStorage implements NoteStorage {
     if (this.branch === "") {
       return this.baseStorage.readNote(id);
     }
+
+    validateBranch(this.branch);
 
     const notePath = `${this.notesRelDir}/${id}.md`;
     const result = await attempt("attached-storage:read-note", async () => {

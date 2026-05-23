@@ -9,6 +9,14 @@ import { pushAfterMutation as pushAfterMutationFromModule, buildMutationRetryCon
 import { SetAttachmentBranchResultSchema, type SetAttachmentBranchResult } from "../structured-content.js";
 import { invalidateActiveProjectCache } from "../cache.js";
 
+const VALID_BRANCH_PATTERN = /^[a-zA-Z0-9._/-]+$/;
+
+function validateBranch(branch: string): void {
+  if (branch !== "" && !VALID_BRANCH_PATTERN.test(branch)) {
+    throw new Error(`Invalid branch name: "${branch}". Branch names must match ${VALID_BRANCH_PATTERN.source}`);
+  }
+}
+
 export function registerSetAttachmentBranchTool(server: McpServer, ctx: ServerContext): void {
   server.registerTool(
     "set_attachment_branch",
@@ -55,6 +63,7 @@ export function registerSetAttachmentBranchTool(server: McpServer, ctx: ServerCo
 
       const att = currentAttachments[attachmentIndex]!;
       const effectiveBranch = branch.trim();
+      validateBranch(effectiveBranch);
 
       let branchTipHash = "";
       if (effectiveBranch) {

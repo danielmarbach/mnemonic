@@ -24,7 +24,9 @@ export function storageLabel(vault: Vault): string {
     if (vault.vaultFolderName === ".mnemonic") return "project-vault";
     return `sub-vault:${vault.vaultFolderName}`;
   }
-  return `attached:${vault.attachmentRef!.projectSlug}/${vault.vaultFolderName}`;
+  const ref = vault.attachmentRef;
+  if (!ref) return `attached:unknown/${vault.vaultFolderName}`;
+  return `attached:${ref.projectSlug}/${vault.vaultFolderName}`;
 }
 
 export function vaultMatchesStorageScope(vault: Vault, storedIn: StorageScope): boolean {

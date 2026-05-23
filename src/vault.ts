@@ -241,12 +241,11 @@ export class VaultManager {
 
     const configs = this.attachmentConfigs.get(projectSlug) ?? [];
     const enabledConfigs = configs.filter(c => c.enabled);
-    const vaults: Vault[] = [];
 
-    for (const config of enabledConfigs) {
+    const vaultPromises = enabledConfigs.map(async (config) => {
       if (!await pathExists(config.localPath)) {
         debugLog("vault:attachment", `skipping attachment ${config.projectSlug}: path not found ${config.localPath}`);
-        continue;
+        return null;
       }
 
       const attachmentsDir = path.join(config.localPath, config.vaultFolder, "attachments", projectSlug);
@@ -278,8 +277,10 @@ export class VaultManager {
       const gitignorePath = path.join(config.localPath, config.vaultFolder, ".gitignore");
       await ensureGitignore(gitignorePath);
 
-      vaults.push(vault);
-    }
+      return vault;
+    });
+
+    const vaults = (await Promise.all(vaultPromises)).filter((v): v is Vault => v !== null);
 
     this.attachedVaults.set(projectSlug, vaults);
     return vaults;
@@ -296,7 +297,10 @@ export class VaultManager {
         v.attachmentRef?.projectSlug !== targetSlug
       ));
     }
-    this.attachmentConfigs.delete(projectSlug);
+    const configs = this.attachmentConfigs.get(projectSlug);
+    if (configs) {
+      this.attachmentConfigs.set(projectSlug, configs.filter(c => c.projectSlug !== targetSlug));
+    }
   }
 
   clearAttachmentCaches(): void {

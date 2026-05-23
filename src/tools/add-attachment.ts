@@ -61,13 +61,24 @@ export function registerAddAttachmentTool(server: McpServer, ctx: ServerContext)
       outputSchema: AddAttachmentResultSchema,
     },
     async ({ cwd, localPath, vaultFolder, branch }) => {
-      const project = await resolveProjectFromModule(ctx, cwd);
-      if (!project) {
-        return projectNotFoundResponse(cwd);
+      const resolvedPath = path.resolve(localPath);
+      if (!resolvedPath.startsWith("/")) {
+        return { content: [{ type: "text", text: `Invalid path: ${localPath}. Must be an absolute path.` }], isError: true };
+      }
+      const folder = vaultFolder?.trim() || ".mnemonic";
+      if (folder.includes("..") || !folder.startsWith(".mnemonic")) {
+        return { content: [{ type: "text", text: `Invalid vault folder: ${folder}. Must start with .mnemonic and not contain ..` }], isError: true };
+      }
+      try {
+        const stat = await fs.stat(resolvedPath);
+        if (!stat.isDirectory()) {
+          return { content: [{ type: "text", text: `Invalid path: ${resolvedPath}. Must be a directory.` }], isError: true };
+        }
+      } catch {
+        return { content: [{ type: "text", text: `Invalid path: ${resolvedPath}. Path does not exist.` }], isError: true };
       }
 
-      const folder = vaultFolder?.trim() || ".mnemonic";
-      const notesDir = path.join(localPath, folder, "notes");
+      const notesDir = path.join(resolvedPath, folder, "notes");
       try {
         await fs.access(notesDir);
       } catch {
@@ -77,11 +88,16 @@ export function registerAddAttachmentTool(server: McpServer, ctx: ServerContext)
         };
       }
 
-      const git = simpleGit(localPath);
+      const project = await resolveProjectFromModule(ctx, cwd);
+      if (!project) {
+        return projectNotFoundResponse(cwd);
+      }
+
+      const git = simpleGit(resolvedPath);
       const remoteResult = await git.raw(["remote", "get-url", "origin"]).catch(() => null);
       if (!remoteResult?.trim()) {
         return {
-          content: [{ type: "text", text: `Cannot attach: no 'origin' remote found at ${localPath}. The repository must have an 'origin' remote.` }],
+          content: [{ type: "text", text: `Cannot attach: no 'origin' remote found at ${resolvedPath}. The repository must have an 'origin' remote.` }],
           isError: true,
         };
       }
@@ -104,7 +120,7 @@ export function registerAddAttachmentTool(server: McpServer, ctx: ServerContext)
       if (branch !== undefined && branch.trim() !== "") {
         effectiveBranch = branch.trim();
       } else {
-        effectiveBranch = await detectDefaultBranch(localPath);
+        effectiveBranch = await detectDefaultBranch(resolvedPath);
       }
 
       let branchTipHash = "";
@@ -117,7 +133,7 @@ export function registerAddAttachmentTool(server: McpServer, ctx: ServerContext)
       const config: ProjectAttachmentConfig = {
         projectSlug: slug,
         projectName: name,
-        localPath,
+        localPath: resolvedPath,
         vaultFolder: folder,
         enabled: true,
         branch: effectiveBranch,
@@ -142,7 +158,7 @@ export function registerAddAttachmentTool(server: McpServer, ctx: ServerContext)
 
       const commitBody = formatCommitBody({
         projectName: project.name,
-        description: `Attached repository: ${name} (${slug})\nPath: ${localPath}\nBranch: ${effectiveBranch || "(working-tree)"}`,
+        description: `Attached repository: ${name} (${slug})\nPath: ${resolvedPath}\nBranch: ${effectiveBranch || "(working-tree)"}`,
       });
       const commitMessage = `attachment: add ${name} to ${project.name}`;
       const commitFiles = ["config.json"];
@@ -171,7 +187,7 @@ export function registerAddAttachmentTool(server: McpServer, ctx: ServerContext)
         attachment: {
           projectSlug: slug,
           projectName: name,
-          localPath,
+          localPath: resolvedPath,
           vaultFolder: folder,
           enabled: true,
           branch: effectiveBranch,
@@ -186,7 +202,7 @@ export function registerAddAttachmentTool(server: McpServer, ctx: ServerContext)
         content: [{
           type: "text",
           text:
-            `Attachment added to ${project.name}: ${name} (${slug}) at ${localPath}, branch=${branchDisplay}` +
+            `Attachment added to ${project.name}: ${name} (${slug}) at ${resolvedPath}, branch=${branchDisplay}` +
             (warnings.length > 0 ? `\nWarnings: ${warnings.join("; ")}` : "") +
             (commitStatus.status === "failed"
               ? `\n${formatRetrySummary(retry) ?? `Commit failed. Push status: ${pushStatus.status}.`}`
