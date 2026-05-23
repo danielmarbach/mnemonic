@@ -608,6 +608,7 @@ export interface ProjectMaintenanceWarning {
 export interface ProjectSummaryNotes {
   total: number;
   projectVault: number;
+  attachedVault?: number;
   mainVault: number;
   privateProject: number;
 }
@@ -996,6 +997,7 @@ export const RelatedGlobalNoteSchema = z.object({
 export const ProjectSummaryNotesSchema = z.object({
   total: z.number(),
   projectVault: z.number(),
+  attachedVault: z.number().optional(),
   mainVault: z.number(),
   privateProject: z.number(),
 });

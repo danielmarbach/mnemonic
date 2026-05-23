@@ -67,7 +67,7 @@ import {
 } from "../provenance.js";
 import { enrichTemporalHistory } from "../temporal-interpretation.js";
 import { getRelationshipPreview } from "../relationships.js";
-import { collectLexicalRescueCandidates, buildRecallCandidateContext, identifyHighPriorityAnchors, computeRecallDiversity, computeRecallRetrievalCoverage } from "./recall-helpers.js";
+import { collectLexicalRescueCandidates, buildRecallCandidateContext, identifyHighPriorityAnchors, computeRecallDiversity, computeRecallRetrievalCoverage, ATTACHMENT_BOOST } from "./recall-helpers.js";
 
 export function registerRecallTool(server: McpServer, ctx: ServerContext): void {
   server.registerTool(
@@ -107,7 +107,7 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
           .optional()
           .default("all")
           .describe(
-            "'project' = only this project's memories (project-scoped storage), " +
+            "'project' = this project's memories and attached vault notes, " +
             "'global' = only unscoped memories (main/global storage), " +
             "'all' = both, with project notes boosted (default)"
           ),
@@ -202,11 +202,12 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
 
           const isProjectNote = note.project !== undefined;
           const isCurrentProject = project && note.project === project.id;
+          const isAttachedVault = vault.provenance === "project-attached";
 
           if (scope === "project") {
-            if (!isCurrentProject) continue;
+            if (!isCurrentProject && !isAttachedVault) continue;
           } else if (scope === "global") {
-            if (isProjectNote) continue;
+            if (isProjectNote && !isAttachedVault) continue;
           }
 
           if (
@@ -221,7 +222,8 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
           const temporalBoost = temporalQueryHint
             ? computeTemporalRecencyBoost(note.updatedAt, temporalQueryHint)
             : 0;
-          const boost = (isCurrentProject ? ctx.projectScopeBoost : 0) + context.metadataBoost + temporalBoost;
+          const scopeBoost = isCurrentProject ? ctx.projectScopeBoost : isAttachedVault ? ATTACHMENT_BOOST : 0;
+          const boost = scopeBoost + context.metadataBoost + temporalBoost;
           scored.push({
             id: rec.id,
             score: rawScore,

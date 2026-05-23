@@ -166,7 +166,7 @@ export function registerProjectMemorySummaryTool(server: McpServer, ctx: ServerC
         const structuredContent: ProjectSummaryResult = {
           action: "project_summary_shown",
           project: { id: project.id, name: project.name },
-          notes: { total: 0, projectVault: 0, mainVault: 0, privateProject: 0 },
+          notes: { total: 0, projectVault: 0, attachedVault: 0, mainVault: 0, privateProject: 0 },
           themes: {},
           recent: [],
           anchors: [],
@@ -247,7 +247,7 @@ export function registerProjectMemorySummaryTool(server: McpServer, ctx: ServerC
 
       // Calculate notes distribution (project-scoped only)
       const projectVaultCount = projectEntries.filter(e => e.vault.provenance === "project-local").length;
-      const _attachedVaultCount = projectEntries.filter(e => e.vault.provenance === "project-attached").length;
+      const attachedVaultCount = projectEntries.filter(e => e.vault.provenance === "project-attached").length;
       const mainVaultProjectEntries = projectEntries.filter(e => e.vault.provenance === "main");
       const mainVaultCount = mainVaultProjectEntries.length;
       const totalProjectNotes = projectEntries.length;
@@ -257,7 +257,7 @@ export function registerProjectMemorySummaryTool(server: McpServer, ctx: ServerC
       sections.push(`Project summary: **${project.name}**`);
       sections.push(`- id: \`${project.id}\``);
       sections.push(`- ${policyLine.replace(/^Policy:\s*/, "policy: ")}`);
-      sections.push(`- memories: ${totalProjectNotes} (project-vault: ${projectVaultCount}, main-vault: ${mainVaultCount})`);
+      sections.push(`- memories: ${totalProjectNotes} (project-vault: ${projectVaultCount}, main-vault: ${mainVaultCount}${attachedVaultCount > 0 ? `, attached: ${attachedVaultCount}` : ""})`);
       if (mainVaultProjectEntries.length > 0) {
         sections.push(`- private project memories: ${mainVaultProjectEntries.length}`);
       }
@@ -631,6 +631,7 @@ export function registerProjectMemorySummaryTool(server: McpServer, ctx: ServerC
         notes: {
           total: totalProjectNotes,
           projectVault: projectVaultCount,
+          attachedVault: attachedVaultCount,
           mainVault: mainVaultCount,
           privateProject: mainVaultProjectEntries.length,
         },
