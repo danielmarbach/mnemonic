@@ -13,6 +13,7 @@ import { formatCommitBody } from "../helpers/git-commit.js";
 import { pushAfterMutation as pushAfterMutationFromModule, buildMutationRetryContract, formatRetrySummary } from "../helpers/persistence.js";
 import { AddAttachmentResultSchema, type AddAttachmentResult } from "../structured-content.js";
 import { invalidateActiveProjectCache } from "../cache.js";
+import { attempt } from "../error-utils.js";
 
 function normalizeRemote(remote: string): string {
   let s = remote.trim().toLowerCase();
@@ -69,19 +70,20 @@ export function registerAddAttachmentTool(server: McpServer, ctx: ServerContext)
       if (folder.includes("..") || !folder.startsWith(".mnemonic")) {
         return { content: [{ type: "text", text: `Invalid vault folder: ${folder}. Must start with .mnemonic and not contain ..` }], isError: true };
       }
-      try {
+      const pathCheck = await attempt("add-attachment:check-path", async () => {
         const stat = await fs.stat(resolvedPath);
         if (!stat.isDirectory()) {
-          return { content: [{ type: "text", text: `Invalid path: ${resolvedPath}. Must be a directory.` }], isError: true };
+          return { valid: false, reason: `Invalid path: ${resolvedPath}. Must be a directory.` };
         }
-      } catch {
-        return { content: [{ type: "text", text: `Invalid path: ${resolvedPath}. Path does not exist.` }], isError: true };
+        return { valid: true, reason: "" };
+      });
+      if (!pathCheck.ok || !pathCheck.value.valid) {
+        return { content: [{ type: "text", text: pathCheck.ok ? pathCheck.value.reason : `Invalid path: ${resolvedPath}. Path does not exist.` }], isError: true };
       }
 
       const notesDir = path.join(resolvedPath, folder, "notes");
-      try {
-        await fs.access(notesDir);
-      } catch {
+      const accessCheck = await attempt("add-attachment:check-notes-dir", () => fs.access(notesDir));
+      if (!accessCheck.ok) {
         return {
           content: [{ type: "text", text: `Cannot attach: no notes directory found at ${notesDir}. Ensure the repository has a ${folder}/notes/ directory.` }],
           isError: true,

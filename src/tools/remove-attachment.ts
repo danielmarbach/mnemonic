@@ -9,6 +9,7 @@ import { formatCommitBody } from "../helpers/git-commit.js";
 import { pushAfterMutation as pushAfterMutationFromModule, buildMutationRetryContract, formatRetrySummary } from "../helpers/persistence.js";
 import { RemoveAttachmentResultSchema, type RemoveAttachmentResult } from "../structured-content.js";
 import { invalidateActiveProjectCache } from "../cache.js";
+import { attempt } from "../error-utils.js";
 
 export function registerRemoveAttachmentTool(server: McpServer, ctx: ServerContext): void {
   server.registerTool(
@@ -55,11 +56,7 @@ export function registerRemoveAttachmentTool(server: McpServer, ctx: ServerConte
       const removed = currentAttachments[attachmentIndex]!;
 
       const embeddingsDir = path.join(removed.localPath, removed.vaultFolder, "attachments", project.id);
-      try {
-        await fs.rm(embeddingsDir, { recursive: true, force: true });
-      } catch {
-        // Directory may not exist, that's fine
-      }
+      await attempt("remove-attachment:clean-embeddings", () => fs.rm(embeddingsDir, { recursive: true, force: true }));
 
       const updatedAttachments = currentAttachments.filter((_, i) => i !== attachmentIndex);
       await ctx.configStore.setProjectAttachments(project.id, updatedAttachments);

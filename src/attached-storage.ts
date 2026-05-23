@@ -4,12 +4,13 @@ import { memoryId, type MemoryId } from "./brands.js";
 import { Storage, type Note, type NoteStorage, type EmbeddingRecord } from "./storage.js";
 import type { NoteProjection } from "./structured-content.js";
 import { attempt, debugLog, getErrorMessage } from "./error-utils.js";
+import { InvalidBranchNameError, AttachedVaultReadOnlyError } from "./domain-errors.js";
 
 const VALID_BRANCH_PATTERN = /^[a-zA-Z0-9._/-]+$/;
 
 function validateBranch(branch: string): void {
   if (!VALID_BRANCH_PATTERN.test(branch)) {
-    throw new Error(`Invalid branch name: "${branch}". Branch names must match ${VALID_BRANCH_PATTERN.source}`);
+    throw new InvalidBranchNameError(branch, VALID_BRANCH_PATTERN.source);
   }
 }
 
@@ -111,23 +112,23 @@ export class AttachedStorage implements NoteStorage {
   }
 
   async writeNote(_note: Note): Promise<void> {
-    throw new Error("Cannot write to attached vault");
+    throw new AttachedVaultReadOnlyError("write note");
   }
 
   async deleteNote(_id: MemoryId): Promise<boolean> {
-    throw new Error("Cannot delete from attached vault");
+    throw new AttachedVaultReadOnlyError("delete note");
   }
 
   async beginAtomicNotesWrite(): Promise<void> {
-    throw new Error("Cannot write to attached vault");
+    throw new AttachedVaultReadOnlyError("begin atomic write");
   }
 
   async commitAtomicNotesWrite(): Promise<void> {
-    throw new Error("Cannot write to attached vault");
+    throw new AttachedVaultReadOnlyError("commit atomic write");
   }
 
   async rollbackAtomicNotesWrite(): Promise<void> {
-    throw new Error("Cannot write to attached vault");
+    throw new AttachedVaultReadOnlyError("rollback atomic write");
   }
 
   async readEmbedding(id: MemoryId): Promise<EmbeddingRecord | null> {

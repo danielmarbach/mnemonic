@@ -14,6 +14,7 @@ import {
   backfillEmbeddingsAfterSync,
   removeStaleEmbeddings,
 } from "../helpers/embed.js";
+import { attempt, getErrorMessage } from "../error-utils.js";
 
 function formatSyncResult(result: SyncResult, label: string, vaultPath?: string): string[] {
   if (!result.hasRemote) return [`${label}: no remote configured — git sync skipped.`];
@@ -140,31 +141,34 @@ export function registerSyncTool(server: McpServer, ctx: ServerContext): void {
           const enabledAttachments = attachmentConfigs.filter(a => a.enabled && a.branch);
           for (const attConfig of enabledAttachments) {
             const label = `attached:${attConfig.projectSlug}`;
-            try {
+            const fetchResult = await attempt("sync:attachment-fetch", async () => {
               const git = simpleGit(attConfig.localPath);
               await git.fetch("origin");
               const newTipResult = await git.raw(["rev-parse", attConfig.branch]).catch(() => null);
               const newTip = newTipResult?.trim() ?? "";
-              if (newTip && newTip !== attConfig.branchTipHash) {
-                const updatedConfigs = attachmentConfigs.map(a =>
-                  a.projectSlug === attConfig.projectSlug
-                    ? { ...a, branchTipHash: newTip, updatedAt: new Date().toISOString() }
-                    : a
-                );
-                await ctx.configStore.setProjectAttachments(project.id, updatedConfigs);
-                ctx.vaultManager.setAttachmentConfigs(project.id, updatedConfigs);
-                ctx.vaultManager.clearAttachmentCaches();
-                await ctx.vaultManager.loadAttachmentsForProject(project.id);
-                lines.push(`${label}: branch tip changed (${attConfig.branchTipHash.substring(0, 8)} → ${newTip.substring(0, 8)}), cache invalidated.`);
-                attConfig.branchTipHash = newTip;
-              } else if (newTip) {
-                lines.push(`${label}: no changes on branch '${attConfig.branch}'.`);
-              } else {
-                lines.push(`${label}: could not resolve branch '${attConfig.branch}'.`);
-              }
-            } catch (err: unknown) {
-              const message = err instanceof Error ? err.message : String(err);
-              lines.push(`${label}: fetch failed — ${message}`);
+              return newTip;
+            });
+            if (!fetchResult.ok) {
+              lines.push(`${label}: fetch failed — ${getErrorMessage(fetchResult.error)}`);
+              continue;
+            }
+            const newTip = fetchResult.value;
+            if (newTip && newTip !== attConfig.branchTipHash) {
+              const updatedConfigs = attachmentConfigs.map(a =>
+                a.projectSlug === attConfig.projectSlug
+                  ? { ...a, branchTipHash: newTip, updatedAt: new Date().toISOString() }
+                  : a
+              );
+              await ctx.configStore.setProjectAttachments(project.id, updatedConfigs);
+              ctx.vaultManager.setAttachmentConfigs(project.id, updatedConfigs);
+              ctx.vaultManager.clearAttachmentCaches();
+              await ctx.vaultManager.loadAttachmentsForProject(project.id);
+              lines.push(`${label}: branch tip changed (${attConfig.branchTipHash.substring(0, 8)} → ${newTip.substring(0, 8)}), cache invalidated.`);
+              attConfig.branchTipHash = newTip;
+            } else if (newTip) {
+              lines.push(`${label}: no changes on branch '${attConfig.branch}'.`);
+            } else {
+              lines.push(`${label}: could not resolve branch '${attConfig.branch}'.`);
             }
           }
           if (enabledAttachments.length === 0 && attachmentConfigs.length > 0) {

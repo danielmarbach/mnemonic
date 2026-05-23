@@ -5,6 +5,7 @@ import type { ServerContext } from "../server-context.js";
 import { resolveProject as resolveProjectFromModule } from "../helpers/project.js";
 import { projectNotFoundResponse } from "../helpers/vault.js";
 import { ListAttachmentsResultSchema, type ListAttachmentsResult } from "../structured-content.js";
+import { attempt } from "../error-utils.js";
 
 export function registerListAttachmentsTool(server: McpServer, ctx: ServerContext): void {
   server.registerTool(
@@ -50,25 +51,22 @@ export function registerListAttachmentsTool(server: McpServer, ctx: ServerContex
       }
 
       for (const att of attachments) {
-        let pathExists = false;
-        try {
-          await fs.access(att.localPath);
-          pathExists = true;
-        } catch {
-          pathExists = false;
-        }
+        const pathCheck = await attempt("list-attachments:check-path", () => fs.access(att.localPath));
+        const pathExists = pathCheck.ok;
 
         let noteCount = 0;
         if (pathExists && att.enabled) {
-          try {
+          const noteCountResult = await attempt("list-attachments:count-notes", async () => {
             const attachedVaults = ctx.vaultManager.getAttachmentsForProject(project.id);
             const matchingVault = attachedVaults.find(v => v.attachmentRef?.projectSlug === att.projectSlug);
             if (matchingVault) {
               const notes = await matchingVault.storage.listNoteIds();
-              noteCount = notes.length;
+              return notes.length;
             }
-          } catch {
-            // swallow
+            return 0;
+          });
+          if (noteCountResult.ok) {
+            noteCount = noteCountResult.value;
           }
         }
 

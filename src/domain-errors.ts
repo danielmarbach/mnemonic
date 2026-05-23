@@ -135,3 +135,17 @@ export class UnknownRelationshipTypeError extends Error {
     this.name = "UnknownRelationshipTypeError";
   }
 }
+
+export class InvalidBranchNameError extends Error {
+  constructor(branch: string, pattern: string) {
+    super(`Invalid branch name: "${branch}". Branch names must match ${pattern}`);
+    this.name = "InvalidBranchNameError";
+  }
+}
+
+export class AttachedVaultReadOnlyError extends Error {
+  constructor(operation: string) {
+    super(`Cannot ${operation} to attached vault`);
+    this.name = "AttachedVaultReadOnlyError";
+  }
+}
