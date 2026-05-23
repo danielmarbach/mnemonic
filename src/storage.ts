@@ -63,7 +63,31 @@ export interface EmbeddingRecord {
   updatedAt: ISO8601DateString;
 }
 
-export class Storage {
+export interface NoteStorage {
+  readonly vaultPath: string;
+  readonly notesDir: string;
+  readonly embeddingsDir: string;
+  readonly projectionsDir: string;
+  init(): Promise<void>;
+  listNoteIds(): Promise<MemoryId[]>;
+  readNote(id: MemoryId): Promise<Note | null>;
+  listNotes(filter?: { project?: string | null }): Promise<Note[]>;
+  writeNote(note: Note): Promise<void>;
+  deleteNote(id: MemoryId): Promise<boolean>;
+  beginAtomicNotesWrite(): Promise<void>;
+  commitAtomicNotesWrite(): Promise<void>;
+  rollbackAtomicNotesWrite(): Promise<void>;
+  readEmbedding(id: MemoryId): Promise<EmbeddingRecord | null>;
+  writeEmbedding(record: EmbeddingRecord): Promise<void>;
+  listEmbeddings(): Promise<EmbeddingRecord[]>;
+  readProjection(id: MemoryId): Promise<NoteProjection | null>;
+  writeProjection(projection: NoteProjection): Promise<void>;
+  notePath(id: MemoryId): string;
+  embeddingPath(id: MemoryId): string;
+  projectionPath(id: MemoryId): string;
+}
+
+export class Storage implements NoteStorage {
   readonly vaultPath: string;
   readonly notesDir: string;
   readonly embeddingsDir: string;
@@ -306,7 +330,7 @@ export class Storage {
       : undefined;
   }
 
-  private async listNoteIds(): Promise<MemoryId[]> {
+  async listNoteIds(): Promise<MemoryId[]> {
     const ids = new Set<string>();
 
     const filesResult = await attempt("storage:listNoteIds", () => fs.readdir(this.notesDir), [] as string[]);
@@ -345,7 +369,7 @@ export class Storage {
     }
   }
 
-  private parseNote(id: MemoryId, raw: string): Note {
+  parseNote(id: MemoryId, raw: string): Note {
     if (!raw.trimStart().startsWith("---")) {
       throw new MalformedNoteError(id);
     }

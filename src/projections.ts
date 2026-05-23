@@ -1,5 +1,4 @@
-import type { Note } from "./storage.js";
-import type { Storage } from "./storage.js";
+import type { Note, NoteStorage } from "./storage.js";
 import type { NoteProjection } from "./structured-content.js";
 import { memoryId } from "./brands.js";
 
@@ -174,12 +173,12 @@ export function isProjectionStale(note: Note, projection: NoteProjection): boole
   return currentText !== projection.projectionText;
 }
 
-// ── Storage helpers ───────────────────────────────────────────────────────────
+// ── NoteStorage helpers ───────────────────────────────────────────────────────────
 
 /**
  * Read a stored projection, or null if not found.
  */
-export async function getProjection(storage: Storage, noteId: string): Promise<NoteProjection | null> {
+export async function getProjection(storage: NoteStorage, noteId: string): Promise<NoteProjection | null> {
   return storage.readProjection(memoryId(noteId));
 }
 
@@ -188,7 +187,7 @@ export async function getProjection(storage: Storage, noteId: string): Promise<N
  * Always returns a valid projection; builds on demand if missing or stale.
  * Saves the fresh projection to storage.
  */
-export async function getOrBuildProjection(storage: Storage, note: Note): Promise<NoteProjection> {
+export async function getOrBuildProjection(storage: NoteStorage, note: Note): Promise<NoteProjection> {
   const existing = await storage.readProjection(note.id);
   if (existing && !isProjectionStale(note, existing)) {
     return existing;
@@ -203,7 +202,7 @@ export async function getOrBuildProjection(storage: Storage, note: Note): Promis
 /**
  * Save a projection to storage.
  */
-export async function saveProjection(storage: Storage, projection: NoteProjection): Promise<void> {
+export async function saveProjection(storage: NoteStorage, projection: NoteProjection): Promise<void> {
   return storage.writeProjection(projection);
 }
 

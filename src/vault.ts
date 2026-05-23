@@ -3,9 +3,10 @@ import path from "path";
 import { simpleGit } from "simple-git";
 
 import { attempt, debugLog, getErrorMessage } from "./error-utils.js";
-import { Storage, type Note } from "./storage.js";
+import { Storage, type Note, type NoteStorage } from "./storage.js";
 import { memoryId } from "./brands.js";
 import { GitOps } from "./git.js";
+import { AttachedStorage } from "./attached-storage.js";
 
 // ── Public types ──────────────────────────────────────────────────────────────
 
@@ -32,7 +33,7 @@ export interface ProjectAttachmentConfig {
 }
 
 export interface Vault {
-  storage: Storage;
+  storage: NoteStorage;
   git: GitOps;
   /**
    * Notes directory path relative to the vault's git root.
@@ -220,21 +221,31 @@ export class VaultManager {
       const attachmentsDir = path.join(config.localPath, config.vaultFolder, "attachments", projectSlug);
       await fs.mkdir(attachmentsDir, { recursive: true });
 
-      const vault = makeVault(
-        attachmentsDir,
-        config.localPath,
-        `${config.vaultFolder}/notes`,
-        "project-attached",
-        config.vaultFolder,
-        path.join(attachmentsDir, "embeddings"),
-        {
+      const baseStorage = new Storage(attachmentsDir);
+      await baseStorage.init();
+
+      const storage = new AttachedStorage(baseStorage, config.localPath, config.branch, `${config.vaultFolder}/notes`);
+
+      const git = new GitOps(config.localPath, `${config.vaultFolder}/notes`);
+
+      const vault: Vault = {
+        storage,
+        git,
+        notesRelDir: `${config.vaultFolder}/notes`,
+        provenance: "project-attached",
+        vaultFolderName: config.vaultFolder,
+        attachmentRef: {
           projectSlug: config.projectSlug,
           projectName: config.projectName,
           localPath: config.localPath,
           branch: config.branch,
           branchTipHash: config.branchTipHash,
         },
-      );
+        get writable() { return this.provenance !== "project-attached"; },
+      };
+
+      const gitignorePath = path.join(config.localPath, config.vaultFolder, ".gitignore");
+      await ensureGitignore(gitignorePath);
 
       vaults.push(vault);
     }
@@ -400,7 +411,7 @@ async function findGitRoot(cwd: string, visited: Set<string> = new Set()): Promi
 }
 
 export async function ensureGitignore(ignorePath: string): Promise<void> {
-  const requiredLines = ["embeddings/", "projections/"];
+  const requiredLines = ["attachments/", "embeddings/", "projections/"];
   const existingResult = await attempt("vault:ensure-gitignore", () =>
     fs.readFile(ignorePath, "utf-8")
   );

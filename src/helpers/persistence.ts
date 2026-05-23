@@ -21,7 +21,7 @@ export function resolveDurability(commit: CommitResult, push: PushResult): Persi
 }
 
 export function buildPersistenceStatus(args: {
-  storage: import("../storage.js").Storage;
+  storage: import("../storage.js").NoteStorage;
   id: string;
   embedding: { status: "written" | "skipped"; reason?: string };
   commit: CommitResult;

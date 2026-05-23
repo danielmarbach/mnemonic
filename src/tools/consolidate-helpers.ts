@@ -46,7 +46,7 @@ async function removeRelationshipsToNoteIds(ctx: ServerContext, noteIds: string[
   return removeRelationshipsToNoteIdsFromModule(ctx, noteIds);
 }
 
-async function embedTextForNote(storage: import("../storage.js").Storage, note: Note) {
+async function embedTextForNote(storage: import("../storage.js").NoteStorage, note: Note) {
   return embedTextForNoteFromModule(storage, note);
 }
 
