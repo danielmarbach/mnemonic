@@ -46,6 +46,7 @@ export function registerListTool(server: McpServer, ctx: ServerContext): void {
           .describe(
             "Storage-label filter. Use `main-vault` for main/global storage. " +
             "Use `project-vault` as the broad filter for any project vault, including sub-vaults. " +
+            "Use `attached` for notes from attached external repositories only. " +
             "Results may still return a more specific label such as `sub-vault:.mnemonic-lib`."
           ),
         tags: z.array(z.string()).optional().describe("Filter to notes matching all of these tags."),
