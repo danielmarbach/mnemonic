@@ -67,6 +67,10 @@ export class VaultManager {
    * The first entry in the array is always the primary `.mnemonic` vault.
    */
   private allProjectVaultsByRoot = new Map<string, Vault[]>();
+  /** Attached vault configs per project slug, set by tools after reading from configStore. */
+  private attachmentConfigs = new Map<string, ProjectAttachmentConfig[]>();
+  /** Attached vault objects per project slug, loaded lazily. */
+  private attachedVaults = new Map<string, Vault[]>();
   /** Git root of the main vault — set after initMain(). */
   private mainGitRoot = "";
 
@@ -190,6 +194,72 @@ export class VaultManager {
       }
     }
     return pendingFiles;
+  }
+
+  // ── Attachments ──────────────────────────────────────────────────────────────
+
+  setAttachmentConfigs(projectSlug: string, configs: ProjectAttachmentConfig[]): void {
+    this.attachmentConfigs.set(projectSlug, configs);
+  }
+
+  async loadAttachmentsForProject(projectSlug: string): Promise<Vault[]> {
+    if (this.attachedVaults.has(projectSlug)) {
+      return this.attachedVaults.get(projectSlug)!;
+    }
+
+    const configs = this.attachmentConfigs.get(projectSlug) ?? [];
+    const enabledConfigs = configs.filter(c => c.enabled);
+    const vaults: Vault[] = [];
+
+    for (const config of enabledConfigs) {
+      if (!await pathExists(config.localPath)) {
+        debugLog("vault:attachment", `skipping attachment ${config.projectSlug}: path not found ${config.localPath}`);
+        continue;
+      }
+
+      const attachmentsDir = path.join(config.localPath, config.vaultFolder, "attachments", projectSlug);
+      await fs.mkdir(attachmentsDir, { recursive: true });
+
+      const vault = makeVault(
+        attachmentsDir,
+        config.localPath,
+        `${config.vaultFolder}/notes`,
+        "project-attached",
+        config.vaultFolder,
+        path.join(attachmentsDir, "embeddings"),
+        {
+          projectSlug: config.projectSlug,
+          projectName: config.projectName,
+          localPath: config.localPath,
+          branch: config.branch,
+          branchTipHash: config.branchTipHash,
+        },
+      );
+
+      vaults.push(vault);
+    }
+
+    this.attachedVaults.set(projectSlug, vaults);
+    return vaults;
+  }
+
+  getAttachmentsForProject(projectSlug: string): Vault[] {
+    return this.attachedVaults.get(projectSlug) ?? [];
+  }
+
+  removeAttachment(projectSlug: string, targetSlug: string): void {
+    const vaults = this.attachedVaults.get(projectSlug);
+    if (vaults) {
+      this.attachedVaults.set(projectSlug, vaults.filter(v =>
+        v.attachmentRef?.projectSlug !== targetSlug
+      ));
+    }
+    this.attachmentConfigs.delete(projectSlug);
+  }
+
+  clearAttachmentCaches(): void {
+    this.attachedVaults.clear();
+    this.attachmentConfigs.clear();
   }
 
   // ── Private ─────────────────────────────────────────────────────────────────

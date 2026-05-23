@@ -43,25 +43,31 @@ export function registerSetProjectMemoryPolicyTool(server: McpServer, ctx: Serve
         protectedBranchPatterns: z.array(z.string()).optional().describe(
           "Protected branch glob patterns. Defaults to [\"main\", \"master\", \"release*\"] when not set"
         ),
+        maxAttachmentsPerProject: z.number().int().min(1).max(20).optional().describe(
+          "Maximum number of attachment vaults allowed per project. Clamped to [1, 20], default 5."
+        ),
       }),
       outputSchema: PolicyResultSchema,
     },
-    async ({ cwd, defaultScope, consolidationMode, protectedBranchBehavior, protectedBranchPatterns }) => {
+    async ({ cwd, defaultScope, consolidationMode, protectedBranchBehavior, protectedBranchPatterns, maxAttachmentsPerProject }) => {
       const project = await resolveProjectFromModule(ctx, cwd);
       if (!project) {
         return projectNotFoundResponse(cwd);
       }
+
+      const maxAttachmentsChanged = maxAttachmentsPerProject !== undefined;
 
       if (
         defaultScope === undefined
         && consolidationMode === undefined
         && protectedBranchBehavior === undefined
         && protectedBranchPatterns === undefined
+        && !maxAttachmentsChanged
       ) {
         return {
           content: [{
             type: "text",
-            text: "No policy fields provided. Set at least one of: defaultScope, consolidationMode, protectedBranchBehavior, protectedBranchPatterns.",
+            text: "No policy fields provided. Set at least one of: defaultScope, consolidationMode, protectedBranchBehavior, protectedBranchPatterns, maxAttachmentsPerProject.",
           }],
           isError: true,
         };
@@ -87,12 +93,19 @@ export function registerSetProjectMemoryPolicyTool(server: McpServer, ctx: Serve
       };
       await ctx.configStore.setProjectPolicy(policy);
 
+      if (maxAttachmentsChanged) {
+        await ctx.configStore.setMaxAttachmentsPerProject(maxAttachmentsPerProject);
+      }
+
       const modeStr = effectiveConsolidationMode ? `, consolidationMode=${effectiveConsolidationMode}` : "";
       const branchBehaviorStr = effectiveProtectedBranchBehavior
         ? `, protectedBranchBehavior=${effectiveProtectedBranchBehavior}`
         : "";
       const branchPatternsStr = effectiveProtectedBranchPatterns && effectiveProtectedBranchPatterns.length > 0
         ? `, protectedBranchPatterns=${effectiveProtectedBranchPatterns.join("|")}`
+        : "";
+      const maxAttachmentsStr = maxAttachmentsChanged
+        ? `, maxAttachmentsPerProject=${maxAttachmentsPerProject}`
         : "";
       const commitBody = formatCommitBody({
         projectName: project.name,
@@ -128,6 +141,7 @@ export function registerSetProjectMemoryPolicyTool(server: McpServer, ctx: Serve
         consolidationMode: effectiveConsolidationMode,
         protectedBranchBehavior: effectiveProtectedBranchBehavior,
         protectedBranchPatterns: effectiveProtectedBranchPatterns,
+        maxAttachmentsPerProject: maxAttachmentsChanged ? maxAttachmentsPerProject : (await ctx.configStore.getMaxAttachmentsPerProject()),
         updatedAt: now,
         retry,
       };
@@ -137,7 +151,7 @@ export function registerSetProjectMemoryPolicyTool(server: McpServer, ctx: Serve
           type: "text",
           text:
             `Project memory policy set for ${project.name}: defaultScope=${effectiveDefaultScope}` +
-            `${modeStr}${branchBehaviorStr}${branchPatternsStr}` +
+            `${modeStr}${branchBehaviorStr}${branchPatternsStr}${maxAttachmentsStr}` +
             `${commitStatus.status === "failed"
               ? `\n${formatRetrySummary(retry) ?? `Commit failed. Push status: ${pushStatus.status}.`}`
               : ""
@@ -182,15 +196,17 @@ export function registerGetProjectMemoryPolicyTool(server: McpServer, ctx: Serve
       }
 
       const policy = await ctx.configStore.getProjectPolicy(project.id);
+      const maxAttachmentsPerProject = await ctx.configStore.getMaxAttachmentsPerProject();
       if (!policy) {
         const structuredContent: PolicyResult = {
           action: "policy_shown",
           project: { id: project.id, name: project.name },
+          maxAttachmentsPerProject,
         };
         return {
           content: [{
             type: "text",
-            text: `No project memory policy set for ${project.name}. Default write behavior remains scope=project when cwd is present.`,
+            text: `No project memory policy set for ${project.name}. Default write behavior remains scope=project when cwd is present. maxAttachmentsPerProject=${maxAttachmentsPerProject}.`,
           }],
           structuredContent,
         };
@@ -203,6 +219,7 @@ export function registerGetProjectMemoryPolicyTool(server: McpServer, ctx: Serve
         consolidationMode: policy.consolidationMode,
         protectedBranchBehavior: policy.protectedBranchBehavior,
         protectedBranchPatterns: policy.protectedBranchPatterns,
+        maxAttachmentsPerProject,
         updatedAt: policy.updatedAt,
       };
 
@@ -213,6 +230,7 @@ export function registerGetProjectMemoryPolicyTool(server: McpServer, ctx: Serve
         policy.protectedBranchPatterns && policy.protectedBranchPatterns.length > 0
           ? `protectedBranchPatterns=${policy.protectedBranchPatterns.join("|")}`
           : undefined,
+        `maxAttachmentsPerProject=${maxAttachmentsPerProject}`,
       ].filter(Boolean).join(", ");
 
       return {

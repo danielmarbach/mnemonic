@@ -10,6 +10,7 @@ import {
   type ProjectMemoryPolicy,
 } from "./project-memory-policy.js";
 import type { ProjectIdentityOverride } from "./project.js";
+import type { ProjectAttachmentConfig } from "./vault.js";
 
 export type MutationPushMode = "all" | "main-only" | "none";
 
@@ -19,17 +20,21 @@ export interface MnemonicConfig {
   mutationPushMode: MutationPushMode;
   projectMemoryPolicies: Record<string, ProjectMemoryPolicy>;
   projectIdentityOverrides: Record<string, ProjectIdentityOverride>;
+  projectAttachments: Record<string, ProjectAttachmentConfig[]>;
+  maxAttachmentsPerProject: number;
 }
 
 const defaultConfig: MnemonicConfig = {
   // Keep this at the latest schema version. When adding a new latest-schema
   // migration, bump this value in the same change so fresh installs start at
   // the current schema instead of missing that migration.
-  schemaVersion: "1.1",
+  schemaVersion: "1.2",
   reindexEmbedConcurrency: 4,
   mutationPushMode: "main-only",
   projectMemoryPolicies: {},
   projectIdentityOverrides: {},
+  projectAttachments: {},
+  maxAttachmentsPerProject: 5,
 };
 
 function normalizeSchemaVersion(value: unknown): string {
@@ -149,6 +154,42 @@ function normalizeProjectMemoryPolicies(value: unknown): Record<string, ProjectM
   return normalized;
 }
 
+function normalizeProjectAttachments(value: unknown): Record<string, ProjectAttachmentConfig[]> {
+  if (!value || typeof value !== "object") return {};
+
+  const normalized: Record<string, ProjectAttachmentConfig[]> = {};
+  for (const [projectId, attachments] of Object.entries(value as Record<string, unknown>)) {
+    if (!Array.isArray(attachments)) continue;
+    const validAttachments: ProjectAttachmentConfig[] = [];
+    for (const att of attachments) {
+      if (!att || typeof att !== "object") continue;
+      const a = att as Record<string, unknown>;
+      if (typeof a.projectSlug !== "string" || !a.projectSlug.trim()) continue;
+      if (typeof a.localPath !== "string" || !a.localPath.trim()) continue;
+      validAttachments.push({
+        projectSlug: a.projectSlug.trim(),
+        projectName: typeof a.projectName === "string" ? a.projectName.trim() : a.projectSlug.trim(),
+        localPath: a.localPath.trim(),
+        vaultFolder: typeof a.vaultFolder === "string" && a.vaultFolder.trim() ? a.vaultFolder.trim() : ".mnemonic",
+        enabled: typeof a.enabled === "boolean" ? a.enabled : true,
+        branch: typeof a.branch === "string" ? a.branch : "main",
+        addedAt: typeof a.addedAt === "string" ? a.addedAt : "",
+        updatedAt: typeof a.updatedAt === "string" ? a.updatedAt : "",
+        branchTipHash: typeof a.branchTipHash === "string" ? a.branchTipHash : "",
+      });
+    }
+    if (validAttachments.length > 0) {
+      normalized[projectId] = validAttachments;
+    }
+  }
+  return normalized;
+}
+
+function normalizeMaxAttachments(value: unknown): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) return 5;
+  return Math.min(20, Math.max(1, Math.floor(value)));
+}
+
 /**
  * Read the schema version from a vault's config.json.
  * Works for both main vault and project vaults.
@@ -223,6 +264,28 @@ export class MnemonicConfigStore {
     await this.writeAll(config);
   }
 
+  async getProjectAttachments(projectId: string): Promise<ProjectAttachmentConfig[]> {
+    const config = await this.readAll();
+    return config.projectAttachments[projectId] ?? [];
+  }
+
+  async setProjectAttachments(projectId: string, attachments: ProjectAttachmentConfig[]): Promise<void> {
+    const config = await this.readAll();
+    config.projectAttachments[projectId] = attachments;
+    await this.writeAll(config);
+  }
+
+  async getMaxAttachmentsPerProject(): Promise<number> {
+    const config = await this.readAll();
+    return config.maxAttachmentsPerProject;
+  }
+
+  async setMaxAttachmentsPerProject(max: number): Promise<void> {
+    const config = await this.readAll();
+    config.maxAttachmentsPerProject = normalizeMaxAttachments(max);
+    await this.writeAll(config);
+  }
+
   invalidateCache(): void {
     this.#cache = null;
   }
@@ -244,6 +307,8 @@ export class MnemonicConfigStore {
         mutationPushMode: normalizeMutationPushMode(data.mutationPushMode),
         projectMemoryPolicies: normalizeProjectMemoryPolicies(data.projectMemoryPolicies),
         projectIdentityOverrides: normalizeProjectIdentityOverrides(data.projectIdentityOverrides),
+        projectAttachments: normalizeProjectAttachments(data.projectAttachments),
+        maxAttachmentsPerProject: normalizeMaxAttachments(data.maxAttachmentsPerProject),
       };
     } else {
       debugLog("config:read", `failed, returning defaults: ${getErrorMessage(readResult.error)}`);
@@ -272,4 +337,6 @@ const MnemonicConfigRawSchema = z.object({
   mutationPushMode: z.unknown().optional(),
   projectMemoryPolicies: z.unknown().optional(),
   projectIdentityOverrides: z.unknown().optional(),
+  projectAttachments: z.unknown().optional(),
+  maxAttachmentsPerProject: z.unknown().optional(),
 }).passthrough();
