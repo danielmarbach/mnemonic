@@ -62,6 +62,9 @@ export async function collectVisibleNotes(
   const entries: NoteEntry[] = [];
 
   for (const vault of vaults) {
+    // Attached vaults are project-scoped; exclude them from global scope
+    if (scope === "global" && vault.provenance === "project-attached") continue;
+
     const includeAllForScope = vault.provenance === "project-attached" && filterProject !== null && filterProject !== undefined;
     const effectiveFilter = includeAllForScope ? undefined : filterProject;
 

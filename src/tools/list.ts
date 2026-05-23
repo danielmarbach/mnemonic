@@ -35,7 +35,7 @@ export function registerListTool(server: McpServer, ctx: ServerContext): void {
           .optional()
           .default("all")
           .describe(
-            "'project' = only this project's memories (project-scoped storage); " +
+            "'project' = this project's memories and attached vault notes; " +
             "'global' = only unscoped memories (main/global storage); " +
             "'all' = everything visible from this context (default)"
           ),

@@ -49,7 +49,7 @@ export function registerDiscoverTagsTool(server: McpServer, ctx: ServerContext):
           .optional()
           .default("all")
           .describe(
-            "'project' = only this project's memories; " +
+            "'project' = this project's memories and attached vault notes; " +
             "'global' = only unscoped memories; " +
             "'all' = everything visible (default)"
           ),
