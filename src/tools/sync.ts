@@ -1,4 +1,5 @@
 import { z } from "zod";
+import path from "path";
 import { simpleGit } from "simple-git";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ServerContext } from "../server-context.js";
@@ -15,6 +16,7 @@ import {
   removeStaleEmbeddings,
 } from "../helpers/embed.js";
 import { attempt, getErrorMessage } from "../error-utils.js";
+import { expandHomePath } from "../paths.js";
 
 function formatSyncResult(result: SyncResult, label: string, vaultPath?: string): string[] {
   if (!result.hasRemote) return [`${label}: no remote configured — git sync skipped.`];
@@ -141,8 +143,9 @@ export function registerSyncTool(server: McpServer, ctx: ServerContext): void {
           const enabledAttachments = attachmentConfigs.filter(a => a.enabled && a.branch);
           for (const attConfig of enabledAttachments) {
             const label = `attached:${attConfig.projectSlug}`;
+            const resolvedLocalPath = path.resolve(expandHomePath(attConfig.localPath));
             const fetchResult = await attempt("sync:attachment-fetch", async () => {
-              const git = simpleGit(attConfig.localPath);
+              const git = simpleGit(resolvedLocalPath);
               await git.fetch("origin");
               const newTipResult = await git.raw(["rev-parse", attConfig.branch]).catch(() => null);
               const newTip = newTipResult?.trim() ?? "";
@@ -154,15 +157,27 @@ export function registerSyncTool(server: McpServer, ctx: ServerContext): void {
             }
             const newTip = fetchResult.value;
             if (newTip && newTip !== attConfig.branchTipHash) {
-              const updatedConfigs = attachmentConfigs.map(a =>
-                a.projectSlug === attConfig.projectSlug
-                  ? { ...a, branchTipHash: newTip, updatedAt: new Date().toISOString() }
-                  : a
-              );
-              await ctx.configStore.setProjectAttachments(project.id, updatedConfigs);
-              ctx.vaultManager.setAttachmentConfigs(project.id, updatedConfigs);
-              ctx.vaultManager.clearAttachmentCaches();
-              await ctx.vaultManager.loadAttachmentsForProject(project.id);
+               const updatedConfigs = attachmentConfigs.map(a =>
+                 a.projectSlug === attConfig.projectSlug
+                   ? { ...a, branchTipHash: newTip, updatedAt: new Date().toISOString() }
+                   : a
+               );
+               await ctx.configStore.setProjectAttachments(project.id, updatedConfigs);
+               ctx.vaultManager.setAttachmentConfigs(project.id, updatedConfigs);
+               ctx.vaultManager.clearAttachmentCaches();
+               const loadedVaults = await ctx.vaultManager.loadAttachmentsForProject(project.id);
+               const staleVault = loadedVaults.find(v => v.attachmentRef?.projectSlug === attConfig.projectSlug);
+               if (staleVault) {
+                 const currentIds = new Set((await staleVault.storage.listNoteIds()).map(id => id as string));
+                 const allEmbeddings = await staleVault.storage.listEmbeddings();
+                 const staleIds = allEmbeddings
+                   .filter(e => !currentIds.has(e.id as string))
+                   .map(e => e.id as string);
+                 if (staleIds.length > 0) {
+                   await removeStaleEmbeddings(staleVault.storage, staleIds);
+                   lines.push(`${label}: removed ${staleIds.length} stale embedding(s).`);
+                 }
+               }
               lines.push(`${label}: branch tip changed (${attConfig.branchTipHash.substring(0, 8)} → ${newTip.substring(0, 8)}), cache invalidated.`);
               attConfig.branchTipHash = newTip;
             } else if (newTip) {

@@ -7,6 +7,7 @@ import { Storage, type Note, type NoteStorage } from "./storage.js";
 import { memoryId } from "./brands.js";
 import { GitOps } from "./git.js";
 import { AttachedStorage } from "./attached-storage.js";
+import { expandHomePath } from "./paths.js";
 
 // ── Public types ──────────────────────────────────────────────────────────────
 
@@ -243,8 +244,9 @@ export class VaultManager {
     const enabledConfigs = configs.filter(c => c.enabled);
 
     const vaultPromises = enabledConfigs.map(async (config) => {
-      if (!await pathExists(config.localPath)) {
-        debugLog("vault:attachment", `skipping attachment ${config.projectSlug}: path not found ${config.localPath}`);
+      const resolvedLocalPath = path.resolve(expandHomePath(config.localPath));
+      if (!await pathExists(resolvedLocalPath)) {
+        debugLog("vault:attachment", `skipping attachment ${config.projectSlug}: path not found ${resolvedLocalPath}`);
         return null;
       }
 
@@ -252,7 +254,7 @@ export class VaultManager {
       let currentTipHash = config.branchTipHash;
       if (config.branch) {
         const tipResult = await attempt("vault:attachment-staleness", async () => {
-          const git = simpleGit(config.localPath);
+          const git = simpleGit(resolvedLocalPath);
           const result = await git.raw(["rev-parse", config.branch]);
           return result.trim();
         });
@@ -261,15 +263,15 @@ export class VaultManager {
         }
       }
 
-      const attachmentsDir = path.join(config.localPath, config.vaultFolder, "attachments", projectSlug);
+      const attachmentsDir = path.join(resolvedLocalPath, config.vaultFolder, "attachments", projectSlug);
       await fs.mkdir(attachmentsDir, { recursive: true });
 
       const baseStorage = new Storage(attachmentsDir);
       await baseStorage.init();
 
-      const storage = new AttachedStorage(baseStorage, config.localPath, config.branch, `${config.vaultFolder}/notes`);
+      const storage = new AttachedStorage(baseStorage, resolvedLocalPath, config.branch, `${config.vaultFolder}/notes`);
 
-      const git = new GitOps(config.localPath, `${config.vaultFolder}/notes`);
+      const git = new GitOps(resolvedLocalPath, `${config.vaultFolder}/notes`);
 
       const vault: Vault = {
         storage,
@@ -280,14 +282,14 @@ export class VaultManager {
         attachmentRef: {
           projectSlug: config.projectSlug,
           projectName: config.projectName,
-          localPath: config.localPath,
+          localPath: resolvedLocalPath,
           branch: config.branch,
           branchTipHash: currentTipHash,
         },
         get writable() { return this.provenance !== "project-attached"; },
       };
 
-      const gitignorePath = path.join(config.localPath, config.vaultFolder, ".gitignore");
+      const gitignorePath = path.join(resolvedLocalPath, config.vaultFolder, ".gitignore");
       await ensureGitignore(gitignorePath);
 
       return vault;

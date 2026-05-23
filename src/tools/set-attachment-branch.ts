@@ -1,4 +1,5 @@
 import { z } from "zod";
+import path from "path";
 import { simpleGit } from "simple-git";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ServerContext } from "../server-context.js";
@@ -9,6 +10,7 @@ import { pushAfterMutation as pushAfterMutationFromModule, buildMutationRetryCon
 import { SetAttachmentBranchResultSchema, type SetAttachmentBranchResult } from "../structured-content.js";
 import { invalidateActiveProjectCache } from "../cache.js";
 import { InvalidBranchNameError } from "../domain-errors.js";
+import { expandHomePath } from "../paths.js";
 
 const VALID_BRANCH_PATTERN = /^[a-zA-Z0-9._/-]+$/;
 
@@ -68,7 +70,8 @@ export function registerSetAttachmentBranchTool(server: McpServer, ctx: ServerCo
 
       let branchTipHash = "";
       if (effectiveBranch) {
-        const git = simpleGit(att.localPath);
+        const resolvedLocalPath = path.resolve(expandHomePath(att.localPath));
+        const git = simpleGit(resolvedLocalPath);
         const hashResult = await git.raw(["rev-parse", effectiveBranch]).catch(() => null);
         branchTipHash = hashResult?.trim() ?? "";
       }

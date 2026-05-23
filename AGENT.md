@@ -222,13 +222,15 @@ When `recall` called with `cwd`, project notes get a small **tiebreaker boost** 
 
 ### Attachment architecture
 - Attached repos are **read-only**: `consolidate`, `prune-superseded`, `remember`, `update`, `forget`, `move_memory`, `relate`, and `unrelate` never modify attached vault notes; they return a specific error when attempted
-- `add_attachment` links an external repo by `localPath` (absolute path); optional `branch` and `vaultFolder` select a branch and sub-vault within it
+- `add_attachment` links an external repo by `localPath` (supports `~` expansion); optional `branch` and `vaultFolder` select a branch and sub-vault within it
 - `remove_attachment` removes by `projectSlug`; `list_attachments` shows all attachments with status
 - `set_attachment_enabled` toggles an attachment on/off without removing config; `set_attachment_branch` changes the branch
 - Max attachments per project: 5 (configurable via `maxAttachmentsPerProject` in project memory policy)
 - Storage label format: `attached:<slug>/.mnemonic`
 - `list`, `recall`, `where_is_memory` accept `storedIn: "attached"` to filter attached-repo audit; `storedIn: "any"` includes all vaults including attachments
 - `sync` fetches attached repo branches and reconciles embeddings in the same call
+- Auto-sync: attached vault branches are also fetched when the consuming project switches branches (via `ensureBranchSynced`); stale embeddings are removed after tip changes
+- `localPath` in attachment config supports `~` notation for portability; paths are expanded at resolution time via `expandHomePath`; stored config uses `collapseHomePath` to make paths shareable across machines
 - Session-scoped note cache uses git-ref reads; fail-soft when an attached repo or branch is unavailable
 - Attached vault notes are included under `scope: "project"` (even though their `note.project` differs) and excluded from `scope: "global"`
 - Attached vault notes receive a moderate boost in recall scoring (less than project-local notes, more than global notes)

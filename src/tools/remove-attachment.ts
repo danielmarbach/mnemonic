@@ -10,6 +10,7 @@ import { pushAfterMutation as pushAfterMutationFromModule, buildMutationRetryCon
 import { RemoveAttachmentResultSchema, type RemoveAttachmentResult } from "../structured-content.js";
 import { invalidateActiveProjectCache } from "../cache.js";
 import { attempt } from "../error-utils.js";
+import { expandHomePath } from "../paths.js";
 
 export function registerRemoveAttachmentTool(server: McpServer, ctx: ServerContext): void {
   server.registerTool(
@@ -54,8 +55,9 @@ export function registerRemoveAttachmentTool(server: McpServer, ctx: ServerConte
       }
 
       const removed = currentAttachments[attachmentIndex]!;
+      const resolvedLocalPath = path.resolve(expandHomePath(removed.localPath));
 
-      const embeddingsDir = path.join(removed.localPath, removed.vaultFolder, "attachments", project.id);
+      const embeddingsDir = path.join(resolvedLocalPath, removed.vaultFolder, "attachments", project.id);
       await attempt("remove-attachment:clean-embeddings", () => fs.rm(embeddingsDir, { recursive: true, force: true }));
 
       const updatedAttachments = currentAttachments.filter((_, i) => i !== attachmentIndex);
@@ -65,7 +67,7 @@ export function registerRemoveAttachmentTool(server: McpServer, ctx: ServerConte
 
       const commitBody = formatCommitBody({
         projectName: project.name,
-        description: `Removed attachment: ${removed.projectName} (${projectSlug})\nPath: ${removed.localPath}`,
+        description: `Removed attachment: ${removed.projectName} (${projectSlug})\nPath: ${resolvedLocalPath}`,
       });
       const commitMessage = `attachment: remove ${removed.projectName} from ${project.name}`;
       const commitFiles = ["config.json"];

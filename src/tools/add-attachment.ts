@@ -14,6 +14,7 @@ import { pushAfterMutation as pushAfterMutationFromModule, buildMutationRetryCon
 import { AddAttachmentResultSchema, type AddAttachmentResult } from "../structured-content.js";
 import { invalidateActiveProjectCache } from "../cache.js";
 import { attempt } from "../error-utils.js";
+import { expandHomePath, collapseHomePath } from "../paths.js";
 
 function normalizeRemote(remote: string): string {
   let s = remote.trim().toLowerCase();
@@ -62,9 +63,10 @@ export function registerAddAttachmentTool(server: McpServer, ctx: ServerContext)
       outputSchema: AddAttachmentResultSchema,
     },
     async ({ cwd, localPath, vaultFolder, branch }) => {
-      const resolvedPath = path.resolve(localPath);
+      const expandedPath = expandHomePath(localPath);
+      const resolvedPath = path.resolve(expandedPath);
       if (!resolvedPath.startsWith("/")) {
-        return { content: [{ type: "text", text: `Invalid path: ${localPath}. Must be an absolute path.` }], isError: true };
+        return { content: [{ type: "text", text: `Invalid path: ${localPath}. Must resolve to an absolute path.` }], isError: true };
       }
       const folder = vaultFolder?.trim() || ".mnemonic";
       if (folder.includes("..") || !folder.startsWith(".mnemonic")) {
@@ -73,12 +75,12 @@ export function registerAddAttachmentTool(server: McpServer, ctx: ServerContext)
       const pathCheck = await attempt("add-attachment:check-path", async () => {
         const stat = await fs.stat(resolvedPath);
         if (!stat.isDirectory()) {
-          return { valid: false, reason: `Invalid path: ${resolvedPath}. Must be a directory.` };
+          return { valid: false, reason: `Invalid path: ${localPath}. Must be a directory.` };
         }
         return { valid: true, reason: "" };
       });
       if (!pathCheck.ok || !pathCheck.value.valid) {
-        return { content: [{ type: "text", text: pathCheck.ok ? pathCheck.value.reason : `Invalid path: ${resolvedPath}. Path does not exist.` }], isError: true };
+        return { content: [{ type: "text", text: pathCheck.ok ? pathCheck.value.reason : `Invalid path: ${localPath}. Path does not exist.` }], isError: true };
       }
 
       const notesDir = path.join(resolvedPath, folder, "notes");
@@ -135,7 +137,7 @@ export function registerAddAttachmentTool(server: McpServer, ctx: ServerContext)
       const config: ProjectAttachmentConfig = {
         projectSlug: slug,
         projectName: name,
-        localPath: resolvedPath,
+        localPath: collapseHomePath(resolvedPath),
         vaultFolder: folder,
         enabled: true,
         branch: effectiveBranch,

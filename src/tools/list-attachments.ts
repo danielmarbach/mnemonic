@@ -1,4 +1,5 @@
 import { z } from "zod";
+import path from "path";
 import fs from "fs/promises";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ServerContext } from "../server-context.js";
@@ -6,6 +7,7 @@ import { resolveProject as resolveProjectFromModule } from "../helpers/project.j
 import { projectNotFoundResponse } from "../helpers/vault.js";
 import { ListAttachmentsResultSchema, type ListAttachmentsResult } from "../structured-content.js";
 import { attempt } from "../error-utils.js";
+import { expandHomePath } from "../paths.js";
 
 export function registerListAttachmentsTool(server: McpServer, ctx: ServerContext): void {
   server.registerTool(
@@ -51,7 +53,8 @@ export function registerListAttachmentsTool(server: McpServer, ctx: ServerContex
       }
 
       for (const att of attachments) {
-        const pathCheck = await attempt("list-attachments:check-path", () => fs.access(att.localPath));
+        const resolvedLocalPath = path.resolve(expandHomePath(att.localPath));
+        const pathCheck = await attempt("list-attachments:check-path", () => fs.access(resolvedLocalPath));
         const pathExists = pathCheck.ok;
 
         let noteCount = 0;
@@ -76,7 +79,7 @@ export function registerListAttachmentsTool(server: McpServer, ctx: ServerContex
         attachmentEntries.push({
           projectSlug: att.projectSlug,
           projectName: att.projectName,
-          localPath: att.localPath,
+          localPath: resolvedLocalPath,
           vaultFolder: att.vaultFolder,
           enabled: att.enabled,
           branch: att.branch,
@@ -86,7 +89,7 @@ export function registerListAttachmentsTool(server: McpServer, ctx: ServerContex
         });
 
         lines.push(
-          `  - ${att.projectName} (${att.projectSlug}): ${status}, branch=${branchDisplay}, notes=${noteCount}, path=${att.localPath}`
+          `  - ${att.projectName} (${att.projectSlug}): ${status}, branch=${branchDisplay}, notes=${noteCount}, path=${resolvedLocalPath}`
         );
       }
 
