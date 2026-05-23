@@ -6,7 +6,7 @@ tags:
   - attachments
 lifecycle: temporary
 createdAt: '2026-05-22T19:04:08.973Z'
-updatedAt: '2026-05-23T12:38:40.665Z'
+updatedAt: '2026-05-23T14:01:17.195Z'
 role: plan
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -21,6 +21,8 @@ relatedTo:
   - id: multi-repo-attachment-phase-2-research-1bb12411
     type: derives-from
   - id: apply-multi-repo-attachment-phase-2-integration-tests-and-p0-f16c0bf8
+    type: follows
+  - id: apply-phase-2-remaining-integration-tests-staleness-auto-syn-9cd530e6
     type: follows
 memoryVersion: 1
 ---

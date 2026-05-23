@@ -9,11 +9,14 @@ tags:
   - phase2
 lifecycle: temporary
 createdAt: '2026-05-23T14:01:10.008Z'
-updatedAt: '2026-05-23T14:01:10.008Z'
+updatedAt: '2026-05-23T14:01:17.195Z'
 role: plan
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: multi-repository-attachment-support-implementation-plan-b6423f79
+    type: follows
 memoryVersion: 1
 ---
 # Apply: Phase 2 remaining — integration tests, staleness, auto-sync, portability
