@@ -157,15 +157,15 @@ export function registerSyncTool(server: McpServer, ctx: ServerContext): void {
             }
             const newTip = fetchResult.value;
             if (newTip && newTip !== attConfig.branchTipHash) {
-               const updatedConfigs = attachmentConfigs.map(a =>
-                 a.projectSlug === attConfig.projectSlug
-                   ? { ...a, branchTipHash: newTip, updatedAt: new Date().toISOString() }
-                   : a
-               );
-               await ctx.configStore.setProjectAttachments(project.id, updatedConfigs);
-               ctx.vaultManager.setAttachmentConfigs(project.id, updatedConfigs);
-               ctx.vaultManager.clearAttachmentCaches();
-               const loadedVaults = await ctx.vaultManager.loadAttachmentsForProject(project.id);
+                const updatedConfigs = attachmentConfigs.map(a =>
+                  a.projectSlug === attConfig.projectSlug
+                    ? { ...a, branchTipHash: newTip, updatedAt: new Date().toISOString() }
+                    : a
+                );
+                await ctx.configStore.setProjectAttachments(project.id, updatedConfigs);
+                ctx.vaultManager.clearAttachmentCaches();
+                ctx.vaultManager.setAttachmentConfigs(project.id, updatedConfigs);
+                const loadedVaults = await ctx.vaultManager.loadAttachmentsForProject(project.id);
                const staleVault = loadedVaults.find(v => v.attachmentRef?.projectSlug === attConfig.projectSlug);
                if (staleVault) {
                  const currentIds = new Set((await staleVault.storage.listNoteIds()).map(id => id as string));

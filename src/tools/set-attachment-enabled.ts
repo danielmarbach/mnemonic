@@ -57,8 +57,8 @@ export function registerSetAttachmentEnabledTool(server: McpServer, ctx: ServerC
       );
 
       await ctx.configStore.setProjectAttachments(project.id, updatedAttachments);
-      ctx.vaultManager.setAttachmentConfigs(project.id, updatedAttachments);
       ctx.vaultManager.clearAttachmentCaches();
+      ctx.vaultManager.setAttachmentConfigs(project.id, updatedAttachments);
       await ctx.vaultManager.loadAttachmentsForProject(project.id);
       invalidateActiveProjectCache();
 

@@ -128,8 +128,8 @@ async function syncAttachedVaultsOnBranchChange(ctx: ServerContext, projectId: s
           : a
       );
       await ctx.configStore.setProjectAttachments(projectId, updatedConfigs);
-      ctx.vaultManager.setAttachmentConfigs(projectId, updatedConfigs);
       ctx.vaultManager.clearAttachmentCaches();
+      ctx.vaultManager.setAttachmentConfigs(projectId, updatedConfigs);
       const loadedVaults = await ctx.vaultManager.loadAttachmentsForProject(projectId);
       const staleVault = loadedVaults.find(v => v.attachmentRef?.projectSlug === attConfig.projectSlug);
       if (staleVault) {
