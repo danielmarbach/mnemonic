@@ -35,6 +35,11 @@ export function vaultMatchesStorageScope(vault: Vault, storedIn: StorageScope): 
   return vault.provenance === "project-local";
 }
 
+export function attachedVaultErrorMessage(id: string, vault: Vault): string {
+  const label = storageLabel(vault);
+  return `Memory '${id}' is in an attached vault (${label}) and cannot be modified. Attached vaults are read-only.`;
+}
+
 export async function collectVisibleNotes(
   ctx: ServerContext,
   cwd?: string,
@@ -44,7 +49,8 @@ export async function collectVisibleNotes(
   sessionProjectId?: string,
 ): Promise<{ project: Awaited<ReturnType<typeof resolveProject>>; entries: NoteEntry[] }> {
   const project = await resolveProject(ctx, cwd);
-  const vaults = await ctx.vaultManager.searchOrder(cwd);
+  const projectId = project?.id;
+  const vaults = await ctx.vaultManager.searchOrder(cwd, projectId);
 
   let filterProject: string | null | undefined = undefined;
   if (scope === "project" && project) filterProject = project.id;
@@ -54,25 +60,29 @@ export async function collectVisibleNotes(
   const entries: NoteEntry[] = [];
 
   for (const vault of vaults) {
+    const includeAllForScope = vault.provenance === "project-attached" && filterProject !== null && filterProject !== undefined;
+    const effectiveFilter = includeAllForScope ? undefined : filterProject;
+
     let rawNotes: Note[];
     if (sessionProjectId) {
       const cached = await getOrBuildVaultNoteList(sessionProjectId, vault);
       if (cached !== undefined) {
-        rawNotes = filterProject !== undefined
-          ? cached.filter((n) => filterProject === null ? !n.project : n.project === filterProject)
+        rawNotes = effectiveFilter !== undefined
+          ? cached.filter((n) => effectiveFilter === null ? !n.project : n.project === effectiveFilter)
           : cached;
       } else {
         rawNotes = await vault.storage.listNotes(
-          filterProject !== undefined ? { project: filterProject } : undefined
+          effectiveFilter !== undefined ? { project: effectiveFilter } : undefined
         );
       }
     } else {
       rawNotes = await vault.storage.listNotes(
-        filterProject !== undefined ? { project: filterProject } : undefined
+        effectiveFilter !== undefined ? { project: effectiveFilter } : undefined
       );
     }
     for (const note of rawNotes) {
-      if (seen.has(note.id)) {
+      const key = `${note.id}::${vault.storage.vaultPath}`;
+      if (seen.has(key)) {
         continue;
       }
       if (tags && tags.length > 0) {
@@ -84,7 +94,7 @@ export async function collectVisibleNotes(
       if (storedIn !== "any" && !vaultMatchesStorageScope(vault, storedIn)) {
         continue;
       }
-      seen.add(note.id);
+      seen.add(key);
       entries.push({ note, vault });
     }
   }
@@ -218,7 +228,7 @@ export async function removeRelationshipsToNoteIds(ctx: ServerContext, noteIds: 
   const vaultChanges = new Map<Vault, string[]>();
 
   await Promise.all(
-    ctx.vaultManager.allKnownVaults().map(async (vault) => {
+    ctx.vaultManager.allKnownVaultsMutable().map(async (vault) => {
       const notes = await vault.storage.listNotes();
       await Promise.all(
         notes.map(async (note) => {

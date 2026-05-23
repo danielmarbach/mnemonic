@@ -60,11 +60,23 @@ export function registerRelateTool(server: McpServer, ctx: ServerContext): void 
       await ensureBranchSynced(ctx, cwd);
 
       const [foundFrom, foundTo] = await Promise.all([
-        ctx.vaultManager.findNote(fromId, cwd),
-        ctx.vaultManager.findNote(toId, cwd),
+        ctx.vaultManager.findNote(fromId, cwd, { mutable: true }),
+        ctx.vaultManager.findNote(toId, cwd, { mutable: true }),
       ]);
-      if (!foundFrom) return { content: [{ type: "text", text: `No memory found with id '${fromId}'` }], isError: true };
-      if (!foundTo) return { content: [{ type: "text", text: `No memory found with id '${toId}'` }], isError: true };
+      if (!foundFrom) {
+        const foundFromAny = await ctx.vaultManager.findNote(fromId, cwd, { mutable: false });
+        if (foundFromAny) {
+          return { content: [{ type: "text", text: `Memory '${fromId}' is in an attached vault and cannot be modified. Attached vaults are read-only.` }], isError: true };
+        }
+        return { content: [{ type: "text", text: `No memory found with id '${fromId}'` }], isError: true };
+      }
+      if (!foundTo) {
+        const foundToAny = await ctx.vaultManager.findNote(toId, cwd, { mutable: false });
+        if (foundToAny) {
+          return { content: [{ type: "text", text: `Memory '${toId}' is in an attached vault and cannot be modified. Attached vaults are read-only.` }], isError: true };
+        }
+        return { content: [{ type: "text", text: `No memory found with id '${toId}'` }], isError: true };
+      }
 
       const { note: fromNote, vault: fromVault } = foundFrom;
       const { note: toNote, vault: toVault } = foundTo;

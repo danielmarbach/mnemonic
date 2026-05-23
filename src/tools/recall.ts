@@ -121,7 +121,7 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
 
       const project = await resolveProject(ctx, cwd);
       const queryVec = await embed(query);
-      const vaults = await ctx.vaultManager.searchOrder(cwd);
+      const vaults = await ctx.vaultManager.searchOrder(cwd, project?.id);
 
       let effectiveLimit = limit;
       let recallScopeNoteCount: number | undefined;
@@ -446,7 +446,7 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
           if (index < recallRelationshipLimit) {
             relationships = await getRelationshipPreview(
               note,
-              ctx.vaultManager.allKnownVaults(),
+              ctx.vaultManager.allKnownVaults(project?.id),
               { activeProjectId: project?.id, limit: 3 }
             );
           }

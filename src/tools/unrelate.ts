@@ -52,9 +52,22 @@ export function registerUnrelateTool(server: McpServer, ctx: ServerContext): voi
       await ensureBranchSynced(ctx, cwd);
 
       const [foundFrom, foundTo] = await Promise.all([
-        ctx.vaultManager.findNote(fromId, cwd),
-        ctx.vaultManager.findNote(toId, cwd),
+        ctx.vaultManager.findNote(fromId, cwd, { mutable: true }),
+        ctx.vaultManager.findNote(toId, cwd, { mutable: true }),
       ]);
+
+      if (!foundFrom && !foundTo) {
+        const [foundFromAny, foundToAny] = await Promise.all([
+          ctx.vaultManager.findNote(fromId, cwd, { mutable: false }),
+          ctx.vaultManager.findNote(toId, cwd, { mutable: false }),
+        ]);
+        if (foundFromAny && foundFromAny.vault.provenance === "project-attached") {
+          return { content: [{ type: "text", text: `Memory '${fromId}' is in an attached vault and cannot be modified. Attached vaults are read-only.` }], isError: true };
+        }
+        if (foundToAny && foundToAny.vault.provenance === "project-attached") {
+          return { content: [{ type: "text", text: `Memory '${toId}' is in an attached vault and cannot be modified. Attached vaults are read-only.` }], isError: true };
+        }
+      }
 
       const now = isoDateString(new Date().toISOString());
       const vaultChanges = new Map<Vault, string[]>();

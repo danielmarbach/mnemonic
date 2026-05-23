@@ -397,7 +397,7 @@ export function registerProjectMemorySummaryTool(server: McpServer, ctx: ServerC
       if (includeRelatedGlobal) {
         const anchorEmbeddings = await Promise.all(
           anchors.slice(0, 5).map(async a => {
-            for (const vault of ctx.vaultManager.allKnownVaults()) {
+            for (const vault of ctx.vaultManager.allKnownVaults(project.id)) {
               const emb = await vault.storage.readEmbedding(memoryId(a.id));
               if (emb) return { id: a.id, embedding: emb.embedding };
             }
@@ -482,7 +482,7 @@ export function registerProjectMemorySummaryTool(server: McpServer, ctx: ServerC
         if (!note) return {};
         const relationships = await getRelationshipPreview(
           note,
-          ctx.vaultManager.allKnownVaults(),
+          ctx.vaultManager.allKnownVaults(project.id),
           { activeProjectId: project.id, limit: 3 }
         );
         return { relationships };
@@ -532,10 +532,10 @@ export function registerProjectMemorySummaryTool(server: McpServer, ctx: ServerC
         }
         const preview = await getRelationshipPreview(
           fallbackNote,
-          ctx.vaultManager.allKnownVaults(),
-          { activeProjectId: project.id, limit: 3 }
-        );
-        if (preview) fallbackRelationships = { relationships: preview };
+           ctx.vaultManager.allKnownVaults(project.id),
+           { activeProjectId: project.id, limit: 3 }
+         );
+         if (preview) fallbackRelationships = { relationships: preview };
       }
 
       const orientation: ProjectSummaryResult["orientation"] = {

@@ -526,6 +526,17 @@ export async function executeMerge(
       };
       return { content: [{ type: "text", text: `Source note '${id}' not found.` }], structuredContent };
     }
+    if (!entry.vault.writable) {
+      const structuredContent: ConsolidateResult = {
+        action: "consolidated",
+        strategy: "execute-merge",
+        project: toProjectRef(project),
+        notesProcessed: entries.length,
+        notesModified: 0,
+        warnings: [`Source note '${id}' is in an attached vault and cannot be modified.`],
+      };
+      return { content: [{ type: "text", text: `Source note '${id}' is in an attached vault and cannot be modified. Attached vaults are read-only.` }], structuredContent };
+    }
     sourceEntries.push(entry);
   }
 
@@ -966,6 +977,10 @@ export async function pruneSuperseded(
   for (const id of supersededIds) {
     const entry = entries.find((e) => e.note.id === id);
     if (!entry) continue;
+    if (!entry.vault.writable) {
+      lines.push(`  - Skipping ${entry.note.title} (${id}): in attached vault (read-only)`);
+      continue;
+    }
 
     const targetId = supersededBy.get(id);
     lines.push(`  - ${entry.note.title} (${id}) -> superseded by ${targetId}`);

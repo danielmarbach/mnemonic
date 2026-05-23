@@ -28,6 +28,7 @@ import {
   removeRelationshipsToNoteIds,
   addVaultChange,
   storageLabel,
+  attachedVaultErrorMessage,
 } from "../helpers/vault.js";
 import { invalidateActiveProjectCache } from "../cache.js";
 
@@ -70,8 +71,12 @@ export function registerForgetTool(server: McpServer, ctx: ServerContext): void 
     async ({ id, cwd, allowProtectedBranch = false }) => {
       await ensureBranchSynced(ctx, cwd);
 
-      const found = await ctx.vaultManager.findNote(id, cwd);
+      const found = await ctx.vaultManager.findNote(id, cwd, { mutable: true });
       if (!found) {
+        const foundAny = await ctx.vaultManager.findNote(id, cwd, { mutable: false });
+        if (foundAny) {
+          return { content: [{ type: "text", text: attachedVaultErrorMessage(id, foundAny.vault) }], isError: true };
+        }
         return { content: [{ type: "text", text: `No memory found with id '${id}'` }], isError: true };
       }
 

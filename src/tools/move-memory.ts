@@ -73,8 +73,12 @@ export function registerMoveMemoryTool(server: McpServer, ctx: ServerContext): v
     async ({ id, target, vaultFolder, cwd, allowProtectedBranch = false }) => {
       await ensureBranchSynced(ctx, cwd);
 
-      const found = await ctx.vaultManager.findNote(id, cwd);
+      const found = await ctx.vaultManager.findNote(id, cwd, { mutable: true });
       if (!found) {
+        const foundAny = await ctx.vaultManager.findNote(id, cwd, { mutable: false });
+        if (foundAny) {
+          return { content: [{ type: "text", text: `Memory '${id}' is in an attached vault and cannot be moved. Attached vaults are read-only.` }], isError: true };
+        }
         return { content: [{ type: "text", text: `No memory found with id '${id}'` }], isError: true };
       }
 

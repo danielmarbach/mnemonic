@@ -131,10 +131,14 @@ export class VaultManager {
   /**
    * Find a note by id, checking the project vault first (when cwd is given)
    * then falling back through all other known vaults and finally the main vault.
+   * When `mutable` is true, excludes attached (read-only) vaults from the search.
    */
-  async findNote(id: string, cwd?: string): Promise<{ note: Note; vault: Vault } | null> {
+  async findNote(id: string, cwd?: string, options?: { mutable?: boolean; projectId?: string }): Promise<{ note: Note; vault: Vault } | null> {
     const memoryIdArg = memoryId(id);
-    for (const vault of await this.searchOrder(cwd)) {
+    const vaults = options?.mutable
+      ? await this.searchOrderMutable(cwd, options?.projectId)
+      : await this.searchOrder(cwd, options?.projectId);
+    for (const vault of vaults) {
       const note = await vault.storage.readNote(memoryIdArg);
       if (note) return { note, vault };
     }
@@ -142,7 +146,20 @@ export class VaultManager {
   }
 
   /** All vaults currently loaded in this session (main + all project vaults including submodule). */
-  allKnownVaults(): Vault[] {
+  allKnownVaults(projectId?: string): Vault[] {
+    const all: Vault[] = [this.main];
+    for (const vaults of this.allProjectVaultsByRoot.values()) {
+      all.push(...vaults);
+    }
+    if (projectId) {
+      const attached = this.attachedVaults.get(projectId);
+      if (attached) all.push(...attached);
+    }
+    return all;
+  }
+
+  /** All writable vaults (excludes attached/read-only vaults). */
+  allKnownVaultsMutable(): Vault[] {
     const all: Vault[] = [this.main];
     for (const vaults of this.allProjectVaultsByRoot.values()) {
       all.push(...vaults);
@@ -153,9 +170,9 @@ export class VaultManager {
   /**
    * Ordered list of vaults for recall / list operations.
    * All project vaults for the cwd's git root come first (primary, then submodule),
-   * followed by the main vault.
+   * then attached vaults for the project, followed by the main vault.
    */
-  async searchOrder(cwd?: string): Promise<Vault[]> {
+  async searchOrder(cwd?: string, projectId?: string): Promise<Vault[]> {
     const vaults: Vault[] = [];
     if (cwd) {
       const gitRoot = await findGitRoot(cwd);
@@ -166,14 +183,28 @@ export class VaultManager {
           if (all) {
             vaults.push(...all);
           } else {
-            // Defensive fallback for consistency if map population ever changes.
             vaults.push(pv);
           }
         }
       }
     }
+    if (projectId) {
+      const attached = this.getAttachmentsForProject(projectId);
+      if (attached.length > 0) {
+        vaults.push(...attached);
+      }
+    }
     vaults.push(this.main);
     return vaults;
+  }
+
+  /**
+   * Same as searchOrder but excludes attached (read-only) vaults.
+   * Use for mutation operations that must never write to attached vaults.
+   */
+  async searchOrderMutable(cwd?: string, projectId?: string): Promise<Vault[]> {
+    const vaults = await this.searchOrder(cwd, projectId);
+    return vaults.filter(v => v.writable);
   }
 
   /** Build the file path for a note relative to the vault's git root. */
