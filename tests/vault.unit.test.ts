@@ -644,6 +644,7 @@ describe("VaultManager", () => {
       const mainIdx = provenances.indexOf("main");
       expect(localIdx).toBeLessThan(attachedIdx);
       expect(localIdx).toBeLessThan(mainIdx);
+      expect(attachedIdx).toBeLessThan(mainIdx);
     });
 
     it("should exclude attached vaults from searchOrderMutable", async () => {
