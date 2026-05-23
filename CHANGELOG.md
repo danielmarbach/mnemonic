@@ -8,33 +8,10 @@ The format is loosely based on Keep a Changelog and uses semver-style version he
 
 ### Added
 
-- **Multi-repository attachment support (Phase 1)**: Federated read-only project attachments allow linking external repositories as knowledge sources. Attached repo notes participate in recall, summaries, list, get, memory_graph, and relationship previews.
-
-  New tools:
-  - `add_attachment` — Add an external repo as a knowledge source
-  - `remove_attachment` — Remove an attached repository
-  - `list_attachments` — List all attachments for the current project
-  - `set_attachment_enabled` — Toggle attachment enable/disable
-  - `set_attachment_branch` — Change the branch an attachment reads from
-
-  Key design decisions:
-  - Attached vaults are read-only: consolidate, prune, remember, update, forget, move_memory, relate, and unrelate never modify attached vault notes
-  - Mutation tools return specific error when attempting to modify an attached vault note
-  - Attached notes visible with `scope: "project"` (attachment-extended) and `storedIn: "any"`
-  - New `storedIn: "attached"` filter for audit
-  - Storage label format: `attached:<slug>/.mnemonic`
-  - Max 5 attachments per project (configurable via `maxAttachmentsPerProject`)
-  - Sync: `mnemonic_sync` fetches attached repo branches and reconciles embeddings
-  - Session-scoped note cache with git-ref reads (fail-soft on missing repos/branches)
-  - Attached vault notes receive a scope boost in recall (half of project-local), appear under `scope: "project"`, and are excluded from `scope: "global"`
-  - `project_memory_summary` includes attached vault count in output
-  - Staleness detection: branch tip hash comparison ensures fresh reads from attached repos
-
-  Breaking changes:
-  - `Vault.isProject` replaced by `Vault.provenance` (`"main" | "project-local" | "project-attached"`)
-  - `StorageScope` now includes `"attached"` value
-  - Config schema version bumped to 1.2
-
+- **Multi-repository attachment support**: Link external repositories as read-only knowledge sources. Attached notes appear in recall, summaries, list, get, memory_graph, and relationship previews. `scope: "project"` includes attached notes; `storedIn: "attached"` filters to them.
+  - `add_attachment`, `remove_attachment`, `list_attachments`, `set_attachment_enabled`, `set_attachment_branch`
+  - Attached notes receive a moderate recall boost (less than project-local, more than global). `project_memory_summary` shows attached vault count.
+  - Breaking: `Vault.isProject` replaced by `Vault.provenance` (`"main" | "project-local" | "project-attached"`), `StorageScope` now includes `"attached"`, config schema bumped to 1.2.
 - Devcontainer configuration for Node 24 development with Ollama and the `nomic-embed-text-v2-moe` embedding model pre-installed ([@boblangley](https://github.com/boblangley)).
 - CI `check-toolchain-sync` job that validates the Node version in the devcontainer matches CI workflows ([@boblangley](https://github.com/boblangley)).
 
