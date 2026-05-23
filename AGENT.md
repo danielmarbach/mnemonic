@@ -230,11 +230,8 @@ When `recall` called with `cwd`, project notes get a small **tiebreaker boost** 
 - `list`, `recall`, `where_is_memory` accept `storedIn: "attached"` to filter attached-repo audit; `storedIn: "any"` includes all vaults including attachments
 - `sync` fetches attached repo branches and reconciles embeddings in the same call
 - Session-scoped note cache uses git-ref reads; fail-soft when an attached repo or branch is unavailable
-- **Attachment boost**: Attached vault notes receive `ATTACHMENT_BOOST = 0.015` (half of `PROJECT_SCOPE_BOOST = 0.03`) in recall scoring — explicit user intent, less than project-local
-- **Scope-extended semantics**: `scope: "project"` includes attached vault notes even though their `note.project` is different; `scope: "global"` excludes them
-- **Project summary**: `project_memory_summary` shows attached vault count in structured output (`attachedVault` field) and text display (conditional)
-- **Staleness detection**: On `loadAttachmentsForProject`, the stored `branchTipHash` is compared against current `git rev-parse <branch>` to detect stale caches
-- **Working-tree mode**: `add_attachment` with empty `branch` reads from the working tree and warns that this is not recommended for production
+- Attached vault notes are included under `scope: "project"` (even though their `note.project` differs) and excluded from `scope: "global"`
+- Attached vault notes receive a moderate boost in recall scoring (less than project-local notes, more than global notes)
 
 ### Routing rules
 - `cwd` identifies project context (separate from write location)
