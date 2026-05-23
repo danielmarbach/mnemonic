@@ -542,6 +542,7 @@ Imported notes are written to the main vault with `lifecycle: permanent` and `sc
 
 | Tool                        | Description                                                              |
 |-----------------------------|--------------------------------------------------------------------------|
+| `add_attachment`            | Add an external repository as a federated knowledge source; requires `localPath`, optional `branch` and `vaultFolder` |
 | `consolidate`               | Merge and analyze overlapping notes; evidence defaults `true` for analysis strategies and execute-merge (lifecycle, risk, classification, warnings) |
 | `detect_project`            | Resolve `cwd` to stable project id via git remote URL                   |
 | `discover_tags`            | Suggest canonical tags for a note using title/content/query context; `mode: "browse"` opts into broader inventory output |
@@ -549,8 +550,9 @@ Imported notes are written to the main vault with `lifecycle: permanent` and `sc
 | `forget`                    | Delete note + embedding, git commit + push, cleanup relationships        |
 | `get`                       | Fetch one or more notes by exact id; `includeRelationships: true` adds bounded 1-hop previews |
 | `get_project_identity`      | Show effective project identity and remote override                      |
-| `get_project_memory_policy` | Show saved write scope, consolidation mode, and protected-branch settings |
-| `list`                      | List notes filtered by scope/tags/storage                                |
+| `get_project_memory_policy` | Show saved write scope, consolidation mode, protected-branch settings, and `maxAttachmentsPerProject` |
+| `list`                      | List notes filtered by scope/tags/storage; `storedIn: "attached"` filters to attached-repo notes |
+| `list_attachments`          | List all attached repositories for the current project with status        |
 | `list_migrations`           | List available migrations and pending count                              |
 | `memory_graph`              | Show compact adjacency list of relationships                             |
 | `move_memory`               | Move note between vaults without changing id                             |
@@ -559,9 +561,12 @@ Imported notes are written to the main vault with `lifecycle: permanent` and `sc
 | `recent_memories`           | Show most recently updated notes for scope                               |
 | `remember`                  | Write note + embedding; `cwd` sets context, `scope` picks storage, `lifecycle` picks temporary vs permanent |
 | `relate`                    | Create typed relationship between notes (bidirectional)                  |
+| `remove_attachment`         | Remove an attached repository by `projectSlug`                           |
+| `set_attachment_branch`     | Change the branch an attached repository reads from; requires `projectSlug` and `branch` |
+| `set_attachment_enabled`    | Enable or disable an attached repository; requires `projectSlug` and `enabled` |
 | `set_project_identity`      | Save which git remote defines project identity                           |
-| `set_project_memory_policy` | Save project policy defaults (scope, consolidation mode, protected-branch behavior/patterns) |
-| `sync`                      | MCP tool for git sync when remote exists plus embedding backfill always; `force: true` rebuilds all embeddings |
+| `set_project_memory_policy` | Save project policy defaults (scope, consolidation mode, protected-branch behavior/patterns, `maxAttachmentsPerProject`) |
+| `sync`                      | Git sync + embedding backfill + attached repo reconciliation; `force: true` rebuilds all embeddings |
 | `unrelate`                  | Remove relationship between notes                                        |
 | `update`                    | Update note content/title/tags/lifecycle; re-embeds when content changes |
 | `where_is_memory`           | Show note's project association and storage location                     |
@@ -602,6 +607,24 @@ relatedTo:
 `workflow` recall mode prefers directional and typed relationships first, then falls back to `related-to` for long-term compatibility with older vaults.
 
 `relate` is bidirectional by default. `forget` automatically removes any edges pointing at the deleted note.
+
+### Multi-repository attachments
+
+Phase 1 of multi-repo attachment support lets you link external repositories as **read-only** knowledge sources alongside your own project vault. Attached repo notes appear in recall, summaries, list, get, memory_graph, and relationship previews — but cannot be modified through mnemonic tools.
+
+Key concepts:
+
+- **Attached vaults are read-only.** Mutation tools (`remember`, `update`, `forget`, `relate`, `unrelate`, `move_memory`, `consolidate`) return a specific error when targeting an attached vault note.
+- `add_attachment` links a repo by its absolute `localPath`; optional `branch` and `vaultFolder` select a branch and sub-vault.
+- `remove_attachment` removes by `projectSlug`; `list_attachments` shows all attachments with status.
+- `set_attachment_enabled` toggles an attachment on/off without removing config; `set_attachment_branch` changes the branch.
+- Max 5 attachments per project (configurable via `maxAttachmentsPerProject` in project memory policy).
+- Storage label format: `attached:<slug>/.mnemonic`
+- Use `storedIn: "attached"` on `list`, `recall`, or `where_is_memory` to audit attached-repo notes; `storedIn: "any"` includes all vaults.
+- `sync` fetches attached repo branches and reconciles embeddings in the same call.
+- If an attached repo or branch is unavailable, reads fail-soft and the rest of the session continues unaffected.
+
+See `AGENT.md` for the full tool descriptions and attachment architecture details.
 
 ## Multi-machine workflow
 

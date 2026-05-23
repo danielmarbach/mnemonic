@@ -218,6 +218,18 @@ When `recall` called with `cwd`, project notes get a small **tiebreaker boost** 
 ### Multi-vault architecture
 - **Main vault** (`~/mnemonic-vault`): Private global memories, own git repo
 - **Project vault** (`<git-root>/.mnemonic/`): Project-specific memories, committed to project repo
+- **Attached vaults**: Read-only external repos linked as federated knowledge sources via `add_attachment`
+
+### Attachment architecture
+- Attached repos are **read-only**: `consolidate`, `prune-superseded`, `remember`, `update`, `forget`, `move_memory`, `relate`, and `unrelate` never modify attached vault notes; they return a specific error when attempted
+- `add_attachment` links an external repo by `localPath` (absolute path); optional `branch` and `vaultFolder` select a branch and sub-vault within it
+- `remove_attachment` removes by `projectSlug`; `list_attachments` shows all attachments with status
+- `set_attachment_enabled` toggles an attachment on/off without removing config; `set_attachment_branch` changes the branch
+- Max attachments per project: 5 (configurable via `maxAttachmentsPerProject` in project memory policy)
+- Storage label format: `attached:<slug>/.mnemonic`
+- `list`, `recall`, `where_is_memory` accept `storedIn: "attached"` to filter attached-repo audit; `storedIn: "any"` includes all vaults including attachments
+- `sync` fetches attached repo branches and reconciles embeddings in the same call
+- Session-scoped note cache uses git-ref reads; fail-soft when an attached repo or branch is unavailable
 
 ### Routing rules
 - `cwd` identifies project context (separate from write location)
@@ -235,7 +247,7 @@ When `recall` called with `cwd`, project notes get a small **tiebreaker boost** 
 - Main vault's own git repo excluded from detection (`isMainRepo()` guard)
 
 ### Main vault config
-Machine-local settings in `~/mnemonic-vault/config.json`. Survives sessions without becoming memory notes. Includes `reindexEmbedConcurrency`, `mutationPushMode` (`all` | `main-only` | `none`), per-project policy defaults (write scope, consolidation mode, protected-branch behavior/patterns), and optional project-identity remote overrides for fork workflows.
+Machine-local settings in `~/mnemonic-vault/config.json`. Survives sessions without becoming memory notes. Includes `reindexEmbedConcurrency`, `mutationPushMode` (`all` | `main-only` | `none`), per-project policy defaults (write scope, consolidation mode, protected-branch behavior/patterns, `maxAttachmentsPerProject`), and optional project-identity remote overrides for fork workflows.
 
 ### Bidirectional sync
 The `sync` MCP tool does: fetch/pull/push when a remote exists, plus embedding backfill on every run. Passing `force: true` rebuilds all embeddings. Single call, linear history. Syncs main vault; pass `cwd` for project vault too. Mutating tools may skip auto-push based on `mutationPushMode`, but `sync` remains the explicit catch-up path.
@@ -301,29 +313,34 @@ Skills are loaded via the `skill` tool and extend agent capabilities with specia
 
 | Tool | Description |
 |------|-------------|
+| `add_attachment` | Add an external repository as a federated knowledge source; requires `localPath` (absolute path to repo), optional `branch` and `vaultFolder` |
 | `consolidate` | Merge and analyze overlapping notes; classification (lineage/duplicate-pressure/unique-evidence-risk/supersession-pressure) and maintenance warnings |
 | `detect_project` | Resolve `cwd` to stable project id via git remote URL |
 | `discover_tags` | Suggest canonical tags for a note; `mode: "browse"` opts into broader inventory output |
 | `execute_migration` | Execute a named migration (supports dry-run) |
 | `forget` | Delete note + embedding, git commit + push, cleanup relationships |
-| `get` | Fetch one or more notes by exact id; `includeRelationships: true` adds bounded 1-hop relationship previews |
+| `get` | Fetch one or more notes by exact id; `includeRelationships: true` adds bounded 1-hop previews |
 | `get_project_identity` | Show effective project identity and remote override |
-| `get_project_memory_policy` | Show saved write scope, consolidation mode, and protected-branch settings |
-| `list` | List notes filtered by scope/tags/storage |
+| `get_project_memory_policy` | Show saved write scope, consolidation mode, protected-branch settings, and `maxAttachmentsPerProject` |
+| `list` | List notes filtered by scope/tags/storage; `storedIn: "attached"` filters to attached-repo notes only, `storedIn: "any"` includes attachments |
+| `list_attachments` | List all attached repositories for the current project with status (enabled, path-exists, branch, note count) |
 | `list_migrations` | List available migrations and pending count |
 | `memory_graph` | Show compact adjacency list of relationships |
 | `move_memory` | Move note between vaults without changing id |
 | `project_memory_summary` | Session-start entrypoint: themes, anchors, orientation, maintenance warnings, and working-state recovery hints |
-| `recall` | Semantic search with optional project boost plus `temporal` and `workflow` modes |
+| `recall` | Semantic search with optional project boost plus `temporal` and `workflow` modes; `storedIn: "attached"` filters to attached-repo notes |
 | `recent_memories` | Show most recently updated notes for scope |
 | `remember` | Write note + embedding; `cwd` sets context, `scope` picks storage, `lifecycle` picks temporary vs permanent |
 | `relate` | Create typed relationship between notes (bidirectional) |
+| `remove_attachment` | Remove an attached repository; requires `projectSlug` of the attachment |
+| `set_attachment_branch` | Change the branch an attached repository reads from; requires `projectSlug` and `branch` |
+| `set_attachment_enabled` | Enable or disable an attached repository without removing config; requires `projectSlug` and `enabled` |
 | `set_project_identity` | Save which git remote defines project identity |
-| `set_project_memory_policy` | Save project policy defaults (scope, consolidation mode, protected-branch behavior/patterns) |
-| `sync` | MCP tool for git sync when remote exists plus embedding backfill always; `force: true` rebuilds all embeddings |
+| `set_project_memory_policy` | Save project policy defaults (scope, consolidation mode, protected-branch behavior/patterns, `maxAttachmentsPerProject`) |
+| `sync` | MCP tool for git sync when remote exists plus embedding backfill always; also fetches attached repo branches and reconciles embeddings; `force: true` rebuilds all embeddings |
 | `unrelate` | Remove relationship between notes |
 | `update` | Update note content/title/tags/lifecycle; re-embeds when content changes |
-| `where_is_memory` | Show note's project association and storage location |
+| `where_is_memory` | Show note's project association and storage location; `storedIn: "attached"` for attached-repo notes |
 
 ## Environment variables
 
