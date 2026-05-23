@@ -5,7 +5,7 @@ tags:
   - request
 lifecycle: temporary
 createdAt: '2026-05-22T18:43:54.599Z'
-updatedAt: '2026-05-22T19:05:37.466Z'
+updatedAt: '2026-05-23T12:19:46.141Z'
 role: context
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -14,6 +14,8 @@ relatedTo:
   - id: multi-repo-federated-reads-codebase-research-626b102b
     type: derives-from
   - id: multi-repository-attachment-support-implementation-plan-b6423f79
+    type: derives-from
+  - id: multi-repo-attachment-phase-2-research-1bb12411
     type: derives-from
 memoryVersion: 1
 ---

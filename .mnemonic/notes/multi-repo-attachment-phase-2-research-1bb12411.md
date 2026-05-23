@@ -7,11 +7,14 @@ tags:
   - phase2
 lifecycle: temporary
 createdAt: '2026-05-23T12:19:42.386Z'
-updatedAt: '2026-05-23T12:19:42.386Z'
+updatedAt: '2026-05-23T12:19:46.141Z'
 role: research
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: multi-repository-attachment-support-request-root-151ad76c
+    type: derives-from
 memoryVersion: 1
 ---
 # Multi-repo attachment — Phase 2 research
