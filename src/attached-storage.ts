@@ -8,7 +8,7 @@ import { InvalidBranchNameError, AttachedVaultReadOnlyError } from "./domain-err
 
 const VALID_BRANCH_PATTERN = /^[a-zA-Z0-9._/-]+$/;
 
-function validateBranch(branch: string): void {
+export function validateBranch(branch: string): void {
   if (!VALID_BRANCH_PATTERN.test(branch)) {
     throw new InvalidBranchNameError(branch, VALID_BRANCH_PATTERN.source);
   }
