@@ -248,6 +248,19 @@ export class VaultManager {
         return null;
       }
 
+      // Staleness detection: compare stored branchTipHash against current tip
+      let currentTipHash = config.branchTipHash;
+      if (config.branch) {
+        const tipResult = await attempt("vault:attachment-staleness", async () => {
+          const git = simpleGit(config.localPath);
+          const result = await git.raw(["rev-parse", config.branch]);
+          return result.trim();
+        });
+        if (tipResult.ok && tipResult.value) {
+          currentTipHash = tipResult.value;
+        }
+      }
+
       const attachmentsDir = path.join(config.localPath, config.vaultFolder, "attachments", projectSlug);
       await fs.mkdir(attachmentsDir, { recursive: true });
 
@@ -269,7 +282,7 @@ export class VaultManager {
           projectName: config.projectName,
           localPath: config.localPath,
           branch: config.branch,
-          branchTipHash: config.branchTipHash,
+          branchTipHash: currentTipHash,
         },
         get writable() { return this.provenance !== "project-attached"; },
       };
