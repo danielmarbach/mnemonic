@@ -5,11 +5,14 @@ tags:
   - request
 lifecycle: temporary
 createdAt: '2026-05-23T21:28:46.530Z'
-updatedAt: '2026-05-23T21:28:46.530Z'
+updatedAt: '2026-05-23T21:28:52.040Z'
 role: context
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: multi-repository-attachment-support-request-root-151ad76c
+    type: follows
 memoryVersion: 1
 ---
 # Multi-repo attachment Phase 3 — request root
