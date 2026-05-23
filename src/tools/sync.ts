@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { simpleGit } from "simple-git";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ServerContext } from "../server-context.js";
 import {
@@ -7,7 +8,7 @@ import {
 } from "../structured-content.js";
 import type { SyncResult } from "../git.js";
 import type { FailedEmbedding } from "../helpers/embed.js";
-import { projectParam } from "../helpers/project.js";
+import { projectParam, resolveProject as resolveProjectFromModule } from "../helpers/project.js";
 import { invalidateActiveProjectCache } from "../cache.js";
 import {
   backfillEmbeddingsAfterSync,
@@ -128,6 +129,49 @@ export function registerSyncTool(server: McpServer, ctx: ServerContext): void {
           });
         } else {
           lines.push("project vault: no .mnemonic/ found — skipped.");
+        }
+      }
+
+      // Sync attached vaults: git fetch in attached repos + staleness check
+      if (cwd) {
+        const project = await resolveProjectFromModule(ctx, cwd);
+        if (project) {
+          const attachmentConfigs = await ctx.configStore.getProjectAttachments(project.id);
+          const enabledAttachments = attachmentConfigs.filter(a => a.enabled && a.branch);
+          for (const attConfig of enabledAttachments) {
+            const label = `attached:${attConfig.projectSlug}`;
+            try {
+              const git = simpleGit(attConfig.localPath);
+              await git.fetch("origin");
+              const newTipResult = await git.raw(["rev-parse", attConfig.branch]).catch(() => null);
+              const newTip = newTipResult?.trim() ?? "";
+              if (newTip && newTip !== attConfig.branchTipHash) {
+                const updatedConfigs = attachmentConfigs.map(a =>
+                  a.projectSlug === attConfig.projectSlug
+                    ? { ...a, branchTipHash: newTip, updatedAt: new Date().toISOString() }
+                    : a
+                );
+                await ctx.configStore.setProjectAttachments(project.id, updatedConfigs);
+                ctx.vaultManager.setAttachmentConfigs(project.id, updatedConfigs);
+                ctx.vaultManager.clearAttachmentCaches();
+                await ctx.vaultManager.loadAttachmentsForProject(project.id);
+                lines.push(`${label}: branch tip changed (${attConfig.branchTipHash.substring(0, 8)} → ${newTip.substring(0, 8)}), cache invalidated.`);
+                attConfig.branchTipHash = newTip;
+              } else if (newTip) {
+                lines.push(`${label}: no changes on branch '${attConfig.branch}'.`);
+              } else {
+                lines.push(`${label}: could not resolve branch '${attConfig.branch}'.`);
+              }
+            } catch (err: unknown) {
+              const message = err instanceof Error ? err.message : String(err);
+              lines.push(`${label}: fetch failed — ${message}`);
+            }
+          }
+          if (enabledAttachments.length === 0 && attachmentConfigs.length > 0) {
+            lines.push("attached vaults: all attachments disabled or using working-tree mode — skipped fetch.");
+          } else if (attachmentConfigs.length === 0) {
+            lines.push("attached vaults: none configured — skipped.");
+          }
         }
       }
 
