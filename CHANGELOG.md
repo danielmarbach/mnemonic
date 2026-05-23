@@ -27,6 +27,22 @@ The format is loosely based on Keep a Changelog and uses semver-style version he
   - Sync: `mnemonic_sync` fetches attached repo branches and reconciles embeddings
   - Session-scoped note cache with git-ref reads (fail-soft on missing repos/branches)
 
+  Phase 2 additions:
+  - **Attachment boost**: Attached vault notes receive half the project scope boost (0.015) in recall scoring, reflecting explicit user intent while keeping project-local notes ranked higher
+  - **Scope-extended semantics**: `scope: "project"` in recall, list, memory_graph, discover_tags now includes attached vault notes; `scope: "global"` excludes them
+  - **Project summary**: `project_memory_summary` includes attached vault count in structured output and text display
+  - **Staleness detection**: `loadAttachmentsForProject` compares stored branch tip hash against current git tip, ensuring fresh reads
+  - **Vault label consistency**: Remember tool text output now uses `storageLabel()` for consistent `attached:slug/.mnemonic` format
+
+  Test additions:
+  - AttachedStorage unit tests (45 tests)
+  - Vault helpers unit tests for storageLabel, vaultMatchesStorageScope, attachedVaultErrorMessage (14 tests)
+  - Config attachment unit tests (61 tests)
+  - IsProject migration verification (4 tests)
+  - Vault attachment functionality tests (11 tests)
+  - Recall attachment integration test (1 passing, 3 skipped for fixture)
+  - Mutation error integration tests (6 skipped for fixture)
+
   Breaking changes:
   - `Vault.isProject` replaced by `Vault.provenance` (`"main" | "project-local" | "project-attached"`)
   - `StorageScope` now includes `"attached"` value
