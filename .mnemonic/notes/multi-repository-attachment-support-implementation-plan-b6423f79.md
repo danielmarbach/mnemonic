@@ -6,7 +6,7 @@ tags:
   - attachments
 lifecycle: temporary
 createdAt: '2026-05-22T19:04:08.973Z'
-updatedAt: '2026-05-23T12:24:20.899Z'
+updatedAt: '2026-05-23T12:24:31.974Z'
 role: plan
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -18,6 +18,8 @@ relatedTo:
     type: derives-from
   - id: multi-repo-attachment-phase-1-implementation-17350a93
     type: related-to
+  - id: multi-repo-attachment-phase-2-research-1bb12411
+    type: derives-from
 memoryVersion: 1
 ---
 # Multi-repository attachment support — implementation plan
