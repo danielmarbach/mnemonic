@@ -6,7 +6,7 @@ tags:
   - attachments
 lifecycle: temporary
 createdAt: '2026-05-22T19:04:08.973Z'
-updatedAt: '2026-05-23T12:24:31.974Z'
+updatedAt: '2026-05-23T12:38:15.193Z'
 role: plan
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -34,10 +34,23 @@ All sub-phases 1a-1g implemented and committed. See permanent summary note `mult
 
 ## Phase 2: Tests, verification, staleness, auto-sync, portability
 
-### Phase 2a: Integration test suite
+### Phase 2a: Integration test suite 🔄
 
-- [ ] 1. `AttachedStorage.unit.test.ts` — git-ref reads, working-tree fallback, fail-soft on git errors, note caching, `writeEmbedding`/`writeProjection` write to local cache, `writeNote`/`deleteNote` throw
-- [ ] 2. `attached-vault.integration.test.ts` — comprehensive end-to-end test fixture:
+- \[x] 1. `AttachedStorage.unit.test.ts` — git-ref reads, working-tree fallback, fail-soft on git errors, note caching, `writeEmbedding`/`writeProjection` write to local cache, `writeNote`/`deleteNote` throw
+- \[ ] 2. `attached-vault.integration.test.ts` — comprehensive end-to-end test fixture
+- \[ ] 3. `recall-pipeline.integration.test.ts` — attached vault notes score/rank correctly with attachment boost, dedup by composite key
+- \[ ] 4. `tool-descriptions.integration.test.ts` — new tool descriptions match schema, existing tool descriptions updated for `storedIn: "attached"` and vault label formats
+- \[ ] 5. `output-rendering.integration.test.ts` — text output for `attached:<slug>/.mnemonic` vault labels
+- \[ ] 6. `mutation-error.integration.test.ts` — specific error messages when attempting to mutate attached vault notes
+- \[ ] 7. `isProject-migration.test.ts` — verify all former `isProject` call sites correctly use `provenance` or `writable`
+- \[ ] 8. `config.unit.test.ts` — attachment config parsing, normalization, count validation, max cap, branch validation, schema migration from 1.1 to 1.2
+- \[ ] 9. `vault.unit.test.ts` — VaultProvenance discrimination, `writable` computed property, attachment vault creation, search order with/without attachments, `allKnownVaults` vs `allKnownVaultsMutable`, `searchOrder` vs `searchOrderMutable`, `findNote` with `mutable: true` excludes attached vault notes
+- \[ ] 10. `storageLabel` unit tests — all provenance types, `attached:<slug>/.mnemonic` format
+- \[ ] 11. `vaultMatchesStorageScope` unit tests — `project-vault` filter excludes attached vaults, `"attached"` filter includes only attached vaults
+- \[ ] 12. `tool-output-schemas.unit.test.ts` — `_VaultLabel` regex accepts `attached:*` pattern, `ProjectSummaryNotesSchema` has `attachedVault` field
+
+- \[ ] 1. `AttachedStorage.unit.test.ts` — git-ref reads, working-tree fallback, fail-soft on git errors, note caching, `writeEmbedding`/`writeProjection` write to local cache, `writeNote`/`deleteNote` throw
+- \[ ] 2. `attached-vault.integration.test.ts` — comprehensive end-to-end test fixture:
   - `add_attachment` with default branch auto-detection via `git symbolic-ref`
   - `add_attachment` with explicit branch
   - `add_attachment` rejects invalid path, missing notes dir, same repo, count > max, no `origin` remote
@@ -72,64 +85,64 @@ All sub-phases 1a-1g implemented and committed. See permanent summary note `mult
   - Consolidate never touches attached vault notes
   - Forget never touches attached vault notes (uses `allKnownVaultsMutable`)
   - Relate/unrelate never modify attached vault notes (uses `allKnownVaultsMutable`)
-  - Remember/update/move_memory return specific error for attached note IDs (not generic "not found")
+  - Remember/update/move\_memory return specific error for attached note IDs (not generic "not found")
   - Working-tree mode (`branch: ""`) reads from filesystem, warning issued
   - Attachment boost scoring: attached notes score between project-local and global notes
   - `ProjectSummaryNotesSchema.attachedVault` count correct
   - `removeRelationshipsToNoteIds` skips attached vaults
   - `pushAfterMutation` skips attached vaults
-- [ ] 3. `recall-pipeline.integration.test.ts` — attached vault notes score/rank correctly with attachment boost, dedup by composite key
-- [ ] 4. `tool-descriptions.integration.test.ts` — new tool descriptions match schema, existing tool descriptions updated for `storedIn: "attached"` and vault label formats
-- [ ] 5. `output-rendering.integration.test.ts` — text output for `attached:<slug>/.mnemonic` vault labels in recall, list, get, where_is_memory, recent_memories, project_memory_summary, memory_graph
-- [ ] 6. `mutation-error.integration.test.ts` — specific error messages when attempting to mutate attached vault notes (update, forget, move_memory, relate, unrelate, consolidate)
-- [ ] 7. `isProject-migration.test.ts` — verify all former `isProject` call sites correctly use `provenance` or `writable`
-- [ ] 8. `config.unit.test.ts` — attachment config parsing, normalization, count validation, max cap, branch validation, schema migration from 1.1 to 1.2
-- [ ] 9. `vault.unit.test.ts` — VaultProvenance discrimination, `writable` computed property, attachment vault creation, search order with/without attachments, `allKnownVaults` vs `allKnownVaultsMutable`, `searchOrder` vs `searchOrderMutable`, `findNote` with `mutable: true` excludes attached vault notes
-- [ ] 10. `storageLabel` unit tests — all provenance types, `attached:<slug>/.mnemonic` format
-- [ ] 11. `vaultMatchesStorageScope` unit tests — `project-vault` filter excludes attached vaults, `"attached"` filter includes only attached vaults
-- [ ] 12. `tool-output-schemas.unit.test.ts` — `_VaultLabel` regex accepts `attached:*` pattern, `ProjectSummaryNotesSchema` has `attachedVault` field
+- \[ ] 3. `recall-pipeline.integration.test.ts` — attached vault notes score/rank correctly with attachment boost, dedup by composite key
+- \[ ] 4. `tool-descriptions.integration.test.ts` — new tool descriptions match schema, existing tool descriptions updated for `storedIn: "attached"` and vault label formats
+- \[ ] 5. `output-rendering.integration.test.ts` — text output for `attached:<slug>/.mnemonic` vault labels in recall, list, get, where\_is\_memory, recent\_memories, project\_memory\_summary, memory\_graph
+- \[ ] 6. `mutation-error.integration.test.ts` — specific error messages when attempting to mutate attached vault notes (update, forget, move\_memory, relate, unrelate, consolidate)
+- \[ ] 7. `isProject-migration.test.ts` — verify all former `isProject` call sites correctly use `provenance` or `writable`
+- \[ ] 8. `config.unit.test.ts` — attachment config parsing, normalization, count validation, max cap, branch validation, schema migration from 1.1 to 1.2
+- \[ ] 9. `vault.unit.test.ts` — VaultProvenance discrimination, `writable` computed property, attachment vault creation, search order with/without attachments, `allKnownVaults` vs `allKnownVaultsMutable`, `searchOrder` vs `searchOrderMutable`, `findNote` with `mutable: true` excludes attached vault notes
+- \[ ] 10. `storageLabel` unit tests — all provenance types, `attached:<slug>/.mnemonic` format
+- \[ ] 11. `vaultMatchesStorageScope` unit tests — `project-vault` filter excludes attached vaults, `"attached"` filter includes only attached vaults
+- \[ ] 12. `tool-output-schemas.unit.test.ts` — `_VaultLabel` regex accepts `attached:*` pattern, `ProjectSummaryNotesSchema` has `attachedVault` field
 
 ### Phase 2b: P0 verification and implementation
 
-- [ ] 13. Verify/implement recall attachment boost: `ATTACHMENT_BOOST = PROJECT_SCOPE_BOOST / 2 = 0.015` applied to notes from `provenance === "project-attached"` vaults
-- [ ] 14. Verify/implement `collectVisibleNotes` composite dedup key `(noteId, vaultPath)` instead of `noteId` alone
-- [ ] 15. Verify/implement `scope: "project"` attachment-extended semantics: attached notes pass `scope: "project"` filtering because explicitly attached
-- [ ] 16. Verify/implement `storedIn: "attached"` enum value in `StorageScope` and `vaultMatchesStorageScope`
-- [ ] 17. Verify/implement `ProjectSummaryNotesSchema.attachedVault` count field
-- [ ] 18. Run full test suite to confirm no regressions (should be >926 tests)
+- \[ ] 13. Verify/implement recall attachment boost: `ATTACHMENT_BOOST = PROJECT_SCOPE_BOOST / 2 = 0.015` applied to notes from `provenance === "project-attached"` vaults
+- \[ ] 14. Verify/implement `collectVisibleNotes` composite dedup key `(noteId, vaultPath)` instead of `noteId` alone
+- \[ ] 15. Verify/implement `scope: "project"` attachment-extended semantics: attached notes pass `scope: "project"` filtering because explicitly attached
+- \[ ] 16. Verify/implement `storedIn: "attached"` enum value in `StorageScope` and `vaultMatchesStorageScope`
+- \[ ] 17. Verify/implement `ProjectSummaryNotesSchema.attachedVault` count field
+- \[ ] 18. Run full test suite to confirm no regressions (should be >926 tests)
 
 ### Phase 2c: Staleness detection + embedding reconciliation
 
-- [ ] 19. `branchTipHash` staleness detection: on cache build, compare `attachmentRef.branchTipHash` against `git rev-parse <branch>`; invalidate caches and update hash when stale
-- [ ] 20. Embedding reconciliation on staleness: when branch tip changes, identify deleted/changed notes, remove stale embeddings, mark for re-embedding
-- [ ] 21. Sync-triggered cache invalidation: after `mnemonic_sync` for attached vault, call `invalidateActiveProjectCache()` or targeted `invalidateAttachedVaultCaches()`
-- [ ] 22. Unit tests for staleness detection and embedding reconciliation
+- \[ ] 19. `branchTipHash` staleness detection: on cache build, compare `attachmentRef.branchTipHash` against `git rev-parse <branch>`; invalidate caches and update hash when stale
+- \[ ] 20. Embedding reconciliation on staleness: when branch tip changes, identify deleted/changed notes, remove stale embeddings, mark for re-embedding
+- \[ ] 21. Sync-triggered cache invalidation: after `mnemonic_sync` for attached vault, call `invalidateActiveProjectCache()` or targeted `invalidateAttachedVaultCaches()`
+- \[ ] 22. Unit tests for staleness detection and embedding reconciliation
 
 ### Phase 2d: Output rendering + working-tree warnings
 
-- [ ] 23. Verify all text output rendering shows `attached:<slug>/.mnemonic` vault labels correctly (recall, list, get, where_is_memory, recent_memories, project_memory_summary, memory_graph, remember)
-- [ ] 24. `add_attachment` working-tree mode warning: when `branch: ""`, return warning that working-tree mode reads uncommitted content with no audit trail
-- [ ] 25. Verify all output schema `.describe()` updates mention `attached:` vault label format
-- [ ] 26. Output rendering integration tests for `attached:` vault labels
+- \[ ] 23. Verify all text output rendering shows `attached:<slug>/.mnemonic` vault labels correctly (recall, list, get, where\_is\_memory, recent\_memories, project\_memory\_summary, memory\_graph, remember)
+- \[ ] 24. `add_attachment` working-tree mode warning: when `branch: ""`, return warning that working-tree mode reads uncommitted content with no audit trail
+- \[ ] 25. Verify all output schema `.describe()` updates mention `attached:` vault label format
+- \[ ] 26. Output rendering integration tests for `attached:` vault labels
 
 ### Phase 2e: Auto-sync on branch change
 
-- [ ] 27. Auto-sync attached vaults when consuming project switches branches (investigate feasibility — this was explicitly deferred from Phase 1)
-- [ ] 28. If feasible: detect branch change in `ensureBranchSynced` for attached vaults, refresh cache
-- [ ] 29. If not feasible: document limitation and recommend explicit `sync` after branch switches
+- \[ ] 27. Auto-sync attached vaults when consuming project switches branches (investigate feasibility — this was explicitly deferred from Phase 1)
+- \[ ] 28. If feasible: detect branch change in `ensureBranchSynced` for attached vaults, refresh cache
+- \[ ] 29. If not feasible: document limitation and recommend explicit `sync` after branch switches
 
 ### Phase 2f: Machine-specific path portability
 
-- [ ] 30. Investigate config portability: machine-specific `localPath` means attachment configs don't port across machines
-- [ ] 31. Evaluate options: relative paths, `~` expansion, auto-detection of known repos, SSH config
-- [ ] 32. Implement chosen solution or document as known limitation with workaround
+- \[ ] 30. Investigate config portability: machine-specific `localPath` means attachment configs don't port across machines
+- \[ ] 31. Evaluate options: relative paths, `~` expansion, auto-detection of known repos, SSH config
+- \[ ] 32. Implement chosen solution or document as known limitation with workaround
 
 ### Phase 2g: Documentation + final verification
 
-- [ ] 33. Update AGENT.md with any new Phase 2 features (auto-sync, path portability)
-- [ ] 34. Update README.md with Phase 2 additions
-- [ ] 35. Update CHANGELOG.md with Phase 2 entry
-- [ ] 36. Run full test suite final time to confirm no regressions
+- \[ ] 33. Update AGENT.md with any new Phase 2 features (auto-sync, path portability)
+- \[ ] 34. Update README.md with Phase 2 additions
+- \[ ] 35. Update CHANGELOG.md with Phase 2 entry
+- \[ ] 36. Run full test suite final time to confirm no regressions
 
 ## Design decisions (confirmed) — carried forward from Phase 1
 
