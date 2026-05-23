@@ -253,7 +253,7 @@ export function registerRememberTool(server: McpServer, ctx: ServerContext): voi
         retry,
       });
 
-      const vaultLabel = vault.provenance === "project-local" ? " [project vault]" : vault.provenance === "project-attached" ? ` [attached:${vault.attachmentRef?.projectSlug}]` : " [main vault]";
+      const vaultLabel = ` [${storageLabel(vault)}]`;
       const textContent = `Remembered as \`${id}\` [${projectScope}, stored=${writeScope}]${vaultLabel}\n${formatPersistenceSummary(persistence)}`;
       
       const structuredContent: RememberResult = {
