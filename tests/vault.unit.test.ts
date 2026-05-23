@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { VaultManager } from "../src/vault.js";
+import { VaultManager, type ProjectAttachmentConfig } from "../src/vault.js";
 import { Storage, type Note } from "../src/storage.js";
 import { GitOps } from "../src/git.js";
 import * as fs from "fs/promises";
@@ -562,6 +562,242 @@ describe("VaultManager", () => {
 
       const relPath = vaultManager.noteRelPath(widgetVault!, "my-note");
       expect(relPath).toBe(".mnemonic-widget/notes/my-note.md");
+    });
+  });
+
+  describe("Attachment functionality", () => {
+    let projectDir: string;
+
+    beforeEach(async () => {
+      projectDir = path.join(tempDir, "attach-project");
+      await fs.mkdir(projectDir, { recursive: true });
+      await initGitRepo(projectDir, "# Attach Project");
+    });
+
+    function makeAttachmentConfig(overrides: Partial<ProjectAttachmentConfig> & { projectSlug: string }): ProjectAttachmentConfig {
+      return {
+        projectName: overrides.projectSlug,
+        localPath: path.join(tempDir, `attached-${overrides.projectSlug}`),
+        vaultFolder: ".mnemonic",
+        enabled: true,
+        branch: "main",
+        addedAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        branchTipHash: "abc123",
+        ...overrides,
+      };
+    }
+
+    async function setupAttachedVault(localPath: string): Promise<void> {
+      await fs.mkdir(localPath, { recursive: true });
+      await initGitRepoWithCommit(localPath, "# Attached vault");
+      const mnemonicDir = path.join(localPath, ".mnemonic", "notes");
+      await fs.mkdir(mnemonicDir, { recursive: true });
+    }
+
+    it("should have writable=false for project-attached provenance", async () => {
+      await vaultManager.getOrCreateProjectVault(projectDir);
+      const attachedPath = path.join(tempDir, "attached-writable-test");
+      await setupAttachedVault(attachedPath);
+
+      const config = makeAttachmentConfig({ projectSlug: "attached-writable-test", localPath: attachedPath });
+      vaultManager.setAttachmentConfigs("attach-project", [config]);
+      await vaultManager.loadAttachmentsForProject("attach-project");
+
+      const attached = vaultManager.getAttachmentsForProject("attach-project");
+      expect(attached).toHaveLength(1);
+      expect(attached[0].provenance).toBe("project-attached");
+      expect(attached[0].writable).toBe(false);
+    });
+
+    it("should have writable=true for project-local provenance", async () => {
+      const vault = await vaultManager.getOrCreateProjectVault(projectDir);
+      expect(vault).toBeTruthy();
+      expect(vault!.provenance).toBe("project-local");
+      expect(vault!.writable).toBe(true);
+    });
+
+    it("should have writable=true for main provenance", () => {
+      expect(vaultManager.main.provenance).toBe("main");
+      expect(vaultManager.main.writable).toBe(true);
+    });
+
+    it("should include attached vaults in searchOrder", async () => {
+      await vaultManager.getOrCreateProjectVault(projectDir);
+
+      const attachedPath = path.join(tempDir, "attached-search-order");
+      await setupAttachedVault(attachedPath);
+
+      const config = makeAttachmentConfig({ projectSlug: "attached-search-order", localPath: attachedPath });
+      vaultManager.setAttachmentConfigs("attach-project", [config]);
+      await vaultManager.loadAttachmentsForProject("attach-project");
+
+      const order = await vaultManager.searchOrder(projectDir, "attach-project");
+
+      const provenances = order.map(v => v.provenance);
+      expect(provenances).toContain("project-local");
+      expect(provenances).toContain("project-attached");
+      expect(provenances).toContain("main");
+
+      const localIdx = provenances.indexOf("project-local");
+      const attachedIdx = provenances.indexOf("project-attached");
+      const mainIdx = provenances.indexOf("main");
+      expect(localIdx).toBeLessThan(attachedIdx);
+      expect(localIdx).toBeLessThan(mainIdx);
+    });
+
+    it("should exclude attached vaults from searchOrderMutable", async () => {
+      await vaultManager.getOrCreateProjectVault(projectDir);
+
+      const attachedPath = path.join(tempDir, "attached-mutable");
+      await setupAttachedVault(attachedPath);
+
+      const config = makeAttachmentConfig({ projectSlug: "attached-mutable", localPath: attachedPath });
+      vaultManager.setAttachmentConfigs("attach-project", [config]);
+      await vaultManager.loadAttachmentsForProject("attach-project");
+
+      const mutable = await vaultManager.searchOrderMutable(projectDir, "attach-project");
+
+      const provenances = mutable.map(v => v.provenance);
+      expect(provenances).not.toContain("project-attached");
+      expect(provenances).toContain("project-local");
+      expect(provenances).toContain("main");
+    });
+
+    it("should include attached vaults in allKnownVaults when projectId is provided", async () => {
+      await vaultManager.getOrCreateProjectVault(projectDir);
+
+      const attachedPath = path.join(tempDir, "attached-known");
+      await setupAttachedVault(attachedPath);
+
+      const config = makeAttachmentConfig({ projectSlug: "attached-known", localPath: attachedPath });
+      vaultManager.setAttachmentConfigs("attach-project", [config]);
+      await vaultManager.loadAttachmentsForProject("attach-project");
+
+      const all = vaultManager.allKnownVaults("attach-project");
+      const provenances = all.map(v => v.provenance);
+      expect(provenances).toContain("project-attached");
+      expect(provenances).toContain("main");
+    });
+
+    it("should not include attached vaults in allKnownVaults without projectId", async () => {
+      await vaultManager.getOrCreateProjectVault(projectDir);
+
+      const attachedPath = path.join(tempDir, "attached-no-pid");
+      await setupAttachedVault(attachedPath);
+
+      const config = makeAttachmentConfig({ projectSlug: "attached-no-pid", localPath: attachedPath });
+      vaultManager.setAttachmentConfigs("attach-project", [config]);
+      await vaultManager.loadAttachmentsForProject("attach-project");
+
+      const all = vaultManager.allKnownVaults();
+      const provenances = all.map(v => v.provenance);
+      expect(provenances).not.toContain("project-attached");
+    });
+
+    it("should exclude attached vaults from allKnownVaultsMutable", async () => {
+      await vaultManager.getOrCreateProjectVault(projectDir);
+
+      const attachedPath = path.join(tempDir, "attached-mutable-known");
+      await setupAttachedVault(attachedPath);
+
+      const config = makeAttachmentConfig({ projectSlug: "attached-mutable-known", localPath: attachedPath });
+      vaultManager.setAttachmentConfigs("attach-project", [config]);
+      await vaultManager.loadAttachmentsForProject("attach-project");
+
+      const mutable = vaultManager.allKnownVaultsMutable();
+      const provenances = mutable.map(v => v.provenance);
+      expect(provenances).not.toContain("project-attached");
+      expect(provenances).toContain("main");
+    });
+
+    it("should exclude attached vaults from findNote with mutable: true", async () => {
+      await vaultManager.getOrCreateProjectVault(projectDir);
+
+      const attachedPath = path.join(tempDir, "attached-find-mutable");
+      await setupAttachedVault(attachedPath);
+
+      const config = makeAttachmentConfig({ projectSlug: "attached-find-mutable", localPath: attachedPath, branch: "" });
+      vaultManager.setAttachmentConfigs("attach-project", [config]);
+      const attached = await vaultManager.loadAttachmentsForProject("attach-project");
+      expect(attached).toHaveLength(1);
+
+      const attachmentsDir = path.join(attachedPath, ".mnemonic", "attachments", "attach-project");
+      const baseStorage = new Storage(attachmentsDir);
+      await baseStorage.init();
+
+      const note: Note = {
+        id: "attached-note-mutable",
+        title: "Attached Mutable Note",
+        content: "Read-only content",
+        tags: [],
+        lifecycle: "permanent",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      await baseStorage.writeNote(note);
+
+      const foundMutable = await vaultManager.findNote("attached-note-mutable", projectDir, { mutable: true, projectId: "attach-project" });
+      expect(foundMutable).toBeNull();
+
+      const foundRegular = await vaultManager.findNote("attached-note-mutable", projectDir, { projectId: "attach-project" });
+      expect(foundRegular).toBeTruthy();
+      expect(foundRegular!.vault.provenance).toBe("project-attached");
+    });
+
+    it("should set and retrieve attachment configs", () => {
+      const config1 = makeAttachmentConfig({ projectSlug: "config-slug-1", localPath: "/tmp/a" });
+      const config2 = makeAttachmentConfig({ projectSlug: "config-slug-2", localPath: "/tmp/b" });
+
+      vaultManager.setAttachmentConfigs("project-x", [config1, config2]);
+      const retrieved = vaultManager.getAttachmentsForProject("project-x");
+
+      expect(retrieved).toHaveLength(0);
+
+      vaultManager.clearAttachmentCaches();
+    });
+
+    it("should clear attachment caches", async () => {
+      await vaultManager.getOrCreateProjectVault(projectDir);
+
+      const attachedPath = path.join(tempDir, "attached-clear");
+      await setupAttachedVault(attachedPath);
+
+      const config = makeAttachmentConfig({ projectSlug: "attached-clear", localPath: attachedPath });
+      vaultManager.setAttachmentConfigs("attach-project", [config]);
+      await vaultManager.loadAttachmentsForProject("attach-project");
+
+      expect(vaultManager.getAttachmentsForProject("attach-project")).toHaveLength(1);
+
+      vaultManager.clearAttachmentCaches();
+
+      expect(vaultManager.getAttachmentsForProject("attach-project")).toHaveLength(0);
+    });
+
+    it("should remove a specific attachment by slug", async () => {
+      await vaultManager.getOrCreateProjectVault(projectDir);
+
+      const attachedPathA = path.join(tempDir, "attached-remove-a");
+      const attachedPathB = path.join(tempDir, "attached-remove-b");
+      await setupAttachedVault(attachedPathA);
+      await setupAttachedVault(attachedPathB);
+
+      const configA = makeAttachmentConfig({ projectSlug: "slug-a", localPath: attachedPathA });
+      const configB = makeAttachmentConfig({ projectSlug: "slug-b", localPath: attachedPathB });
+      vaultManager.setAttachmentConfigs("attach-project", [configA, configB]);
+      await vaultManager.loadAttachmentsForProject("attach-project");
+
+      expect(vaultManager.getAttachmentsForProject("attach-project")).toHaveLength(2);
+
+      vaultManager.removeAttachment("attach-project", "slug-a");
+
+      const remaining = vaultManager.getAttachmentsForProject("attach-project");
+      expect(remaining).toHaveLength(1);
+      expect(remaining[0].attachmentRef?.projectSlug).toBe("slug-b");
+    });
+
+    it("should not throw when removing a non-existent attachment", () => {
+      expect(() => vaultManager.removeAttachment("no-such-project", "no-such-slug")).not.toThrow();
     });
   });
 
