@@ -110,6 +110,7 @@ export function registerRememberTool(server: McpServer, ctx: ServerContext): voi
           .describe(
             "Where to store: 'project' writes to the shared project vault visible to all contributors; " +
             "'global' writes to the private main vault visible only on this machine. " +
+            "Attached vaults are read-only and cannot be written to. " +
             "When omitted, uses the project's saved policy or defaults to 'project'."
           ),
         allowProtectedBranch: z
