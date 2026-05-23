@@ -40,7 +40,7 @@ export function registerListTool(server: McpServer, ctx: ServerContext): void {
             "'all' = everything visible from this context (default)"
           ),
         storedIn: z
-          .enum(["project-vault", "main-vault", "any"])
+          .enum(["project-vault", "main-vault", "any", "attached"])
           .optional()
           .default("any")
           .describe(

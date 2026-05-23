@@ -40,7 +40,7 @@ describe("VaultManager", () => {
   describe("Main Vault Initialization", () => {
     it("should initialize main vault with correct structure", async () => {
       expect(vaultManager.main).toBeTruthy();
-      expect(vaultManager.main.isProject).toBe(false);
+      expect(vaultManager.main.provenance).toBe("main");
       expect(vaultManager.main.notesRelDir).toBe("notes");
       
       // Check directories created
@@ -82,7 +82,7 @@ describe("VaultManager", () => {
       // Now should detect
       const vaultAfter = await vaultManager.getProjectVaultIfExists(projectDir);
       expect(vaultAfter).toBeTruthy();
-      expect(vaultAfter!.isProject).toBe(true);
+      expect(vaultAfter!.provenance).toBe("project-local");
     });
 
     it("should create project vault with getOrCreateProjectVault", async () => {
@@ -98,7 +98,7 @@ describe("VaultManager", () => {
       // Create it
       const vault = await vaultManager.getOrCreateProjectVault(projectDir);
       expect(vault).toBeTruthy();
-      expect(vault!.isProject).toBe(true);
+      expect(vault!.provenance).toBe("project-local");
       expect(vault!.notesRelDir).toBe(".mnemonic/notes");
       
       // Should exist now
@@ -182,7 +182,7 @@ describe("VaultManager", () => {
       const found = await vaultManager.findNote("project-note", projectDir);
       expect(found).toBeTruthy();
       expect(found!.note.id).toBe("project-note");
-      expect(found!.vault.isProject).toBe(true);
+      expect(found!.vault.provenance).toBe("project-local");
     });
 
     it("should find note in main vault when note not in project", async () => {
@@ -210,7 +210,7 @@ describe("VaultManager", () => {
       const found = await vaultManager.findNote("main-only-note", projectDir);
       expect(found).toBeTruthy();
       expect(found!.note.id).toBe("main-only-note");
-      expect(found!.vault.isProject).toBe(false);
+      expect(found!.vault.provenance).toBe("main");
     });
 
     it("should find note without cwd (search all vaults)", async () => {
@@ -228,7 +228,7 @@ describe("VaultManager", () => {
       
       const found = await vaultManager.findNote("main-note");
       expect(found).toBeTruthy();
-      expect(found!.vault.isProject).toBe(false);
+      expect(found!.vault.provenance).toBe("main");
     });
 
     it("should return null for non-existent note", async () => {
@@ -261,7 +261,7 @@ describe("VaultManager", () => {
       // Should find project version first
       const found = await vaultManager.findNote("duplicate-id", projectDir);
       expect(found).toBeTruthy();
-      expect(found!.vault.isProject).toBe(true);
+      expect(found!.vault.provenance).toBe("project-local");
       expect(found!.note.content).toBe("Project version");
     });
   });
@@ -287,7 +287,7 @@ describe("VaultManager", () => {
       const vaults = vaultManager.allKnownVaults();
       expect(vaults).toHaveLength(4); // main + 3 projects
       
-      const projectVaults = vaults.filter(v => v.isProject);
+      const projectVaults = vaults.filter(v => v.provenance === "project-local");
       expect(projectVaults).toHaveLength(3);
     });
   });
@@ -331,7 +331,7 @@ describe("VaultManager", () => {
       // getOrCreateProjectVault from inside the submodule should place .mnemonic in the parent
       const vault = await vaultManager.getOrCreateProjectVault(submoduleCwd);
       expect(vault).toBeTruthy();
-      expect(vault!.isProject).toBe(true);
+      expect(vault!.provenance).toBe("project-local");
       // The vault storage path must be inside the parent repo, not the submodule
       expect(vault!.storage.vaultPath).toContain(parentDir);
       expect(vault!.storage.vaultPath).not.toContain("vendor/submodule");
@@ -393,7 +393,7 @@ describe("VaultManager", () => {
       const order = await vaultManager.searchOrder(projectDir);
       
       expect(order).toHaveLength(2);
-      const projectCount = order.filter(v => v.isProject).length;
+      const projectCount = order.filter(v => v.provenance === "project-local").length;
       expect(projectCount).toBe(1);
     });
   });
@@ -415,8 +415,8 @@ describe("VaultManager", () => {
 
       // allKnownVaults should include main + primary + both submodule vaults
       const allVaults = vaultManager.allKnownVaults();
-      const projectVaults = allVaults.filter(v => v.isProject);
-      expect(projectVaults).toHaveLength(3); // primary + sub1 + sub2
+      const projectVaults = allVaults.filter(v => v.provenance === "project-local");
+      expect(projectVaults).toHaveLength(3);
 
       const folderNames = projectVaults.map(v => v.vaultFolderName).sort();
       expect(folderNames).toEqual([".mnemonic", ".mnemonic-sub1", ".mnemonic-sub2"]);
@@ -434,7 +434,7 @@ describe("VaultManager", () => {
       expect(primaryVault).toBeTruthy();
 
       const allVaults = vaultManager.allKnownVaults();
-      const projectVaults = allVaults.filter(v => v.isProject);
+      const projectVaults = allVaults.filter(v => v.provenance === "project-local");
       expect(projectVaults).toHaveLength(1);
       expect(projectVaults[0]!.vaultFolderName).toBe(".mnemonic");
     });
@@ -453,7 +453,7 @@ describe("VaultManager", () => {
       const libVault = await vaultManager.getVaultByFolder(projectDir, ".mnemonic-lib");
       expect(libVault).toBeTruthy();
       expect(libVault!.vaultFolderName).toBe(".mnemonic-lib");
-      expect(libVault!.isProject).toBe(true);
+      expect(libVault!.provenance).toBe("project-local");
       expect(libVault!.notesRelDir).toBe(".mnemonic-lib/notes");
     });
 
@@ -504,7 +504,7 @@ describe("VaultManager", () => {
 
       // Should have: primary project vault, submodule vault, main vault
       expect(order.length).toBeGreaterThanOrEqual(3);
-      const projectVaultsInOrder = order.filter(v => v.isProject);
+      const projectVaultsInOrder = order.filter(v => v.provenance === "project-local");
       expect(projectVaultsInOrder).toHaveLength(2);
 
       // Primary project vault should come first

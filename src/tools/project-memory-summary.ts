@@ -158,7 +158,7 @@ export function registerProjectMemorySummaryTool(server: McpServer, ctx: ServerC
 
       // Separate project-scoped notes (for themes/anchors) from global notes
       const projectEntries = entries.filter(e =>
-        e.note.project === project.id || e.vault.isProject
+        e.note.project === project.id || e.vault.provenance !== "main"
       );
 
       // Empty-project case: no project-scoped notes exist
@@ -246,8 +246,9 @@ export function registerProjectMemorySummaryTool(server: McpServer, ctx: ServerC
       }
 
       // Calculate notes distribution (project-scoped only)
-      const projectVaultCount = projectEntries.filter(e => e.vault.isProject).length;
-      const mainVaultProjectEntries = projectEntries.filter(e => !e.vault.isProject);
+      const projectVaultCount = projectEntries.filter(e => e.vault.provenance === "project-local").length;
+      const _attachedVaultCount = projectEntries.filter(e => e.vault.provenance === "project-attached").length;
+      const mainVaultProjectEntries = projectEntries.filter(e => e.vault.provenance === "main");
       const mainVaultCount = mainVaultProjectEntries.length;
       const totalProjectNotes = projectEntries.length;
 

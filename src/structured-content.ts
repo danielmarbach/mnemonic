@@ -180,7 +180,7 @@ export interface ListResult extends Record<string, unknown> {
   action: "listed";
   count: number;
   scope: "project" | "global" | "all";
-  storedIn: "project-vault" | "main-vault" | "any";
+  storedIn: "project-vault" | "main-vault" | "any" | "attached";
   project?: ProjectRef;
   notes: Array<{
     id: string;
@@ -579,7 +579,7 @@ const _ChangeCategory = z.enum(CHANGE_CATEGORIES);
  * - "project-vault" for the primary project vault (.mnemonic/).
  * - "sub-vault:.mnemonic-<name>" for submodule-specific project vaults.
  */
-const _VaultLabel = z.string().regex(/^main-vault$|^project-vault$|^sub-vault:\.mnemonic-.+$/);
+const _VaultLabel = z.string().regex(/^main-vault$|^project-vault$|^sub-vault:\.mnemonic-.+$|^attached:[a-z0-9][-a-z0-9]*\/\.mnemonic(-.+)?$/);
 const ProjectRefSchema = z.object({ id: z.string(), name: z.string() });
 
 export const RelatedNotePreviewSchema = z.object({
@@ -763,7 +763,7 @@ export const ListResultSchema = z.object({
   action: z.literal("listed"),
   count: z.number(),
   scope: z.enum(["project", "global", "all"]),
-  storedIn: z.enum(["project-vault", "main-vault", "any"]),
+  storedIn: z.enum(["project-vault", "main-vault", "any", "attached"]),
   project: ProjectRefSchema.optional(),
   notes: z.array(z.object({
     id: z.string(),

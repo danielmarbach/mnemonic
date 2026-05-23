@@ -177,7 +177,7 @@ export async function shouldBlockProtectedBranchCommit(options: {
 export async function wouldRelationshipCleanupTouchProjectVault(ctx: ServerContext, noteIds: string[]): Promise<boolean> {
   const noteIdSet = new Set(noteIds);
   for (const vault of ctx.vaultManager.allKnownVaults()) {
-    if (!vault.isProject) {
+    if (vault.provenance !== "project-local") {
       continue;
     }
 

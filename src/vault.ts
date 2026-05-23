@@ -9,6 +9,28 @@ import { GitOps } from "./git.js";
 
 // ── Public types ──────────────────────────────────────────────────────────────
 
+export type VaultProvenance = "main" | "project-local" | "project-attached";
+
+export interface AttachmentRef {
+  projectSlug: string;
+  projectName: string;
+  localPath: string;
+  branch: string;
+  branchTipHash: string;
+}
+
+export interface ProjectAttachmentConfig {
+  projectSlug: string;
+  projectName: string;
+  localPath: string;
+  vaultFolder: string;
+  enabled: boolean;
+  branch: string;
+  addedAt: string;
+  updatedAt: string;
+  branchTipHash: string;
+}
+
 export interface Vault {
   storage: Storage;
   git: GitOps;
@@ -17,8 +39,7 @@ export interface Vault {
    * "notes" for the main vault, ".mnemonic/notes" for project vaults.
    */
   notesRelDir: string;
-  /** True when this vault lives inside a project repo (.mnemonic/). */
-  isProject: boolean;
+  provenance: VaultProvenance;
   /**
    * Vault folder name relative to the git root.
    * - "" for the main vault (it is its own standalone git repo).
@@ -26,6 +47,10 @@ export interface Vault {
    * - ".mnemonic-<name>" for submodule-specific project vaults.
    */
   vaultFolderName: string;
+  /** Ref metadata for attached vaults. Only present when provenance === "project-attached". */
+  attachmentRef?: AttachmentRef;
+  /** Whether this vault allows write operations. Computed from provenance. */
+  readonly writable: boolean;
 }
 
 // ── VaultManager ─────────────────────────────────────────────────────────────
@@ -47,7 +72,7 @@ export class VaultManager {
 
   constructor(mainVaultPath: string) {
     const resolved = path.resolve(mainVaultPath);
-    this.main = makeVault(resolved, resolved, "notes", false, "");
+    this.main = makeVault(resolved, resolved, "notes", "main", "");
   }
 
   async initMain(): Promise<void> {
@@ -189,7 +214,7 @@ export class VaultManager {
 
     if (!create && !(await pathExists(mnemonicPath))) return null;
 
-    const primaryVault = makeVault(mnemonicPath, resolved, ".mnemonic/notes", true, ".mnemonic");
+    const primaryVault = makeVault(mnemonicPath, resolved, ".mnemonic/notes", "project-local", ".mnemonic");
     await primaryVault.storage.init();
     await primaryVault.git.init();
 
@@ -219,7 +244,7 @@ export class VaultManager {
         subVaultPath,
         resolved,
         notesRelDir,
-        true,
+        "project-local",
         folderName,
         primaryVault.storage.embeddingsDir,
       );
@@ -239,16 +264,19 @@ function makeVault(
   vaultPath: string,
   gitRoot: string,
   notesRelDir: string,
-  isProject: boolean,
+  provenance: VaultProvenance,
   vaultFolderName: string,
   embeddingsDirOverride?: string,
+  attachmentRef?: AttachmentRef,
 ): Vault {
   return {
     storage: new Storage(vaultPath, embeddingsDirOverride),
     git: new GitOps(gitRoot, notesRelDir),
     notesRelDir,
-    isProject,
+    provenance,
     vaultFolderName,
+    attachmentRef,
+    get writable() { return this.provenance !== "project-attached"; },
   };
 }
 

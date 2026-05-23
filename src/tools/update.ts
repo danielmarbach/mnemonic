@@ -161,7 +161,7 @@ export function registerUpdateTool(server: McpServer, ctx: ServerContext): void 
       }
 
       const { note, vault } = found;
-      if (vault.isProject) {
+      if (vault.writable && vault.provenance === "project-local") {
         const resolvedProject = await resolveProject(ctx, cwd);
         const projectLabel = resolvedProject
           ? `${resolvedProject.name} (${resolvedProject.id})`

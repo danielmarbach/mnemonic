@@ -11,7 +11,7 @@ import { summarizePreview } from "../project-introspection.js";
 
 
 export type SearchScope = "project" | "global" | "all";
-export type StorageScope = "project-vault" | "main-vault" | "any";
+export type StorageScope = "project-vault" | "main-vault" | "any" | "attached";
 
 export type NoteEntry = {
   note: Note;
@@ -19,15 +19,20 @@ export type NoteEntry = {
 };
 
 export function storageLabel(vault: Vault): string {
-  if (!vault.isProject) return "main-vault";
-  if (vault.vaultFolderName === ".mnemonic") return "project-vault";
-  return `sub-vault:${vault.vaultFolderName}`;
+  if (vault.provenance === "main") return "main-vault";
+  if (vault.provenance === "project-local") {
+    if (vault.vaultFolderName === ".mnemonic") return "project-vault";
+    return `sub-vault:${vault.vaultFolderName}`;
+  }
+  return `attached:${vault.attachmentRef!.projectSlug}/${vault.vaultFolderName}`;
 }
 
 export function vaultMatchesStorageScope(vault: Vault, storedIn: StorageScope): boolean {
   if (storedIn === "any") return true;
-  if (storedIn === "main-vault") return !vault.isProject;
-  return vault.isProject;
+  if (storedIn === "main-vault") return vault.provenance === "main";
+  if (storedIn === "attached") return vault.provenance === "project-attached";
+  // "project-vault" matches only project-local vaults (not attached)
+  return vault.provenance === "project-local";
 }
 
 export async function collectVisibleNotes(

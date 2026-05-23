@@ -126,7 +126,7 @@ export function registerMoveMemoryTool(server: McpServer, ctx: ServerContext): v
         return { content: [{ type: "text", text: `Memory '${id}' is already stored in ${targetLabel}.` }], isError: true };
       }
 
-      if (found.vault.isProject || targetVault.isProject) {
+      if (found.vault.provenance === "project-local" || targetVault.provenance === "project-local") {
         const resolvedProject = targetProject ?? await resolveProject(ctx, cwd);
         const projectLabel = resolvedProject
           ? `${resolvedProject.name} (${resolvedProject.id})`

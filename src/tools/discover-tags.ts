@@ -54,7 +54,7 @@ export function registerDiscoverTagsTool(server: McpServer, ctx: ServerContext):
             "'all' = everything visible (default)"
           ),
         storedIn: z
-          .enum(["project-vault", "main-vault", "any"])
+          .enum(["project-vault", "main-vault", "any", "attached"])
           .optional()
           .default("any")
           .describe("Filter by vault storage label like list tool."),

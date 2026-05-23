@@ -539,7 +539,7 @@ export async function executeMerge(
   const projectVault = cwd ? await vaultManager.getProjectVaultIfExists(cwd) : null;
   const targetVault = existingTargetEntry?.vault ?? projectVault ?? vaultManager.main;
 
-  let touchesProjectVault = targetVault.isProject || sourceEntries.some((entry) => entry.vault.isProject);
+  let touchesProjectVault = targetVault.provenance === "project-local" || sourceEntries.some((entry) => entry.vault.provenance === "project-local");
   if (!touchesProjectVault && consolidationMode === "delete") {
     touchesProjectVault = await wouldRelationshipCleanupTouchProjectVault(ctx, sourceIds);
   }
@@ -929,7 +929,7 @@ export async function pruneSuperseded(
   }
 
   const supersededList = Array.from(supersededIds);
-  let touchesProjectVault = supersededList.some((id) => entries.find((e) => e.note.id === id)?.vault.isProject);
+  let touchesProjectVault = supersededList.some((id) => entries.find((e) => e.note.id === id)?.vault.provenance === "project-local");
   if (!touchesProjectVault) {
     touchesProjectVault = await wouldRelationshipCleanupTouchProjectVault(ctx, supersededList);
   }

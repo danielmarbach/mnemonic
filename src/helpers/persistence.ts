@@ -203,13 +203,17 @@ export async function getMutationPushMode(ctx: ServerContext): Promise<MutationP
 }
 
 export async function pushAfterMutation(ctx: ServerContext, vault: Vault): Promise<PushResult> {
+  if (!vault.writable) {
+    return { status: "skipped" as const, reason: "read-only-vault" as const };
+  }
+
   const mutationPushMode = await getMutationPushMode(ctx);
 
   switch (mutationPushMode) {
     case "all":
       return vault.git.pushWithStatus();
     case "main-only":
-      return vault.isProject
+      return vault.provenance === "project-local"
         ? { status: "skipped" as const, reason: "auto-push-disabled" as const }
         : vault.git.pushWithStatus();
     case "none":

@@ -50,7 +50,7 @@ export type CommitResult =
 
 export type PushResult =
   | { status: "pushed" }
-  | { status: "skipped"; reason: "git-disabled" | "no-remote" | "auto-push-disabled" | "commit-failed" }
+  | { status: "skipped"; reason: "git-disabled" | "no-remote" | "auto-push-disabled" | "commit-failed" | "read-only-vault" }
   | { status: "failed"; error: string };
 
 export class GitOps {

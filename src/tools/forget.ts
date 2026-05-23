@@ -76,7 +76,7 @@ export function registerForgetTool(server: McpServer, ctx: ServerContext): void 
       }
 
       const { note, vault: noteVault } = found;
-      const touchesProjectVault = noteVault.isProject || await wouldRelationshipCleanupTouchProjectVault(ctx, [id]);
+      const touchesProjectVault = noteVault.provenance === "project-local" || await wouldRelationshipCleanupTouchProjectVault(ctx, [id]);
       if (touchesProjectVault) {
         const resolvedProject = await resolveProject(ctx, cwd);
         const projectLabel = resolvedProject
