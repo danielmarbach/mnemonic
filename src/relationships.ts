@@ -172,7 +172,10 @@ export async function getDirectRelatedNotes(
 
   const visibleNotes = [...noteById.values()].map(v => v.note);
 
-  for (const relationship of note.relatedTo ?? []) {
+  for (const relatedId of relatedIds) {
+    const relationship = note.relatedTo?.find(r => r.id === relatedId);
+    if (!relationship) continue;
+
     let entry: { note: Note; vault: Vault } | undefined;
 
     if (relationship.vaultPath) {
@@ -186,7 +189,7 @@ export async function getDirectRelatedNotes(
     }
 
     if (!entry) {
-      entry = noteById.get(relationship.id);
+      entry = noteById.get(relatedId);
     }
 
     if (!entry) continue;
