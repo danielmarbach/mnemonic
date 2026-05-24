@@ -77,6 +77,10 @@ export function registerMoveMemoryTool(server: McpServer, ctx: ServerContext): v
       if (!found) {
         const foundAny = await ctx.vaultManager.findNote(id, cwd, { mutable: false });
         if (foundAny) {
+          if (foundAny.vault.writable) {
+            // Should not happen: writable attached vaults appear in mutable search
+            return { content: [{ type: "text", text: `Memory '${id}' is in an attached vault that appears non-writable.` }], isError: true };
+          }
           return { content: [{ type: "text", text: `Memory '${id}' is in an attached vault and cannot be moved. Attached vaults are read-only.` }], isError: true };
         }
         return { content: [{ type: "text", text: `No memory found with id '${id}'` }], isError: true };

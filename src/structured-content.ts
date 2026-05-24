@@ -299,6 +299,8 @@ export interface AddAttachmentResult extends Record<string, unknown> {
     enabled: boolean;
     branch: string;
     branchTipHash: string;
+    writable?: boolean;
+    pushBranch?: string;
   };
   warnings?: string[];
   retry?: MutationRetryContract;
@@ -330,6 +332,8 @@ export interface ListAttachmentsResult extends Record<string, unknown> {
     branchTipHash: string;
     pathExists: boolean;
     noteCount: number;
+    writable?: boolean;
+    pushBranch?: string;
   }>;
   maxAttachmentsPerProject: number;
 }
@@ -1292,6 +1296,8 @@ export const AddAttachmentResultSchema = z.object({
     enabled: z.boolean(),
     branch: z.string(),
     branchTipHash: z.string(),
+    writable: z.boolean().optional(),
+    pushBranch: z.string().optional(),
   }),
   warnings: z.array(z.string()).optional(),
   retry: PersistenceStatusSchema.shape.retry,
@@ -1323,6 +1329,8 @@ export const ListAttachmentsResultSchema = z.object({
     branchTipHash: z.string(),
     pathExists: z.boolean(),
     noteCount: z.number(),
+    writable: z.boolean().optional(),
+    pushBranch: z.string().optional(),
   })),
   maxAttachmentsPerProject: z.number(),
 });

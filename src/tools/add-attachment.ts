@@ -39,9 +39,9 @@ export function registerAddAttachmentTool(server: McpServer, ctx: ServerContext)
       description:
         "Use this when:\n" +
         "- You want to attach an external repository's mnemonic vault to the current project\n" +
-        "- You need read-only access to another project's memories\n\n" +
+        "- You need read-only or write-through access to another project's memories\n\n" +
         "Do not use this when:\n" +
-        "- You want to modify memories in another project (attachments are read-only)\n" +
+        "- You want to modify memories in another project without enabling write-through (set writable=false)\n" +
         "- You want to move memories between vaults (use `move_memory`)\n\n" +
         "Returns: the new attachment config and activation status.\n\n" +
         "[mutating: writes config, git commits, may push]\n\n" +
@@ -59,10 +59,12 @@ export function registerAddAttachmentTool(server: McpServer, ctx: ServerContext)
         localPath: z.string().describe("Absolute path to the external repository to attach."),
         vaultFolder: z.string().optional().describe("Vault folder name within the attached repo (default: .mnemonic)"),
         branch: z.string().optional().describe("Git branch to read notes from in the attached repo (default: auto-detected)"),
+        writable: z.boolean().optional().default(false).describe("Whether this attachment supports write operations (default: false). When true, remember/update/forget/relate/unrelate can modify notes in this attached vault."),
+        pushBranch: z.string().optional().describe("Git branch to push mutations to when writable. Defaults to the read branch. If empty, commits locally without push."),
       }),
       outputSchema: AddAttachmentResultSchema,
     },
-    async ({ cwd, localPath, vaultFolder, branch }) => {
+    async ({ cwd, localPath, vaultFolder, branch, writable, pushBranch }) => {
       const expandedPath = expandHomePath(localPath);
       const resolvedPath = path.resolve(expandedPath);
       if (!resolvedPath.startsWith("/")) {
@@ -144,6 +146,8 @@ export function registerAddAttachmentTool(server: McpServer, ctx: ServerContext)
         addedAt: existingIndex !== -1 ? currentAttachments[existingIndex]!.addedAt : now,
         updatedAt: now,
         branchTipHash,
+        writable: writable ?? false,
+        pushBranch: pushBranch ?? undefined,
       };
 
       let updatedAttachments: ProjectAttachmentConfig[];
@@ -196,17 +200,21 @@ export function registerAddAttachmentTool(server: McpServer, ctx: ServerContext)
           enabled: true,
           branch: effectiveBranch,
           branchTipHash,
+          writable: writable ?? false,
+          pushBranch: pushBranch ?? undefined,
         },
         warnings: warnings.length > 0 ? warnings : undefined,
         retry,
       };
 
       const branchDisplay = effectiveBranch || "(working-tree)";
+      const writableStr = writable ? "writable" : "read-only";
+      const pushStr = pushBranch ? `pushBranch=${pushBranch}` : "";
       return {
         content: [{
           type: "text",
           text:
-            `Attachment added to ${project.name}: ${name} (${slug}) at ${resolvedPath}, branch=${branchDisplay}` +
+            `Attachment added to ${project.name}: ${name} (${slug}) at ${resolvedPath}, branch=${branchDisplay}, ${writableStr}${pushStr ? `, ${pushStr}` : ""}` +
             (warnings.length > 0 ? `\nWarnings: ${warnings.join("; ")}` : "") +
             (commitStatus.status === "failed"
               ? `\n${formatRetrySummary(retry) ?? `Commit failed. Push status: ${pushStatus.status}.`}`

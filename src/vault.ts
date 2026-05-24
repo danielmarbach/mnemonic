@@ -163,11 +163,16 @@ export class VaultManager {
     return all;
   }
 
-  /** All writable vaults (excludes attached/read-only vaults). */
+  /** All writable vaults (includes writable attached vaults). */
   allKnownVaultsMutable(): Vault[] {
     const all: Vault[] = [this.main];
     for (const vaults of this.allProjectVaultsByRoot.values()) {
       all.push(...vaults);
+    }
+    for (const vaults of this.attachedVaults.values()) {
+      for (const vault of vaults) {
+        if (vault.writable) all.push(vault);
+      }
     }
     return all;
   }

@@ -86,10 +86,14 @@ export function registerListAttachmentsTool(server: McpServer, ctx: ServerContex
           branchTipHash: att.branchTipHash,
           pathExists,
           noteCount,
+          writable: att.writable,
+          pushBranch: att.pushBranch,
         });
 
+        const writableStr = att.writable ? "writable" : "read-only";
+        const pushStr = att.pushBranch ? `pushBranch=${att.pushBranch}` : "push=default";
         lines.push(
-          `  - ${att.projectName} (${att.projectSlug}): ${status}, branch=${branchDisplay}, notes=${noteCount}, path=${resolvedLocalPath}`
+          `  - ${att.projectName} (${att.projectSlug}): ${status}, ${writableStr}, ${pushStr}, branch=${branchDisplay}, notes=${noteCount}, path=${resolvedLocalPath}`
         );
       }
 
