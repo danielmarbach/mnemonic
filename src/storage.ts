@@ -29,6 +29,7 @@ export const NOTE_IMPORTANCE_LEVELS = ["high", "normal", "low"] as const satisfi
 export interface Relationship {
   id: MemoryId;
   type: RelationshipType;
+  vaultPath?: string;
 }
 
 export interface Note {

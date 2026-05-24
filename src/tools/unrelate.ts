@@ -4,6 +4,7 @@ import type { ServerContext } from "../server-context.js";
 import { projectParam, ensureBranchSynced } from "../helpers/project.js";
 import { isoDateString } from "../brands.js";
 import type { Vault } from "../vault.js";
+import type { Relationship } from "../storage.js";
 import {
   RelateResultSchema,
   type RelateResult,

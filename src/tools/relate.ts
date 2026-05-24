@@ -2,7 +2,7 @@ import { z } from "zod";
 import path from "node:path";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ServerContext } from "../server-context.js";
-import { RELATIONSHIP_TYPES } from "../storage.js";
+import { RELATIONSHIP_TYPES, type Relationship } from "../storage.js";
 import {
   RelateResultSchema,
   type RelateResult,
@@ -85,10 +85,16 @@ export function registerRelateTool(server: McpServer, ctx: ServerContext): void 
       // Group changes by vault so notes in the same vault share one commit
       const vaultChanges = new Map<Vault, string[]>();
 
+      const crossVault = fromVault.storage.vaultPath !== toVault.storage.vaultPath;
+
       const fromRels = fromNote.relatedTo ?? [];
       const fromRelExists = fromRels.some((r) => r.id === toId);
       if (!fromRelExists) {
-        await fromVault.storage.writeNote({ ...fromNote, relatedTo: [...fromRels, { id: memoryId(toId), type }], updatedAt: now });
+        const fromRelationship: Relationship = { id: memoryId(toId), type };
+        if (crossVault) {
+          fromRelationship.vaultPath = toVault.storage.vaultPath;
+        }
+        await fromVault.storage.writeNote({ ...fromNote, relatedTo: [...fromRels, fromRelationship], updatedAt: now });
         const files = vaultChanges.get(fromVault) ?? [];
         files.push(ctx.vaultManager.noteRelPath(fromVault, fromId));
         vaultChanges.set(fromVault, files);
@@ -97,7 +103,11 @@ export function registerRelateTool(server: McpServer, ctx: ServerContext): void 
       const toRels = toNote.relatedTo ?? [];
       const toRelExists = toRels.some((r) => r.id === fromId);
       if (bidirectional && !toRelExists) {
-        await toVault.storage.writeNote({ ...toNote, relatedTo: [...toRels, { id: memoryId(fromId), type }], updatedAt: now });
+        const toRelationship: Relationship = { id: memoryId(fromId), type };
+        if (crossVault) {
+          toRelationship.vaultPath = fromVault.storage.vaultPath;
+        }
+        await toVault.storage.writeNote({ ...toNote, relatedTo: [...toRels, toRelationship], updatedAt: now });
         const files = vaultChanges.get(toVault) ?? [];
         files.push(ctx.vaultManager.noteRelPath(toVault, toId));
         vaultChanges.set(toVault, files);

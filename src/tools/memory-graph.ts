@@ -59,8 +59,8 @@ export function registerMemoryGraphTool(server: McpServer, ctx: ServerContext): 
         .slice(0, limit)
         .map((entry) => {
           const edges = (entry.note.relatedTo ?? [])
-            .filter((rel) => visibleIds.has(rel.id))
-            .map((rel) => `${rel.id} (${rel.type})`);
+            .filter((rel) => visibleIds.has(rel.id) || rel.vaultPath)
+            .map((rel) => `${rel.id} (${rel.type})${rel.vaultPath ? ` [vault:${rel.vaultPath}]` : ""}`);
           return edges.length > 0 ? `- ${entry.note.id} -> ${edges.join(", ")}` : null;
         })
         .filter(Boolean);
@@ -82,7 +82,7 @@ export function registerMemoryGraphTool(server: McpServer, ctx: ServerContext): 
         .slice(0, limit)
         .map((entry: NoteEntry) => {
           const edges = (entry.note.relatedTo ?? [])
-            .filter((rel) => visibleIds.has(rel.id))
+            .filter((rel) => visibleIds.has(rel.id) || rel.vaultPath)
             .map((rel) => ({ toId: rel.id, type: rel.type }));
           return {
             id: entry.note.id,
