@@ -1294,6 +1294,11 @@
         <h3>Agents know what to trust</h3>
         <p>Every <code style="font-family:JetBrains Mono,monospace;font-size:0.8em;color:var(--primary-lt)">recall</code> result carries structured quality signals: <code style="font-family:JetBrains Mono,monospace;font-size:0.8em;color:var(--cyan-lt)">signalStrength</code> rates each note on role, centrality, and recency; <code style="font-family:JetBrains Mono,monospace;font-size:0.8em;color:var(--cyan-lt)">retrievalCoverage</code> shows how many of your most important notes made it in; <code style="font-family:JetBrains Mono,monospace;font-size:0.8em;color:var(--cyan-lt)">diversity</code> reveals how many perspectives the result set spans. Agents don't just see ranked notes — they see why each note is worth paying attention to.</p>
       </div>
+      <div class="feature-card fade-up">
+        <span class="feature-icon">&#x1F517;</span>
+        <h3>Federated knowledge</h3>
+        <p>Link other repositories as read-only knowledge sources so relevant context from adjacent projects surfaces automatically in recall and summaries. Mark an attachment writable and mnemonic can remember, update, and relate notes across repository boundaries while keeping each project's decision log in its own git history.</p>
+      </div>
     </div>
   </div>
 </section>
@@ -1632,6 +1637,33 @@
           <div class="tool-card" data-tip="Set per-project policy once: where memories go by default, and whether protected branches should ask, block, or allow automatic project-vault commits.">
             <div class="tool-card-name">set_project_memory_policy</div>
             <div class="tool-card-purpose">Set default memory and protected-branch behavior</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Attachments -->
+      <div>
+        <div class="tool-category-header">Attachments</div>
+        <div class="tool-category-grid">
+          <div class="tool-card" data-tip="Link an external repository as a read-only or writable knowledge source. Supports branch pinning, sub-vault selection, and write-through for cross-repo memory.">
+            <div class="tool-card-name">add_attachment</div>
+            <div class="tool-card-purpose">Add a federated knowledge source</div>
+          </div>
+          <div class="tool-card" data-tip="Remove a linked repository by its project slug. This stops recall and summaries from including that external vault.">
+            <div class="tool-card-name">remove_attachment</div>
+            <div class="tool-card-purpose">Remove a federated knowledge source</div>
+          </div>
+          <div class="tool-card" data-tip="List every attachment for the current project with its path, branch, and note count. Useful for auditing which repos are feeding into your project memory.">
+            <div class="tool-card-name">list_attachments</div>
+            <div class="tool-card-purpose">See all linked repositories</div>
+          </div>
+          <div class="tool-card" data-tip="Temporarily turn an attachment on or off without deleting its configuration. Good for pausing noisy or currently irrelevant repos.">
+            <div class="tool-card-name">set_attachment_enabled</div>
+            <div class="tool-card-purpose">Toggle an attachment on or off</div>
+          </div>
+          <div class="tool-card" data-tip="Switch which branch an attachment reads from. Useful when you want to follow a release branch or a feature branch instead of main.">
+            <div class="tool-card-name">set_attachment_branch</div>
+            <div class="tool-card-purpose">Change the attachment branch</div>
           </div>
         </div>
       </div>

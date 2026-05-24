@@ -542,7 +542,7 @@ Imported notes are written to the main vault with `lifecycle: permanent` and `sc
 
 | Tool                        | Description                                                              |
 |-----------------------------|--------------------------------------------------------------------------|
-| `add_attachment`            | Add an external repository as a federated knowledge source; requires `localPath`, optional `branch` and `vaultFolder` |
+| `add_attachment`            | Add an external repository as a federated knowledge source; requires `localPath`, optional `branch`, `vaultFolder`, `writable`, and `pushBranch` |
 | `consolidate`               | Merge and analyze overlapping notes; evidence defaults `true` for analysis strategies and execute-merge (lifecycle, risk, classification, warnings) |
 | `detect_project`            | Resolve `cwd` to stable project id via git remote URL                   |
 | `discover_tags`            | Suggest canonical tags for a note using title/content/query context; `mode: "browse"` opts into broader inventory output |
@@ -610,18 +610,19 @@ relatedTo:
 
 ### Multi-repository attachments
 
-Phase 1 of multi-repo attachment support lets you link external repositories as **read-only** knowledge sources alongside your own project vault. Attached repo notes appear in recall, summaries, list, get, memory_graph, and relationship previews — but cannot be modified through mnemonic tools.
+Multi-repo attachment support lets you link external repositories as **federated knowledge sources** alongside your own project vault. By default, attached repos are read-only; set `writable: true` on `add_attachment` to enable write-through.
 
 Key concepts:
 
-- **Attached vaults are read-only.** Mutation tools (`remember`, `update`, `forget`, `relate`, `unrelate`, `move_memory`, `consolidate`) return a specific error when targeting an attached vault note.
-- `add_attachment` links a repo by its absolute `localPath`; optional `branch` and `vaultFolder` select a branch and sub-vault.
+- `add_attachment` links a repo by its absolute `localPath` (supports `~` expansion); optional `branch`, `vaultFolder`, `writable`, and `pushBranch` select branch, sub-vault, write access, and push target.
 - `remove_attachment` removes by `projectSlug`; `list_attachments` shows all attachments with status.
 - `set_attachment_enabled` toggles an attachment on/off without removing config; `set_attachment_branch` changes the branch.
 - Max 5 attachments per project (configurable via `maxAttachmentsPerProject` in project memory policy).
 - Storage label format: `attached:<slug>/.mnemonic`
 - Use `storedIn: "attached"` on `list`, `recall`, or `where_is_memory` to audit attached-repo notes; `storedIn: "any"` includes all vaults.
 - `sync` fetches attached repo branches and reconciles embeddings in the same call.
+- **Writable attached vaults**: when `writable: true`, `remember`, `update`, `forget`, `relate`, `unrelate`, `consolidate`, and `move_memory` can modify notes in the attached vault; commits push to `pushBranch` (or the attachment's `branch` if omitted).
+- **Cross-vault relationships**: notes in different vaults can be related; the `Relationship` type includes a `vaultPath` field for cross-vault traversal.
 - If an attached repo or branch is unavailable, reads fail-soft and the rest of the session continues unaffected.
 
 See `AGENT.md` for the full tool descriptions and attachment architecture details.

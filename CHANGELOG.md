@@ -15,7 +15,7 @@ The format is loosely based on Keep a Changelog and uses semver-style version he
   - **Attachment auto-sync**: Attached vault branches are now fetched automatically when the consuming project switches branches. Stale embeddings are removed after branch tip changes.
   - **Path portability**: `add_attachment` `localPath` now supports `~` expansion. Config stores portable `~`-prefixed paths; all tools resolve `~` at runtime via `expandHomePath`.
   - **Embedding reconciliation**: `sync` and auto-sync now remove stale embeddings when attached vault branch tips change.
-  - **Phase 3 — Writable attached vaults**: Attachments can be marked `writable: true` on `add_attachment`, enabling `remember`, `update`, `forget`, `relate`, `unrelate`, `consolidate`, and `move_memory` on notes in the attached vault. Writes commit and push to the attachment's `pushBranch` (falls back to `branch`). Config schema bumped to 1.3 with `writable` and `pushBranch` fields.
+  - **Phase 3 — Writable attached vaults**: Attachments can be marked `writable: true` on `add_attachment`, enabling mutating tools on attached vault notes; writes commit and push to the attachment's `pushBranch` (falls back to `branch`). Config schema bumped to 1.3.
   - **Phase 3 — Cross-vault relationships**: Notes in different vaults can now be related; the `Relationship` type includes a `vaultPath` field for cross-vault traversal.
 - Devcontainer configuration for Node 24 development with Ollama and the `nomic-embed-text-v2-moe` embedding model pre-installed ([@boblangley](https://github.com/boblangley)).
 - CI `check-toolchain-sync` job that validates the Node version in the devcontainer matches CI workflows ([@boblangley](https://github.com/boblangley)).
