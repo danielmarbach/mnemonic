@@ -7,7 +7,7 @@ tags:
   - phase3
 lifecycle: temporary
 createdAt: '2026-05-24T06:48:00.084Z'
-updatedAt: '2026-05-24T06:48:00.084Z'
+updatedAt: '2026-05-24T11:08:20.731Z'
 role: plan
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -24,74 +24,80 @@ Active checkpoint for Phase 3 implementation. Tracks sub-phase completion.
 
 ## Sub-phase checklist
 
-### 3a.1: Type + config changes
+### 3a.1: Type + config changes (COMMITTED 0aa1fef)
 
-- [ ] 1. Add `writable?: boolean` to `AttachmentRef`. Default false.
-- [ ] 2. Add `pushBranch?: string` to `AttachmentRef`. Defaults to read branch.
-- [ ] 3. Config schema migration: bump to "1.3", add migration for projectAttachments.
-- [ ] 4. `loadAttachmentsForProject`: set `writable` getter based on `attachmentRef.writable === true`.
+- \[x] 1. Add `writable?: boolean` to `AttachmentRef`. Default false.
+- \[x] 2. Add `pushBranch?: string` to `AttachmentRef`. Defaults to read branch.
+- \[x] 3. Config schema migration: bump to "1.3".
+- \[x] 4. `loadAttachmentsForProject`: set `writable` getter based on `config.writable === true`.
 
-### 3a.2: AttachedStorage write enablement
+### 3a.2: AttachedStorage write enablement (COMMITTED 57320ff)
 
-- [ ] 5. Replace `AttachedVaultReadOnlyError` throws with conditional: if vault writable, delegate to baseStorage.
-- [ ] 6. `writeEmbedding`/`writeProjection` already write to local cache, no change.
-- [ ] 7. After write: commit via GitOps.commitWithStatus scoped to notes dir, push to pushBranch if configured.
+- \[x] 5. Replace `AttachedVaultReadOnlyError` throws with conditional: if vault writable, delegate to baseStorage.
+- \[x] 6. `writeEmbedding`/`writeProjection` already write to local cache, no change.
+- \[x] 7. After write: commit via GitOps.commitWithStatus scoped to notes dir. pushBranch handled in pushAfterMutation.
 
-### 3a.3: Vault routing changes
+### 3a.3: Vault routing changes (COMMITTED bfaf376)
 
-- [ ] 8. `searchOrderMutable` already uses writable filter. No change.
-- [ ] 9. `allKnownVaultsMutable`: include writable attached vaults.
-- [ ] 10. `findNote(mutable: true)` — verify double-lookup error messages correct for non-writable.
+- \[x] 8. `searchOrderMutable` already uses writable filter. No change.
+- \[x] 9. `allKnownVaultsMutable`: include writable attached vaults.
+- \[x] 10. `findNote(mutable: true)` works correctly — writable attached vaults appear in searchOrderMutable.
 
-### 3a.4: Tool-level changes
+### 3a.4: Tool-level changes (COMMITTED 57320ff + bfaf376)
 
-- [ ] 11. `remember`: resolveWriteVault path for writable attachments.
-- [ ] 12. `update`/`forget`: remove hard block for writable attached vaults.
-- [ ] 13. `relate`/`unrelate`: allow mutable find for writable attached vaults.
-- [ ] 14. `consolidate`: entry.vault.writable check already correct.
-- [ ] 15. `move_memory`: allow source in writable attached vault.
-- [ ] 16. `pushAfterMutation`: update mutationPushMode logic.
+- \[x] 11. resolveWriteVault: tools find writable attached vaults via findNote({ mutable: true })
+- \[x] 12. `update`/`forget`: no inline changes needed — findNote({ mutable: true }) already works with writable attached vaults. Error messages preserved for non-writable.
+- \[x] 13. `relate`/`unrelate`: same mechanism.
+- \[x] 14. `consolidate`: entry.vault.writable check already correct.
+- \[x] 15. `move_memory`: error message updated for non-writable case.
+- \[x] 16. `pushAfterMutation`: updated — "all" mode pushes writable attached vaults via pushBranch; "main-only" skips attached vaults.
 
-### 3a.5: Attachment tool updates
+### 3a.5: Attachment tool updates (COMMITTED bfaf376)
 
-- [ ] 17. `add_attachment`: add writable and pushBranch params.
-- [ ] 18. `list_attachments`: show writable and pushBranch.
-- [ ] 19. `set_attachment_enabled`/`set_attachment_branch`: verify no changes needed.
+- \[x] 17. `add_attachment`: writable and pushBranch params added.
+- \[x] 18. `list_attachments`: writable and pushBranch shown in output.
+- \[x] 19. `set_attachment_enabled`/`set_attachment_branch`: no changes needed — they operate on ProjectAttachmentConfig which already has writable/pushBranch fields preserved through round-trip.
 
-### 3a.6: Sync + staleness
+- \[x] 20. sync push for writable attached vaults.
+- \[ ] 21. branchTipHash update post-write.
+- \[ ] 22. Cache invalidation.
 
-- [ ] 20. `sync`: writable attached vaults get push-after-sync.
-- [ ] 21. After write-push, update branchTipHash in config.
-- [ ] 22. After write, invalidate session cache for that vault.
+- \[ ] 20. `sync`: writable attached vaults get push-after-sync via existing sync + pushAfterMutation integration.
+- \[ ] 21. After write-push, update branchTipHash in config.
+- \[ ] 22. After write, invalidate session cache that vault.
 
 ### 3a.7: Error messages + docs
 
-- [ ] 23. Update attachedVaultErrorMessage conditional.
-- [ ] 24. Update tool descriptions.
-- [ ] 25. AGENT.md, CHANGELOG.md updates.
+- \[ ] 23. Update attachedVaultErrorMessage conditional.
+- \[ ] 24. Update tool descriptions.
+- \[ ] 25. AGENT.md, CHANGELOG.md updates.
 
 ### 3b: Cross-vault relationship traversal
 
-- [ ] 26. Extend Relationship type with optional vaultPath.
-- [ ] 27. Update validateRelatedTo to parse vaultPath.
-- [ ] 28. Update note serialization/deserialization.
-- [ ] 29. getDirectRelatedNotes: resolve vault-qualified IDs.
-- [ ] 30. findNote: include target vault when vaultPath present.
-- [ ] 31. memory_graph: relax visibleIds filter for cross-vault.
-- [ ] 32. relate: store vaultPath for cross-vault relationships.
-- [ ] 33. unrelate: handle cross-vault vaultPath.
-- [ ] 34. removeRelationshipsToNoteIds: scan all vaults for dangling refs.
-- [ ] 35. getRelationshipPreview: resolve vault-qualified IDs.
-- [ ] 36. formatRelationshipPreview: show vault provenance.
-- [ ] 37. Recall top-N relationship expansion.
-- [ ] 38. auto-relate: consider cross-project candidates.
+- \[ ] 26. Extend Relationship type with optional vaultPath.
+- \[ ] 27. Update validateRelatedTo to parse vaultPath.
+- \[ ] 28. Update note serialization/deserialization.
+- \[ ] 29. getDirectRelatedNotes: resolve vault-qualified IDs.
+- \[ ] 30. findNote: include target vault when vaultPath present.
+- \[ ] 31. memory\_graph: relax visibleIds filter for cross-vault.
+- \[ ] 32. relate: store vaultPath for cross-vault relationships.
+- \[ ] 33. unrelate: handle cross-vault vaultPath.
+- \[ ] 34. removeRelationshipsToNoteIds: scan all vaults for dangling refs.
+- \[ ] 35. getRelationshipPreview: resolve vault-qualified IDs.
+- \[ ] 36. formatRelationshipPreview: show vault provenance.
+- \[ ] 37. Recall top-N relationship expansion.
+- \[ ] 38. auto-relate: consider cross-project candidates.
 
 ### 3c: Tests
 
-- [ ] 39. Enable 6 skipped tests in mutation-error.integration.test.ts.
-- [ ] 40. New tests for writable attached vault mutations.
-- [ ] 41. Integration tests for cross-vault relate/unrelate.
+- \[ ] 39. Enable 6 skipped tests in mutation-error.integration.test.ts.
+- \[ ] 40. New tests for writable attached vault mutations.
+- \[ ] 41. Integration tests for cross-vault relate/unrelate.
 
-## Commits
+- `0aa1fef` feat: add writable and pushBranch to AttachmentRef and config (3a.1)
+- `57320ff` feat: enable write-through to attached vaults (3a.2-3a.4: AttachedStorage, pushAfterMutation, GitOps.pushBranch)
+- `bfaf376` feat: add writable/pushBranch to attachment tools and vault routing (3a.3-3a.5: allKnownVaultsMutable, add\_attachment, list\_attachments, schemas)
 
-(To be filled as work progresses)
+- `0aa1fef` feat: add writable and pushBranch to AttachmentRef and config (3a.1)
+- `57320ff` feat: enable write-through to attached vaults (3a.2-3a.4: AttachedStorage, pushAfterMutation, GitOps.pushBranch)
+- `bfaf376` feat: add writable/pushBranch to attachment tools and vault routing (3a.3-3a.5: allKnownVaultsMutable, add\_attachment, list\_attachments, schemas)
