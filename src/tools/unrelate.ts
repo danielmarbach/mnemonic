@@ -1,9 +1,9 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ServerContext } from "../server-context.js";
-import { projectParam, ensureBranchSynced } from "../helpers/project.js";
+import { projectParam, ensureBranchSynced, resolveProject } from "../helpers/project.js";
 import { isoDateString } from "../brands.js";
-import { attachedVaultErrorMessage } from "../helpers/vault.js";
+import { attachedVaultErrorMessage, ensureAttachmentsLoaded } from "../helpers/vault.js";
 import type { Vault } from "../vault.js";
 import type { Relationship } from "../storage.js";
 import {
@@ -53,16 +53,19 @@ export function registerUnrelateTool(server: McpServer, ctx: ServerContext): voi
     },
     async ({ fromId, toId, bidirectional, cwd }) => {
       await ensureBranchSynced(ctx, cwd);
+      const project = await resolveProject(ctx, cwd);
+      const projectId = project?.id;
+      if (projectId) await ensureAttachmentsLoaded(ctx, projectId);
 
       const [foundFrom, foundTo] = await Promise.all([
-        ctx.vaultManager.findNote(fromId, cwd, { mutable: true }),
-        ctx.vaultManager.findNote(toId, cwd, { mutable: true }),
+        ctx.vaultManager.findNote(fromId, cwd, { mutable: true, projectId }),
+        ctx.vaultManager.findNote(toId, cwd, { mutable: true, projectId }),
       ]);
 
       if (!foundFrom && !foundTo) {
         const [foundFromAny, foundToAny] = await Promise.all([
-          ctx.vaultManager.findNote(fromId, cwd, { mutable: false }),
-          ctx.vaultManager.findNote(toId, cwd, { mutable: false }),
+          ctx.vaultManager.findNote(fromId, cwd, { mutable: false, projectId }),
+          ctx.vaultManager.findNote(toId, cwd, { mutable: false, projectId }),
         ]);
         if (foundFromAny && foundFromAny.vault.provenance === "project-attached") {
           return { content: [{ type: "text", text: attachedVaultErrorMessage(fromId, foundFromAny.vault) }], isError: true };

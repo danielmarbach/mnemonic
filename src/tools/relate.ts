@@ -11,9 +11,10 @@ import {
 import {
   projectParam,
   ensureBranchSynced,
+  resolveProject,
 } from "../helpers/project.js";
 import { memoryId, isoDateString } from "../brands.js";
-import { attachedVaultErrorMessage } from "../helpers/vault.js";
+import { attachedVaultErrorMessage, ensureAttachmentsLoaded } from "../helpers/vault.js";
 import type { Vault } from "../vault.js";
 import { formatCommitBody } from "../helpers/git-commit.js";
 import {
@@ -60,20 +61,23 @@ export function registerRelateTool(server: McpServer, ctx: ServerContext): void 
     },
     async ({ fromId, toId, type, bidirectional, cwd }) => {
       await ensureBranchSynced(ctx, cwd);
+      const project = await resolveProject(ctx, cwd);
+      const projectId = project?.id;
+      if (projectId) await ensureAttachmentsLoaded(ctx, projectId);
 
       const [foundFrom, foundTo] = await Promise.all([
-        ctx.vaultManager.findNote(fromId, cwd, { mutable: true }),
-        ctx.vaultManager.findNote(toId, cwd, { mutable: true }),
+        ctx.vaultManager.findNote(fromId, cwd, { mutable: true, projectId }),
+        ctx.vaultManager.findNote(toId, cwd, { mutable: true, projectId }),
       ]);
       if (!foundFrom) {
-        const foundFromAny = await ctx.vaultManager.findNote(fromId, cwd, { mutable: false });
+        const foundFromAny = await ctx.vaultManager.findNote(fromId, cwd, { mutable: false, projectId });
         if (foundFromAny) {
           return { content: [{ type: "text", text: attachedVaultErrorMessage(fromId, foundFromAny.vault) }], isError: true };
         }
         return { content: [{ type: "text", text: `No memory found with id '${fromId}'` }], isError: true };
       }
       if (!foundTo) {
-        const foundToAny = await ctx.vaultManager.findNote(toId, cwd, { mutable: false });
+        const foundToAny = await ctx.vaultManager.findNote(toId, cwd, { mutable: false, projectId });
         if (foundToAny) {
           return { content: [{ type: "text", text: attachedVaultErrorMessage(toId, foundToAny.vault) }], isError: true };
         }
