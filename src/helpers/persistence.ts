@@ -9,7 +9,7 @@ import { storageLabel } from "./vault.js";
 import { UnknownRecoveryKindError, UnknownMutationPushModeError } from "../domain-errors.js";
 import { AttachedStorage } from "../attached-storage.js";
 import { simpleGit } from "simple-git";
-import { debugLog, getErrorMessage } from "../error-utils.js";
+import { debugLog, attempt } from "../error-utils.js";
 import { expandHomePath } from "../paths.js";
 import { detectProject } from "../project.js";
 import path from "node:path";
@@ -256,21 +256,22 @@ async function doPush(vault: Vault): Promise<PushResult> {
 }
 
 async function updateAttachedBranchTipHash(ctx: ServerContext, vault: Vault): Promise<void> {
-  const ref = vault.attachmentRef!;
+  if (!vault.attachmentRef) return;
+  const ref = vault.attachmentRef;
   const resolvedLocalPath = path.resolve(expandHomePath(ref.localPath));
   const branch = ref.pushBranch || ref.branch;
   if (!branch) return;
 
-  try {
+  const result = await attempt("persistence:branch-tip", async () => {
     const git = simpleGit(resolvedLocalPath);
     const newTipResult = await git.raw(["rev-parse", branch]);
     const newTip = newTipResult?.trim() ?? "";
-    if (!newTip || newTip === ref.branchTipHash) return;
+    if (!newTip || newTip === ref.branchTipHash) return null;
 
     const project = await detectProject(resolvedLocalPath, {
       getProjectIdentityOverride: async (projectId) => ctx.configStore.getProjectIdentityOverride(projectId),
     });
-    if (!project) return;
+    if (!project) return null;
 
     const configs = await ctx.configStore.getProjectAttachments(project.id);
     const updatedConfigs = configs.map(a =>
@@ -279,9 +280,11 @@ async function updateAttachedBranchTipHash(ctx: ServerContext, vault: Vault): Pr
         : a
     );
     await ctx.configStore.setProjectAttachments(project.id, updatedConfigs);
-    ref.branchTipHash = newTip;
-    debugLog("persistence:branch-tip", `${ref.projectSlug}: updated to ${newTip.substring(0, 8)}`);
-  } catch (err) {
-    debugLog("persistence:branch-tip", `failed: ${getErrorMessage(err)}`);
+    return newTip;
+  });
+
+  if (result.ok && result.value) {
+    ref.branchTipHash = result.value;
+    debugLog("persistence:branch-tip", `${ref.projectSlug}: updated to ${result.value.substring(0, 8)}`);
   }
 }
