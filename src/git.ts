@@ -313,6 +313,24 @@ export class GitOps {
     });
   }
 
+  /** Push to a specific branch. Used for writable attached vaults with pushBranch configured. */
+  async pushBranch(branch: string): Promise<PushResult> {
+    if (!this.enabled) return { status: "skipped", reason: "git-disabled" };
+    return this.withMutationLock(async () => {
+      try {
+        const remotes = await this.git.getRemotes();
+        if (remotes.length === 0) return { status: "skipped", reason: "no-remote" };
+        await this.retryLockErrors("push", () => this.git.push(["--set-upstream", "origin", branch]));
+        console.error(`[git] Pushed to ${branch}`);
+        return { status: "pushed" };
+      } catch (err) {
+        const message = getErrorMessage(err);
+        console.error(`[git] Push to ${branch} failed: ${message}`);
+        return { status: "failed", error: message };
+      }
+    });
+  }
+
   private async withMutationLock<T>(operation: () => Promise<T>): Promise<T> {
     const previous = mutationLocks.get(this.gitRoot) ?? Promise.resolve();
     let release!: () => void;

@@ -21,12 +21,14 @@ export class AttachedStorage implements NoteStorage {
   private noteCache = new Map<string, Note>();
   private noteIdCache: MemoryId[] | null = null;
   private notesRelDir: string;
+  private writable: boolean;
 
-  constructor(baseStorage: Storage, repoPath: string, branch: string, notesRelDir: string) {
+  constructor(baseStorage: Storage, repoPath: string, branch: string, notesRelDir: string, writable: boolean = false) {
     this.baseStorage = baseStorage;
     this.repoPath = repoPath;
     this.branch = branch;
     this.notesRelDir = notesRelDir;
+    this.writable = writable;
   }
 
   get vaultPath(): string { return this.baseStorage.vaultPath; }
@@ -111,23 +113,38 @@ export class AttachedStorage implements NoteStorage {
     return notes;
   }
 
-  async writeNote(_note: Note): Promise<void> {
+  async writeNote(note: Note): Promise<void> {
+    if (this.writable) {
+      return this.baseStorage.writeNote(note);
+    }
     throw new AttachedVaultReadOnlyError("write note");
   }
 
-  async deleteNote(_id: MemoryId): Promise<boolean> {
+  async deleteNote(id: MemoryId): Promise<boolean> {
+    if (this.writable) {
+      return this.baseStorage.deleteNote(id);
+    }
     throw new AttachedVaultReadOnlyError("delete note");
   }
 
   async beginAtomicNotesWrite(): Promise<void> {
+    if (this.writable) {
+      return this.baseStorage.beginAtomicNotesWrite();
+    }
     throw new AttachedVaultReadOnlyError("begin atomic write");
   }
 
   async commitAtomicNotesWrite(): Promise<void> {
+    if (this.writable) {
+      return this.baseStorage.commitAtomicNotesWrite();
+    }
     throw new AttachedVaultReadOnlyError("commit atomic write");
   }
 
   async rollbackAtomicNotesWrite(): Promise<void> {
+    if (this.writable) {
+      return this.baseStorage.rollbackAtomicNotesWrite();
+    }
     throw new AttachedVaultReadOnlyError("rollback atomic write");
   }
 

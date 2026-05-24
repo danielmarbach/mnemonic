@@ -211,11 +211,14 @@ export async function pushAfterMutation(ctx: ServerContext, vault: Vault): Promi
 
   switch (mutationPushMode) {
     case "all":
-      return vault.git.pushWithStatus();
+      return doPush(vault);
     case "main-only":
+      if (vault.provenance === "project-attached") {
+        return { status: "skipped" as const, reason: "auto-push-disabled" as const };
+      }
       return vault.provenance === "project-local"
         ? { status: "skipped" as const, reason: "auto-push-disabled" as const }
-        : vault.git.pushWithStatus();
+        : doPush(vault);
     case "none":
       return { status: "skipped" as const, reason: "auto-push-disabled" as const };
     default: {
@@ -223,4 +226,12 @@ export async function pushAfterMutation(ctx: ServerContext, vault: Vault): Promi
       throw new UnknownMutationPushModeError(_exhaustive);
     }
   }
+}
+
+async function doPush(vault: Vault): Promise<PushResult> {
+  const pushBranch = vault.attachmentRef?.pushBranch;
+  if (pushBranch && pushBranch.length > 0) {
+    return vault.git.pushBranch(pushBranch);
+  }
+  return vault.git.pushWithStatus();
 }
