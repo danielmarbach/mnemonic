@@ -32,7 +32,7 @@ import {
   getRecentSessionAccessNote,
 } from "../cache.js";
 import { NOTE_LIFECYCLES, NOTE_ROLES, type Note } from "../storage.js";
-import { storageLabel } from "../helpers/vault.js";
+import { storageLabel, ensureAttachmentsLoaded } from "../helpers/vault.js";
 import {
   type UpdateResult,
   UpdateToolResultSchema,
@@ -148,10 +148,13 @@ export function registerUpdateTool(server: McpServer, ctx: ServerContext): void 
     async ({ id, content, semanticPatch, title, tags, lifecycle, role, summary, alwaysLoad, cwd, allowProtectedBranch = false }) => {
       await ensureBranchSynced(ctx, cwd);
       const noteId = memoryId(id);
+      const project = await resolveProject(ctx, cwd);
+      const projectId = project?.id;
+      if (projectId) await ensureAttachmentsLoaded(ctx, projectId);
 
-      const found = await ctx.vaultManager.findNote(id, cwd, { mutable: true });
+      const found = await ctx.vaultManager.findNote(id, cwd, { mutable: true, projectId });
       if (!found) {
-        const foundAny = await ctx.vaultManager.findNote(id, cwd, { mutable: false });
+        const foundAny = await ctx.vaultManager.findNote(id, cwd, { mutable: false, projectId });
         if (foundAny) {
           return { content: [{ type: "text", text: `Memory '${id}' is in an attached vault (${storageLabel(foundAny.vault)}) and cannot be modified. Attached vaults are read-only.` }], isError: true };
         }

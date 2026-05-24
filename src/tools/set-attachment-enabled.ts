@@ -99,7 +99,7 @@ export function registerSetAttachmentEnabledTool(server: McpServer, ctx: ServerC
         content: [{
           type: "text",
           text:
-            `Attachment ${updated.projectName} (${projectSlug}) for ${project.name}: enabled=${enabled}` +
+            `Attachment ${updated.projectName} (${projectSlug}) for ${project.name}: ${enabled ? "enabled" : "disabled"}` +
             (commitStatus.status === "failed"
               ? `\n${formatRetrySummary(retry) ?? `Commit failed. Push status: ${pushStatus.status}.`}`
               : ""),

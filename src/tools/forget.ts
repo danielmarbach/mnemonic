@@ -29,6 +29,7 @@ import {
   addVaultChange,
   storageLabel,
   attachedVaultErrorMessage,
+  ensureAttachmentsLoaded,
 } from "../helpers/vault.js";
 import { invalidateActiveProjectCache } from "../cache.js";
 
@@ -70,10 +71,13 @@ export function registerForgetTool(server: McpServer, ctx: ServerContext): void 
     },
     async ({ id, cwd, allowProtectedBranch = false }) => {
       await ensureBranchSynced(ctx, cwd);
+      const project = await resolveProject(ctx, cwd);
+      const projectId = project?.id;
+      if (projectId) await ensureAttachmentsLoaded(ctx, projectId);
 
-      const found = await ctx.vaultManager.findNote(id, cwd, { mutable: true });
+      const found = await ctx.vaultManager.findNote(id, cwd, { mutable: true, projectId });
       if (!found) {
-        const foundAny = await ctx.vaultManager.findNote(id, cwd, { mutable: false });
+        const foundAny = await ctx.vaultManager.findNote(id, cwd, { mutable: false, projectId });
         if (foundAny) {
           return { content: [{ type: "text", text: attachedVaultErrorMessage(id, foundAny.vault) }], isError: true };
         }

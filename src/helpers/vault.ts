@@ -156,6 +156,17 @@ export const ROLE_LIFECYCLE_DEFAULTS = {
   reference: "permanent",
 } as const satisfies Record<NoteRole, NoteLifecycle>;
 
+export async function ensureAttachmentsLoaded(ctx: ServerContext, projectId: string): Promise<void> {
+  const existing = ctx.vaultManager.getAttachmentsForProject(projectId);
+  if (existing.length > 0) return;
+
+  const configs = await ctx.configStore.getProjectAttachments(projectId);
+  if (configs.length === 0) return;
+
+  ctx.vaultManager.setAttachmentConfigs(projectId, configs);
+  await ctx.vaultManager.loadAttachmentsForProject(projectId);
+}
+
 export function projectNotFoundResponse(cwd: string) {
   return { content: [{ type: "text" as const, text: `Could not detect a project for: ${cwd}` }], isError: true as const };
 }
