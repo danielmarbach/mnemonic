@@ -1,30 +1,50 @@
 import { describe, expect, it } from "vitest";
 import { Vault, VaultProvenance } from "../src/vault.js";
+import { readdir, readFile, stat } from "fs/promises";
+import path from "path";
 
-async function rgMatches(pattern: string, cwd: string): Promise<string[]> {
-  const { execFile } = await import("child_process");
-  const { promisify } = await import("util");
-  const execFileAsync = promisify(execFile);
+async function getTsFiles(dir: string): Promise<string[]> {
+  const files: string[] = [];
+  const entries = await readdir(dir, { withFileTypes: true });
 
-  try {
-    const { stdout } = await execFileAsync("rg", ["--pcre2", pattern, "--type", "ts", "--no-heading", "-n", "src/"], { cwd });
-    return stdout.split("\n").filter((line) => line.trim());
-  } catch (err: unknown) {
-    if (err instanceof Error && "code" in err && (err as NodeJS.ErrnoException).code === 1) {
-      return [];
+  for (const entry of entries) {
+    const fullPath = path.join(dir, entry.name);
+    if (entry.isDirectory() && entry.name !== "node_modules" && entry.name !== "build") {
+      files.push(...await getTsFiles(fullPath));
+    } else if (entry.isFile() && entry.name.endsWith(".ts")) {
+      files.push(fullPath);
     }
-    throw err;
   }
+
+  return files;
+}
+
+async function searchFiles(pattern: RegExp, cwd: string): Promise<string[]> {
+  const files = await getTsFiles(path.join(cwd, "src"));
+  const matches: string[] = [];
+
+  for (const file of files) {
+    const content = await readFile(file, "utf-8");
+    let match;
+    const relativePath = path.relative(cwd, file);
+    while ((match = pattern.exec(content)) !== null) {
+      const lines = content.substring(0, match.index).split("\n");
+      const lineNumber = lines.length;
+      matches.push(`${relativePath}:${lineNumber}:${match[0]}`);
+    }
+  }
+
+  return matches;
 }
 
 describe("isProject migration (Phase 1)", () => {
   it("has no .isProject property access remaining in TypeScript source files", async () => {
-    const matches = await rgMatches("isProject(?!ion|Note)", import.meta.dirname + "/..");
+    const matches = await searchFiles(/\.isProject(?!ion|Note)/, import.meta.dirname + "/..");
     expect(matches).toHaveLength(0);
   });
 
   it("has no isProject property definition remaining in TypeScript source files", async () => {
-    const matches = await rgMatches("\\bisProject\\b", import.meta.dirname + "/..");
+    const matches = await searchFiles(/\bisProject\b/, import.meta.dirname + "/..");
     expect(matches).toHaveLength(0);
   });
 
