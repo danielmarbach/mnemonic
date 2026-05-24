@@ -240,7 +240,7 @@ export function registerUpdateTool(server: McpServer, ctx: ServerContext): void 
       const resolvedContent = patchedContent ?? cleanedContent ?? note.content;
       const resolvedTags = tags ?? note.tags;
       const resolvedLifecycle = lifecycle ?? note.lifecycle;
-      const resolvedRole = role !== undefined ? role : (note.role ? note.role : undefined);
+      const resolvedRole = role ?? note.role;
       const resolvedAlwaysLoad = alwaysLoad !== undefined ? alwaysLoad : note.alwaysLoad;
 
       let relatedToChanged = false;

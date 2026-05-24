@@ -25,12 +25,25 @@ const createNote = (overrides: Partial<Note>): Note => ({
   ...overrides,
 });
 
-const createVault = (notes: Note[]): Vault => ({
-  storage: {
-    readNote: async (id: string) => notes.find(note => note.id === id),
-    listNotes: async () => notes,
-  },
-} as unknown as Vault);
+function mockVault(partial: Partial<Vault> = {}): Vault {
+  return {
+    storage: {} as Vault["storage"],
+    git: {} as Vault["git"],
+    notesRelDir: "notes",
+    provenance: "main",
+    vaultFolderName: "",
+    writable: true,
+    ...partial,
+  };
+}
+
+const createVault = (notes: Note[]): Vault =>
+  mockVault({
+    storage: {
+      readNote: async (id: string) => notes.find(note => note.id === id) ?? null,
+      listNotes: async () => notes,
+    } as unknown as Vault["storage"],
+  });
 
 // ── Unit tests for scoring helpers ────────────────────────────────────────────
 
@@ -220,10 +233,10 @@ describe("buildRelationshipPreview", () => {
 
   it("respects limit parameter", () => {
     const scored = [
-      { note: createNote({ id: "1", title: "First" }), vault: {} as any, relationType: "related-to" as const, score: 100 },
-      { note: createNote({ id: "2", title: "Second" }), vault: {} as any, relationType: "related-to" as const, score: 90 },
-      { note: createNote({ id: "3", title: "Third" }), vault: {} as any, relationType: "related-to" as const, score: 80 },
-      { note: createNote({ id: "4", title: "Fourth" }), vault: {} as any, relationType: "related-to" as const, score: 70 },
+      { note: createNote({ id: "1", title: "First" }), vault: mockVault(), relationType: "related-to" as const, score: 100 },
+      { note: createNote({ id: "2", title: "Second" }), vault: mockVault(), relationType: "related-to" as const, score: 90 },
+      { note: createNote({ id: "3", title: "Third" }), vault: mockVault(), relationType: "related-to" as const, score: 80 },
+      { note: createNote({ id: "4", title: "Fourth" }), vault: mockVault(), relationType: "related-to" as const, score: 70 },
     ];
 
     const result = buildRelationshipPreview(scored, { activeProjectId: "test-project", limit: 2 });
@@ -235,7 +248,7 @@ describe("buildRelationshipPreview", () => {
   it("enforces hard max of 5", () => {
     const scored = Array.from({ length: 10 }, (_, i) => ({
       note: createNote({ id: `${i}`, title: `Note ${i}` }),
-      vault: {} as any,
+      vault: mockVault(),
       relationType: "related-to" as const,
       score: 100 - i,
     }));
@@ -247,7 +260,7 @@ describe("buildRelationshipPreview", () => {
 
   it("includes theme in preview", () => {
     const scored = [
-      { note: createNote({ id: "1", title: "Design Decision", tags: ["design"] }), vault: {} as any, relationType: "related-to" as const, score: 100 },
+      { note: createNote({ id: "1", title: "Design Decision", tags: ["design"] }), vault: mockVault(), relationType: "related-to" as const, score: 100 },
     ];
 
     const result = buildRelationshipPreview(scored, { activeProjectId: "test-project" });
@@ -256,7 +269,7 @@ describe("buildRelationshipPreview", () => {
 
   it("omits theme when classified as other", () => {
     const scored = [
-      { note: createNote({ id: "1", title: "Random Note" }), vault: {} as any, relationType: "related-to" as const, score: 100 },
+      { note: createNote({ id: "1", title: "Random Note" }), vault: mockVault(), relationType: "related-to" as const, score: 100 },
     ];
 
     const result = buildRelationshipPreview(scored, { activeProjectId: "test-project" });
@@ -317,21 +330,21 @@ describe("getDirectRelatedNotes", () => {
       ],
     });
 
-    const vaultA = {
+    const vaultA = mockVault({
       storage: {
         vaultPath: vaultPathA,
         readNote: async () => null,
         listNotes: async () => [source],
-      },
-    } as unknown as Vault;
+      } as unknown as Vault["storage"],
+    });
 
-    const vaultB = {
+    const vaultB = mockVault({
       storage: {
         vaultPath: vaultPathB,
         readNote: async () => targetNote,
         listNotes: async () => [targetNote],
-      },
-    } as unknown as Vault;
+      } as unknown as Vault["storage"],
+    });
 
     const result = await getDirectRelatedNotes(source, [vaultA, vaultB]);
 
@@ -365,8 +378,8 @@ describe("Phase 4 acceptance criteria", () => {
     const globalNote = createNote({ id: "global", title: "Global" });
 
     const scored = [
-      { note: globalNote, vault: {} as any, relationType: "related-to" as const, score: scoreRelatedNote(globalNote, undefined) },
-      { note: projectNote, vault: {} as any, relationType: "related-to" as const, score: scoreRelatedNote(projectNote, "test-project") },
+      { note: globalNote, vault: mockVault(), relationType: "related-to" as const, score: scoreRelatedNote(globalNote, undefined) },
+      { note: projectNote, vault: mockVault(), relationType: "related-to" as const, score: scoreRelatedNote(projectNote, "test-project") },
     ];
     scored.sort((a, b) => b.score - a.score);
 
@@ -376,7 +389,7 @@ describe("Phase 4 acceptance criteria", () => {
   it("output stays compact (max 3 shown by default)", () => {
     const scored = Array.from({ length: 10 }, (_, i) => ({
       note: createNote({ id: `${i}`, title: `Note ${i}` }),
-      vault: {} as any,
+      vault: mockVault(),
       relationType: "related-to" as const,
       score: 100 - i,
     }));
@@ -388,7 +401,7 @@ describe("Phase 4 acceptance criteria", () => {
   it("truncated flag set when more relations exist", () => {
     const scored = Array.from({ length: 5 }, (_, i) => ({
       note: createNote({ id: `${i}`, title: `Note ${i}` }),
-      vault: {} as any,
+      vault: mockVault(),
       relationType: "related-to" as const,
       score: 100 - i,
     }));

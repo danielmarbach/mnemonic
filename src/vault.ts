@@ -67,16 +67,16 @@ export class VaultManager {
    * Primary project vaults (`.mnemonic/`) loaded this session, keyed by resolved git root.
    * Used for backwards-compatible single-vault access.
    */
-  private primaryProjectVaults = new Map<string, Vault>();
+  private readonly primaryProjectVaults = new Map<string, Vault>();
   /**
    * All project vaults per git root (primary + submodule vaults), keyed by resolved git root.
    * The first entry in the array is always the primary `.mnemonic` vault.
    */
-  private allProjectVaultsByRoot = new Map<string, Vault[]>();
+  private readonly allProjectVaultsByRoot = new Map<string, Vault[]>();
   /** Attached vault configs per project slug, set by tools after reading from configStore. */
-  private attachmentConfigs = new Map<string, ProjectAttachmentConfig[]>();
+  private readonly attachmentConfigs = new Map<string, ProjectAttachmentConfig[]>();
   /** Attached vault objects per project slug, loaded lazily. */
-  private attachedVaults = new Map<string, Vault[]>();
+  private readonly attachedVaults = new Map<string, Vault[]>();
   /** Git root of the main vault — set after initMain(). */
   private mainGitRoot = "";
 

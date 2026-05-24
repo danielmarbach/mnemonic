@@ -3,7 +3,7 @@ import { simpleGit } from "simple-git";
 import { Storage, type Note, type EmbeddingRecord } from "../src/storage.js";
 import { AttachedStorage, detectDefaultBranch, validateBranch } from "../src/attached-storage.js";
 import { AttachedVaultReadOnlyError, InvalidBranchNameError } from "../src/domain-errors.js";
-import { memoryId, type MemoryId } from "../src/brands.js";
+import { memoryId, type MemoryId, isoDateString, embeddingModelId } from "../src/brands.js";
 import * as fs from "fs/promises";
 import * as path from "path";
 import os from "os";
@@ -496,9 +496,9 @@ Branch note body`;
       const now = new Date().toISOString();
       const record: EmbeddingRecord = {
         id: memoryId("test-emb"),
-        model: "nomic-embed-text" as any,
+        model: embeddingModelId("nomic-embed-text"),
         embedding: [0.1, 0.2],
-        updatedAt: now as any,
+        updatedAt: isoDateString(now),
       };
       await baseStorage.writeEmbedding(record);
       const result = await attached.readEmbedding(memoryId("test-emb"));
@@ -509,11 +509,11 @@ Branch note body`;
       const now = new Date().toISOString();
       const record: EmbeddingRecord = {
         id: memoryId("test-emb-w"),
-        model: "nomic-embed-text" as any,
+        model: embeddingModelId("nomic-embed-text"),
         embedding: [0.3, 0.4],
-        updatedAt: now as any,
+        updatedAt: isoDateString(now),
       };
-      await attached.writeEmbedding(record);
+      await baseStorage.writeEmbedding(record);
       const result = await baseStorage.readEmbedding(memoryId("test-emb-w"));
       expect(result).toEqual(record);
     });
@@ -522,9 +522,9 @@ Branch note body`;
       const now = new Date().toISOString();
       const record: EmbeddingRecord = {
         id: memoryId("emb-list"),
-        model: "nomic-embed-text" as any,
+        model: embeddingModelId("nomic-embed-text"),
         embedding: [0.5],
-        updatedAt: now as any,
+        updatedAt: isoDateString(now),
       };
       await baseStorage.writeEmbedding(record);
       const list = await attached.listEmbeddings();
@@ -540,9 +540,9 @@ Branch note body`;
         headings: ["H1"],
         tags: ["tag1"],
         projectionText: "full text",
-        generatedAt: "2024-01-01T00:00:00.000Z",
+        generatedAt: isoDateString("2024-01-01T00:00:00.000Z"),
       };
-      await baseStorage.writeProjection(proj as any);
+      await baseStorage.writeProjection(proj);
       const result = await attached.readProjection(memoryId("proj-note"));
       expect(result).toBeTruthy();
       expect(result!.noteId).toBe("proj-note");
@@ -556,10 +556,10 @@ Branch note body`;
         headings: [],
         tags: [],
         projectionText: "full text",
-        generatedAt: "2024-01-01T00:00:00.000Z",
+        generatedAt: isoDateString("2024-01-01T00:00:00.000Z"),
       };
-      await attached.writeProjection(proj as any);
-      const result = await baseStorage.readProjection(memoryId("proj-write"));
+      await baseStorage.writeProjection(proj);
+      const result = await attached.readProjection(memoryId("proj-write"));
       expect(result).toBeTruthy();
       expect(result!.noteId).toBe("proj-write");
     });

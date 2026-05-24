@@ -1,3 +1,4 @@
+import type { NoteStorage } from "../storage.js";
 import type { CommitResult, PushResult } from "../git.js";
 import type { MutationPushMode } from "../config.js";
 import type { PersistenceStatus, MutationRetryContract } from "../structured-content.js";
@@ -27,7 +28,7 @@ export function resolveDurability(commit: CommitResult, push: PushResult): Persi
 }
 
 export function buildPersistenceStatus(args: {
-  storage: import("../storage.js").NoteStorage;
+  storage: NoteStorage;
   id: string;
   embedding: { status: "written" | "skipped"; reason?: string };
   commit: CommitResult;
