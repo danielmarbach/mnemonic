@@ -19,6 +19,8 @@ export interface AttachmentRef {
   localPath: string;
   branch: string;
   branchTipHash: string;
+  writable?: boolean;
+  pushBranch?: string;
 }
 
 export interface ProjectAttachmentConfig {
@@ -31,6 +33,8 @@ export interface ProjectAttachmentConfig {
   addedAt: string;
   updatedAt: string;
   branchTipHash: string;
+  writable?: boolean;
+  pushBranch?: string;
 }
 
 export interface Vault {
@@ -285,8 +289,10 @@ export class VaultManager {
           localPath: resolvedLocalPath,
           branch: config.branch,
           branchTipHash: currentTipHash,
+          writable: config.writable,
+          pushBranch: config.pushBranch,
         },
-        get writable() { return this.provenance !== "project-attached"; },
+        get writable() { return config.writable === true; },
       };
 
       const gitignorePath = path.join(resolvedLocalPath, config.vaultFolder, ".gitignore");

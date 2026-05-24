@@ -28,7 +28,7 @@ const defaultConfig: MnemonicConfig = {
   // Keep this at the latest schema version. When adding a new latest-schema
   // migration, bump this value in the same change so fresh installs start at
   // the current schema instead of missing that migration.
-  schemaVersion: "1.2",
+  schemaVersion: "1.3",
   reindexEmbedConcurrency: 4,
   mutationPushMode: "main-only",
   projectMemoryPolicies: {},
@@ -176,6 +176,8 @@ function normalizeProjectAttachments(value: unknown): Record<string, ProjectAtta
         addedAt: typeof a.addedAt === "string" ? a.addedAt : "",
         updatedAt: typeof a.updatedAt === "string" ? a.updatedAt : "",
         branchTipHash: typeof a.branchTipHash === "string" ? a.branchTipHash : "",
+        writable: typeof a.writable === "boolean" ? a.writable : false,
+        pushBranch: typeof a.pushBranch === "string" ? a.pushBranch.trim() : undefined,
       });
     }
     if (validAttachments.length > 0) {
