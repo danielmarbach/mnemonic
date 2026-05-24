@@ -75,6 +75,8 @@ describe("normalizeProjectAttachments", () => {
       addedAt: "2025-01-01T00:00:00Z",
       updatedAt: "2025-01-02T00:00:00Z",
       branchTipHash: "abc123",
+      writable: false,
+      pushBranch: undefined,
     };
     await writeConfig({
       schemaVersion: "1.2",
@@ -600,6 +602,8 @@ describe("Schema migration for projectAttachments", () => {
       addedAt: "2025-01-01T00:00:00Z",
       updatedAt: "2025-01-02T00:00:00Z",
       branchTipHash: "abc123",
+      writable: false,
+      pushBranch: undefined,
     };
     await configStore.load();
     await configStore.setProjectAttachments("proj-1", [attachment]);
@@ -640,6 +644,8 @@ describe("getProjectAttachments / setProjectAttachments", () => {
       addedAt: "2025-01-01T00:00:00Z",
       updatedAt: "2025-01-02T00:00:00Z",
       branchTipHash: "deadbeef",
+      writable: false,
+      pushBranch: undefined,
     };
     await configStore.load();
     await configStore.setProjectAttachments("proj-1", [attachment]);

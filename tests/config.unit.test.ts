@@ -18,7 +18,7 @@ describe("MnemonicConfigStore", () => {
 
     const store = new MnemonicConfigStore(dir);
     await expect(store.load()).resolves.toEqual({
-      schemaVersion: "1.2",
+      schemaVersion: "1.3",
       reindexEmbedConcurrency: 4,
       mutationPushMode: "main-only",
       projectMemoryPolicies: {},
@@ -40,7 +40,7 @@ describe("MnemonicConfigStore", () => {
 
     const store = new MnemonicConfigStore(dir);
     await expect(store.load()).resolves.toEqual({
-      schemaVersion: "1.2",
+      schemaVersion: "1.3",
       reindexEmbedConcurrency: 16,
       mutationPushMode: "main-only",
       projectMemoryPolicies: {},
@@ -62,7 +62,7 @@ describe("MnemonicConfigStore", () => {
 
     const store = new MnemonicConfigStore(dir);
     await expect(store.load()).resolves.toEqual({
-      schemaVersion: "1.2",
+      schemaVersion: "1.3",
       reindexEmbedConcurrency: 4,
       mutationPushMode: "main-only",
       projectMemoryPolicies: {},
@@ -84,7 +84,7 @@ describe("MnemonicConfigStore", () => {
 
     const store = new MnemonicConfigStore(dir);
     await expect(store.load()).resolves.toEqual({
-      schemaVersion: "1.2",
+      schemaVersion: "1.3",
       reindexEmbedConcurrency: 4,
       mutationPushMode: "none",
       projectMemoryPolicies: {},
@@ -106,7 +106,7 @@ describe("MnemonicConfigStore", () => {
 
     const store = new MnemonicConfigStore(dir);
     await expect(store.load()).resolves.toEqual({
-      schemaVersion: "1.2",
+      schemaVersion: "1.3",
       reindexEmbedConcurrency: 4,
       mutationPushMode: "main-only",
       projectMemoryPolicies: {},
