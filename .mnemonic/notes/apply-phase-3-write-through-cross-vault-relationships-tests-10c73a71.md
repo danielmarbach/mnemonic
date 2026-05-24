@@ -7,7 +7,7 @@ tags:
   - phase3
 lifecycle: temporary
 createdAt: '2026-05-24T06:48:00.084Z'
-updatedAt: '2026-05-24T11:08:20.731Z'
+updatedAt: '2026-05-24T11:44:49.901Z'
 role: plan
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -55,15 +55,21 @@ Active checkpoint for Phase 3 implementation. Tracks sub-phase completion.
 ### 3a.5: Attachment tool updates (COMMITTED bfaf376)
 
 - \[x] 17. `add_attachment`: writable and pushBranch params added.
+
 - \[x] 18. `list_attachments`: writable and pushBranch shown in output.
+
 - \[x] 19. `set_attachment_enabled`/`set_attachment_branch`: no changes needed — they operate on ProjectAttachmentConfig which already has writable/pushBranch fields preserved through round-trip.
 
 - \[x] 20. sync push for writable attached vaults.
+
 - \[ ] 21. branchTipHash update post-write.
+
 - \[ ] 22. Cache invalidation.
 
 - \[ ] 20. `sync`: writable attached vaults get push-after-sync via existing sync + pushAfterMutation integration.
+
 - \[ ] 21. After write-push, update branchTipHash in config.
+
 - \[ ] 22. After write, invalidate session cache that vault.
 
 ### 3a.7: Error messages + docs
@@ -72,7 +78,17 @@ Active checkpoint for Phase 3 implementation. Tracks sub-phase completion.
 - \[ ] 24. Update tool descriptions.
 - \[ ] 25. AGENT.md, CHANGELOG.md updates.
 
-### 3b: Cross-vault relationship traversal
+### 3b: Cross-vault relationship traversal (COMMITTED 1ce2024)
+
+- \[x] 26. Relationship type vaultPath field.
+- \[x] 27. validateRelatedTo parses vaultPath.
+- \[x] 28. Note serialization preserves vaultPath.
+- \[x] 29. getDirectRelatedNotes resolves vault-qualified IDs.
+- \[x] 32. relate stores vaultPath for cross-vault.
+- \[x] 33. unrelate handles vaultPath.
+- \[x] 31. memory\_graph relaxes visibleIds filter for cross-vault.
+- \[ ] 34. removeRelationshipsToNoteIds cross-vault scan (deferred).
+- \[ ] 35-38. Relationship previews cross-vault (deferred).
 
 - \[ ] 26. Extend Relationship type with optional vaultPath.
 - \[ ] 27. Update validateRelatedTo to parse vaultPath.
@@ -91,13 +107,19 @@ Active checkpoint for Phase 3 implementation. Tracks sub-phase completion.
 ### 3c: Tests
 
 - \[ ] 39. Enable 6 skipped tests in mutation-error.integration.test.ts.
+
 - \[ ] 40. New tests for writable attached vault mutations.
+
 - \[ ] 41. Integration tests for cross-vault relate/unrelate.
 
 - `0aa1fef` feat: add writable and pushBranch to AttachmentRef and config (3a.1)
+
 - `57320ff` feat: enable write-through to attached vaults (3a.2-3a.4: AttachedStorage, pushAfterMutation, GitOps.pushBranch)
+
 - `bfaf376` feat: add writable/pushBranch to attachment tools and vault routing (3a.3-3a.5: allKnownVaultsMutable, add\_attachment, list\_attachments, schemas)
 
 - `0aa1fef` feat: add writable and pushBranch to AttachmentRef and config (3a.1)
+
 - `57320ff` feat: enable write-through to attached vaults (3a.2-3a.4: AttachedStorage, pushAfterMutation, GitOps.pushBranch)
+
 - `bfaf376` feat: add writable/pushBranch to attachment tools and vault routing (3a.3-3a.5: allKnownVaultsMutable, add\_attachment, list\_attachments, schemas)
