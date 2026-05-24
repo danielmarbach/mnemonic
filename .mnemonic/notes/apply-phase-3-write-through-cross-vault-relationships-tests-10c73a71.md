@@ -7,7 +7,7 @@ tags:
   - phase3
 lifecycle: temporary
 createdAt: '2026-05-24T06:48:00.084Z'
-updatedAt: '2026-05-24T11:44:49.901Z'
+updatedAt: '2026-05-24T12:11:46.737Z'
 role: plan
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -36,6 +36,9 @@ Active checkpoint for Phase 3 implementation. Tracks sub-phase completion.
 - \[x] 5. Replace `AttachedVaultReadOnlyError` throws with conditional: if vault writable, delegate to baseStorage.
 - \[x] 6. `writeEmbedding`/`writeProjection` already write to local cache, no change.
 - \[x] 7. After write: commit via GitOps.commitWithStatus scoped to notes dir. pushBranch handled in pushAfterMutation.
+
+- `1ce2024` feat: cross-vault relationship traversal (3b)
+- `b84c7a4` test: update config schema version to 1.3 and add writable/pushBranch fields
 
 ### 3a.3: Vault routing changes (COMMITTED bfaf376)
 
@@ -81,27 +84,47 @@ Active checkpoint for Phase 3 implementation. Tracks sub-phase completion.
 ### 3b: Cross-vault relationship traversal (COMMITTED 1ce2024)
 
 - \[x] 26. Relationship type vaultPath field.
+
 - \[x] 27. validateRelatedTo parses vaultPath.
+
 - \[x] 28. Note serialization preserves vaultPath.
+
 - \[x] 29. getDirectRelatedNotes resolves vault-qualified IDs.
+
 - \[x] 32. relate stores vaultPath for cross-vault.
+
 - \[x] 33. unrelate handles vaultPath.
+
 - \[x] 31. memory\_graph relaxes visibleIds filter for cross-vault.
+
 - \[ ] 34. removeRelationshipsToNoteIds cross-vault scan (deferred).
+
 - \[ ] 35-38. Relationship previews cross-vault (deferred).
 
 - \[ ] 26. Extend Relationship type with optional vaultPath.
+
 - \[ ] 27. Update validateRelatedTo to parse vaultPath.
+
 - \[ ] 28. Update note serialization/deserialization.
+
 - \[ ] 29. getDirectRelatedNotes: resolve vault-qualified IDs.
+
 - \[ ] 30. findNote: include target vault when vaultPath present.
+
 - \[ ] 31. memory\_graph: relax visibleIds filter for cross-vault.
+
 - \[ ] 32. relate: store vaultPath for cross-vault relationships.
+
 - \[ ] 33. unrelate: handle cross-vault vaultPath.
+
 - \[ ] 34. removeRelationshipsToNoteIds: scan all vaults for dangling refs.
+
 - \[ ] 35. getRelationshipPreview: resolve vault-qualified IDs.
+
 - \[ ] 36. formatRelationshipPreview: show vault provenance.
+
 - \[ ] 37. Recall top-N relationship expansion.
+
 - \[ ] 38. auto-relate: consider cross-project candidates.
 
 ### 3c: Tests
