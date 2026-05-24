@@ -33,6 +33,7 @@ export function registerUnrelateTool(server: McpServer, ctx: ServerContext): voi
         "Do not use this when:\n" +
         "- You are adding a new connection; use `relate`\n\n" +
         "Returns: both ids, removed relationship details.\n\n" +
+        "Writable attachments: can unrelate notes in writable attached vaults.\n\n" +
         "[mutating: modifies both notes, git commits, may push]\n\n" +
         "Typical next step:\n" +
         "- Use `get` to verify both notes now stand on their own.",

@@ -387,13 +387,13 @@ Branch note body`;
     });
   });
 
-  describe("write operations throw AttachedVaultReadOnlyError", () => {
+  describe("write operations throw AttachedVaultReadOnlyError (non-writable)", () => {
     let attached: AttachedStorage;
 
     beforeEach(async () => {
       baseStorage = new Storage(path.join(tempDir, "vault"));
       await baseStorage.init();
-      attached = new AttachedStorage(baseStorage, "/repo", "main", "notes");
+      attached = new AttachedStorage(baseStorage, "/repo", "main", "notes", false);
     });
 
     it("writeNote throws", async () => {
@@ -439,6 +439,47 @@ Branch note body`;
       } catch (err) {
         expect((err as AttachedVaultReadOnlyError).message).toContain("rollback atomic write");
       }
+    });
+  });
+
+  describe("write operations delegate to baseStorage (writable)", () => {
+    let attached: AttachedStorage;
+
+    beforeEach(async () => {
+      baseStorage = new Storage(path.join(tempDir, "vault"));
+      await baseStorage.init();
+      attached = new AttachedStorage(baseStorage, "/repo", "main", "notes", true);
+    });
+
+    it("writeNote delegates to baseStorage", async () => {
+      const note = makeNote("writable-note");
+      await attached.writeNote(note);
+      const readBack = await baseStorage.readNote(memoryId("writable-note"));
+      expect(readBack).toBeTruthy();
+      expect(readBack!.id).toBe(memoryId("writable-note"));
+    });
+
+    it("deleteNote delegates to baseStorage", async () => {
+      const note = makeNote("to-delete");
+      await baseStorage.writeNote(note);
+      const deleted = await attached.deleteNote(memoryId("to-delete"));
+      expect(deleted).toBe(true);
+      const readBack = await baseStorage.readNote(memoryId("to-delete"));
+      expect(readBack).toBeNull();
+    });
+
+    it("beginAtomicNotesWrite delegates to baseStorage", async () => {
+      await expect(attached.beginAtomicNotesWrite()).resolves.toBeUndefined();
+    });
+
+    it("commitAtomicNotesWrite delegates to baseStorage", async () => {
+      await attached.beginAtomicNotesWrite();
+      await expect(attached.commitAtomicNotesWrite()).resolves.toBeUndefined();
+    });
+
+    it("rollbackAtomicNotesWrite delegates to baseStorage", async () => {
+      await attached.beginAtomicNotesWrite();
+      await expect(attached.rollbackAtomicNotesWrite()).resolves.toBeUndefined();
     });
   });
 

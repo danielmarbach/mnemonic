@@ -39,6 +39,7 @@ export function registerMoveMemoryTool(server: McpServer, ctx: ServerContext): v
         "- You only need to edit the note content; use `update`\n" +
         "- You want to delete the note; use `forget`\n\n" +
         "Returns: moved id, from/to vault labels, project association, persistence status.\n\n" +
+        "Writable attachments: can move notes in writable attached vaults.\n\n" +
         "[mutating: moves note between vaults, may adjust project association, git commits, may push]\n\n" +
         "Typical next step:\n" +
         "- Use `where_is_memory` or `get` to verify the final state.\n" +

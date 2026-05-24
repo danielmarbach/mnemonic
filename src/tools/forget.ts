@@ -47,6 +47,7 @@ export function registerForgetTool(server: McpServer, ctx: ServerContext): void 
         "- The note should stay but move to another vault; use `move_memory`\n" +
         "- The note should be replaced or merged; use `consolidate`\n\n" +
         "Returns: deleted id/title, relationship cleanup details.\n\n" +
+        "Writable attachments: can delete notes in writable attached vaults.\n\n" +
         "[mutating: deletes note, cleans relationships, git commits, may push]\n\n" +
         "Typical next step:\n" +
         "- Use `recall` or `list` to confirm the remaining memory set is clean.",

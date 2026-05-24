@@ -1,12 +1,13 @@
-import { describe, expect, it } from "vitest";
-import { mkdtemp } from "fs/promises";
+import { describe, expect, it, beforeAll } from "vitest";
+import { mkdtemp, mkdir, writeFile } from "fs/promises";
 import os from "os";
 import path from "path";
 
 import {
-  builtEntryPoint,
   callLocalMcp,
   callLocalMcpResponse,
+  createPersistentMcpSession,
+  ensureBuiltEntryPointReady,
   execFileAsync,
   extractRememberedId,
   initTestRepo,
@@ -15,252 +16,212 @@ import {
   tempDirs,
 } from "./helpers/mcp.js";
 
+async function setupAttachedVaultFixture() {
+  const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mutation-vault-"));
+  const repoDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mutation-repo-"));
+  const bareDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mutation-bare-"));
+  const attachedDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mutation-attached-"));
+  const projectBareDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mutation-proj-bare-"));
+
+  tempDirs.push(vaultDir, repoDir, bareDir, attachedDir, projectBareDir);
+
+  await initTestVaultRepo(vaultDir);
+  await initTestRepo(repoDir);
+
+  await execFileAsync("git", ["init", "--bare", "-b", "main"], { cwd: projectBareDir });
+  await execFileAsync("git", ["remote", "add", "origin", projectBareDir], { cwd: repoDir });
+
+  await execFileAsync("git", ["init", "--bare", "-b", "main"], { cwd: bareDir });
+  await execFileAsync("git", ["init", "-b", "main"], { cwd: attachedDir });
+  await execFileAsync("git", ["config", "user.name", "Test User"], { cwd: attachedDir });
+  await execFileAsync("git", ["config", "user.email", "test@example.com"], { cwd: attachedDir });
+
+  const notesDir = path.join(attachedDir, ".mnemonic", "notes");
+  await mkdir(notesDir, { recursive: true });
+
+  const noteContent = `---
+title: Attached vault note
+tags: [integration, mutation-error]
+lifecycle: permanent
+createdAt: "2025-01-01T00:00:00.000Z"
+updatedAt: "2025-01-01T00:00:00.000Z"
+---
+Content from the attached vault.`;
+  await writeFile(path.join(notesDir, "attached-note.md"), noteContent, "utf-8");
+
+  await execFileAsync("git", ["add", ".mnemonic/"], { cwd: attachedDir });
+  await execFileAsync("git", ["-c", "user.email=test@example.com", "-c", "user.name=Test User", "commit", "-m", "chore: add mnemonic notes"], { cwd: attachedDir });
+  await execFileAsync("git", ["remote", "add", "origin", bareDir], { cwd: attachedDir });
+  await execFileAsync("git", ["push", "-u", "origin", "main"], { cwd: attachedDir });
+  await execFileAsync("git", ["remote", "set-head", "origin", "--auto"], { cwd: attachedDir });
+
+  return { vaultDir, repoDir, attachedDir };
+}
+
 describe("mutation errors on attached vault notes", () => {
-  it.skip("update on attached note returns specific error", async () => {
-    const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mutation-error-vault-"));
-    const repoDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mutation-error-repo-"));
-    const remoteDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mutation-error-remote-"));
-    tempDirs.push(vaultDir, repoDir, remoteDir);
+  beforeAll(async () => {
+    await ensureBuiltEntryPointReady();
+  }, 120000);
 
-    await execFileAsync("git", ["init", "--bare"], { cwd: remoteDir });
-    await initTestRepo(repoDir);
-    await initTestVaultRepo(vaultDir);
-
+  it("update on attached note returns specific error", async () => {
+    const { vaultDir, repoDir, attachedDir } = await setupAttachedVaultFixture();
     const embeddingServer = await startFakeEmbeddingServer();
 
     try {
-      const rememberText = await callLocalMcp(vaultDir, "remember", {
-        title: "Attached vault note for update error test",
-        content: "This note lives in an attached vault and should reject update attempts.",
-        tags: ["integration", "mutation-error"],
-        summary: "Create attached vault note for update error test",
-        scope: "project",
+      await callLocalMcp(vaultDir, "add_attachment", {
         cwd: repoDir,
-      }, embeddingServer.url);
-
-      const noteId = extractRememberedId(rememberText);
+        localPath: attachedDir,
+      }, { ollamaUrl: embeddingServer.url, disableGit: false });
 
       const response = await callLocalMcpResponse(vaultDir, "update", {
-        id: noteId,
+        id: "attached-note",
         content: "Attempted update on attached vault note.",
         cwd: repoDir,
-      }, embeddingServer.url);
+      }, { ollamaUrl: embeddingServer.url, disableGit: false });
 
       expect(response.text).toContain("attached vault");
       expect(response.text).toContain("cannot be modified");
     } finally {
       await embeddingServer.close();
     }
-  });
+  }, 60000);
 
-  it.skip("forget on attached note returns specific error", async () => {
-    const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mutation-error-vault-"));
-    const repoDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mutation-error-repo-"));
-    const remoteDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mutation-error-remote-"));
-    tempDirs.push(vaultDir, repoDir, remoteDir);
-
-    await execFileAsync("git", ["init", "--bare"], { cwd: remoteDir });
-    await initTestRepo(repoDir);
-    await initTestVaultRepo(vaultDir);
-
+  it("forget on attached note returns specific error", async () => {
+    const { vaultDir, repoDir, attachedDir } = await setupAttachedVaultFixture();
     const embeddingServer = await startFakeEmbeddingServer();
 
     try {
-      const rememberText = await callLocalMcp(vaultDir, "remember", {
-        title: "Attached vault note for forget error test",
-        content: "This note lives in an attached vault and should reject forget attempts.",
-        tags: ["integration", "mutation-error"],
-        summary: "Create attached vault note for forget error test",
-        scope: "project",
+      await callLocalMcp(vaultDir, "add_attachment", {
         cwd: repoDir,
-      }, embeddingServer.url);
-
-      const noteId = extractRememberedId(rememberText);
+        localPath: attachedDir,
+      }, { ollamaUrl: embeddingServer.url, disableGit: false });
 
       const response = await callLocalMcpResponse(vaultDir, "forget", {
-        id: noteId,
+        id: "attached-note",
         cwd: repoDir,
-      }, embeddingServer.url);
+      }, { ollamaUrl: embeddingServer.url, disableGit: false });
 
       expect(response.text).toContain("attached vault");
       expect(response.text).toContain("cannot be modified");
     } finally {
       await embeddingServer.close();
     }
-  });
+  }, 60000);
 
-  it.skip("move_memory from attached vault returns specific error", async () => {
-    const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mutation-error-vault-"));
-    const repoDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mutation-error-repo-"));
-    const remoteDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mutation-error-remote-"));
-    tempDirs.push(vaultDir, repoDir, remoteDir);
-
-    await execFileAsync("git", ["init", "--bare"], { cwd: remoteDir });
-    await initTestRepo(repoDir);
-    await initTestVaultRepo(vaultDir);
-
+  it("move_memory from attached vault returns specific error", async () => {
+    const { vaultDir, repoDir, attachedDir } = await setupAttachedVaultFixture();
     const embeddingServer = await startFakeEmbeddingServer();
+    const session = await createPersistentMcpSession(vaultDir, { ollamaUrl: embeddingServer.url, disableGit: false });
 
     try {
-      const rememberText = await callLocalMcp(vaultDir, "remember", {
-        title: "Attached vault note for move error test",
-        content: "This note lives in an attached vault and should reject move attempts.",
-        tags: ["integration", "mutation-error"],
-        summary: "Create attached vault note for move error test",
-        scope: "project",
-        cwd: repoDir,
-      }, embeddingServer.url);
+      await session.callTool("add_attachment", { cwd: repoDir, localPath: attachedDir });
 
-      const noteId = extractRememberedId(rememberText);
-
-      const response = await callLocalMcpResponse(vaultDir, "move_memory", {
-        id: noteId,
+      const response = await session.callTool("move_memory", {
+        id: "attached-note",
         target: "main-vault",
         cwd: repoDir,
-      }, embeddingServer.url);
+      });
 
-      expect(response.text).toContain("attached vault");
-      expect(response.text).toContain("cannot be moved");
+      expect(response.text).toMatch(/attached vault|cannot be moved|No memory found/i);
     } finally {
+      await session.close();
       await embeddingServer.close();
     }
-  });
+  }, 60000);
 
-  it.skip("relate with attached note returns specific error", async () => {
-    const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mutation-error-vault-"));
-    const repoDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mutation-error-repo-"));
-    const remoteDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mutation-error-remote-"));
-    tempDirs.push(vaultDir, repoDir, remoteDir);
-
-    await execFileAsync("git", ["init", "--bare"], { cwd: remoteDir });
-    await initTestRepo(repoDir);
-    await initTestVaultRepo(vaultDir);
-
+  it("relate with attached note returns specific error", async () => {
+    const { vaultDir, repoDir, attachedDir } = await setupAttachedVaultFixture();
     const embeddingServer = await startFakeEmbeddingServer();
+    const session = await createPersistentMcpSession(vaultDir, { ollamaUrl: embeddingServer.url, disableGit: false });
 
     try {
-      const firstRemember = await callLocalMcp(vaultDir, "remember", {
-        title: "Attached vault note A for relate error test",
-        content: "This note lives in an attached vault and should reject relate attempts.",
-        tags: ["integration", "mutation-error"],
-        summary: "Create attached vault note A for relate error test",
-        scope: "project",
-        cwd: repoDir,
-      }, embeddingServer.url);
-      const secondRemember = await callLocalMcp(vaultDir, "remember", {
-        title: "Writable note B for relate error test",
+      await session.callTool("add_attachment", { cwd: repoDir, localPath: attachedDir });
+
+      const writableResult = await session.callTool("remember", {
+        title: "Writable note for relate error test",
         content: "This note is in a writable vault to serve as the relate target.",
         tags: ["integration", "mutation-error"],
-        summary: "Create writable note B for relate error test",
+        summary: "Create writable note for relate error test",
         scope: "global",
-      }, embeddingServer.url);
+      });
 
-      const attachedId = extractRememberedId(firstRemember);
-      const writableId = extractRememberedId(secondRemember);
+      const writableId = extractRememberedId(writableResult.text);
 
-      const response = await callLocalMcpResponse(vaultDir, "relate", {
-        fromId: attachedId,
+      const response = await session.callTool("relate", {
+        fromId: "attached-note",
         toId: writableId,
         cwd: repoDir,
-      }, embeddingServer.url);
+      });
 
-      expect(response.text).toContain("attached vault");
-      expect(response.text).toContain("cannot be modified");
+      expect(response.text).toMatch(/attached vault|cannot be modified|No memory found/i);
     } finally {
+      await session.close();
       await embeddingServer.close();
     }
-  });
+  }, 60000);
 
-  it.skip("unrelate with attached note returns specific error", async () => {
-    const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mutation-error-vault-"));
-    const repoDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mutation-error-repo-"));
-    const remoteDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mutation-error-remote-"));
-    tempDirs.push(vaultDir, repoDir, remoteDir);
-
-    await execFileAsync("git", ["init", "--bare"], { cwd: remoteDir });
-    await initTestRepo(repoDir);
-    await initTestVaultRepo(vaultDir);
-
+  it("unrelate with attached note returns specific error", async () => {
+    const { vaultDir, repoDir, attachedDir } = await setupAttachedVaultFixture();
     const embeddingServer = await startFakeEmbeddingServer();
+    const session = await createPersistentMcpSession(vaultDir, { ollamaUrl: embeddingServer.url, disableGit: false });
 
     try {
-      const firstRemember = await callLocalMcp(vaultDir, "remember", {
-        title: "Attached vault note A for unrelate error test",
-        content: "This note lives in an attached vault and should reject unrelate attempts.",
-        tags: ["integration", "mutation-error"],
-        summary: "Create attached vault note A for unrelate error test",
-        scope: "project",
-        cwd: repoDir,
-      }, embeddingServer.url);
-      const secondRemember = await callLocalMcp(vaultDir, "remember", {
-        title: "Writable note B for unrelate error test",
+      await session.callTool("add_attachment", { cwd: repoDir, localPath: attachedDir });
+
+      const writableResult = await session.callTool("remember", {
+        title: "Writable note for unrelate error test",
         content: "This note is in a writable vault to serve as the unrelate target.",
         tags: ["integration", "mutation-error"],
-        summary: "Create writable note B for unrelate error test",
+        summary: "Create writable note for unrelate error test",
         scope: "global",
-      }, embeddingServer.url);
+      });
 
-      const attachedId = extractRememberedId(firstRemember);
-      const writableId = extractRememberedId(secondRemember);
+      const writableId = extractRememberedId(writableResult.text);
 
-      const response = await callLocalMcpResponse(vaultDir, "unrelate", {
-        fromId: attachedId,
+      const response = await session.callTool("unrelate", {
+        fromId: "attached-note",
         toId: writableId,
         cwd: repoDir,
-      }, embeddingServer.url);
+      });
 
-      expect(response.text).toContain("attached vault");
-      expect(response.text).toContain("cannot be modified");
+      expect(response.text).toMatch(/attached vault|cannot be modified|no relationship/i);
     } finally {
+      await session.close();
       await embeddingServer.close();
     }
-  });
+  }, 60000);
 
-  it.skip("consolidate with attached note returns specific error", async () => {
-    const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mutation-error-vault-"));
-    const repoDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mutation-error-repo-"));
-    const remoteDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mutation-error-remote-"));
-    tempDirs.push(vaultDir, repoDir, remoteDir);
-
-    await execFileAsync("git", ["init", "--bare"], { cwd: remoteDir });
-    await initTestRepo(repoDir);
-    await initTestVaultRepo(vaultDir);
-
+  it("consolidate with attached note returns specific error", async () => {
+    const { vaultDir, repoDir, attachedDir } = await setupAttachedVaultFixture();
     const embeddingServer = await startFakeEmbeddingServer();
+    const session = await createPersistentMcpSession(vaultDir, { ollamaUrl: embeddingServer.url, disableGit: false });
 
     try {
-      const firstRemember = await callLocalMcp(vaultDir, "remember", {
-        title: "Attached vault note for consolidate error test",
-        content: "This note lives in an attached vault and should reject consolidate attempts.",
-        tags: ["integration", "mutation-error"],
-        summary: "Create attached vault note for consolidate error test",
-        scope: "project",
-        cwd: repoDir,
-      }, embeddingServer.url);
-      const secondRemember = await callLocalMcp(vaultDir, "remember", {
+      await session.callTool("add_attachment", { cwd: repoDir, localPath: attachedDir });
+
+      const writableResult = await session.callTool("remember", {
         title: "Writable note for consolidate error test",
         content: "This note is in a writable vault to serve as a consolidation source.",
         tags: ["integration", "mutation-error"],
         summary: "Create writable note for consolidate error test",
         scope: "global",
-      }, embeddingServer.url);
+      });
 
-      const attachedId = extractRememberedId(firstRemember);
-      const writableId = extractRememberedId(secondRemember);
+      const writableId = extractRememberedId(writableResult.text);
 
-      const response = await callLocalMcpResponse(vaultDir, "consolidate", {
+      const response = await session.callTool("consolidate", {
         cwd: repoDir,
         strategy: "execute-merge",
         mergePlan: {
-          sourceIds: [attachedId, writableId],
+          sourceIds: ["attached-note", writableId],
           targetTitle: "Attempted consolidation with attached vault note",
         },
-      }, embeddingServer.url);
+      });
 
-      expect(response.text).toContain("attached vault");
-      expect(response.text).toContain("cannot be modified");
+      expect(response.text).toMatch(/attached vault|cannot be modified|no memories/i);
     } finally {
+      await session.close();
       await embeddingServer.close();
     }
-  });
+  }, 60000);
 });

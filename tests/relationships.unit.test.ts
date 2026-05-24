@@ -303,6 +303,42 @@ describe("getDirectRelatedNotes", () => {
 
     expect(result.map(entry => entry.note.id).slice(0, 2)).toEqual(["summary", "plain"]);
   });
+
+  it("resolves notes via vaultPath in relationship", async () => {
+    const vaultPathA = "/tmp/vault-a";
+    const vaultPathB = "/tmp/vault-b";
+
+    const targetNote = createNote({ id: "cross-vault-target", title: "Cross Vault Target" });
+
+    const source = createNote({
+      id: "source",
+      relatedTo: [
+        { id: "cross-vault-target", type: "related-to", vaultPath: vaultPathB },
+      ],
+    });
+
+    const vaultA = {
+      storage: {
+        vaultPath: vaultPathA,
+        readNote: async () => null,
+        listNotes: async () => [source],
+      },
+    } as unknown as Vault;
+
+    const vaultB = {
+      storage: {
+        vaultPath: vaultPathB,
+        readNote: async () => targetNote,
+        listNotes: async () => [targetNote],
+      },
+    } as unknown as Vault;
+
+    const result = await getDirectRelatedNotes(source, [vaultA, vaultB]);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].note.id).toBe("cross-vault-target");
+    expect(result[0].vault).toBe(vaultB);
+  });
 });
 
 // ── Acceptance criteria validation ────────────────────────────────────────────

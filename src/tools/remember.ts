@@ -56,6 +56,7 @@ export function registerRememberTool(server: McpServer, ctx: ServerContext): voi
         "- You need to change an existing memory; use `update`\n" +
         "- Several overlapping notes should be merged; use `consolidate`\n\n" +
         "Returns: created id, scope, vault label, lifecycle, persistence status. On lint failure, returns action=lint_error with the list of unfixable issues.\n\n" +
+        "Writable attachments: set `writable: true` on `add_attachment` to enable writes.\n\n" +
         "[mutating: writes note, embeddings, git commits, may push]\n\n" +
         "Typical next step:\n" +
         "- Use `relate` if this new memory connects to something recalled earlier.",

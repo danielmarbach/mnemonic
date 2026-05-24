@@ -221,8 +221,10 @@ When `recall` called with `cwd`, project notes get a small **tiebreaker boost** 
 - **Attached vaults**: Read-only external repos linked as federated knowledge sources via `add_attachment`
 
 ### Attachment architecture
-- Attached repos are **read-only**: `consolidate`, `prune-superseded`, `remember`, `update`, `forget`, `move_memory`, `relate`, and `unrelate` never modify attached vault notes; they return a specific error when attempted
-- `add_attachment` links an external repo by `localPath` (supports `~` expansion); optional `branch` and `vaultFolder` select a branch and sub-vault within it
+- Attached repos default to **read-only**; set `writable: true` on `add_attachment` to enable write-through
+- **Writable attached vaults**: when an attachment is marked writable, `remember`, `update`, `forget`, `relate`, `unrelate`, `consolidate`, `move_memory` can modify notes in the attached vault; commits push to the branch specified by `pushBranch` (or the attachment's `branch` if `pushBranch` is omitted); protected-branch policy from the consuming project applies
+- **Cross-vault relationships**: notes in different vaults can be related; the `Relationship` type includes a `vaultPath` field indicating which vault the related note lives in
+- `add_attachment` links an external repo by `localPath` (supports `~` expansion); optional `branch`, `vaultFolder`, `writable`, and `pushBranch` select branch, sub-vault, write access, and push target
 - `remove_attachment` removes by `projectSlug`; `list_attachments` shows all attachments with status
 - `set_attachment_enabled` toggles an attachment on/off without removing config; `set_attachment_branch` changes the branch
 - Max attachments per project: 5 (configurable via `maxAttachmentsPerProject` in project memory policy)
@@ -231,7 +233,7 @@ When `recall` called with `cwd`, project notes get a small **tiebreaker boost** 
 - `sync` fetches attached repo branches and reconciles embeddings in the same call
 - Auto-sync: attached vault branches are also fetched when the consuming project switches branches (via `ensureBranchSynced`); stale embeddings are removed after tip changes
 - `localPath` in attachment config supports `~` notation for portability; paths are expanded at resolution time via `expandHomePath`; stored config uses `collapseHomePath` to make paths shareable across machines
-- Session-scoped note cache uses git-ref reads; fail-soft when an attached repo or branch is unavailable
+- Session-scoped note cache uses git-ref reads; cache is invalidated after writes to writable attached vaults; fail-soft when an attached repo or branch is unavailable
 - Attached vault notes are included under `scope: "project"` (even though their `note.project` differs) and excluded from `scope: "global"`
 - Attached vault notes receive a moderate boost in recall scoring (less than project-local notes, more than global notes)
 
@@ -317,7 +319,7 @@ Skills are loaded via the `skill` tool and extend agent capabilities with specia
 
 | Tool | Description |
 |------|-------------|
-| `add_attachment` | Add an external repository as a federated knowledge source; requires `localPath` (absolute path to repo), optional `branch` and `vaultFolder` |
+| `add_attachment` | Add an external repository as a federated knowledge source; requires `localPath` (absolute path to repo), optional `branch`, `vaultFolder`, `writable`, and `pushBranch` |
 | `consolidate` | Merge and analyze overlapping notes; classification (lineage/duplicate-pressure/unique-evidence-risk/supersession-pressure) and maintenance warnings |
 | `detect_project` | Resolve `cwd` to stable project id via git remote URL |
 | `discover_tags` | Suggest canonical tags for a note; `mode: "browse"` opts into broader inventory output |

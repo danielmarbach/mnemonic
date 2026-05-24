@@ -37,6 +37,7 @@ export function registerRelateTool(server: McpServer, ctx: ServerContext): void 
         "- The connection is weak or speculative\n" +
         "- You need to remove a relationship rather than add one\n\n" +
         "Returns: both ids, relationship type.\n\n" +
+        "Writable attachments: can relate notes in writable attached vaults.\n\n" +
         "[mutating: modifies both notes, git commits, may push]\n\n" +
         "Typical next step:\n" +
         "- Use `get` on both notes to verify the relationship context reads well.",

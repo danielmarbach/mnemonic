@@ -63,6 +63,7 @@ export function registerUpdateTool(server: McpServer, ctx: ServerContext): void 
         "- No note exists yet; use `remember`\n" +
         "- Several notes need to be merged or retired together; use `consolidate`\n\n" +
         "Returns: updated id, changed fields, persistence status. On lint failure, returns action=lint_error with the list of unfixable issues.\n\n" +
+        "Writable attachments: can update notes in writable attached vaults.\n\n" +
         "[mutating: rewrites note, refreshes embeddings, git commits, may push]\n\n" +
         "Typical next step:\n" +
         "- Use `relate` or `consolidate` if the update changes how this note connects to others.\n\n" +

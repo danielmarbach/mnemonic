@@ -98,7 +98,7 @@ describe("vaultMatchesStorageScope", () => {
 });
 
 describe("attachedVaultErrorMessage", () => {
-  it("produces a message containing the vault label", () => {
+  it("produces a read-only message for non-writable vaults", () => {
     const vault = makeVault({
       provenance: "project-attached",
       vaultFolderName: ".mnemonic",
@@ -115,6 +115,27 @@ describe("attachedVaultErrorMessage", () => {
     expect(message).toContain("note-42");
     expect(message).toContain("attached:my-project/.mnemonic");
     expect(message).toContain("read-only");
+  });
+
+  it("produces a not-currently-mutable message for writable vaults", () => {
+    const vault = makeVault({
+      provenance: "project-attached",
+      vaultFolderName: ".mnemonic",
+      writable: true,
+      attachmentRef: {
+        projectSlug: "my-project",
+        projectName: "My Project",
+        localPath: "/tmp/my-project",
+        branch: "main",
+        branchTipHash: "abc123",
+        writable: true,
+      },
+    });
+    const message = attachedVaultErrorMessage("note-42", vault);
+    expect(message).toContain("note-42");
+    expect(message).toContain("attached:my-project/.mnemonic");
+    expect(message).toContain("not currently mutable");
+    expect(message).not.toContain("read-only");
   });
 });
 

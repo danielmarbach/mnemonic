@@ -800,6 +800,86 @@ describe("VaultManager", () => {
     it("should not throw when removing a non-existent attachment", () => {
       expect(() => vaultManager.removeAttachment("no-such-project", "no-such-slug")).not.toThrow();
     });
+
+    it("should include writable attached vaults in allKnownVaultsMutable", async () => {
+      await vaultManager.getOrCreateProjectVault(projectDir);
+
+      const attachedPath = path.join(tempDir, "attached-writable-mutable");
+      await setupAttachedVault(attachedPath);
+
+      const config = makeAttachmentConfig({ projectSlug: "attached-writable-mutable", localPath: attachedPath, writable: true });
+      vaultManager.setAttachmentConfigs("attach-project", [config]);
+      await vaultManager.loadAttachmentsForProject("attach-project");
+
+      const mutable = vaultManager.allKnownVaultsMutable();
+      const provenances = mutable.map(v => v.provenance);
+      expect(provenances).toContain("project-attached");
+      expect(mutable.filter(v => v.provenance === "project-attached").every(v => v.writable)).toBe(true);
+    });
+
+    it("should include writable attached vaults in searchOrderMutable", async () => {
+      await vaultManager.getOrCreateProjectVault(projectDir);
+
+      const attachedPath = path.join(tempDir, "attached-writable-search");
+      await setupAttachedVault(attachedPath);
+
+      const config = makeAttachmentConfig({ projectSlug: "attached-writable-search", localPath: attachedPath, writable: true });
+      vaultManager.setAttachmentConfigs("attach-project", [config]);
+      await vaultManager.loadAttachmentsForProject("attach-project");
+
+      const mutable = await vaultManager.searchOrderMutable(projectDir, "attach-project");
+      const provenances = mutable.map(v => v.provenance);
+      expect(provenances).toContain("project-attached");
+      expect(mutable.filter(v => v.provenance === "project-attached").every(v => v.writable)).toBe(true);
+    });
+
+    it("should find notes in writable attached vaults via findNote({ mutable: true })", async () => {
+      await vaultManager.getOrCreateProjectVault(projectDir);
+
+      const attachedPath = path.join(tempDir, "attached-find-writable");
+      await setupAttachedVault(attachedPath);
+
+      const config = makeAttachmentConfig({ projectSlug: "attached-find-writable", localPath: attachedPath, writable: true, branch: "" });
+      vaultManager.setAttachmentConfigs("attach-project", [config]);
+      const attached = await vaultManager.loadAttachmentsForProject("attach-project");
+      expect(attached).toHaveLength(1);
+
+      const attachmentsDir = path.join(attachedPath, ".mnemonic", "attachments", "attach-project");
+      const baseStorage = new Storage(attachmentsDir);
+      await baseStorage.init();
+
+      const note: Note = {
+        id: "writable-attached-note",
+        title: "Writable Attached Note",
+        content: "Writable content",
+        tags: [],
+        lifecycle: "permanent",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      await baseStorage.writeNote(note);
+
+      const foundMutable = await vaultManager.findNote("writable-attached-note", projectDir, { mutable: true, projectId: "attach-project" });
+      expect(foundMutable).toBeTruthy();
+      expect(foundMutable!.vault.provenance).toBe("project-attached");
+      expect(foundMutable!.vault.writable).toBe(true);
+    });
+
+    it("should return writable=true for attached vault when attachmentRef.writable=true", async () => {
+      await vaultManager.getOrCreateProjectVault(projectDir);
+
+      const attachedPath = path.join(tempDir, "attached-writable-prop");
+      await setupAttachedVault(attachedPath);
+
+      const config = makeAttachmentConfig({ projectSlug: "attached-writable-prop", localPath: attachedPath, writable: true });
+      vaultManager.setAttachmentConfigs("attach-project", [config]);
+      await vaultManager.loadAttachmentsForProject("attach-project");
+
+      const attached = vaultManager.getAttachmentsForProject("attach-project");
+      expect(attached).toHaveLength(1);
+      expect(attached[0].writable).toBe(true);
+      expect(attached[0].attachmentRef?.writable).toBe(true);
+    });
   });
 
   describe("getPendingNoteFiles", () => {
