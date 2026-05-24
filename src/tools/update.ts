@@ -32,7 +32,7 @@ import {
   getRecentSessionAccessNote,
 } from "../cache.js";
 import { NOTE_LIFECYCLES, NOTE_ROLES, type Note } from "../storage.js";
-import { storageLabel, ensureAttachmentsLoaded } from "../helpers/vault.js";
+import { ensureAttachmentsLoaded, attachedVaultErrorMessage } from "../helpers/vault.js";
 import {
   type UpdateResult,
   UpdateToolResultSchema,
@@ -156,7 +156,7 @@ export function registerUpdateTool(server: McpServer, ctx: ServerContext): void 
       if (!found) {
         const foundAny = await ctx.vaultManager.findNote(id, cwd, { mutable: false, projectId });
         if (foundAny) {
-          return { content: [{ type: "text", text: `Memory '${id}' is in an attached vault (${storageLabel(foundAny.vault)}) and cannot be modified. Attached vaults are read-only.` }], isError: true };
+          return { content: [{ type: "text", text: attachedVaultErrorMessage(id, foundAny.vault) }], isError: true };
         }
         return { content: [{ type: "text", text: `No memory found with id '${id}'` }], isError: true };
       }

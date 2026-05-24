@@ -3,6 +3,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ServerContext } from "../server-context.js";
 import { projectParam, ensureBranchSynced } from "../helpers/project.js";
 import { isoDateString } from "../brands.js";
+import { attachedVaultErrorMessage } from "../helpers/vault.js";
 import type { Vault } from "../vault.js";
 import type { Relationship } from "../storage.js";
 import {
@@ -63,10 +64,10 @@ export function registerUnrelateTool(server: McpServer, ctx: ServerContext): voi
           ctx.vaultManager.findNote(toId, cwd, { mutable: false }),
         ]);
         if (foundFromAny && foundFromAny.vault.provenance === "project-attached") {
-          return { content: [{ type: "text", text: `Memory '${fromId}' is in an attached vault and cannot be modified. Attached vaults are read-only.` }], isError: true };
+          return { content: [{ type: "text", text: attachedVaultErrorMessage(fromId, foundFromAny.vault) }], isError: true };
         }
         if (foundToAny && foundToAny.vault.provenance === "project-attached") {
-          return { content: [{ type: "text", text: `Memory '${toId}' is in an attached vault and cannot be modified. Attached vaults are read-only.` }], isError: true };
+          return { content: [{ type: "text", text: attachedVaultErrorMessage(toId, foundToAny.vault) }], isError: true };
         }
       }
 

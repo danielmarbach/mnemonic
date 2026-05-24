@@ -19,7 +19,7 @@ import { memoryId, isoDateString } from "../brands.js";
 import { formatCommitBody, shouldBlockProtectedBranchCommit as shouldBlockProtectedBranchCommitFromModule, wouldRelationshipCleanupTouchProjectVault as wouldRelationshipCleanupTouchProjectVaultFromModule } from "../helpers/git-commit.js";
 import { buildPersistenceStatus, buildMutationRetryContract, formatPersistenceSummary, pushAfterMutation as pushAfterMutationFromModule } from "../helpers/persistence.js";
 import type { MutationRetryContract } from "../structured-content.js";
-import { type NoteEntry, storageLabel, addVaultChange, removeRelationshipsToNoteIds as removeRelationshipsToNoteIdsFromModule } from "../helpers/vault.js";
+import { type NoteEntry, storageLabel, addVaultChange, attachedVaultErrorMessage, removeRelationshipsToNoteIds as removeRelationshipsToNoteIdsFromModule } from "../helpers/vault.js";
 import { toProjectRef } from "../helpers/project.js";
 import { embedTextForNote as embedTextForNoteFromModule } from "../helpers/embed.js";
 import type { EmbeddingRecord, Note } from "../storage.js";
@@ -535,7 +535,7 @@ export async function executeMerge(
         notesModified: 0,
         warnings: [`Source note '${id}' is in an attached vault and cannot be modified.`],
       };
-      return { content: [{ type: "text", text: `Source note '${id}' is in an attached vault and cannot be modified. Attached vaults are read-only.` }], structuredContent };
+      return { content: [{ type: "text", text: attachedVaultErrorMessage(id, entry.vault) }], structuredContent };
     }
     sourceEntries.push(entry);
   }

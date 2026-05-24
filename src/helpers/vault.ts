@@ -39,6 +39,9 @@ export function vaultMatchesStorageScope(vault: Vault, storedIn: StorageScope): 
 
 export function attachedVaultErrorMessage(id: string, vault: Vault): string {
   const label = storageLabel(vault);
+  if (vault.writable) {
+    return `Memory '${id}' is in an attached vault (${label}) that is not currently mutable. This may be due to a protected branch or access restriction.`;
+  }
   return `Memory '${id}' is in an attached vault (${label}) and cannot be modified. Attached vaults are read-only.`;
 }
 

@@ -7,6 +7,12 @@ import { currentEmbeddingIdentity } from "../embeddings.js";
 import { memoryId } from "../brands.js";
 import { storageLabel } from "./vault.js";
 import { UnknownRecoveryKindError, UnknownMutationPushModeError } from "../domain-errors.js";
+import { AttachedStorage } from "../attached-storage.js";
+import { simpleGit } from "simple-git";
+import { debugLog, getErrorMessage } from "../error-utils.js";
+import { expandHomePath } from "../paths.js";
+import { detectProject } from "../project.js";
+import path from "node:path";
 
 export function resolveDurability(commit: CommitResult, push: PushResult): PersistenceStatus["durability"] {
   if (push.status === "pushed") {
@@ -207,18 +213,25 @@ export async function pushAfterMutation(ctx: ServerContext, vault: Vault): Promi
     return { status: "skipped" as const, reason: "read-only-vault" as const };
   }
 
+  if (vault.storage instanceof AttachedStorage) {
+    vault.storage.invalidateCache();
+  }
+
   const mutationPushMode = await getMutationPushMode(ctx);
 
+  let pushResult: PushResult;
   switch (mutationPushMode) {
     case "all":
-      return doPush(vault);
+      pushResult = await doPush(vault);
+      break;
     case "main-only":
       if (vault.provenance === "project-attached") {
         return { status: "skipped" as const, reason: "auto-push-disabled" as const };
       }
-      return vault.provenance === "project-local"
+      pushResult = vault.provenance === "project-local"
         ? { status: "skipped" as const, reason: "auto-push-disabled" as const }
-        : doPush(vault);
+        : await doPush(vault);
+      break;
     case "none":
       return { status: "skipped" as const, reason: "auto-push-disabled" as const };
     default: {
@@ -226,6 +239,12 @@ export async function pushAfterMutation(ctx: ServerContext, vault: Vault): Promi
       throw new UnknownMutationPushModeError(_exhaustive);
     }
   }
+
+  if (pushResult.status === "pushed" && vault.provenance === "project-attached" && vault.attachmentRef) {
+    await updateAttachedBranchTipHash(ctx, vault);
+  }
+
+  return pushResult;
 }
 
 async function doPush(vault: Vault): Promise<PushResult> {
@@ -234,4 +253,35 @@ async function doPush(vault: Vault): Promise<PushResult> {
     return vault.git.pushBranch(pushBranch);
   }
   return vault.git.pushWithStatus();
+}
+
+async function updateAttachedBranchTipHash(ctx: ServerContext, vault: Vault): Promise<void> {
+  const ref = vault.attachmentRef!;
+  const resolvedLocalPath = path.resolve(expandHomePath(ref.localPath));
+  const branch = ref.pushBranch || ref.branch;
+  if (!branch) return;
+
+  try {
+    const git = simpleGit(resolvedLocalPath);
+    const newTipResult = await git.raw(["rev-parse", branch]);
+    const newTip = newTipResult?.trim() ?? "";
+    if (!newTip || newTip === ref.branchTipHash) return;
+
+    const project = await detectProject(resolvedLocalPath, {
+      getProjectIdentityOverride: async (projectId) => ctx.configStore.getProjectIdentityOverride(projectId),
+    });
+    if (!project) return;
+
+    const configs = await ctx.configStore.getProjectAttachments(project.id);
+    const updatedConfigs = configs.map(a =>
+      a.projectSlug === ref.projectSlug
+        ? { ...a, branchTipHash: newTip, updatedAt: new Date().toISOString() }
+        : a
+    );
+    await ctx.configStore.setProjectAttachments(project.id, updatedConfigs);
+    ref.branchTipHash = newTip;
+    debugLog("persistence:branch-tip", `${ref.projectSlug}: updated to ${newTip.substring(0, 8)}`);
+  } catch (err) {
+    debugLog("persistence:branch-tip", `failed: ${getErrorMessage(err)}`);
+  }
 }

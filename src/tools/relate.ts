@@ -13,6 +13,7 @@ import {
   ensureBranchSynced,
 } from "../helpers/project.js";
 import { memoryId, isoDateString } from "../brands.js";
+import { attachedVaultErrorMessage } from "../helpers/vault.js";
 import type { Vault } from "../vault.js";
 import { formatCommitBody } from "../helpers/git-commit.js";
 import {
@@ -66,14 +67,14 @@ export function registerRelateTool(server: McpServer, ctx: ServerContext): void 
       if (!foundFrom) {
         const foundFromAny = await ctx.vaultManager.findNote(fromId, cwd, { mutable: false });
         if (foundFromAny) {
-          return { content: [{ type: "text", text: `Memory '${fromId}' is in an attached vault and cannot be modified. Attached vaults are read-only.` }], isError: true };
+          return { content: [{ type: "text", text: attachedVaultErrorMessage(fromId, foundFromAny.vault) }], isError: true };
         }
         return { content: [{ type: "text", text: `No memory found with id '${fromId}'` }], isError: true };
       }
       if (!foundTo) {
         const foundToAny = await ctx.vaultManager.findNote(toId, cwd, { mutable: false });
         if (foundToAny) {
-          return { content: [{ type: "text", text: `Memory '${toId}' is in an attached vault and cannot be modified. Attached vaults are read-only.` }], isError: true };
+          return { content: [{ type: "text", text: attachedVaultErrorMessage(toId, foundToAny.vault) }], isError: true };
         }
         return { content: [{ type: "text", text: `No memory found with id '${toId}'` }], isError: true };
       }

@@ -418,7 +418,7 @@ function makeVault(
     provenance,
     vaultFolderName,
     attachmentRef,
-    get writable() { return this.provenance !== "project-attached"; },
+    get writable() { return this.provenance !== "project-attached" || this.attachmentRef?.writable === true; },
   };
 }
 
