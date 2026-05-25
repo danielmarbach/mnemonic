@@ -7,7 +7,7 @@ tags:
   - phase3
 lifecycle: temporary
 createdAt: '2026-05-23T21:43:11.965Z'
-updatedAt: '2026-05-23T21:43:21.122Z'
+updatedAt: '2026-05-25T17:21:07.693Z'
 role: plan
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -15,6 +15,8 @@ projectName: mnemonic
 relatedTo:
   - id: multi-repo-attachment-phase-3-request-root-58d643a2
     type: derives-from
+  - id: multi-repo-attachment-implementation-history-d0630b71
+    type: supersedes
 memoryVersion: 1
 ---
 # Multi-repo attachment Phase 3 — implementation plan

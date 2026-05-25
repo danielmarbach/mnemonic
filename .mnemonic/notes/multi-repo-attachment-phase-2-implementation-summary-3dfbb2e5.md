@@ -7,11 +7,14 @@ tags:
   - phase2
 lifecycle: permanent
 createdAt: '2026-05-23T13:16:52.923Z'
-updatedAt: '2026-05-23T13:16:52.923Z'
+updatedAt: '2026-05-25T17:21:07.693Z'
 role: summary
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: multi-repo-attachment-implementation-history-d0630b71
+    type: supersedes
 memoryVersion: 1
 ---
 # Multi-repo attachment — Phase 2 implementation summary
