@@ -15,8 +15,6 @@ projectName: mnemonic
 relatedTo:
   - id: implementation-principles-for-mnemonic-mcp-2e178bba
     type: related-to
-  - id: summary-evidence-enrichment-implementation-across-recall-and-10b7ba37
-    type: related-to
 memoryVersion: 1
 ---
 ## Consolidated from:

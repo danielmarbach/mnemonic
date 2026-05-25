@@ -14,15 +14,11 @@ alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
-  - id: summary-evidence-enrichment-implementation-across-recall-and-10b7ba37
-    type: follows
   - id: request-implement-evidence-enrichment-phases-from-explainabi-abe55a21
     type: derives-from
   - id: reference-rpir-evidence-enrichment-delivery-pattern-for-mnem-4a852278
     type: derives-from
   - id: research-consolidate-evidence-defaults-and-execute-merge-saf-8560d01e
-    type: derives-from
-  - id: summary-consolidate-evidence-always-on-and-execute-merge-evi-544d3ee8
     type: derives-from
   - id: dogfood-findings-consolidation-evidence-metadata-alone-insuf-7278ec64
     type: derives-from

@@ -16,8 +16,6 @@ projectName: mnemonic
 relatedTo:
   - id: decision-expose-trust-evidence-at-decision-points-via-opt-in-244d8317
     type: derives-from
-  - id: summary-evidence-enrichment-implementation-across-recall-and-10b7ba37
-    type: follows
 memoryVersion: 1
 ---
 # Reference: RPIR evidence-enrichment delivery pattern for mnemonic
