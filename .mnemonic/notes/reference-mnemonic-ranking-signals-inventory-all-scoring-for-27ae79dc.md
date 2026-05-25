@@ -10,13 +10,15 @@ tags:
   - design
 lifecycle: permanent
 createdAt: '2026-05-09T15:25:30.750Z'
-updatedAt: '2026-05-09T21:03:51.510Z'
+updatedAt: '2026-05-25T14:17:34.050Z'
 role: reference
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
   - id: enriched-confidence-scoring-with-signal-strength-composite-i-06563116
+    type: derives-from
+  - id: plan-three-channel-rrf-with-graph-rank-and-rank-window-size-1c7d15da
     type: derives-from
 memoryVersion: 1
 ---

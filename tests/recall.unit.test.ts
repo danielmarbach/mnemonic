@@ -212,6 +212,21 @@ describe("computeHybridScore", () => {
     expect(hybrid).toBeGreaterThan(0.8);
   });
 
+  it("adds graph rank as a third RRF channel", () => {
+    const twoChannel: ScoredRecallCandidate = {
+      id: "a",
+      score: 0.7,
+      boosted: 0.8,
+      vault,
+      isCurrentProject: true,
+      semanticRank: 1,
+      lexicalRank: 1,
+    };
+    const threeChannel: ScoredRecallCandidate = { ...twoChannel, graphRank: 1 };
+
+    expect(computeHybridScore(threeChannel)).toBeGreaterThan(computeHybridScore(twoChannel));
+  });
+
   it("lexical score cannot overcome large semantic gap", () => {
     const lowSemantic: ScoredRecallCandidate = { id: "a", score: 0.3, boosted: 0.3, vault, isCurrentProject: false, lexicalScore: 1.0 };
     const highSemantic: ScoredRecallCandidate = { id: "b", score: 0.8, boosted: 0.8, vault, isCurrentProject: false, lexicalScore: 0 };
@@ -233,6 +248,19 @@ describe("computeHybridScore", () => {
     const withCanonical = computeHybridScore(candidate);
     const withoutCanonical = computeHybridScore({ ...candidate, canonicalExplanationScore: 0 });
     expect(withCanonical).toBeGreaterThan(withoutCanonical);
+  });
+
+  it("keeps canonical contribution weighted when all rank channels are missing", () => {
+    const candidate: ScoredRecallCandidate = {
+      id: "tail-canonical",
+      score: 0.4,
+      boosted: 0.4,
+      vault,
+      isCurrentProject: true,
+      canonicalExplanationScore: 0.1,
+    };
+
+    expect(computeHybridScore(candidate)).toBeCloseTo(0.405, 5);
   });
 });
 
@@ -297,6 +325,35 @@ describe("applyLexicalReranking", () => {
     const reranked = applyLexicalReranking(candidates, "test", () => undefined);
 
     expect(reranked[0].lexicalScore).toBeUndefined();
+  });
+
+  it("does not assign ranks past the RRF rank window", () => {
+    const candidates: ScoredRecallCandidate[] = Array.from({ length: 101 }, (_, i) => ({
+      id: `candidate-${i}`,
+      score: 1 - i * 0.001,
+      boosted: 1 - i * 0.001,
+      vault,
+      isCurrentProject: true,
+    }));
+
+    applyLexicalReranking(candidates, "test", (id) => `projection ${id}`);
+
+    expect(candidates[99].semanticRank).toBe(100);
+    expect(candidates[100].semanticRank).toBeUndefined();
+  });
+
+  it("keeps rank window inactive for smaller candidate sets", () => {
+    const candidates: ScoredRecallCandidate[] = Array.from({ length: 3 }, (_, i) => ({
+      id: `candidate-${i}`,
+      score: 1 - i * 0.1,
+      boosted: 1 - i * 0.1,
+      vault,
+      isCurrentProject: true,
+    }));
+
+    applyLexicalReranking(candidates, "test", (id) => `projection ${id}`);
+
+    expect(candidates.map((candidate) => candidate.semanticRank)).toEqual([1, 2, 3]);
   });
 
   it("preserves all candidates after reranking", () => {
@@ -620,6 +677,7 @@ describe("canonical explanation promotion", () => {
         id: "canonical-structural",
         score: 0.56,
         semanticRank: 1,
+        graphRank: 1,
         semanticScoreForPromotion: 0.56,
         boosted: 0.56,
         vault,
@@ -727,10 +785,14 @@ describe("applyGraphSpreadingActivation", () => {
     expect(result).toHaveLength(2);
     const discovered = result.find((c) => c.id === "related-note");
     expect(discovered).toBeDefined();
-    expect(discovered!.score).toBeCloseTo(0.6 * 0.5 * 0.8, 5);
+    expect(discovered!.score).toBe(0);
+    expect(discovered!.boosted).toBe(0);
+    expect(discovered!.semanticRank).toBeUndefined();
+    expect(discovered!.graphScore).toBeCloseTo(0.6 * 0.5 * 0.8, 5);
+    expect(discovered!.graphRank).toBe(1);
   });
 
-  it("boosts an existing candidate instead of skipping it", () => {
+  it("adds graph evidence to an existing candidate without changing semantic scores", () => {
     const candidates: ScoredRecallCandidate[] = [
       { id: "entry", score: 0.6, boosted: 0.6, vault, isCurrentProject: true },
       { id: "already-there", score: 0.5, boosted: 0.5, vault, isCurrentProject: true },
@@ -747,8 +809,10 @@ describe("applyGraphSpreadingActivation", () => {
 
     expect(result).toHaveLength(2);
     const boosted = result.find((c) => c.id === "already-there")!;
-    expect(boosted.score).toBeCloseTo(0.5 + 0.6 * 0.5 * 0.8, 5);
-    expect(boosted.boosted).toBeCloseTo(0.5 + 0.6 * 0.5 * 0.8, 5);
+    expect(boosted.score).toBeCloseTo(0.5, 5);
+    expect(boosted.boosted).toBeCloseTo(0.5, 5);
+    expect(boosted.graphScore).toBeCloseTo(0.6 * 0.5 * 0.8, 5);
+    expect(boosted.graphRank).toBe(1);
   });
 
   it("accumulates propagated scores onto an existing candidate from multiple entry points", () => {
@@ -772,9 +836,10 @@ describe("applyGraphSpreadingActivation", () => {
 
     const shared = result.find((c) => c.id === "shared")!;
     const expectedBoost = 0.6 * 0.5 * 0.8 + 0.55 * 0.5 * 1.0;
-    expect(shared.score).toBeCloseTo(0.5 + expectedBoost, 5);
-    expect(shared.boosted).toBeCloseTo(0.5 + expectedBoost, 5);
-    expect(shared.semanticScoreForPromotion).toBeCloseTo(0.5 + expectedBoost, 5);
+    expect(shared.score).toBeCloseTo(0.5, 5);
+    expect(shared.boosted).toBeCloseTo(0.5, 5);
+    expect(shared.semanticScoreForPromotion).toBeCloseTo(0.5, 5);
+    expect(shared.graphScore).toBeCloseTo(expectedBoost, 5);
   });
 
   it("applies explains/derives-from multiplier of 1.0", () => {
@@ -792,7 +857,7 @@ describe("applyGraphSpreadingActivation", () => {
     const result = applyGraphSpreadingActivation(candidates, getNoteRelationships);
 
     const discovered = result.find((c) => c.id === "explains-note");
-    expect(discovered!.score).toBeCloseTo(0.7 * 0.5 * 1.0, 5);
+    expect(discovered!.graphScore).toBeCloseTo(0.7 * 0.5 * 1.0, 5);
   });
 
   it("only uses top 5 entry points", () => {
@@ -872,7 +937,7 @@ describe("applyGraphSpreadingActivation", () => {
 
     const discovered = result.find((c) => c.id === "shared");
     const expectedScore = (0.6 * 0.5 * 0.8) + (0.55 * 0.5 * 0.8);
-    expect(discovered!.score).toBeCloseTo(expectedScore, 5);
+    expect(discovered!.graphScore).toBeCloseTo(expectedScore, 5);
   });
 
   it("returns original candidates unchanged when no relationships exist", () => {
@@ -895,7 +960,7 @@ describe("applyGraphSpreadingActivation", () => {
     expect(result).toHaveLength(0);
   });
 
-  it("sets semanticScoreForPromotion on discovered candidates", () => {
+  it("does not treat graph-discovered candidates as semantically promoted", () => {
     const candidates: ScoredRecallCandidate[] = [
       { id: "entry", score: 0.7, boosted: 0.7, vault, isCurrentProject: true },
     ];
@@ -910,7 +975,25 @@ describe("applyGraphSpreadingActivation", () => {
     const result = applyGraphSpreadingActivation(candidates, getNoteRelationships);
 
     const discovered = result.find((c) => c.id === "discovered");
-    expect(discovered!.semanticScoreForPromotion).toBeCloseTo(0.7 * 0.5 * 1.0, 5);
+    expect(discovered!.semanticScoreForPromotion).toBe(0);
+    expect(discovered!.graphRank).toBe(1);
+  });
+
+  it("does not assign graph ranks past the RRF rank window", () => {
+    const candidates: ScoredRecallCandidate[] = [
+      { id: "entry", score: 0.7, boosted: 0.7, vault, isCurrentProject: true },
+    ];
+
+    const result = applyGraphSpreadingActivation(candidates, (id) => {
+      if (id !== "entry") return undefined;
+      return Array.from({ length: 101 }, (_, i) => ({ id: `related-${i}`, type: "related-to" as const }));
+    });
+
+    const ranked = result
+      .filter((candidate) => candidate.id.startsWith("related-"))
+      .sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true }));
+    expect(ranked[99].graphRank).toBe(1);
+    expect(ranked[100].graphRank).toBeUndefined();
   });
 });
 

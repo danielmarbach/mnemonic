@@ -8,12 +8,13 @@ import type { Confidence } from "./structured-content.js";
 import type { RelationshipType } from "./storage.js";
 
 const RRF_K = 60;
+const RRF_RANK_WINDOW = 100;
 const CANONICAL_HYBRID_WEIGHT = 0.05;
 
-// RRF scaling factor: with K=60 and two channels, max RRF ≈ 2/60 ≈ 0.033.
-// Multiplied by 3.5 ≈ 0.115, matching the old additive lexical weight's order-of-magnitude
+// RRF scaling factor: with K=60 and three channels, max RRF ≈ 3/60 ≈ 0.050.
+// Multiplied by 3.0 ≈ 0.150, matching the old additive lexical weight's order-of-magnitude
 // while remaining calibration-free.
-const RRF_SCALING_FACTOR = 3.5;
+const RRF_SCALING_FACTOR = 3.0;
 
 const RECALL_ALWAYS_LOAD_BOOST = 0.01;
 const RECALL_SUMMARY_BOOST = 0.012;
@@ -52,6 +53,10 @@ export interface ScoredRecallCandidate {
   semanticRank?: number;
   /** Rank from the lexical reranking step (1-based). */
   lexicalRank?: number;
+  /** Graph spreading activation score. Undefined when no graph evidence exists. */
+  graphScore?: number;
+  /** Rank from the graph spreading activation channel (1-based). */
+  graphRank?: number;
   boosted: number;
   vault: Vault;
   isCurrentProject: boolean;
@@ -188,17 +193,16 @@ export function isWithinTemporalFilterWindow(
  * Formula:
  *   boosted + RRF + canonicalExplanationScore * CANONICAL_HYBRID_WEIGHT
  *
- * where RRF = 1/(K + semanticRank) + 1/(K + lexicalRank)
+ * where RRF = 1/(K + semanticRank) + 1/(K + lexicalRank) + 1/(K + graphRank)
  *
- * When semanticRank is missing but lexicalRank is available (rescue candidates)
- * only the lexical channel contributes. When both are missing the function
- * falls back to pure boosted (pre-RRF scoring stage).
+ * Missing channels contribute 0. When all ranks are missing, the function keeps
+ * only the boosted score plus the bounded canonical explanation contribution.
  */
 export function computeHybridScore(candidate: ScoredRecallCandidate): number {
   const canonical = candidate.canonicalExplanationScore ?? 0;
 
-  if (candidate.semanticRank === undefined && candidate.lexicalRank === undefined) {
-    return candidate.boosted + canonical;
+  if (candidate.semanticRank === undefined && candidate.lexicalRank === undefined && candidate.graphRank === undefined) {
+    return candidate.boosted + canonical * CANONICAL_HYBRID_WEIGHT;
   }
 
   const semanticContribution = candidate.semanticRank !== undefined
@@ -207,12 +211,15 @@ export function computeHybridScore(candidate: ScoredRecallCandidate): number {
   const lexicalContribution = candidate.lexicalRank !== undefined
     ? 1 / (RRF_K + candidate.lexicalRank)
     : 0;
+  const graphContribution = candidate.graphRank !== undefined
+    ? 1 / (RRF_K + candidate.graphRank)
+    : 0;
 
   // Scale RRF so its maximum influence is comparable to the old additive
-  // lexical weight (~0.12). With K = 60 and two channels the max RRF is
-  // roughly 2/60 ≈ 0.033. Multiplied by 3.5 this hits ~0.115, matching the
+  // lexical weight. With K = 60 and three channels the max RRF is roughly
+  // 3/60 ≈ 0.050. Multiplied by 3.0 this hits ~0.150, matching the
   // old order-of-magnitude while remaining calibration-free.
-  const rrf = semanticContribution + lexicalContribution;
+  const rrf = semanticContribution + lexicalContribution + graphContribution;
 
   return candidate.boosted + rrf * RRF_SCALING_FACTOR + canonical * CANONICAL_HYBRID_WEIGHT;
 }
@@ -226,12 +233,21 @@ function computeLexicalRankSignal(candidate: ScoredRecallCandidate): number {
 
 const RANK_EPSILON = 1e-9;
 
-export function assignDenseRanks<T>(items: T[], scoreOf: (item: T) => number, setRank: (item: T, rank: number) => void): void {
+export function assignDenseRanks<T>(
+  items: T[],
+  scoreOf: (item: T) => number,
+  setRank: (item: T, rank: number | undefined) => void,
+  rankWindow = RRF_RANK_WINDOW
+): void {
   let currentRank = 0;
   let previousScore: number | undefined;
   for (let i = 0; i < items.length; i++) {
     const item = items[i];
     if (item === undefined) continue;
+    if (i >= rankWindow) {
+      setRank(item, undefined);
+      continue;
+    }
     const score = scoreOf(item);
     if (previousScore === undefined || Math.abs(score - previousScore) > RANK_EPSILON) {
       currentRank = i + 1;
@@ -286,8 +302,9 @@ export function applyCanonicalExplanationPromotion(candidates: ScoredRecallCandi
     candidate.canonicalExplanationScore = computeCanonicalExplanationScore(candidate);
   }
 
-  // Assign lexicalRank based on lexicalScore (undefined scores rank last).
-  const sortedByLexical = [...candidates]
+  // Assign lexicalRank only to candidates with lexical evidence.
+  const sortedByLexical = candidates
+    .filter((candidate) => computeLexicalRankSignal(candidate) > 0)
     .sort((a, b) => computeLexicalRankSignal(b) - computeLexicalRankSignal(a) || b.score - a.score);
   assignDenseRanks(sortedByLexical, computeLexicalRankSignal, (candidate, rank) => {
     candidate.lexicalRank = rank;
@@ -504,36 +521,33 @@ export function applyGraphSpreadingActivation(
 
       const existingCandidate = candidateMap.get(rel.id);
       if (existingCandidate) {
-        existingCandidate.score += propagatedScore;
-        existingCandidate.boosted += propagatedScore;
-        if (existingCandidate.semanticScoreForPromotion !== undefined) {
-          existingCandidate.semanticScoreForPromotion += propagatedScore;
-        }
+        existingCandidate.graphScore = (existingCandidate.graphScore ?? 0) + propagatedScore;
       } else if (!discovered.has(rel.id)) {
         discovered.set(rel.id, {
           id: rel.id,
-          score: propagatedScore,
-          semanticScoreForPromotion: propagatedScore,
-          boosted: propagatedScore,
+          score: 0,
+          semanticScoreForPromotion: 0,
+          graphScore: propagatedScore,
+          boosted: 0,
           vault: entry.vault,
           isCurrentProject: entry.isCurrentProject,
         });
       } else {
         const existing = discovered.get(rel.id)!;
-        existing.score += propagatedScore;
-        existing.boosted += propagatedScore;
-        if (existing.semanticScoreForPromotion !== undefined) {
-          existing.semanticScoreForPromotion += propagatedScore;
-        }
+        existing.graphScore = (existing.graphScore ?? 0) + propagatedScore;
       }
     }
   }
 
-  if (discovered.size === 0) {
-    return candidates;
-  }
+  const withDiscovered = discovered.size === 0 ? candidates : [...candidates, ...discovered.values()];
+  const sortedByGraph = withDiscovered
+    .filter((candidate) => candidate.graphScore !== undefined)
+    .sort((a, b) => (b.graphScore ?? 0) - (a.graphScore ?? 0) || b.score - a.score);
+  assignDenseRanks(sortedByGraph, (candidate) => candidate.graphScore ?? 0, (candidate, rank) => {
+    candidate.graphRank = rank;
+  });
 
-  return [...candidates, ...discovered.values()];
+  return withDiscovered;
 }
 
 export function resolveDiscoveredVaults(
