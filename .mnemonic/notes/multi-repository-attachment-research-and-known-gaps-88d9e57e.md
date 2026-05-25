@@ -13,10 +13,6 @@ projectName: mnemonic
 relatedTo:
   - id: multi-repository-attachment-support-request-root-151ad76c
     type: derives-from
-  - id: multi-repo-attachment-phase-3-request-root-58d643a2
-    type: derives-from
-  - id: multi-repo-federated-reads-codebase-research-626b102b
-    type: derives-from
   - id: apply-multi-repo-attachment-phase-2-integration-tests-and-p0-f16c0bf8
     type: follows
 memoryVersion: 1
