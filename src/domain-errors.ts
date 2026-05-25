@@ -143,6 +143,13 @@ export class InvalidBranchNameError extends Error {
   }
 }
 
+export class ProtectedBranchError extends Error {
+  constructor(message?: string) {
+    super(message ?? "Protected branch policy blocked this commit");
+    this.name = "ProtectedBranchError";
+  }
+}
+
 export class AttachedVaultReadOnlyError extends Error {
   constructor(operation: string) {
     super(`Cannot ${operation} to attached vault`);

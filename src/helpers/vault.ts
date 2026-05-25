@@ -6,7 +6,10 @@ import { getOrBuildVaultNoteList } from "../cache.js";
 import { resolveProject } from "./project.js";
 import { formatCommitBody, commitVaultWithProtection, checkVaultProtectedBranch } from "./git-commit.js";
 import { pushAfterMutation, buildMutationRetryContract, buildPersistenceStatus } from "./persistence.js";
-import { filterRelationships } from "../consolidate.js";
+import {
+  ProtectedBranchError,
+  filterRelationships,
+} from "../consolidate.js";
 import { summarizePreview } from "../project-introspection.js";
 
 
@@ -194,7 +197,7 @@ export async function moveNoteBetweenVaults(
 
   for (const check of preChecks) {
     if (check.blocked) {
-      throw new Error(check.message ?? "Protected branch policy blocked this commit.");
+      throw new ProtectedBranchError(check.message ?? undefined);
     }
   }
 
