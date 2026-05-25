@@ -7,13 +7,15 @@ tags:
   - ranking
 lifecycle: temporary
 createdAt: '2026-05-25T14:07:26.547Z'
-updatedAt: '2026-05-25T14:15:30.062Z'
+updatedAt: '2026-05-25T14:17:30.658Z'
 role: plan
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
   - id: research-rrf-ranking-improvements-article-analysis-vs-curren-3b8585ab
+    type: derives-from
+  - id: decision-phase-2-recall-scoring-uses-rrf-with-dense-rank-tie-7969c37d
     type: derives-from
 memoryVersion: 1
 ---
