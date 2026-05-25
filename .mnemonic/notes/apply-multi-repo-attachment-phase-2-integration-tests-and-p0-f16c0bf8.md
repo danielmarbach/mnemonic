@@ -12,9 +12,6 @@ role: plan
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
-relatedTo:
-  - id: multi-repository-attachment-support-implementation-plan-b6423f79
-    type: follows
 memoryVersion: 1
 ---
 # Apply: Multi-repo attachment Phase 2 — integration tests and P0 corrections

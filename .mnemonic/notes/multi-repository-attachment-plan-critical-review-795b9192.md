@@ -12,9 +12,6 @@ role: review
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
-relatedTo:
-  - id: multi-repository-attachment-support-implementation-plan-b6423f79
-    type: derives-from
 memoryVersion: 1
 ---
 # Multi-repository attachment plan — critical review
