@@ -21,8 +21,6 @@ relatedTo:
     type: derives-from
   - id: apply-multi-repo-attachment-phase-2-integration-tests-and-p0-f16c0bf8
     type: follows
-  - id: apply-phase-2-remaining-integration-tests-staleness-auto-syn-9cd530e6
-    type: follows
 memoryVersion: 1
 ---
 Consolidate multi-repository attachment research, review evidence, design decisions, implementation status, and known gaps into one canonical note.
