@@ -4,6 +4,12 @@ All notable changes to `mnemonic` will be documented in this file.
 
 The format is loosely based on Keep a Changelog and uses semver-style version headings.
 
+## [Unreleased]
+
+### Changed
+
+- `recall` ranking now treats graph spreading activation as an independent RRF channel (`graph-rank`) instead of mutating semantic scores, applies a 100-result rank window per channel, and keeps canonical explanation scoring bounded when rank channels are missing.
+
 ## [0.33.1] - 2026-05-25
 
 ### Fixed
