@@ -15,8 +15,6 @@ projectName: mnemonic
 relatedTo:
   - id: reference-mnemonic-ranking-signals-inventory-all-scoring-for-27ae79dc
     type: derives-from
-  - id: dogfooding-results-signalstrength-validation-pack-2026-05-09-c06ffece
-    type: example-of
 memoryVersion: 1
 ---
 ## Consolidated from:
