@@ -9,13 +9,15 @@ tags:
   - ranking
 lifecycle: temporary
 createdAt: '2026-05-25T14:06:16.108Z'
-updatedAt: '2026-05-25T14:06:19.207Z'
+updatedAt: '2026-05-25T14:07:30.124Z'
 role: research
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
   - id: request-rrf-ranking-improvements-from-bigdata-boutique-artic-1765a16b
+    type: derives-from
+  - id: plan-three-channel-rrf-with-graph-rank-and-rank-window-size-1c7d15da
     type: derives-from
 memoryVersion: 1
 ---

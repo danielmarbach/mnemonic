@@ -7,11 +7,14 @@ tags:
   - ranking
 lifecycle: temporary
 createdAt: '2026-05-25T14:07:26.547Z'
-updatedAt: '2026-05-25T14:07:26.547Z'
+updatedAt: '2026-05-25T14:07:30.124Z'
 role: plan
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: research-rrf-ranking-improvements-article-analysis-vs-curren-3b8585ab
+    type: derives-from
 memoryVersion: 1
 ---
 ## Plan: Three-channel RRF with graph rank and rank window size
