@@ -13,8 +13,6 @@ projectName: mnemonic
 relatedTo:
   - id: github-packages-publishing-and-ci-workflow-55495350
     type: related-to
-  - id: runtime-version-sourced-from-package-json-f5646ce9
-    type: related-to
 memoryVersion: 1
 ---
 Mnemonic now includes a repo-local helper for development dogfooding.

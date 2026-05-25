@@ -15,8 +15,6 @@ relatedTo:
     type: related-to
   - id: mnemonic-mcp-tools-inventory-47499799
     type: explains
-  - id: agent-instruction-improvements-session-start-recall-first-an-ecd402c3
-    type: example-of
 memoryVersion: 1
 ---
 ## Tool design

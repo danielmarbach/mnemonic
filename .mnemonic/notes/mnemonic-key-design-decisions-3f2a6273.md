@@ -30,10 +30,6 @@ relatedTo:
     type: derives-from
   - id: split-index-ts-into-modular-structure-implemented-e97a019f
     type: derives-from
-  - id: semantic-patch-builder-design-and-implementation-b8d48f5e
-    type: related-to
-  - id: dogfooding-results-core-enrichment-orientation-pack-2026-05--910c0886
-    type: related-to
   - id: design-principle-git-commits-must-only-touch-mnemonic-manage-cecb8d11
     type: related-to
   - id: bug-fix-update-tool-no-op-detection-1031c864

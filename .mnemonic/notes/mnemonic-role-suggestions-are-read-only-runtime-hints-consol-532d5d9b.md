@@ -7,7 +7,7 @@ tags:
   - decision
 lifecycle: permanent
 createdAt: '2026-04-04T22:09:20.109Z'
-updatedAt: '2026-04-20T21:37:02.076Z'
+updatedAt: '2026-05-25T17:35:43.310Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
@@ -17,6 +17,8 @@ relatedTo:
     type: related-to
   - id: rpir-workflow-design-for-mnemonic-research-plan-implement-re-80b00851
     type: explains
+  - id: mnemonic-language-independent-role-heuristics-f66619c1
+    type: related-to
 memoryVersion: 1
 ---
 Roles and importance suggestions in mnemonic are **read-only runtime hints**, not a required schema, and must never mutate notes.

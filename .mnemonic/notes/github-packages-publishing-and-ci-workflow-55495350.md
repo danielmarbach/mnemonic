@@ -14,8 +14,6 @@ projectName: mnemonic
 relatedTo:
   - id: local-mcp-dogfooding-helper-script-a34e7468
     type: related-to
-  - id: runtime-version-sourced-from-package-json-f5646ce9
-    type: related-to
   - id: npm-package-renamed-to-mnemonic-mcp-54a86ad6
     type: related-to
   - id: dynamic-project-context-loading-plan-9f2ed29c

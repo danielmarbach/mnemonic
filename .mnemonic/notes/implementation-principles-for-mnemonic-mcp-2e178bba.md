@@ -29,8 +29,6 @@ relatedTo:
     type: related-to
   - id: enriched-confidence-scoring-with-signal-strength-composite-i-06563116
     type: related-to
-  - id: dogfooding-results-core-enrichment-orientation-pack-2026-05--910c0886
-    type: related-to
   - id: structured-mcp-schema-audit-test-strategy-targeted-high-risk-f966c089
     type: related-to
   - id: ci-safe-mcp-integration-and-failure-learning-workflow-91431beb

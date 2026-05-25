@@ -10,11 +10,6 @@ role: research
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
-relatedTo:
-  - id: multi-repository-attachment-support-request-root-151ad76c
-    type: derives-from
-  - id: multi-repository-attachment-support-implementation-plan-b6423f79
-    type: derives-from
 memoryVersion: 1
 ---
 # Multi-repo federated reads — codebase research

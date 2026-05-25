@@ -13,8 +13,6 @@ projectName: mnemonic
 relatedTo:
   - id: implementation-principles-for-mnemonic-mcp-2e178bba
     type: related-to
-  - id: typescript-code-review-mnemonic-project-961d984b
-    type: related-to
   - id: apply-multi-provider-embedding-support-implementation-f55f935a
     type: follows
 memoryVersion: 1
