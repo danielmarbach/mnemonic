@@ -18,8 +18,6 @@ projectName: mnemonic
 relatedTo:
   - id: enriched-confidence-scoring-with-signal-strength-composite-i-06563116
     type: derives-from
-  - id: plan-three-channel-rrf-with-graph-rank-and-rank-window-size-1c7d15da
-    type: derives-from
 memoryVersion: 1
 ---
 ## Reference: Mnemonic Ranking Signals Inventory

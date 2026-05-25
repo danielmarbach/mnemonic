@@ -18,8 +18,6 @@ relatedTo:
     type: derives-from
   - id: mnemonic-key-design-decisions-3f2a6273
     type: related-to
-  - id: plan-three-channel-rrf-with-graph-rank-and-rank-window-size-1c7d15da
-    type: derives-from
 memoryVersion: 1
 ---
 # Decision: Phase 2 recall scoring uses RRF with dense rank tie handling

@@ -14,9 +14,6 @@ role: research
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
-relatedTo:
-  - id: plan-three-channel-rrf-with-graph-rank-and-rank-window-size-1c7d15da
-    type: derives-from
 memoryVersion: 1
 ---
 ## Research: RRF Ranking Improvements — Article Analysis vs Current Implementation
