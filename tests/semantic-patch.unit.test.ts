@@ -346,7 +346,7 @@ describe("semantic-patch", () => {
       { selector: { heading: "Data" }, operation: { op: "insertAfter", value: "| Col A | Col B |\n| --- | --- |\n| 1 | 2 |" } },
     ];
     const result = await applySemanticPatches(note, patches);
-    const expected = "# Report\n\n## Data\n\n| Col A | Col B |\n| --- | --- |\n| 1 | 2 |\n\nExisting.";
+    const expected = "# Report\n\n## Data\n\n| Col A | Col B |\n| ----- | ----- |\n| 1     | 2     |\n\nExisting.";
     expect(result.content).toBe(expected);
     expect(result.lintWarnings).toEqual([]);
   });
