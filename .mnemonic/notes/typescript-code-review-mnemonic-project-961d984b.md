@@ -8,7 +8,7 @@ tags:
   - performance
 lifecycle: permanent
 createdAt: '2026-05-02T04:20:54.784Z'
-updatedAt: '2026-05-21T10:37:47.145Z'
+updatedAt: '2026-05-25T17:29:36.356Z'
 role: review
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -18,6 +18,8 @@ relatedTo:
     type: related-to
   - id: parallel-consolidate-operations-can-leave-staged-local-only--e8c33780
     type: related-to
+  - id: typescript-code-review-mnemonic-project-4136d9a2
+    type: supersedes
 memoryVersion: 1
 ---
 ## Review Workflow
