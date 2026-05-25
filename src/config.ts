@@ -11,6 +11,7 @@ import {
 } from "./project-memory-policy.js";
 import type { ProjectIdentityOverride } from "./project.js";
 import type { ProjectAttachmentConfig } from "./vault.js";
+import { attachmentSlug } from "./brands.js";
 
 export type MutationPushMode = "all" | "main-only" | "none";
 
@@ -167,7 +168,7 @@ function normalizeProjectAttachments(value: unknown): Record<string, ProjectAtta
       if (typeof a.projectSlug !== "string" || !a.projectSlug.trim()) continue;
       if (typeof a.localPath !== "string" || !a.localPath.trim()) continue;
       validAttachments.push({
-        projectSlug: a.projectSlug.trim(),
+        projectSlug: attachmentSlug(a.projectSlug.trim()),
         projectName: typeof a.projectName === "string" ? a.projectName.trim() : a.projectSlug.trim(),
         localPath: a.localPath.trim(),
         vaultFolder: typeof a.vaultFolder === "string" && a.vaultFolder.trim() ? a.vaultFolder.trim() : ".mnemonic",

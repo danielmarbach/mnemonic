@@ -39,6 +39,9 @@ export type EmbeddingMetric = Brand<string, "EmbeddingMetric">;
 /** ISO 8601 date string used for timestamps (createdAt, updatedAt). */
 export type ISO8601DateString = Brand<string, "ISO8601DateString">;
 
+/** Normalized git remote slug used as attachment key (e.g., "github-com-org-repo"). */
+export type AttachmentSlug = Brand<string, "AttachmentSlug">;
+
 // ── Validation patterns ────────────────────────────────────────────────────────
 
 const MEMORY_ID_PATTERN = /^[a-zA-Z0-9_-]+$/;
@@ -111,4 +114,9 @@ export function embeddingMetric(metric: string): EmbeddingMetric {
 /** Create an `ISO8601DateString` from a plain ISO date string. */
 export function isoDateString(date: string): ISO8601DateString {
   return date as ISO8601DateString;
+}
+
+/** Create an `AttachmentSlug` from a normalized remote URL. */
+export function attachmentSlug(slug: string): AttachmentSlug {
+  return slug as AttachmentSlug;
 }

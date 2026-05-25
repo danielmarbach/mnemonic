@@ -6,7 +6,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ServerContext } from "../server-context.js";
 import type { ProjectAttachmentConfig } from "../vault.js";
 import { detectDefaultBranch } from "../attached-storage.js";
-import { projectId } from "../brands.js";
+import { projectId, attachmentSlug, type AttachmentSlug } from "../brands.js";
 import { resolveProject as resolveProjectFromModule } from "../helpers/project.js";
 import { projectNotFoundResponse } from "../helpers/vault.js";
 import { formatCommitBody } from "../helpers/git-commit.js";
@@ -16,14 +16,14 @@ import { invalidateActiveProjectCache } from "../cache.js";
 import { attempt } from "../error-utils.js";
 import { expandHomePath, collapseHomePath } from "../paths.js";
 
-function normalizeRemote(remote: string): string {
+function normalizeRemote(remote: string): AttachmentSlug {
   let s = remote.trim().toLowerCase();
   s = s.replace(/^git@/, "").replace(/:/, "/");
   s = s.replace(/^https?:\/\//, "").replace(/^ssh:\/\//, "");
   s = s.replace(/^[^@]*@/, "");
   s = s.replace(/\.git$/, "");
   s = s.replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
-  return s;
+  return attachmentSlug(s);
 }
 
 function extractRepoName(remote: string): string {

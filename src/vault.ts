@@ -4,7 +4,7 @@ import { simpleGit } from "simple-git";
 
 import { attempt, debugLog, getErrorMessage } from "./error-utils.js";
 import { Storage, type Note, type NoteStorage } from "./storage.js";
-import { memoryId } from "./brands.js";
+import { memoryId, type AttachmentSlug } from "./brands.js";
 import { GitOps } from "./git.js";
 import { AttachedStorage } from "./attached-storage.js";
 import { expandHomePath } from "./paths.js";
@@ -14,7 +14,7 @@ import { expandHomePath } from "./paths.js";
 export type VaultProvenance = "main" | "project-local" | "project-attached";
 
 export interface AttachmentRef {
-  projectSlug: string;
+  projectSlug: AttachmentSlug;
   projectName: string;
   localPath: string;
   branch: string;
@@ -24,7 +24,7 @@ export interface AttachmentRef {
 }
 
 export interface ProjectAttachmentConfig {
-  projectSlug: string;
+  projectSlug: AttachmentSlug;
   projectName: string;
   localPath: string;
   vaultFolder: string;
@@ -286,23 +286,26 @@ export class VaultManager {
       const git = new GitOps(resolvedLocalPath, `${config.vaultFolder}/notes`);
       await git.init();
 
-      const vault: Vault = {
+      const attachmentRef: AttachmentRef = {
+        projectSlug: config.projectSlug,
+        projectName: config.projectName,
+        localPath: resolvedLocalPath,
+        branch: config.branch,
+        branchTipHash: currentTipHash,
+        writable: config.writable,
+        pushBranch: config.pushBranch,
+      };
+      const vault = makeVault(
+        attachmentsDir,
+        resolvedLocalPath,
+        `${config.vaultFolder}/notes`,
+        "project-attached",
+        config.vaultFolder,
+        undefined,
+        attachmentRef,
         storage,
         git,
-        notesRelDir: `${config.vaultFolder}/notes`,
-        provenance: "project-attached",
-        vaultFolderName: config.vaultFolder,
-        attachmentRef: {
-          projectSlug: config.projectSlug,
-          projectName: config.projectName,
-          localPath: resolvedLocalPath,
-          branch: config.branch,
-          branchTipHash: currentTipHash,
-          writable: config.writable,
-          pushBranch: config.pushBranch,
-        },
-        get writable() { return config.writable === true; },
-      };
+      );
 
       const gitignorePath = path.join(resolvedLocalPath, config.vaultFolder, ".gitignore");
       await ensureGitignore(gitignorePath);
@@ -414,16 +417,18 @@ function makeVault(
   vaultFolderName: string,
   embeddingsDirOverride?: string,
   attachmentRef?: AttachmentRef,
+  storage?: NoteStorage,
+  git?: GitOps,
 ): Vault {
   return {
-    storage: new Storage(vaultPath, embeddingsDirOverride),
-    git: new GitOps(gitRoot, notesRelDir),
+    storage: storage ?? new Storage(vaultPath, embeddingsDirOverride),
+    git: git ?? new GitOps(gitRoot, notesRelDir),
     notesRelDir,
     provenance,
     vaultFolderName,
     attachmentRef,
     get writable() { return this.provenance !== "project-attached" || this.attachmentRef?.writable === true; },
-  };
+  } satisfies Vault;
 }
 
 /**
