@@ -7,11 +7,14 @@ tags:
   - bug-risk
 lifecycle: temporary
 createdAt: '2026-05-25T16:28:34.246Z'
-updatedAt: '2026-05-25T16:28:34.246Z'
+updatedAt: '2026-05-25T17:25:55.146Z'
 role: context
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: semantic-patch-design-usability-fixes-and-known-footguns-a45c4f5a
+    type: supersedes
 memoryVersion: 1
 ---
 # Semantic patch section replacement footgun and mitigation ideas
