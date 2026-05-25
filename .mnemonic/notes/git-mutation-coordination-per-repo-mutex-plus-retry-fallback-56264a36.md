@@ -15,8 +15,6 @@ projectName: mnemonic
 relatedTo:
   - id: git-resilience-retry-contract-concurrency-design-and-languag-351fab47
     type: explains
-  - id: typescript-code-review-mnemonic-project-961d984b
-    type: related-to
 memoryVersion: 1
 ---
 Approved design: serialize all mutating git operations inside mnemonic with an in-process per-repo async mutex, while keeping bounded retry handling for transient git lock failures.
