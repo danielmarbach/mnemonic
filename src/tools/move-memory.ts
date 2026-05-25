@@ -22,6 +22,7 @@ import {
   projectNotFoundResponse,
   storageLabel,
 } from "../helpers/vault.js";
+import { attempt, getErrorMessage } from "../error-utils.js";
 import { invalidateActiveProjectCache } from "../cache.js";
 
 export function registerMoveMemoryTool(server: McpServer, ctx: ServerContext): void {
@@ -155,13 +156,12 @@ export function registerMoveMemoryTool(server: McpServer, ctx: ServerContext): v
         };
       }
 
-      let moveResult;
-      try {
-        moveResult = await moveNoteBetweenVaults(ctx, found, targetVault, noteToWrite, cwd, allowProtectedBranch, targetProject?.id);
-      } catch (err) {
-        const message = err instanceof Error ? err.message : "Move blocked by protected branch policy.";
+      const moveAttempt = await attempt("move:between-vaults", () => moveNoteBetweenVaults(ctx, found, targetVault, noteToWrite, cwd, allowProtectedBranch, targetProject?.id));
+      if (!moveAttempt.ok) {
+        const message = getErrorMessage(moveAttempt.error);
         return { content: [{ type: "text", text: message }], isError: true };
       }
+      let moveResult = moveAttempt.value;
       const movedNote = moveResult.note;
       const associationValue = movedNote.projectName && movedNote.project
         ? `${movedNote.projectName} (${movedNote.project})`

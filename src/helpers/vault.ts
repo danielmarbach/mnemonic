@@ -6,10 +6,8 @@ import { getOrBuildVaultNoteList } from "../cache.js";
 import { resolveProject } from "./project.js";
 import { formatCommitBody, commitVaultWithProtection, checkVaultProtectedBranch } from "./git-commit.js";
 import { pushAfterMutation, buildMutationRetryContract, buildPersistenceStatus } from "./persistence.js";
-import {
-  ProtectedBranchError,
-  filterRelationships,
-} from "../consolidate.js";
+import { ProtectedBranchError } from "../domain-errors.js";
+import { filterRelationships } from "../consolidate.js";
 import { summarizePreview } from "../project-introspection.js";
 
 
