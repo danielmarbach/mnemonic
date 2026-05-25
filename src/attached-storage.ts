@@ -16,6 +16,7 @@ export function validateBranch(branch: string): void {
 
 export class AttachedStorage implements NoteStorage {
   private baseStorage: Storage;
+  private repoStorage: Storage;
   private repoPath: string;
   private branch: string;
   private noteCache = new Map<string, Note>();
@@ -23,8 +24,9 @@ export class AttachedStorage implements NoteStorage {
   private notesRelDir: string;
   private writable: boolean;
 
-  constructor(baseStorage: Storage, repoPath: string, branch: string, notesRelDir: string, writable: boolean = false) {
+  constructor(baseStorage: Storage, repoStorage: Storage, repoPath: string, branch: string, notesRelDir: string, writable: boolean = false) {
     this.baseStorage = baseStorage;
+    this.repoStorage = repoStorage;
     this.repoPath = repoPath;
     this.branch = branch;
     this.notesRelDir = notesRelDir;
@@ -115,35 +117,43 @@ export class AttachedStorage implements NoteStorage {
 
   async writeNote(note: Note): Promise<void> {
     if (this.writable) {
-      return this.baseStorage.writeNote(note);
+      await this.repoStorage.writeNote(note);
+      this.noteCache.set(note.id, note);
+      this.noteIdCache = null;
+      return;
     }
     throw new AttachedVaultReadOnlyError("write note");
   }
 
   async deleteNote(id: MemoryId): Promise<boolean> {
     if (this.writable) {
-      return this.baseStorage.deleteNote(id);
+      const ok = await this.repoStorage.deleteNote(id);
+      if (ok) {
+        this.noteCache.delete(id);
+        this.noteIdCache = null;
+      }
+      return ok;
     }
     throw new AttachedVaultReadOnlyError("delete note");
   }
 
   async beginAtomicNotesWrite(): Promise<void> {
     if (this.writable) {
-      return this.baseStorage.beginAtomicNotesWrite();
+      return this.repoStorage.beginAtomicNotesWrite();
     }
     throw new AttachedVaultReadOnlyError("begin atomic write");
   }
 
   async commitAtomicNotesWrite(): Promise<void> {
     if (this.writable) {
-      return this.baseStorage.commitAtomicNotesWrite();
+      return this.repoStorage.commitAtomicNotesWrite();
     }
     throw new AttachedVaultReadOnlyError("commit atomic write");
   }
 
   async rollbackAtomicNotesWrite(): Promise<void> {
     if (this.writable) {
-      return this.baseStorage.rollbackAtomicNotesWrite();
+      return this.repoStorage.rollbackAtomicNotesWrite();
     }
     throw new AttachedVaultReadOnlyError("rollback atomic write");
   }

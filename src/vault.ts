@@ -278,9 +278,13 @@ export class VaultManager {
       const baseStorage = new Storage(attachmentsDir);
       await baseStorage.init();
 
-      const storage = new AttachedStorage(baseStorage, resolvedLocalPath, config.branch, `${config.vaultFolder}/notes`, config.writable === true);
+      const repoStorage = new Storage(path.join(resolvedLocalPath, config.vaultFolder));
+      await repoStorage.init();
+
+      const storage = new AttachedStorage(baseStorage, repoStorage, resolvedLocalPath, config.branch, `${config.vaultFolder}/notes`, config.writable === true);
 
       const git = new GitOps(resolvedLocalPath, `${config.vaultFolder}/notes`);
+      await git.init();
 
       const vault: Vault = {
         storage,

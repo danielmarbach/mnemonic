@@ -111,7 +111,13 @@ export function registerForgetTool(server: McpServer, ctx: ServerContext): void 
         }
       }
 
-      await noteVault.storage.deleteNote(memoryId(id));
+      const deleted = await noteVault.storage.deleteNote(memoryId(id));
+      if (!deleted) {
+        return {
+          content: [{ type: "text", text: `Failed to delete note '${id}' from ${storageLabel(noteVault)}` }],
+          isError: true,
+        };
+      }
 
       // Clean up dangling references grouped by vault so we make one commit per vault
       const vaultChanges = await removeRelationshipsToNoteIds(ctx, [id]);

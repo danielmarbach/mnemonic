@@ -180,7 +180,38 @@ async function main() {
   const wrSlug = addWr.structured?.attachment?.projectSlug;
   check("8. add_attachment writable returns slug", wrSlug);
 
-  // 9. Seed a note in consuming repo
+  // 9. Toggle attachment off and on
+  const toggleOff = await callTool("set_attachment_enabled", {
+    cwd: consumingRepo,
+    projectSlug: wrSlug,
+    enabled: false,
+  });
+  check("9. set_attachment_enabled off succeeds", !toggleOff.isError);
+
+  const listAfterToggleOff = await callTool("list", {
+    cwd: consumingRepo,
+    storedIn: "attached",
+    limit: 10,
+  });
+  const attachedHidden = (listAfterToggleOff.structured?.notes ?? []).length === 0;
+  check("10. attached notes hidden when disabled", attachedHidden);
+
+  const toggleOn = await callTool("set_attachment_enabled", {
+    cwd: consumingRepo,
+    projectSlug: wrSlug,
+    enabled: true,
+  });
+  check("11. set_attachment_enabled on succeeds", !toggleOn.isError);
+
+  const listAfterToggleOn = await callTool("list", {
+    cwd: consumingRepo,
+    storedIn: "attached",
+    limit: 10,
+  });
+  const attachedVisibleAgain = (listAfterToggleOn.structured?.notes ?? []).length > 0;
+  check("12. attached notes visible when re-enabled", attachedVisibleAgain);
+
+  // 13. Seed a note in consuming repo
   const conRemember = await callTool("remember", {
     title: "Consuming repo requirement",
     content: "# Consuming repo requirement\n\nWe need cross-repo memory access.",
@@ -191,7 +222,7 @@ async function main() {
     allowProtectedBranch: true,
   });
   const consumingNoteId = parseId(conRemember.text);
-  check("9. remember in consuming repo", consumingNoteId);
+  check("13a. remember in consuming repo", consumingNoteId);
 
   // 10. Cross-vault relate (requires writable attached vault)
   const relateResult = await callTool("relate", {
@@ -201,7 +232,7 @@ async function main() {
     cwd: consumingRepo,
     allowProtectedBranch: true,
   });
-  check("10. cross-vault relate succeeds", !relateResult.isError);
+  check("13. cross-vault relate succeeds", !relateResult.isError);
 
   // 11. get with includeRelationships shows vaultPath in raw relatedTo
   const getResult = await callTool("get", {
@@ -211,26 +242,61 @@ async function main() {
   });
   const note = getResult.structured?.notes?.[0];
   const hasVaultPath = note?.relatedTo?.some((r) => r.vaultPath);
-  check("11. get relatedTo includes vaultPath", hasVaultPath);
+  check("14. get relatedTo includes vaultPath", hasVaultPath);
 
   // 12. memory_graph resolves cross-vault edge
   const graphResult = await callTool("memory_graph", { cwd: consumingRepo });
   const graphHasCrossVault = graphResult.text.includes(attachedNoteId) || graphResult.text.includes("attached:");
-  check("12. memory_graph resolves cross-vault", graphHasCrossVault);
+  check("15. memory_graph resolves cross-vault", graphHasCrossVault);
 
-  // 13. Write-through: update existing attached note
+  // 13. Cross-vault unrelate
+  const unrelateResult = await callTool("unrelate", {
+    fromId: consumingNoteId,
+    toId: attachedNoteId,
+    cwd: consumingRepo,
+    allowProtectedBranch: true,
+  });
+  check("16. cross-vault unrelate succeeds", !unrelateResult.isError);
+
+  // 14. Verify relationship was removed from consuming note
+  const getAfterUnrelate = await callTool("get", {
+    ids: [consumingNoteId],
+    cwd: consumingRepo,
+  });
+  const consumingNoteAfter = getAfterUnrelate.structured?.notes?.[0];
+  const relationshipRemoved = !consumingNoteAfter?.relatedTo?.some(
+    (r) => r.id === attachedNoteId
+  );
+  check("17. relationship removed from consuming note", relationshipRemoved);
+
+  // 15. Write-through: update existing attached note
   const updateWr = await callTool("update", {
     id: attachedNoteId,
     content: "# Attached repo architecture decision\n\nWe chose federated reads over a centralised service. Updated via write-through.",
     cwd: consumingRepo,
     allowProtectedBranch: true,
   });
-  check("13. update across writable attached vault", !updateWr.isError);
+  check("18. update across writable attached vault", !updateWr.isError);
 
-  // 14. Sync mentions attached vault
+  // 19. forget on attached vault via consuming project
+  const forgetWr = await callTool("forget", {
+    id: attachedNoteId,
+    cwd: consumingRepo,
+    allowProtectedBranch: true,
+  });
+  check("19. forget on writable attached vault", !forgetWr.isError);
+
+  // 20. Verify attached note is gone
+  const getAfterForget = await callTool("get", {
+    ids: [attachedNoteId],
+    cwd: consumingRepo,
+  });
+  check("20. attached note no longer found after forget", getAfterForget.text.includes("Not found"));
+
+  // 18. Sync mentions attached vault
   const syncResult = await callTool("sync", { cwd: consumingRepo });
   const syncMentions = syncResult.text.includes("attached") || syncResult.text.includes("Attachment");
-  check("14. sync output mentions attached vault", syncMentions);
+  check("21. sync output mentions attached vault", syncMentions);
 
   // Summary
   const failed = checks.filter((c) => !c.ok);

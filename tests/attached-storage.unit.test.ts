@@ -94,25 +94,29 @@ describe("AttachedStorage", () => {
   describe("property delegation", () => {
     it("delegates vaultPath to baseStorage", () => {
       baseStorage = new Storage(path.join(tempDir, "vault"));
-      const attached = new AttachedStorage(baseStorage, "/repo", "main", "notes");
+      const repoStorage = new Storage(path.join(tempDir, "repo-vault"));
+      const attached = new AttachedStorage(baseStorage, repoStorage, "/repo", "main", "notes");
       expect(attached.vaultPath).toBe(baseStorage.vaultPath);
     });
 
     it("delegates notesDir to baseStorage", () => {
       baseStorage = new Storage(path.join(tempDir, "vault"));
-      const attached = new AttachedStorage(baseStorage, "/repo", "main", "notes");
+      const repoStorage = new Storage(path.join(tempDir, "repo-vault"));
+      const attached = new AttachedStorage(baseStorage, repoStorage, "/repo", "main", "notes");
       expect(attached.notesDir).toBe(baseStorage.notesDir);
     });
 
     it("delegates embeddingsDir to baseStorage", () => {
       baseStorage = new Storage(path.join(tempDir, "vault"));
-      const attached = new AttachedStorage(baseStorage, "/repo", "main", "notes");
+      const repoStorage = new Storage(path.join(tempDir, "repo-vault"));
+      const attached = new AttachedStorage(baseStorage, repoStorage, "/repo", "main", "notes");
       expect(attached.embeddingsDir).toBe(baseStorage.embeddingsDir);
     });
 
     it("delegates projectionsDir to baseStorage", () => {
       baseStorage = new Storage(path.join(tempDir, "vault"));
-      const attached = new AttachedStorage(baseStorage, "/repo", "main", "notes");
+      const repoStorage = new Storage(path.join(tempDir, "repo-vault"));
+      const attached = new AttachedStorage(baseStorage, repoStorage, "/repo", "main", "notes");
       expect(attached.projectionsDir).toBe(baseStorage.projectionsDir);
     });
   });
@@ -120,7 +124,8 @@ describe("AttachedStorage", () => {
   describe("init", () => {
     it("delegates init to baseStorage", async () => {
       baseStorage = new Storage(path.join(tempDir, "vault"));
-      const attached = new AttachedStorage(baseStorage, "/repo", "main", "notes");
+      const repoStorage = new Storage(path.join(tempDir, "repo-vault"));
+      const attached = new AttachedStorage(baseStorage, repoStorage, "/repo", "main", "notes");
       await attached.init();
       await fs.stat(path.join(tempDir, "vault", "notes"));
     });
@@ -132,7 +137,9 @@ describe("AttachedStorage", () => {
     beforeEach(async () => {
       baseStorage = new Storage(path.join(tempDir, "vault"));
       await baseStorage.init();
-      attached = new AttachedStorage(baseStorage, "/nonexistent-repo", "", "notes");
+      const repoStorage = new Storage(path.join(tempDir, "vault"));
+      await repoStorage.init();
+      attached = new AttachedStorage(baseStorage, repoStorage, "/nonexistent-repo", "", "notes");
     });
 
     it("listNoteIds delegates to baseStorage", async () => {
@@ -192,7 +199,7 @@ Test note body`;
 
       baseStorage = new Storage(path.join(tempDir, "vault"));
       await baseStorage.init();
-      const attached = new AttachedStorage(baseStorage, repoDir, "main", ".mnemonic/notes");
+      const attached = new AttachedStorage(baseStorage, baseStorage, repoDir, "main", ".mnemonic/notes");
 
       const ids = await attached.listNoteIds();
       expect(ids).toContain(memoryId("my-note"));
@@ -225,7 +232,7 @@ Branch note body`;
 
       baseStorage = new Storage(path.join(tempDir, "vault"));
       await baseStorage.init();
-      const attached = new AttachedStorage(baseStorage, repoDir, "main", ".mnemonic/notes");
+      const attached = new AttachedStorage(baseStorage, baseStorage, repoDir, "main", ".mnemonic/notes");
 
       const note = await attached.readNote(memoryId("branch-note"));
       expect(note).toBeTruthy();
@@ -242,7 +249,7 @@ Branch note body`;
 
       baseStorage = new Storage(path.join(tempDir, "vault"));
       await baseStorage.init();
-      const attached = new AttachedStorage(baseStorage, repoDir, "main", ".mnemonic/notes");
+      const attached = new AttachedStorage(baseStorage, baseStorage, repoDir, "main", ".mnemonic/notes");
 
       const note = await attached.readNote(memoryId("nonexistent"));
       expect(note).toBeNull();
@@ -265,7 +272,7 @@ Branch note body`;
 
       baseStorage = new Storage(path.join(tempDir, "vault"));
       await baseStorage.init();
-      const attached = new AttachedStorage(baseStorage, repoDir, "main", ".mnemonic/notes");
+      const attached = new AttachedStorage(baseStorage, baseStorage, repoDir, "main", ".mnemonic/notes");
 
       const ids = await attached.listNoteIds();
       expect(ids).toContain(memoryId("real-note"));
@@ -277,7 +284,7 @@ Branch note body`;
     it("throws InvalidBranchNameError when branch name is invalid", async () => {
       baseStorage = new Storage(path.join(tempDir, "vault"));
       await baseStorage.init();
-      const attached = new AttachedStorage(baseStorage, repoDir, "bad branch;rm -rf /", ".mnemonic/notes");
+      const attached = new AttachedStorage(baseStorage, baseStorage, repoDir, "bad branch;rm -rf /", ".mnemonic/notes");
 
       await expect(attached.listNoteIds()).rejects.toThrow(InvalidBranchNameError);
       await expect(attached.readNote(memoryId("x"))).rejects.toThrow(InvalidBranchNameError);
@@ -299,7 +306,7 @@ Branch note body`;
 
       baseStorage = new Storage(path.join(tempDir, "vault"));
       await baseStorage.init();
-      const attached = new AttachedStorage(baseStorage, repoDir, "feature/test", ".mnemonic/notes");
+      const attached = new AttachedStorage(baseStorage, baseStorage, repoDir, "feature/test", ".mnemonic/notes");
 
       const ids = await attached.listNoteIds();
       expect(ids).toContain(memoryId("feature-note"));
@@ -314,7 +321,7 @@ Branch note body`;
       await baseStorage.init();
 
       await baseStorage.writeNote(makeNote("cached-id"));
-      const attached = new AttachedStorage(baseStorage, "/irrelevant", "", "notes");
+      const attached = new AttachedStorage(baseStorage, baseStorage, "/irrelevant", "", "notes");
 
       const ids1 = await attached.listNoteIds();
       const ids2 = await attached.listNoteIds();
@@ -337,7 +344,7 @@ Branch note body`;
 
         baseStorage = new Storage(path.join(tempDir, "vault"));
         await baseStorage.init();
-        const attached = new AttachedStorage(baseStorage, repoDir, "main", ".mnemonic/notes");
+      const attached = new AttachedStorage(baseStorage, baseStorage, repoDir, "main", ".mnemonic/notes");
 
         const note1 = await attached.readNote(memoryId("cached-read"));
         const note2 = await attached.readNote(memoryId("cached-read"));
@@ -354,7 +361,7 @@ Branch note body`;
       await baseStorage.init();
 
       await baseStorage.writeNote(makeNote("x"));
-      const attached = new AttachedStorage(baseStorage, "/irrelevant", "", "notes");
+      const attached = new AttachedStorage(baseStorage, baseStorage, "/irrelevant", "", "notes");
 
       const ids1 = await attached.listNoteIds();
       expect(ids1).toContain(memoryId("x"));
@@ -372,7 +379,7 @@ Branch note body`;
       await baseStorage.init();
 
       await baseStorage.writeNote(makeNote("y"));
-      const attached = new AttachedStorage(baseStorage, "/irrelevant", "", "notes");
+      const attached = new AttachedStorage(baseStorage, baseStorage, "/irrelevant", "", "notes");
 
       const note1 = await attached.readNote(memoryId("y"));
       expect(note1).toBeTruthy();
@@ -393,7 +400,7 @@ Branch note body`;
     beforeEach(async () => {
       baseStorage = new Storage(path.join(tempDir, "vault"));
       await baseStorage.init();
-      attached = new AttachedStorage(baseStorage, "/repo", "main", "notes", false);
+      attached = new AttachedStorage(baseStorage, baseStorage, "/repo", "main", "notes", false);
     });
 
     it("writeNote throws", async () => {
@@ -448,7 +455,7 @@ Branch note body`;
     beforeEach(async () => {
       baseStorage = new Storage(path.join(tempDir, "vault"));
       await baseStorage.init();
-      attached = new AttachedStorage(baseStorage, "/repo", "main", "notes", true);
+      attached = new AttachedStorage(baseStorage, baseStorage, "/repo", "main", "notes", true);
     });
 
     it("writeNote delegates to baseStorage", async () => {
@@ -489,7 +496,7 @@ Branch note body`;
     beforeEach(async () => {
       baseStorage = new Storage(path.join(tempDir, "vault"));
       await baseStorage.init();
-      attached = new AttachedStorage(baseStorage, "/repo", "main", "notes");
+      attached = new AttachedStorage(baseStorage, baseStorage, "/repo", "main", "notes");
     });
 
     it("readEmbedding delegates to baseStorage", async () => {
@@ -581,7 +588,7 @@ Branch note body`;
     it("listNoteIds returns empty array for invalid repo path", async () => {
       baseStorage = new Storage(path.join(tempDir, "vault"));
       await baseStorage.init();
-      const attached = new AttachedStorage(baseStorage, "/nonexistent/path/to/repo", "main", ".mnemonic/notes");
+      const attached = new AttachedStorage(baseStorage, baseStorage, "/nonexistent/path/to/repo", "main", ".mnemonic/notes");
 
       const ids = await attached.listNoteIds();
       expect(ids).toEqual([]);
@@ -590,7 +597,7 @@ Branch note body`;
     it("readNote returns null for invalid repo path", async () => {
       baseStorage = new Storage(path.join(tempDir, "vault"));
       await baseStorage.init();
-      const attached = new AttachedStorage(baseStorage, "/nonexistent/path/to/repo", "main", ".mnemonic/notes");
+      const attached = new AttachedStorage(baseStorage, baseStorage, "/nonexistent/path/to/repo", "main", ".mnemonic/notes");
 
       const note = await attached.readNote(memoryId("missing"));
       expect(note).toBeNull();
@@ -604,7 +611,7 @@ Branch note body`;
 
         baseStorage = new Storage(path.join(tempDir, "vault"));
         await baseStorage.init();
-        const attached = new AttachedStorage(baseStorage, repoDir, "nonexistent-branch", ".mnemonic/notes");
+        const attached = new AttachedStorage(baseStorage, baseStorage, repoDir, "nonexistent-branch", ".mnemonic/notes");
 
         const ids = await attached.listNoteIds();
         expect(ids).toEqual([]);
@@ -622,7 +629,7 @@ Branch note body`;
 
         baseStorage = new Storage(path.join(tempDir, "vault"));
         await baseStorage.init();
-        const attached = new AttachedStorage(baseStorage, repoDir, "nonexistent-branch", ".mnemonic/notes");
+        const attached = new AttachedStorage(baseStorage, baseStorage, repoDir, "nonexistent-branch", ".mnemonic/notes");
 
         const note = await attached.readNote(memoryId("no-note"));
         expect(note).toBeNull();
@@ -642,7 +649,7 @@ Branch note body`;
       await baseStorage.writeNote(makeNote("proj-b", { project: "beta" }));
       await baseStorage.writeNote(makeNote("proj-none"));
 
-      const attached = new AttachedStorage(baseStorage, "/repo", "", "notes");
+      const attached = new AttachedStorage(baseStorage, baseStorage, "/repo", "", "notes");
 
       const all = await attached.listNotes();
       expect(all).toHaveLength(3);
@@ -655,7 +662,7 @@ Branch note body`;
       await baseStorage.writeNote(makeNote("proj-a", { project: "alpha" }));
       await baseStorage.writeNote(makeNote("proj-b", { project: "beta" }));
 
-      const attached = new AttachedStorage(baseStorage, "/repo", "", "notes");
+      const attached = new AttachedStorage(baseStorage, baseStorage, "/repo", "", "notes");
 
       const alphaOnly = await attached.listNotes({ project: "alpha" });
       expect(alphaOnly).toHaveLength(1);
