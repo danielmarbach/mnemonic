@@ -7,11 +7,14 @@ tags:
   - ranking
 lifecycle: temporary
 createdAt: '2026-05-25T16:05:13.044Z'
-updatedAt: '2026-05-25T16:05:13.044Z'
+updatedAt: '2026-05-25T16:05:21.293Z'
 role: context
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: plan-three-channel-rrf-with-graph-rank-and-rank-window-size-1c7d15da
+    type: follows
 memoryVersion: 1
 ---
 # Apply: Three-channel RRF graph rank and rank window implementation
