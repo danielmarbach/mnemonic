@@ -8,10 +8,13 @@ tags:
   - temporary-notes
 lifecycle: permanent
 createdAt: '2026-05-09T12:09:59.366Z'
-updatedAt: '2026-05-09T12:09:59.366Z'
+updatedAt: '2026-05-25T17:38:47.619Z'
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: dogfooding-results-for-enrichment-and-orientation-packs-2026-7c0adde7
+    type: supersedes
 memoryVersion: 1
 ---
 Dogfooding results for the working-state continuity pack on 2026-05-09 using the installed mnemonic server.

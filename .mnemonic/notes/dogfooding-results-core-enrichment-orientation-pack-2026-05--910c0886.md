@@ -7,7 +7,7 @@ tags:
   - regression
 lifecycle: permanent
 createdAt: '2026-05-09T12:09:58.133Z'
-updatedAt: '2026-05-09T21:09:07.363Z'
+updatedAt: '2026-05-25T17:38:47.619Z'
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
@@ -18,6 +18,8 @@ relatedTo:
     type: related-to
   - id: mnemonic-key-design-decisions-3f2a6273
     type: related-to
+  - id: dogfooding-results-for-enrichment-and-orientation-packs-2026-7c0adde7
+    type: supersedes
 memoryVersion: 1
 ---
 Dogfooding results for the core enrichment/orientation pack on 2026-05-09 using the installed mnemonic server.
