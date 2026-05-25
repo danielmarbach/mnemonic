@@ -84,19 +84,21 @@ export function registerUpdateTool(server: McpServer, ctx: ServerContext): void 
             selector: z.object({
               heading: z.string().optional(),
               headingStartsWith: z.string().optional(),
+              section: z.string().optional(),
               nthChild: z.number().int().optional(),
               lastChild: z.literal(true).optional(),
             }).refine(
               (sel) => {
-                const keys = [sel.heading, sel.headingStartsWith, sel.nthChild, sel.lastChild].filter((v) => v !== undefined);
+                const keys = [sel.heading, sel.headingStartsWith, sel.section, sel.nthChild, sel.lastChild].filter((v) => v !== undefined);
                 return keys.length === 1;
               },
-              { message: "Selector must have exactly one of: heading, headingStartsWith, nthChild, lastChild" }
+              { message: "Selector must have exactly one of: heading, headingStartsWith, section, nthChild, lastChild" }
             ),
             operation: z.discriminatedUnion("op", [
               z.object({ op: z.literal("appendChild"), value: z.string() }),
               z.object({ op: z.literal("prependChild"), value: z.string() }),
               z.object({ op: z.literal("replace"), value: z.string() }),
+              z.object({ op: z.literal("replaceSection"), value: z.string() }),
               z.object({ op: z.literal("replaceChildren"), value: z.string() }),
               z.object({ op: z.literal("insertAfter"), value: z.string() }),
               z.object({ op: z.literal("insertBefore"), value: z.string() }),
@@ -107,15 +109,15 @@ export function registerUpdateTool(server: McpServer, ctx: ServerContext): void 
           .describe(
             "Targeted edits to note sections. Array of {selector, operation} objects. Mutually exclusive with content. " +
             "If this fails, fix the issue in your patch values and retry — do NOT fall back to full content rewrite.\n\n" +
-            "selector: exactly one of { heading: \"exact heading text\" } | { headingStartsWith: \"prefix\" } | { lastChild: true } | { nthChild: 0-based-index }\n" +
-            "operation: { op: \"appendChild\", value: \"content\" } | { op: \"prependChild\", value: \"content\" } | { op: \"replace\", value: \"new content\" } | { op: \"replaceChildren\", value: \"new children\" } | { op: \"insertAfter\", value: \"content\" } | { op: \"insertBefore\", value: \"content\" } | { op: \"remove\" }\n\n" +
+            "selector: exactly one of { heading: \"exact heading text\" } | { headingStartsWith: \"prefix\" } | { section: \"exact heading text\" } | { lastChild: true } | { nthChild: 0-based-index }\n" +
+            "operation: { op: \"appendChild\", value: \"content\" } | { op: \"prependChild\", value: \"content\" } | { op: \"replace\", value: \"new content\" } | { op: \"replaceSection\", value: \"new section\" } | { op: \"replaceChildren\", value: \"new children\" } | { op: \"insertAfter\", value: \"content\" } | { op: \"insertBefore\", value: \"content\" } | { op: \"remove\" }\n\n" +
             "Example — add a paragraph under ## Findings, replace body under ## Recommendation, remove ## Old Section:\n" +
             "[\n" +
             "  { \"selector\": { \"heading\": \"Findings\" }, \"operation\": { \"op\": \"insertAfter\", \"value\": \"A new paragraph.\" } },\n" +
-            "  { \"selector\": { \"heading\": \"Recommendation\" }, \"operation\": { \"op\": \"replace\", \"value\": \"## Recommendation\\n\\nUpdated recommendation.\" } },\n" +
+            "  { \"selector\": { \"section\": \"Recommendation\" }, \"operation\": { \"op\": \"replaceSection\", \"value\": \"## Recommendation\\n\\nUpdated recommendation.\" } },\n" +
             "  { \"selector\": { \"heading\": \"Old Section\" }, \"operation\": { \"op\": \"remove\" } }\n" +
             "]\n\n" +
-            "IMPORTANT: `appendChild`, `prependChild`, and `replaceChildren` do NOT work with `heading` selectors (headings only contain inline text, not block content). To add or replace content under a heading, use `insertAfter`. To replace a heading entirely, use `replace`."
+            "IMPORTANT: `appendChild`, `prependChild`, and `replaceChildren` do NOT work with `heading` selectors (headings only contain inline text, not block content). To add content under a heading, use `insertAfter`. To replace a full section including its body, use `section` + `replaceSection`."
           ),
         content: z.string().max(100000, "Content must be at most 100,000 characters").optional().describe("Full note body replacement. Use only for complete rewrites or when the note is small. Mutually exclusive with semanticPatch. Content must pass markdown lint. Auto-fixable issues are fixed automatically. Common unfixable issues: fenced code blocks need a language tag (e.g. use ```text not bare ```), and broken links are rejected. If lint fails, fix the specific issues and retry — do NOT fall back to semanticPatch for this."),
         title: z.string().max(500, "Title must be at most 500 characters").optional().describe("Specific, retrieval-friendly title. Prefer the concrete topic or decision, not a vague label."),

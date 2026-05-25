@@ -71,12 +71,12 @@ export function registerPrompts(server: McpServer): void {
               "### semanticPatch format\n\n" +
               "When using `update` with `semanticPatch`:\n" +
               "- Each patch is an object with two keys: `selector` and `operation` (not flat `{op, value}` at top level).\n" +
-              "- `selector` has exactly one key: `heading`, `headingStartsWith`, `nthChild`, or `lastChild`.\n" +
+              "- `selector` has exactly one key: `heading`, `headingStartsWith`, `section`, `nthChild`, or `lastChild`.\n" +
               "- `operation` has an `op` key plus `value` (except `remove` which has no value).\n" +
               "- The parameter must be a JSON array, NOT a string.\n" +
               "- Use `get` first to read exact heading text, then use those headings (without `##` prefix) as selector values.\n" +
               "- Common mistake: writing `{ \"op\": \"appendChild\", \"value\": \"...\" }` at the top level instead of nesting inside `operation`. Correct shape: `{ \"selector\": { \"heading\": \"Findings\" }, \"operation\": { \"op\": \"insertAfter\", \"value\": \"text\" } }`\n" +
-              "- `appendChild`, `prependChild`, and `replaceChildren` do NOT work with `heading` selectors. To add content under a heading, use `insertAfter`. To replace a heading, use `replace`.",
+              "- `appendChild`, `prependChild`, and `replaceChildren` do NOT work with `heading` selectors. To add content under a heading, use `insertAfter`. To replace a full section including its body, use `{ \"selector\": { \"section\": \"Findings\" }, \"operation\": { \"op\": \"replaceSection\", \"value\": \"## Findings\\n\\nNew body.\" } }`.",
           },
         },
       ],

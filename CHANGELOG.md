@@ -6,9 +6,14 @@ The format is loosely based on Keep a Changelog and uses semver-style version he
 
 ## [0.33.1] - 2026-05-25
 
+### Added
+
+- `update` `semanticPatch` now supports `{ selector: { section: "..." }, operation: { op: "replaceSection", value: "..." } }` for replacing an entire Markdown section, including nested content up to the next same-or-higher-level heading.
+
 ### Fixed
 
 - Semantic patch no longer escapes GFM task list checkboxes (`- [ ]` / `- [x]`) as `\[ ]` / `\[x]` during round-trip serialization.
+- Heading-level `semanticPatch` `replace` now rejects replacements that look like whole-section replacements, preventing duplicated section bodies and directing callers to `replaceSection`.
 
 ## [0.33.0] - 2026-05-25
 
