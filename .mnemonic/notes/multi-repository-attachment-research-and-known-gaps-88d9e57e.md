@@ -17,8 +17,6 @@ relatedTo:
     type: derives-from
   - id: multi-repo-federated-reads-codebase-research-626b102b
     type: derives-from
-  - id: multi-repository-attachment-plan-critical-review-795b9192
-    type: derives-from
   - id: apply-multi-repo-attachment-phase-2-integration-tests-and-p0-f16c0bf8
     type: follows
 memoryVersion: 1
