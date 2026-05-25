@@ -15,8 +15,6 @@ relatedTo:
     type: derives-from
   - id: multi-repository-attachment-support-implementation-plan-b6423f79
     type: derives-from
-  - id: multi-repo-attachment-phase-2-research-1bb12411
-    type: derives-from
   - id: multi-repo-attachment-phase-3-request-root-58d643a2
     type: follows
 memoryVersion: 1

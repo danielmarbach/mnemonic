@@ -13,8 +13,6 @@ projectName: mnemonic
 relatedTo:
   - id: multi-repository-attachment-support-request-root-151ad76c
     type: follows
-  - id: multi-repo-attachment-phase-3-implementation-plan-1a8cbb57
-    type: derives-from
 memoryVersion: 1
 ---
 # Multi-repo attachment Phase 3 — request root

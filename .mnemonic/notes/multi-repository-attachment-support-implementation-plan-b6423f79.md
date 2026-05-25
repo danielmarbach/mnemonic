@@ -16,15 +16,9 @@ relatedTo:
     type: derives-from
   - id: multi-repository-attachment-plan-critical-review-795b9192
     type: derives-from
-  - id: multi-repo-attachment-phase-1-implementation-17350a93
-    type: related-to
-  - id: multi-repo-attachment-phase-2-research-1bb12411
-    type: derives-from
   - id: apply-multi-repo-attachment-phase-2-integration-tests-and-p0-f16c0bf8
     type: follows
   - id: apply-phase-2-remaining-integration-tests-staleness-auto-syn-9cd530e6
-    type: follows
-  - id: multi-repo-attachment-phase-3-implementation-plan-1a8cbb57
     type: follows
 memoryVersion: 1
 ---
