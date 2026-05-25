@@ -15,8 +15,6 @@ alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
-  - id: request-rrf-ranking-improvements-from-bigdata-boutique-artic-1765a16b
-    type: derives-from
   - id: plan-three-channel-rrf-with-graph-rank-and-rank-window-size-1c7d15da
     type: derives-from
 memoryVersion: 1
