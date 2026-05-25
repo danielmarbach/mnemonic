@@ -4,6 +4,12 @@ All notable changes to `mnemonic` will be documented in this file.
 
 The format is loosely based on Keep a Changelog and uses semver-style version headings.
 
+## [0.33.1] - 2026-05-25
+
+### Fixed
+
+- Semantic patch no longer escapes GFM task list checkboxes (`- [ ]` / `- [x]`) as `\[ ]` / `\[x]` during round-trip serialization.
+
 ## [0.33.0] - 2026-05-25
 
 ### Added
