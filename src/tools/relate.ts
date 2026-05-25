@@ -16,7 +16,11 @@ import {
 import { memoryId, isoDateString } from "../brands.js";
 import { attachedVaultErrorMessage, ensureAttachmentsLoaded } from "../helpers/vault.js";
 import type { Vault } from "../vault.js";
-import { formatCommitBody } from "../helpers/git-commit.js";
+import {
+  formatCommitBody,
+  commitVaultWithProtection,
+  checkVaultProtectedBranch,
+} from "../helpers/git-commit.js";
 import {
   buildMutationRetryContract,
   formatRetrySummary,
@@ -88,6 +92,19 @@ export function registerRelateTool(server: McpServer, ctx: ServerContext): void 
       const { note: toNote, vault: toVault } = foundTo;
       const now = isoDateString(new Date().toISOString());
 
+      // Pre-check branch protection before mutating any notes
+      const mutableVaults = new Set([fromVault, ...(bidirectional && toVault !== fromVault ? [toVault] : [])]);
+      const preChecks = await Promise.all(
+        Array.from(mutableVaults).map(vault =>
+          checkVaultProtectedBranch({ ctx, vault, allowProtectedBranch: false, toolName: "relate", noteProjectId: vault === fromVault ? fromNote.project ?? undefined : toNote.project ?? undefined })
+        )
+      );
+      for (const check of preChecks) {
+        if (check.blocked) {
+          return { content: [{ type: "text", text: check.message ?? "Protected branch policy blocked this commit." }], isError: true };
+        }
+      }
+
       // Group changes by vault so notes in the same vault share one commit
       const vaultChanges = new Map<Vault, string[]>();
 
@@ -139,7 +156,15 @@ export function registerRelateTool(server: McpServer, ctx: ServerContext): void 
               relationship: { fromId, toId, type },
             });
             const commitMessage = `relate: ${fromNote.title} ↔ ${toNote.title}`;
-            const commitStatus = await vault.git.commitWithStatus(commitMessage, pendingFiles, commitBody);
+            const commitStatus = await commitVaultWithProtection({
+              ctx,
+              vault,
+              commitMessage,
+              files: pendingFiles,
+              commitBody,
+              allowProtectedBranch: false,
+              toolName: "relate",
+            });
             
             if (commitStatus.status === "committed") {
               await pushAfterMutation(ctx, vault);
@@ -197,7 +222,15 @@ export function registerRelateTool(server: McpServer, ctx: ServerContext): void 
           },
         });
         const commitMessage = `relate: ${fromNote.title} ↔ ${toNote.title}`;
-        const commitStatus = await vault.git.commitWithStatus(commitMessage, files, commitBody);
+        const commitStatus = await commitVaultWithProtection({
+          ctx,
+          vault,
+          commitMessage,
+          files,
+          commitBody,
+          allowProtectedBranch: false,
+          toolName: "relate",
+        });
         if (!retry) {
           retry = buildMutationRetryContract({
             commit: commitStatus,

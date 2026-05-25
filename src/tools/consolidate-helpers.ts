@@ -16,7 +16,7 @@ import { classifyTheme, titleCaseTheme } from "../project-introspection.js";
 import { getErrorMessage, attempt } from "../error-utils.js";
 import { makeId, slugify } from "../helpers/index.js";
 import { memoryId, isoDateString } from "../brands.js";
-import { formatCommitBody, shouldBlockProtectedBranchCommit as shouldBlockProtectedBranchCommitFromModule, wouldRelationshipCleanupTouchProjectVault as wouldRelationshipCleanupTouchProjectVaultFromModule } from "../helpers/git-commit.js";
+import { formatCommitBody, commitVaultWithProtection as commitVaultWithProtectionFromModule, wouldRelationshipCleanupTouchProjectVault as wouldRelationshipCleanupTouchProjectVaultFromModule, checkVaultProtectedBranch } from "../helpers/git-commit.js";
 import { buildPersistenceStatus, buildMutationRetryContract, formatPersistenceSummary, pushAfterMutation as pushAfterMutationFromModule } from "../helpers/persistence.js";
 import type { MutationRetryContract } from "../structured-content.js";
 import { type NoteEntry, storageLabel, addVaultChange, attachedVaultErrorMessage, removeRelationshipsToNoteIds as removeRelationshipsToNoteIdsFromModule } from "../helpers/vault.js";
@@ -31,8 +31,26 @@ import type { CommitResult, PushResult } from "../git.js";
 import { UnknownConsolidationModeError } from "../domain-errors.js";
 
 // Re-export helpers that close over ctx for convenience
-async function shouldBlockProtectedBranchCommit(ctx: ServerContext, options: Omit<Parameters<typeof shouldBlockProtectedBranchCommitFromModule>[0], "ctx">) {
-  return shouldBlockProtectedBranchCommitFromModule({ ctx, ...options });
+async function commitVaultWithProtection(
+  ctx: ServerContext,
+  vault: Vault,
+  commitMessage: string,
+  files: string[],
+  commitBody: string | undefined,
+  allowProtectedBranch: boolean,
+  toolName: string,
+  noteProjectId?: string,
+): Promise<CommitResult> {
+  return commitVaultWithProtectionFromModule({
+    ctx,
+    vault,
+    commitMessage,
+    files,
+    commitBody,
+    allowProtectedBranch,
+    toolName,
+    noteProjectId,
+  });
 }
 
 async function wouldRelationshipCleanupTouchProjectVault(ctx: ServerContext, noteIds: string[]) {
@@ -289,6 +307,7 @@ async function commitVaultMergeChanges(
   consolidationMode: ConsolidationMode,
   project: ProjectInfo | undefined,
   cwd: string | undefined,
+  allowProtectedBranch: boolean = false,
 ): Promise<{
   targetCommitStatus: CommitResult;
   targetPushStatus: PushResult;
@@ -323,7 +342,15 @@ async function commitVaultMergeChanges(
           noteIds: files.map((f) => f.replace(/\.mnemonic\/notes\/(.+)\.md$/, "$1").replace(/notes\/(.+)\.md$/, "$1")),
         });
     const commitMessage = `${action}: ${targetTitle}`;
-    const commitStatus = await vault.git.commitWithStatus(commitMessage, files, commitBody);
+      const commitStatus = await commitVaultWithProtection(
+        ctx,
+        vault,
+        commitMessage,
+        files,
+        commitBody,
+        allowProtectedBranch,
+        "consolidate",
+      );
     const pushStatus = commitStatus.status === "committed"
       ? await pushAfterMutation(ctx, vault)
       : { status: "skipped" as const, reason: "commit-failed" as const };
@@ -384,37 +411,6 @@ export async function executeMerge(
   const projectVault = cwd ? await vaultManager.getProjectVaultIfExists(cwd) : null;
   const targetVault = existingTargetEntry?.vault ?? projectVault ?? vaultManager.main;
 
-  let touchesProjectVault = targetVault.provenance === "project-local" || sourceEntries.some((entry) => entry.vault.provenance === "project-local");
-  if (!touchesProjectVault && consolidationMode === "delete") {
-    touchesProjectVault = await wouldRelationshipCleanupTouchProjectVault(ctx, sourceIds);
-  }
-  if (touchesProjectVault) {
-    const projectLabel = project
-      ? `${project.name} (${project.id})`
-      : "this context";
-    const protectedBranchCheck = await shouldBlockProtectedBranchCommit(ctx, {
-      cwd,
-      writeScope: "project",
-      automaticCommit: true,
-      projectLabel,
-      policy,
-      allowProtectedBranch,
-      toolName: "consolidate",
-    });
-    if (protectedBranchCheck.blocked) {
-      const message = protectedBranchCheck.message ?? "Protected branch policy blocked this commit.";
-      const structuredContent: ConsolidateResult = {
-        action: "consolidated",
-        strategy: "execute-merge",
-        project: toProjectRef(project),
-        notesProcessed: entries.length,
-        notesModified: 0,
-        warnings: [message],
-      };
-      return { content: [{ type: "text", text: message }], structuredContent };
-    }
-  }
-
   const now = isoDateString(new Date().toISOString());
 
   // Build consolidated note
@@ -440,6 +436,54 @@ export async function executeMerge(
     updatedAt: now,
     memoryVersion: 1,
   };
+
+  // Pre-check protected branches for vaults we are about to modify
+  const vaultsToCheck = new Set<Vault>([targetVault, ...sourceEntries.map((e) => e.vault)]);
+  for (const vault of vaultsToCheck) {
+    const protectedBranchCheck = await checkVaultProtectedBranch({
+      ctx,
+      vault,
+      allowProtectedBranch,
+      toolName: "consolidate",
+      noteProjectId: project?.id,
+    });
+    if (protectedBranchCheck.blocked) {
+      const structuredContent: ConsolidateResult = {
+        action: "consolidated",
+        strategy: "execute-merge",
+        project: toProjectRef(project),
+        notesProcessed: entries.length,
+        notesModified: 0,
+        warnings: [protectedBranchCheck.message ?? "Protected branch policy blocked this operation."],
+      };
+      return {
+        content: [{ type: "text", text: protectedBranchCheck.message ?? "Protected branch policy blocked this operation." }],
+        structuredContent,
+      };
+    }
+  }
+
+  // Pre-check protected branches
+  for (const vault of new Set([targetVault, ...sourceEntries.map((se) => se.vault)])) {
+    const check = await checkVaultProtectedBranch({
+      ctx,
+      vault,
+      allowProtectedBranch,
+      toolName: "consolidate",
+      noteProjectId: project?.id,
+    });
+    if (check.blocked) {
+      const structuredContent: ConsolidateResult = {
+        action: "consolidated",
+        strategy: "execute-merge",
+        project: toProjectRef(project),
+        notesProcessed: entries.length,
+        notesModified: 0,
+        warnings: [check.message ?? "Protected branch policy blocked this commit."],
+      };
+      return { content: [{ type: "text", text: check.message ?? "Protected branch policy blocked this commit." }], structuredContent };
+    }
+  }
 
   await targetVault.storage.writeNote(consolidatedNote);
 
@@ -474,7 +518,7 @@ export async function executeMerge(
     targetCommitBody,
     targetCommitMessage,
     targetCommitFiles,
-  } = await commitVaultMergeChanges(ctx, vaultChanges, targetVault, targetId, targetTitle, sourceIds, summary, consolidationMode, project, cwd);
+  } = await commitVaultMergeChanges(ctx, vaultChanges, targetVault, targetId, targetTitle, sourceIds, summary, consolidationMode, project, cwd, allowProtectedBranch);
 
   const retry = targetCommitMessage && targetCommitFiles
     ? buildMutationRetryContract({
@@ -1043,34 +1087,27 @@ export async function pruneSuperseded(
   }
 
   const supersededList = Array.from(supersededIds);
-  let touchesProjectVault = supersededList.some((id) => entries.find((e) => e.note.id === id)?.vault.provenance === "project-local");
-  if (!touchesProjectVault) {
-    touchesProjectVault = await wouldRelationshipCleanupTouchProjectVault(ctx, supersededList);
-  }
-  if (touchesProjectVault) {
-    const projectLabel = project
-      ? `${project.name} (${project.id})`
-      : "this context";
-    const protectedBranchCheck = await shouldBlockProtectedBranchCommit(ctx, {
-      cwd,
-      writeScope: "project",
-      automaticCommit: true,
-      projectLabel,
-      policy,
+  const touchesProjectVault = supersededList.some((id) => entries.find((e) => e.note.id === id)?.vault.provenance === "project-local");
+
+  // Pre-check protected branches
+  for (const vault of new Set(entries.filter((e) => supersededIds.has(e.note.id)).map((e) => e.vault))) {
+    const check = await checkVaultProtectedBranch({
+      ctx,
+      vault,
       allowProtectedBranch,
       toolName: "consolidate",
+      noteProjectId: project?.id,
     });
-    if (protectedBranchCheck.blocked) {
-      const message = protectedBranchCheck.message ?? "Protected branch policy blocked this commit.";
+    if (check.blocked) {
       const structuredContent: ConsolidateResult = {
         action: "consolidated",
         strategy: "prune-superseded",
         project: toProjectRef(project),
         notesProcessed: entries.length,
         notesModified: 0,
-        warnings: [message],
+        warnings: [check.message ?? "Protected branch policy blocked this commit."],
       };
-      return { content: [{ type: "text", text: message }], structuredContent };
+      return { content: [{ type: "text", text: check.message ?? "Protected branch policy blocked this commit." }], structuredContent };
     }
   }
 
@@ -1108,7 +1145,15 @@ export async function pruneSuperseded(
       description: `Pruned ${prunedIds.length} superseded note(s)\nNotes: ${prunedIds.join(", ")}`,
     });
     const commitMessage = `prune: removed ${files.length} superseded note(s)`;
-    const commitStatus = await vault.git.commitWithStatus(commitMessage, files, commitBody);
+      const commitStatus = await commitVaultWithProtection(
+        ctx,
+        vault,
+        commitMessage,
+        files,
+        commitBody,
+        allowProtectedBranch,
+        "consolidate",
+      );
     if (!retry) {
       retry = buildMutationRetryContract({
         commit: commitStatus,

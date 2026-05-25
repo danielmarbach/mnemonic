@@ -4,7 +4,7 @@ import type { Vault } from "../vault.js";
 import type { PersistenceStatus } from "../structured-content.js";
 import { getOrBuildVaultNoteList } from "../cache.js";
 import { resolveProject } from "./project.js";
-import { formatCommitBody } from "./git-commit.js";
+import { formatCommitBody, commitVaultWithProtection, checkVaultProtectedBranch } from "./git-commit.js";
 import { pushAfterMutation, buildMutationRetryContract, buildPersistenceStatus } from "./persistence.js";
 import { filterRelationships } from "../consolidate.js";
 import { summarizePreview } from "../project-introspection.js";
@@ -180,10 +180,23 @@ export async function moveNoteBetweenVaults(
   targetVault: Vault,
   noteToWrite?: Note,
   cwd?: string,
+  allowProtectedBranch: boolean = false,
+  targetProjectId?: string,
 ): Promise<{ note: Note; persistence: PersistenceStatus }> {
   const { note, vault: sourceVault } = found;
   const finalNote = noteToWrite ?? note;
   const embedding = await sourceVault.storage.readEmbedding(note.id);
+
+  const preChecks = await Promise.all([
+    checkVaultProtectedBranch({ ctx, vault: sourceVault, allowProtectedBranch, toolName: "move_memory", noteProjectId: note.project ?? undefined }),
+    checkVaultProtectedBranch({ ctx, vault: targetVault, allowProtectedBranch, toolName: "move_memory", noteProjectId: (targetVault.provenance === "project-local" ? (targetProjectId ?? note.project) : undefined) }),
+  ]);
+
+  for (const check of preChecks) {
+    if (check.blocked) {
+      throw new Error(check.message ?? "Protected branch policy blocked this commit.");
+    }
+  }
 
   await targetVault.storage.writeNote(finalNote);
   if (embedding) {
@@ -203,7 +216,15 @@ export async function moveNoteBetweenVaults(
   });
   const targetCommitMessage = `move: ${finalNote.title}`;
   const targetCommitFiles = [ctx.vaultManager.noteRelPath(targetVault, finalNote.id)];
-  const targetCommit = await targetVault.git.commitWithStatus(targetCommitMessage, targetCommitFiles, targetCommitBody);
+  const targetCommit = await commitVaultWithProtection({
+    ctx,
+    vault: targetVault,
+    commitMessage: targetCommitMessage,
+    files: targetCommitFiles,
+    commitBody: targetCommitBody,
+    allowProtectedBranch,
+    toolName: "move_memory",
+  });
 
   const sourceCommitBody = formatCommitBody({
     summary: `Moved to ${targetVaultLabel}`,
@@ -211,7 +232,15 @@ export async function moveNoteBetweenVaults(
     noteTitle: finalNote.title,
     projectName: finalNote.projectName,
   });
-  await sourceVault.git.commitWithStatus(`move: ${finalNote.title}`, [ctx.vaultManager.noteRelPath(sourceVault, finalNote.id)], sourceCommitBody);
+  await commitVaultWithProtection({
+    ctx,
+    vault: sourceVault,
+    commitMessage: `move: ${finalNote.title}`,
+    files: [ctx.vaultManager.noteRelPath(sourceVault, finalNote.id)],
+    commitBody: sourceCommitBody,
+    allowProtectedBranch,
+    toolName: "move_memory",
+  });
   const targetPush = targetCommit.status === "committed"
     ? await pushAfterMutation(ctx, targetVault)
     : { status: "skipped" as const, reason: "commit-failed" as const };

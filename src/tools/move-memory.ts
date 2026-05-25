@@ -13,7 +13,7 @@ import {
   ensureBranchSynced,
 } from "../helpers/project.js";
 import { memoryId, isoDateString } from "../brands.js";
-import { shouldBlockProtectedBranchCommit } from "../helpers/git-commit.js";
+import { commitVaultWithProtection } from "../helpers/git-commit.js";
 import {
   formatPersistenceSummary,
 } from "../helpers/persistence.js";
@@ -135,31 +135,6 @@ export function registerMoveMemoryTool(server: McpServer, ctx: ServerContext): v
         return { content: [{ type: "text", text: `Memory '${id}' is already stored in ${targetLabel}.` }], isError: true };
       }
 
-      if (found.vault.provenance === "project-local" || targetVault.provenance === "project-local") {
-        const resolvedProject = targetProject ?? await resolveProject(ctx, cwd);
-        const projectLabel = resolvedProject
-          ? `${resolvedProject.name} (${resolvedProject.id})`
-          : `${found.note.projectName ?? "project"} (${found.note.project ?? "unknown"})`;
-        const projectId = targetProject?.id ?? found.note.project;
-        const policy = projectId ? await ctx.configStore.getProjectPolicy(projectId) : undefined;
-        const protectedBranchCheck = await shouldBlockProtectedBranchCommit({
-          ctx,
-          cwd,
-          writeScope: "project",
-          automaticCommit: true,
-          projectLabel,
-          policy,
-          allowProtectedBranch,
-          toolName: "move_memory",
-        });
-        if (protectedBranchCheck.blocked) {
-          return {
-            content: [{ type: "text", text: protectedBranchCheck.message ?? "Protected branch policy blocked this commit." }],
-            isError: true,
-          };
-        }
-      }
-
       const targetLabel = storageLabel(targetVault);
       const existing = await targetVault.storage.readNote(memoryId(id));
       if (existing) {
@@ -180,7 +155,13 @@ export function registerMoveMemoryTool(server: McpServer, ctx: ServerContext): v
         };
       }
 
-      const moveResult = await moveNoteBetweenVaults(ctx, found, targetVault, noteToWrite, cwd);
+      let moveResult;
+      try {
+        moveResult = await moveNoteBetweenVaults(ctx, found, targetVault, noteToWrite, cwd, allowProtectedBranch, targetProject?.id);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Move blocked by protected branch policy.";
+        return { content: [{ type: "text", text: message }], isError: true };
+      }
       const movedNote = moveResult.note;
       const associationValue = movedNote.projectName && movedNote.project
         ? `${movedNote.projectName} (${movedNote.project})`

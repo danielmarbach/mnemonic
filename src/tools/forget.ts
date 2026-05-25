@@ -16,8 +16,8 @@ import {
 import { memoryId } from "../brands.js";
 import {
   formatCommitBody,
-  shouldBlockProtectedBranchCommit,
-  wouldRelationshipCleanupTouchProjectVault,
+  commitVaultWithProtection,
+  checkVaultProtectedBranch,
 } from "../helpers/git-commit.js";
 import {
   buildMutationRetryContract,
@@ -86,29 +86,19 @@ export function registerForgetTool(server: McpServer, ctx: ServerContext): void 
       }
 
       const { note, vault: noteVault } = found;
-      const touchesProjectVault = noteVault.provenance === "project-local" || await wouldRelationshipCleanupTouchProjectVault(ctx, [id]);
-      if (touchesProjectVault) {
-        const resolvedProject = await resolveProject(ctx, cwd);
-        const projectLabel = resolvedProject
-          ? `${resolvedProject.name} (${resolvedProject.id})`
-          : `${note.projectName ?? "project"} (${note.project ?? "unknown"})`;
-        const policy = note.project ? await ctx.configStore.getProjectPolicy(note.project) : undefined;
-        const protectedBranchCheck = await shouldBlockProtectedBranchCommit({
-          ctx,
-          cwd,
-          writeScope: "project",
-          automaticCommit: true,
-          projectLabel,
-          policy,
-          allowProtectedBranch,
-          toolName: "forget",
-        });
-        if (protectedBranchCheck.blocked) {
-          return {
-            content: [{ type: "text", text: protectedBranchCheck.message ?? "Protected branch policy blocked this commit." }],
-            isError: true,
-          };
-        }
+
+      const protectedBranchCheck = await checkVaultProtectedBranch({
+        ctx,
+        vault: noteVault,
+        allowProtectedBranch,
+        toolName: "forget",
+        noteProjectId: note.project ?? undefined,
+      });
+      if (protectedBranchCheck.blocked) {
+        return {
+          content: [{ type: "text", text: protectedBranchCheck.message ?? "Protected branch policy blocked this commit." }],
+          isError: true,
+        };
       }
 
       const deleted = await noteVault.storage.deleteNote(memoryId(id));
@@ -136,7 +126,16 @@ export function registerForgetTool(server: McpServer, ctx: ServerContext): void 
           projectName: note.projectName,
         });
         const commitMessage = `forget: ${note.title}`;
-        const commitStatus = await v.git.commitWithStatus(commitMessage, files, commitBody);
+        const commitStatus = await commitVaultWithProtection({
+          ctx,
+          vault: v,
+          commitMessage,
+          files,
+          commitBody,
+          allowProtectedBranch,
+          toolName: "forget",
+          noteProjectId: note.project ?? undefined,
+        });
         if (!retry) {
           retry = buildMutationRetryContract({
             commit: commitStatus,

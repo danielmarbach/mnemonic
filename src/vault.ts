@@ -445,7 +445,7 @@ async function discoverSubmoduleVaultFolders(gitRoot: string): Promise<string[]>
     .sort();
 }
 
-async function findGitRoot(cwd: string, visited: Set<string> = new Set()): Promise<string | null> {
+export async function findGitRoot(cwd: string, visited: Set<string> = new Set()): Promise<string | null> {
   const git = simpleGit(cwd);
   const rootResult = await attempt("vault:find-git-root", () =>
     git.revparse(["--show-toplevel"])

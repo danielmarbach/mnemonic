@@ -9,7 +9,8 @@ import {
 } from "../helpers/project.js";
 import {
   formatCommitBody,
-  shouldBlockProtectedBranchCommit,
+  commitVaultWithProtection,
+  checkVaultProtectedBranch,
 } from "../helpers/git-commit.js";
 import {
   buildPersistenceStatus,
@@ -170,29 +171,6 @@ export function registerUpdateTool(server: McpServer, ctx: ServerContext): void 
       }
 
       const { note, vault } = found;
-      if (vault.writable && vault.provenance === "project-local") {
-        const resolvedProject = await resolveProject(ctx, cwd);
-        const projectLabel = resolvedProject
-          ? `${resolvedProject.name} (${resolvedProject.id})`
-          : `${note.projectName ?? "project"} (${note.project ?? "unknown"})`;
-        const policy = note.project ? await ctx.configStore.getProjectPolicy(note.project) : undefined;
-        const protectedBranchCheck = await shouldBlockProtectedBranchCommit({
-          ctx,
-          cwd,
-          writeScope: "project",
-          automaticCommit: true,
-          projectLabel,
-          policy,
-          allowProtectedBranch,
-          toolName: "update",
-        });
-        if (protectedBranchCheck.blocked) {
-          return {
-            content: [{ type: "text", text: protectedBranchCheck.message ?? "Protected branch policy blocked this commit." }],
-            isError: true,
-          };
-        }
-      }
 
       const now = isoDateString(new Date().toISOString());
 
@@ -358,6 +336,20 @@ export function registerUpdateTool(server: McpServer, ctx: ServerContext): void 
         relatedTo: resolvedRelatedTo,
       };
 
+      const protectedBranchCheck = await checkVaultProtectedBranch({
+        ctx,
+        vault,
+        allowProtectedBranch,
+        toolName: "update",
+        noteProjectId: note.project ?? undefined,
+      });
+      if (protectedBranchCheck.blocked) {
+        return {
+          content: [{ type: "text", text: protectedBranchCheck.message ?? "Protected branch policy blocked this commit." }],
+          isError: true,
+        };
+      }
+
       await vault.storage.writeNote(updated);
 
       const shouldReembed = patchedContent !== undefined || cleanedContent !== undefined;
@@ -389,7 +381,16 @@ export function registerUpdateTool(server: McpServer, ctx: ServerContext): void 
       });
       const commitMessage = `update: ${updated.title}`;
       const commitFiles = [ctx.vaultManager.noteRelPath(vault, id)];
-      const commitStatus = await vault.git.commitWithStatus(commitMessage, commitFiles, commitBody);
+      const commitStatus = await commitVaultWithProtection({
+        ctx,
+        vault,
+        commitMessage,
+        files: commitFiles,
+        commitBody,
+        allowProtectedBranch,
+        toolName: "update",
+        noteProjectId: note.project,
+      });
       const pushStatus = commitStatus.status === "committed"
         ? await pushAfterMutation(ctx, vault)
         : { status: "skipped" as const, reason: "commit-failed" as const };

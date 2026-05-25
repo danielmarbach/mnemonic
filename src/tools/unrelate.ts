@@ -11,7 +11,7 @@ import {
   type RelateResult,
   type MutationRetryContract,
 } from "../structured-content.js";
-import { formatCommitBody } from "../helpers/git-commit.js";
+import { formatCommitBody, commitVaultWithProtection, checkVaultProtectedBranch } from "../helpers/git-commit.js";
 import {
   buildMutationRetryContract,
   formatRetrySummary,
@@ -78,6 +78,21 @@ export function registerUnrelateTool(server: McpServer, ctx: ServerContext): voi
       const now = isoDateString(new Date().toISOString());
       const vaultChanges = new Map<Vault, string[]>();
 
+      // Pre-check branch protection before mutating any vaults
+      const mutableVaults = new Set<Vault>();
+      if (foundFrom) mutableVaults.add(foundFrom.vault);
+      if (bidirectional && foundTo) mutableVaults.add(foundTo.vault);
+      const preChecks = await Promise.all(
+        Array.from(mutableVaults).map(vault =>
+          checkVaultProtectedBranch({ ctx, vault, allowProtectedBranch: false, toolName: "unrelate", noteProjectId: vault === foundFrom?.vault ? foundFrom.note.project ?? undefined : foundTo?.note.project ?? undefined })
+        )
+      );
+      for (const check of preChecks) {
+        if (check.blocked) {
+          return { content: [{ type: "text", text: check.message ?? "Protected branch policy blocked this commit." }], isError: true };
+        }
+      }
+
       if (foundFrom) {
         const { note: fromNote, vault: fromVault } = foundFrom;
         const filtered = (fromNote.relatedTo ?? []).filter((r) => r.id !== toId);
@@ -127,7 +142,15 @@ export function registerUnrelateTool(server: McpServer, ctx: ServerContext): voi
                 })
               : undefined;
             const commitMessage = `unrelate: ${fromId} ↔ ${toId}`;
-            const commitStatus = await vault.git.commitWithStatus(commitMessage, pendingFiles, commitBody);
+            const commitStatus = await commitVaultWithProtection({
+              ctx,
+              vault,
+              commitMessage,
+              files: pendingFiles,
+              commitBody,
+              allowProtectedBranch: false,
+              toolName: "unrelate",
+            });
             
             if (commitStatus.status === "committed") {
               await pushAfterMutation(ctx, vault);
@@ -179,7 +202,15 @@ export function registerUnrelateTool(server: McpServer, ctx: ServerContext): voi
             })
           : undefined;
         const commitMessage = `unrelate: ${fromId} ↔ ${toId}`;
-        const commitStatus = await vault.git.commitWithStatus(commitMessage, files, commitBody);
+        const commitStatus = await commitVaultWithProtection({
+          ctx,
+          vault,
+          commitMessage,
+          files,
+          commitBody,
+          allowProtectedBranch: false,
+          toolName: "unrelate",
+        });
         if (!retry) {
           retry = buildMutationRetryContract({
             commit: commitStatus,
