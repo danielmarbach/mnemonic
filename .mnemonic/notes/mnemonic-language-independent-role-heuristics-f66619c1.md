@@ -7,11 +7,13 @@ tags:
   - design
 lifecycle: permanent
 createdAt: '2026-03-28T00:56:11.578Z'
-updatedAt: '2026-04-16T19:47:01.107Z'
+updatedAt: '2026-05-25T17:35:43.310Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
   - id: mcp-workflow-ux-hint-prompt-tool-descriptions-and-session-st-e89a18fc
+    type: related-to
+  - id: mnemonic-role-suggestions-are-read-only-runtime-hints-consol-532d5d9b
     type: related-to
 memoryVersion: 1
 ---
