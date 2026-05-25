@@ -11,8 +11,6 @@ updatedAt: '2026-05-09T21:16:14.014Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
-  - id: agent-instruction-improvements-session-start-recall-first-an-ecd402c3
-    type: related-to
   - id: changelog-writing-principles-87cdbc5b
     type: related-to
   - id: implementation-principles-for-mnemonic-mcp-2e178bba
