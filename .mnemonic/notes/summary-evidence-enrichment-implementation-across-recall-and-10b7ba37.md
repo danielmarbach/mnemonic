@@ -8,7 +8,7 @@ tags:
   - verification
 lifecycle: permanent
 createdAt: '2026-04-26T19:00:03.718Z'
-updatedAt: '2026-05-09T21:03:51.512Z'
+updatedAt: '2026-05-25T17:38:32.222Z'
 role: summary
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -24,6 +24,8 @@ relatedTo:
     type: derives-from
   - id: retrieval-precision-and-diversity-diagnostics-implemented-763c1459
     type: related-to
+  - id: evidence-enrichment-for-recall-and-consolidate-fd166604
+    type: supersedes
 memoryVersion: 1
 ---
 # Summary: evidence enrichment implementation across recall and consolidate

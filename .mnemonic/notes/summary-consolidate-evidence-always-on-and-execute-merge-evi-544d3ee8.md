@@ -7,7 +7,7 @@ tags:
   - execute-merge
 lifecycle: permanent
 createdAt: '2026-04-28T10:40:03.748Z'
-updatedAt: '2026-04-28T16:06:00.251Z'
+updatedAt: '2026-05-25T17:38:32.222Z'
 role: summary
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -17,6 +17,8 @@ relatedTo:
     type: derives-from
   - id: theme-evidence-enrichment-design-research-signal-inventory-d-294ccd73
     type: derives-from
+  - id: evidence-enrichment-for-recall-and-consolidate-fd166604
+    type: supersedes
 memoryVersion: 1
 ---
 # Summary: consolidate evidence always-on and execute-merge evidence support
