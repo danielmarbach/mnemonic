@@ -28,7 +28,6 @@ import {
   resolveDiscoveredVaults,
   applyCanonicalExplanationPromotion,
   applyGraphSpreadingActivation,
-  assignDenseRanks,
   type ScoredRecallCandidate,
 } from "../recall.js";
 import { shouldTriggerLexicalRescue } from "../lexical.js";
@@ -280,7 +279,6 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
         undefined
       );
       const reranked = applyLexicalReranking(scored, query, getProjectionText);
-      const semanticCandidateIds = new Set(reranked.map((candidate) => candidate.id));
 
       // Apply graph spreading activation: traverse related notes and boost their scores
       const preSpreadIds = new Set(reranked.map((c) => c.id));
@@ -288,7 +286,6 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
         return noteRelationships.get(id);
       };
       const withGraphSpread = applyGraphSpreadingActivation(reranked, getNoteRelationships);
-      const graphDiscoveredIds = new Set(withGraphSpread.filter((candidate) => !semanticCandidateIds.has(candidate.id)).map((candidate) => candidate.id));
 
       // Resolve correct vault for graph-discovered candidates that inherited their
       // entry point's vault instead of their own.
@@ -301,13 +298,6 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
           }
         }
         return undefined;
-      });
-
-      // Re-assign semanticRank after graph spreading since scores are now modified
-      // and graph-discovered candidates have no semanticRank.
-      const sortedByScore = [...withGraphSpread].sort((a, b) => b.score - a.score || b.boosted - a.boosted);
-      assignDenseRanks(sortedByScore, (candidate) => candidate.score, (candidate, rank) => {
-        candidate.semanticRank = rank;
       });
 
       let promoted = applyCanonicalExplanationPromotion(withGraphSpread);
@@ -394,7 +384,7 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
       // Top 1 by default, top 3 if result count is small
       const recallRelationshipLimit = top.length <= 3 ? 3 : 1;
 
-      for (const [index, { id, score, vault, boosted, semanticRank, lexicalRank, canonicalExplanationScore, metadata, isCurrentProject }] of top.entries()) {
+      for (const [index, { id, score, vault, boosted, semanticRank, lexicalRank, graphRank, canonicalExplanationScore, metadata, isCurrentProject }] of top.entries()) {
         const note = await readCachedNote(vault, id);
         if (note) {
           const centrality = note.relatedTo?.length ?? 0;
@@ -470,7 +460,7 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
               channels: [
                 semanticRank !== undefined ? "semantic" : undefined,
                 lexicalRank !== undefined ? "lexical" : undefined,
-                graphDiscoveredIds.has(id) ? "graph" : undefined,
+                graphRank !== undefined ? "graph-rank" : undefined,
                 rescueCandidateIds.has(id) ? "rescue" : undefined,
                 canonicalExplanationScore !== undefined && canonicalExplanationScore > 0 ? "canonical" : undefined,
                 temporalQueryHint ? "temporal-boost" : undefined,

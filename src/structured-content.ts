@@ -162,7 +162,7 @@ export interface RecallRetrievalCoverage {
   missingAnchors: Array<{ id: string; title: string }>;
 }
 
-export type RetrievalEvidenceChannel = "semantic" | "lexical" | "graph" | "temporal-boost" | "canonical" | "rescue";
+export type RetrievalEvidenceChannel = "semantic" | "lexical" | "graph-rank" | "temporal-boost" | "canonical" | "rescue";
 export type RetrievalEvidenceRankBand = "top3" | "top10" | "lower";
 export type RetrievalEvidenceFreshness = "today" | "thisWeek" | "thisMonth" | "older";
 
@@ -830,7 +830,7 @@ export const RecallResultSchema = z.object({
     historySummary: z.string().optional(),
     relationships: RelationshipPreviewSchema.optional(),
     retrievalEvidence: z.object({
-      channels: z.array(z.enum(["semantic", "lexical", "graph", "temporal-boost", "canonical", "rescue"])),
+      channels: z.array(z.enum(["semantic", "lexical", "graph-rank", "temporal-boost", "canonical", "rescue"])),
       rankBand: z.enum(["top3", "top10", "lower"]),
       projectRelevant: z.boolean(),
       freshness: z.enum(["today", "thisWeek", "thisMonth", "older"]),
