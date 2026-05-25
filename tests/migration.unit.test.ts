@@ -64,7 +64,7 @@ describe("Migrator", () => {
       storage,
       git: new GitOps(tempDir, "notes"),
       notesRelDir: "notes",
-      isProject: false,
+      provenance: "main",
     };
 
     vaultManager = {
@@ -374,7 +374,7 @@ Test content`;
         storage: otherStorage,
         git: new GitOps(otherDir, "notes"),
         notesRelDir: "notes",
-        isProject: true,
+        provenance: "project-local",
       };
 
       vaultManager.allKnownVaults = vi.fn().mockReturnValue([vault, otherVault]);
@@ -517,7 +517,7 @@ Test content`;
         storage: otherStorage,
         git: new GitOps(otherDir, "notes"),
         notesRelDir: "notes",
-        isProject: true,
+        provenance: "project-local",
       };
 
       vaultManager.allKnownVaults = vi.fn().mockReturnValue([vault, otherVault]);
@@ -773,7 +773,7 @@ Main content 2`,
         storage: otherStorage,
         git: new GitOps(otherTempDir, "notes"),
         notesRelDir: "notes",
-        isProject: false,
+        provenance: "main",
       };
 
       try {
@@ -841,7 +841,7 @@ Main content 2`,
           storage: newStorage,
           git: new GitOps(newTempDir, "notes"),
           notesRelDir: "notes",
-          isProject: false,
+          provenance: "main",
         };
         vaults.push(newVault);
 
@@ -971,7 +971,7 @@ Project content`,
         storage: projectStorage,
         git: new GitOps(projectDir, "notes"),
         notesRelDir: "notes",
-        isProject: true,
+        provenance: "project-local",
       };
 
       const sessionOneVaultManager = {

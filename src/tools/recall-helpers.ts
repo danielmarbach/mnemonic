@@ -33,6 +33,7 @@ export function buildRecallCandidateContext(note: Note) {
 // ── Lexical rescue ────────────────────────────────────────────────────────────
 
 export const PROJECT_SCOPE_BOOST = 0.03;
+export const ATTACHMENT_BOOST = PROJECT_SCOPE_BOOST / 2;
 
 export async function collectLexicalRescueCandidates(
   vaults: Vault[],
@@ -52,6 +53,7 @@ export async function collectLexicalRescueCandidates(
     id: string;
     vault: Vault;
     isCurrentProject: boolean;
+    isAttachedVault: boolean;
     updatedAt: string;
     projectionText: string;
     projectionTokens: string[];
@@ -72,9 +74,10 @@ export async function collectLexicalRescueCandidates(
 
       const isProjectNote = note.project !== undefined;
       const isCurrentProject = project && note.project === project.id;
+      const isAttachedVault = vault.provenance === "project-attached";
 
-      if (scope === "project" && !isCurrentProject) continue;
-      if (scope === "global" && isProjectNote) continue;
+      if (scope === "project" && !isCurrentProject && !isAttachedVault) continue;
+      if (scope === "global" && isProjectNote && !isAttachedVault) continue;
       if (
         applyTemporalFilter
         && temporalFilterWindowDays !== undefined
@@ -90,6 +93,7 @@ export async function collectLexicalRescueCandidates(
         id: note.id,
         vault,
         isCurrentProject: Boolean(isCurrentProject),
+        isAttachedVault: Boolean(isAttachedVault),
         updatedAt: note.updatedAt,
         projectionText: projection.projectionText,
         projectionTokens: projectId
@@ -148,7 +152,8 @@ export async function collectLexicalRescueCandidates(
     const temporalBoost = temporalQueryHint
       ? computeTemporalRecencyBoost(candidate.updatedAt, temporalQueryHint)
       : 0;
-    const boost = (candidate.isCurrentProject ? PROJECT_SCOPE_BOOST : 0) + candidate.context.metadataBoost + temporalBoost;
+    const scopeBoost = candidate.isCurrentProject ? PROJECT_SCOPE_BOOST : candidate.isAttachedVault ? ATTACHMENT_BOOST : 0;
+    const boost = scopeBoost + candidate.context.metadataBoost + temporalBoost;
     candidates.push({
       id: candidate.id,
       score: lexicalScore,

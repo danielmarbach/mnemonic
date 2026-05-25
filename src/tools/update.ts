@@ -9,7 +9,8 @@ import {
 } from "../helpers/project.js";
 import {
   formatCommitBody,
-  shouldBlockProtectedBranchCommit,
+  commitVaultWithProtection,
+  checkVaultProtectedBranch,
 } from "../helpers/git-commit.js";
 import {
   buildPersistenceStatus,
@@ -32,6 +33,7 @@ import {
   getRecentSessionAccessNote,
 } from "../cache.js";
 import { NOTE_LIFECYCLES, NOTE_ROLES, type Note } from "../storage.js";
+import { ensureAttachmentsLoaded, attachedVaultErrorMessage } from "../helpers/vault.js";
 import {
   type UpdateResult,
   UpdateToolResultSchema,
@@ -62,6 +64,7 @@ export function registerUpdateTool(server: McpServer, ctx: ServerContext): void 
         "- No note exists yet; use `remember`\n" +
         "- Several notes need to be merged or retired together; use `consolidate`\n\n" +
         "Returns: updated id, changed fields, persistence status. On lint failure, returns action=lint_error with the list of unfixable issues.\n\n" +
+        "Writable attachments: can update notes in writable attached vaults.\n\n" +
         "[mutating: rewrites note, refreshes embeddings, git commits, may push]\n\n" +
         "Typical next step:\n" +
         "- Use `relate` or `consolidate` if the update changes how this note connects to others.\n\n" +
@@ -147,9 +150,16 @@ export function registerUpdateTool(server: McpServer, ctx: ServerContext): void 
     async ({ id, content, semanticPatch, title, tags, lifecycle, role, summary, alwaysLoad, cwd, allowProtectedBranch = false }) => {
       await ensureBranchSynced(ctx, cwd);
       const noteId = memoryId(id);
+      const project = await resolveProject(ctx, cwd);
+      const projectId = project?.id;
+      if (projectId) await ensureAttachmentsLoaded(ctx, projectId);
 
-      const found = await ctx.vaultManager.findNote(id, cwd);
+      const found = await ctx.vaultManager.findNote(id, cwd, { mutable: true, projectId });
       if (!found) {
+        const foundAny = await ctx.vaultManager.findNote(id, cwd, { mutable: false, projectId });
+        if (foundAny) {
+          return { content: [{ type: "text", text: attachedVaultErrorMessage(id, foundAny.vault) }], isError: true };
+        }
         return { content: [{ type: "text", text: `No memory found with id '${id}'` }], isError: true };
       }
 
@@ -161,29 +171,6 @@ export function registerUpdateTool(server: McpServer, ctx: ServerContext): void 
       }
 
       const { note, vault } = found;
-      if (vault.isProject) {
-        const resolvedProject = await resolveProject(ctx, cwd);
-        const projectLabel = resolvedProject
-          ? `${resolvedProject.name} (${resolvedProject.id})`
-          : `${note.projectName ?? "project"} (${note.project ?? "unknown"})`;
-        const policy = note.project ? await ctx.configStore.getProjectPolicy(note.project) : undefined;
-        const protectedBranchCheck = await shouldBlockProtectedBranchCommit({
-          ctx,
-          cwd,
-          writeScope: "project",
-          automaticCommit: true,
-          projectLabel,
-          policy,
-          allowProtectedBranch,
-          toolName: "update",
-        });
-        if (protectedBranchCheck.blocked) {
-          return {
-            content: [{ type: "text", text: protectedBranchCheck.message ?? "Protected branch policy blocked this commit." }],
-            isError: true,
-          };
-        }
-      }
 
       const now = isoDateString(new Date().toISOString());
 
@@ -231,7 +218,7 @@ export function registerUpdateTool(server: McpServer, ctx: ServerContext): void 
       const resolvedContent = patchedContent ?? cleanedContent ?? note.content;
       const resolvedTags = tags ?? note.tags;
       const resolvedLifecycle = lifecycle ?? note.lifecycle;
-      const resolvedRole = role !== undefined ? role : (note.role ? note.role : undefined);
+      const resolvedRole = role ?? note.role;
       const resolvedAlwaysLoad = alwaysLoad !== undefined ? alwaysLoad : note.alwaysLoad;
 
       let relatedToChanged = false;
@@ -349,6 +336,20 @@ export function registerUpdateTool(server: McpServer, ctx: ServerContext): void 
         relatedTo: resolvedRelatedTo,
       };
 
+      const protectedBranchCheck = await checkVaultProtectedBranch({
+        ctx,
+        vault,
+        allowProtectedBranch,
+        toolName: "update",
+        noteProjectId: note.project ?? undefined,
+      });
+      if (protectedBranchCheck.blocked) {
+        return {
+          content: [{ type: "text", text: protectedBranchCheck.message ?? "Protected branch policy blocked this commit." }],
+          isError: true,
+        };
+      }
+
       await vault.storage.writeNote(updated);
 
       const shouldReembed = patchedContent !== undefined || cleanedContent !== undefined;
@@ -380,7 +381,16 @@ export function registerUpdateTool(server: McpServer, ctx: ServerContext): void 
       });
       const commitMessage = `update: ${updated.title}`;
       const commitFiles = [ctx.vaultManager.noteRelPath(vault, id)];
-      const commitStatus = await vault.git.commitWithStatus(commitMessage, commitFiles, commitBody);
+      const commitStatus = await commitVaultWithProtection({
+        ctx,
+        vault,
+        commitMessage,
+        files: commitFiles,
+        commitBody,
+        allowProtectedBranch,
+        toolName: "update",
+        noteProjectId: note.project,
+      });
       const pushStatus = commitStatus.status === "committed"
         ? await pushAfterMutation(ctx, vault)
         : { status: "skipped" as const, reason: "commit-failed" as const };

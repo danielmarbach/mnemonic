@@ -24,7 +24,7 @@ import {
   extractSummary,
   formatCommitBody,
   formatAskForWriteScope,
-  shouldBlockProtectedBranchCommit,
+  commitVaultWithProtection,
 } from "../helpers/git-commit.js";
 import { embedTextForNote } from "../helpers/embed.js";
 import {
@@ -56,6 +56,7 @@ export function registerRememberTool(server: McpServer, ctx: ServerContext): voi
         "- You need to change an existing memory; use `update`\n" +
         "- Several overlapping notes should be merged; use `consolidate`\n\n" +
         "Returns: created id, scope, vault label, lifecycle, persistence status. On lint failure, returns action=lint_error with the list of unfixable issues.\n\n" +
+        "Writable attachments: set `writable: true` on `add_attachment` to enable writes.\n\n" +
         "[mutating: writes note, embeddings, git commits, may push]\n\n" +
         "Typical next step:\n" +
         "- Use `relate` if this new memory connects to something recalled earlier.",
@@ -110,6 +111,7 @@ export function registerRememberTool(server: McpServer, ctx: ServerContext): voi
           .describe(
             "Where to store: 'project' writes to the shared project vault visible to all contributors; " +
             "'global' writes to the private main vault visible only on this machine. " +
+            "Attached vaults are read-only and cannot be written to. " +
             "When omitted, uses the project's saved policy or defaults to 'project'."
           ),
         allowProtectedBranch: z
@@ -154,20 +156,6 @@ export function registerRememberTool(server: McpServer, ctx: ServerContext): voi
       if (writeScope === "ask") {
         const unadopted = !projectVaultExists && !policyScope;
         return { content: [{ type: "text", text: formatAskForWriteScope(project, unadopted) }], isError: true };
-      }
-
-      const protectedBranchCheck = await shouldBlockProtectedBranchCommit({
-        cwd,
-        writeScope,
-        automaticCommit: true,
-        projectLabel: project ? `${project.name} (${project.id})` : "this context",
-        policy,
-        allowProtectedBranch,
-        toolName: "remember",
-        ctx,
-      });
-      if (protectedBranchCheck.blocked) {
-        return { content: [{ type: "text", text: protectedBranchCheck.message ?? "Protected branch policy blocked this commit." }], isError: true };
       }
 
       const vault = await resolveWriteVault(ctx, cwd, writeScope);
@@ -229,7 +217,16 @@ export function registerRememberTool(server: McpServer, ctx: ServerContext): voi
       });
       const commitMessage = `remember: ${title}`;
       const commitFiles = [ctx.vaultManager.noteRelPath(vault, id)];
-      const commitStatus = await vault.git.commitWithStatus(commitMessage, commitFiles, commitBody);
+      const commitStatus = await commitVaultWithProtection({
+        ctx,
+        vault,
+        commitMessage,
+        files: commitFiles,
+        commitBody,
+        allowProtectedBranch,
+        toolName: "remember",
+        noteProjectId: project?.id,
+      });
       const pushStatus = commitStatus.status === "committed"
         ? await pushAfterMutation(ctx, vault)
         : { status: "skipped" as const, reason: "commit-failed" as const };
@@ -253,7 +250,7 @@ export function registerRememberTool(server: McpServer, ctx: ServerContext): voi
         retry,
       });
 
-      const vaultLabel = vault.isProject ? " [project vault]" : " [main vault]";
+      const vaultLabel = ` [${storageLabel(vault)}]`;
       const textContent = `Remembered as \`${id}\` [${projectScope}, stored=${writeScope}]${vaultLabel}\n${formatPersistenceSummary(persistence)}`;
       
       const structuredContent: RememberResult = {

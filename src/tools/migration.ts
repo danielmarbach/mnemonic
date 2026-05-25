@@ -40,11 +40,11 @@ export function registerListMigrationsTool(server: McpServer, ctx: ServerContext
         const version = await readVaultSchemaVersion(vault.storage.vaultPath);
         const pending = await ctx.migrator.getPendingMigrations(version);
         totalPending += pending.length;
-        const label = vault.isProject ? "project" : "main";
+        const label = vault.provenance === "project-local" ? "project" : "main";
         lines.push(`  ${label} (${vault.storage.vaultPath}): ${version} — ${pending.length} pending`);
         vaultsInfo.push({
           path: vault.storage.vaultPath,
-          type: vault.isProject ? "project" : "main",
+          type: vault.provenance === "project-local" ? "project" : "main",
           version,
           pending: pending.length,
         });

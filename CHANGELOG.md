@@ -4,10 +4,19 @@ All notable changes to `mnemonic` will be documented in this file.
 
 The format is loosely based on Keep a Changelog and uses semver-style version headings.
 
-## [Unreleased]
+## [0.33.0] - 2026-05-25
 
 ### Added
 
+- **Multi-repository attachment support**: Link external repositories as read-only knowledge sources. Attached notes appear in recall, summaries, list, get, memory_graph, and relationship previews. `scope: "project"` includes attached notes; `storedIn: "attached"` filters to them.
+  - `add_attachment`, `remove_attachment`, `list_attachments`, `set_attachment_enabled`, `set_attachment_branch`
+  - Attached notes receive a moderate recall boost (less than project-local, more than global). `project_memory_summary` shows attached vault count.
+  - Breaking: `Vault.isProject` replaced by `Vault.provenance` (`"main" | "project-local" | "project-attached"`), `StorageScope` now includes `"attached"`, config schema bumped to 1.2.
+  - **Attachment auto-sync**: Attached vault branches are now fetched automatically when the consuming project switches branches. Stale embeddings are removed after branch tip changes.
+  - **Path portability**: `add_attachment` `localPath` now supports `~` expansion. Config stores portable `~`-prefixed paths; all tools resolve `~` at runtime via `expandHomePath`.
+  - **Embedding reconciliation**: `sync` and auto-sync now remove stale embeddings when attached vault branch tips change.
+  - **Phase 3 — Writable attached vaults**: Attachments can be marked `writable: true` on `add_attachment`, enabling mutating tools on attached vault notes; writes commit and push to the attachment's `pushBranch` (falls back to `branch`). Config schema bumped to 1.3.
+  - **Phase 3 — Cross-vault relationships**: Notes in different vaults can now be related; the `Relationship` type includes a `vaultPath` field for cross-vault traversal.
 - Devcontainer configuration for Node 24 development with Ollama and the `nomic-embed-text-v2-moe` embedding model pre-installed ([@boblangley](https://github.com/boblangley)).
 - CI `check-toolchain-sync` job that validates the Node version in the devcontainer matches CI workflows ([@boblangley](https://github.com/boblangley)).
 

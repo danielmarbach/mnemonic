@@ -3,7 +3,7 @@ import { checkEmbeddingCompatibility, currentEmbeddingIdentity, embed, embedding
 import { memoryId, isoDateString } from "../brands.js";
 import { getOrBuildProjection } from "../projections.js";
 import { attempt, getErrorMessage } from "../error-utils.js";
-import type { Storage, Note } from "../storage.js";
+import type { NoteStorage, Note } from "../storage.js";
 import type { ServerContext } from "../server-context.js";
 
 export interface FailedEmbedding {
@@ -11,7 +11,7 @@ export interface FailedEmbedding {
   error: string;
 }
 
-export async function embedTextForNote(storage: Storage, note: Note): Promise<string> {
+export async function embedTextForNote(storage: NoteStorage, note: Note): Promise<string> {
   const result = await attempt("projection:build", () => getOrBuildProjection(storage, note));
   if (!result.ok) return `${note.title}\n\n${note.content}`;
   return result.value.projectionText;
@@ -19,7 +19,7 @@ export async function embedTextForNote(storage: Storage, note: Note): Promise<st
 
 export async function embedMissingNotes(
   ctx: ServerContext,
-  storage: Storage,
+  storage: NoteStorage,
   noteIds?: string[],
   force = false,
 ): Promise<{ rebuilt: number; failed: FailedEmbedding[] }> {
@@ -77,7 +77,7 @@ export async function embedMissingNotes(
 
 export async function backfillEmbeddingsAfterSync(
   ctx: ServerContext,
-  storage: Storage,
+  storage: NoteStorage,
   label: string,
   lines: string[],
   force = false,
@@ -98,7 +98,7 @@ export async function backfillEmbeddingsAfterSync(
   return { embedded: rebuilt, failed };
 }
 
-export async function removeStaleEmbeddings(storage: Storage, noteIds: string[]): Promise<void> {
+export async function removeStaleEmbeddings(storage: NoteStorage, noteIds: string[]): Promise<void> {
   for (const id of noteIds) {
     const result = await attempt("embed:unlink", () => fs.unlink(storage.embeddingPath(memoryId(id))));
     if (!result.ok) { /* already gone */ }

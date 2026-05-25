@@ -62,7 +62,7 @@ Examples:
       const version = await readVaultSchemaVersion(vault.storage.vaultPath);
       const pending = await migrator.getPendingMigrations(version);
       totalPending += pending.length;
-      const label = vault.isProject ? "project" : "main";
+      const label = vault.provenance === "project-local" ? "project" : "main";
       console.log(`  ${label} (${vault.storage.vaultPath}): ${version} — ${pending.length} pending`);
     }
 

@@ -35,17 +35,18 @@ export function registerListTool(server: McpServer, ctx: ServerContext): void {
           .optional()
           .default("all")
           .describe(
-            "'project' = only this project's memories (project-scoped storage); " +
+            "'project' = this project's memories and attached vault notes; " +
             "'global' = only unscoped memories (main/global storage); " +
             "'all' = everything visible from this context (default)"
           ),
         storedIn: z
-          .enum(["project-vault", "main-vault", "any"])
+          .enum(["project-vault", "main-vault", "any", "attached"])
           .optional()
           .default("any")
           .describe(
             "Storage-label filter. Use `main-vault` for main/global storage. " +
             "Use `project-vault` as the broad filter for any project vault, including sub-vaults. " +
+            "Use `attached` for notes from attached external repositories only. " +
             "Results may still return a more specific label such as `sub-vault:.mnemonic-lib`."
           ),
         tags: z.array(z.string()).optional().describe("Filter to notes matching all of these tags."),

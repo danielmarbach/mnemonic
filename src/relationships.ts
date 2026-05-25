@@ -5,6 +5,7 @@ import { classifyTheme } from "./project-introspection.js";
 import { getEffectiveMetadata, type EffectiveNoteMetadata, type RoleSuggestionContext } from "./role-suggestions.js";
 import { daysSince } from "./date-utils.js";
 import { attempt } from "./error-utils.js";
+import { memoryId } from "./brands.js";
 
 const RECENTLY_CHANGED_DAYS = 5;
 const HIGH_CONFIDENCE_CENTRALITY = 5;
@@ -172,12 +173,28 @@ export async function getDirectRelatedNotes(
   const visibleNotes = [...noteById.values()].map(v => v.note);
 
   for (const relatedId of relatedIds) {
-    const entry = noteById.get(relatedId);
+    const relationship = note.relatedTo?.find(r => r.id === relatedId);
+    if (!relationship) continue;
+
+    let entry: { note: Note; vault: Vault } | undefined;
+
+    if (relationship.vaultPath) {
+      const targetVault = allVaults.find(v => v.storage.vaultPath === relationship.vaultPath);
+      if (targetVault) {
+        const foundNote = await targetVault.storage.readNote(memoryId(relationship.id));
+        if (foundNote) {
+          entry = { note: foundNote, vault: targetVault };
+        }
+      }
+    }
+
+    if (!entry) {
+      entry = noteById.get(relatedId);
+    }
+
     if (!entry) continue;
 
     const { note: relatedNote, vault } = entry;
-    const relationship = note.relatedTo?.find(r => r.id === relatedId);
-    if (!relationship) continue;
 
     const metadata = getEffectiveMetadata(relatedNote, buildRoleSuggestionContext(relatedNote, visibleNotes));
     const score = scoreRelatedNote(relatedNote, activeProjectId, metadata);

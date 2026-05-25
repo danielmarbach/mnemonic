@@ -16,8 +16,8 @@ import {
 import { memoryId } from "../brands.js";
 import {
   formatCommitBody,
-  shouldBlockProtectedBranchCommit,
-  wouldRelationshipCleanupTouchProjectVault,
+  commitVaultWithProtection,
+  checkVaultProtectedBranch,
 } from "../helpers/git-commit.js";
 import {
   buildMutationRetryContract,
@@ -28,6 +28,8 @@ import {
   removeRelationshipsToNoteIds,
   addVaultChange,
   storageLabel,
+  attachedVaultErrorMessage,
+  ensureAttachmentsLoaded,
 } from "../helpers/vault.js";
 import { invalidateActiveProjectCache } from "../cache.js";
 
@@ -45,6 +47,7 @@ export function registerForgetTool(server: McpServer, ctx: ServerContext): void 
         "- The note should stay but move to another vault; use `move_memory`\n" +
         "- The note should be replaced or merged; use `consolidate`\n\n" +
         "Returns: deleted id/title, relationship cleanup details.\n\n" +
+        "Writable attachments: can delete notes in writable attached vaults.\n\n" +
         "[mutating: deletes note, cleans relationships, git commits, may push]\n\n" +
         "Typical next step:\n" +
         "- Use `recall` or `list` to confirm the remaining memory set is clean.",
@@ -69,39 +72,42 @@ export function registerForgetTool(server: McpServer, ctx: ServerContext): void 
     },
     async ({ id, cwd, allowProtectedBranch = false }) => {
       await ensureBranchSynced(ctx, cwd);
+      const project = await resolveProject(ctx, cwd);
+      const projectId = project?.id;
+      if (projectId) await ensureAttachmentsLoaded(ctx, projectId);
 
-      const found = await ctx.vaultManager.findNote(id, cwd);
+      const found = await ctx.vaultManager.findNote(id, cwd, { mutable: true, projectId });
       if (!found) {
+        const foundAny = await ctx.vaultManager.findNote(id, cwd, { mutable: false, projectId });
+        if (foundAny) {
+          return { content: [{ type: "text", text: attachedVaultErrorMessage(id, foundAny.vault) }], isError: true };
+        }
         return { content: [{ type: "text", text: `No memory found with id '${id}'` }], isError: true };
       }
 
       const { note, vault: noteVault } = found;
-      const touchesProjectVault = noteVault.isProject || await wouldRelationshipCleanupTouchProjectVault(ctx, [id]);
-      if (touchesProjectVault) {
-        const resolvedProject = await resolveProject(ctx, cwd);
-        const projectLabel = resolvedProject
-          ? `${resolvedProject.name} (${resolvedProject.id})`
-          : `${note.projectName ?? "project"} (${note.project ?? "unknown"})`;
-        const policy = note.project ? await ctx.configStore.getProjectPolicy(note.project) : undefined;
-        const protectedBranchCheck = await shouldBlockProtectedBranchCommit({
-          ctx,
-          cwd,
-          writeScope: "project",
-          automaticCommit: true,
-          projectLabel,
-          policy,
-          allowProtectedBranch,
-          toolName: "forget",
-        });
-        if (protectedBranchCheck.blocked) {
-          return {
-            content: [{ type: "text", text: protectedBranchCheck.message ?? "Protected branch policy blocked this commit." }],
-            isError: true,
-          };
-        }
+
+      const protectedBranchCheck = await checkVaultProtectedBranch({
+        ctx,
+        vault: noteVault,
+        allowProtectedBranch,
+        toolName: "forget",
+        noteProjectId: note.project ?? undefined,
+      });
+      if (protectedBranchCheck.blocked) {
+        return {
+          content: [{ type: "text", text: protectedBranchCheck.message ?? "Protected branch policy blocked this commit." }],
+          isError: true,
+        };
       }
 
-      await noteVault.storage.deleteNote(memoryId(id));
+      const deleted = await noteVault.storage.deleteNote(memoryId(id));
+      if (!deleted) {
+        return {
+          content: [{ type: "text", text: `Failed to delete note '${id}' from ${storageLabel(noteVault)}` }],
+          isError: true,
+        };
+      }
 
       // Clean up dangling references grouped by vault so we make one commit per vault
       const vaultChanges = await removeRelationshipsToNoteIds(ctx, [id]);
@@ -120,7 +126,16 @@ export function registerForgetTool(server: McpServer, ctx: ServerContext): void 
           projectName: note.projectName,
         });
         const commitMessage = `forget: ${note.title}`;
-        const commitStatus = await v.git.commitWithStatus(commitMessage, files, commitBody);
+        const commitStatus = await commitVaultWithProtection({
+          ctx,
+          vault: v,
+          commitMessage,
+          files,
+          commitBody,
+          allowProtectedBranch,
+          toolName: "forget",
+          noteProjectId: note.project ?? undefined,
+        });
         if (!retry) {
           retry = buildMutationRetryContract({
             commit: commitStatus,

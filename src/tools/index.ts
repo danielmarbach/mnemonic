@@ -22,6 +22,11 @@ import { registerMoveMemoryTool } from "./move-memory.js";
 import { registerRelateTool } from "./relate.js";
 import { registerUnrelateTool } from "./unrelate.js";
 import { registerConsolidateTool } from "./consolidate.js";
+import { registerAddAttachmentTool } from "./add-attachment.js";
+import { registerRemoveAttachmentTool } from "./remove-attachment.js";
+import { registerListAttachmentsTool } from "./list-attachments.js";
+import { registerSetAttachmentEnabledTool } from "./set-attachment-enabled.js";
+import { registerSetAttachmentBranchTool } from "./set-attachment-branch.js";
 
 export function registerAllTools(server: McpServer, ctx: ServerContext): void {
   registerDetectProjectTool(server, ctx);
@@ -47,4 +52,9 @@ export function registerAllTools(server: McpServer, ctx: ServerContext): void {
   registerRelateTool(server, ctx);
   registerUnrelateTool(server, ctx);
   registerConsolidateTool(server, ctx);
+  registerAddAttachmentTool(server, ctx);
+  registerRemoveAttachmentTool(server, ctx);
+  registerListAttachmentsTool(server, ctx);
+  registerSetAttachmentEnabledTool(server, ctx);
+  registerSetAttachmentBranchTool(server, ctx);
 }

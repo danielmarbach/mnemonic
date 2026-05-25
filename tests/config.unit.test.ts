@@ -18,11 +18,13 @@ describe("MnemonicConfigStore", () => {
 
     const store = new MnemonicConfigStore(dir);
     await expect(store.load()).resolves.toEqual({
-      schemaVersion: "1.1",
+      schemaVersion: "1.3",
       reindexEmbedConcurrency: 4,
       mutationPushMode: "main-only",
       projectMemoryPolicies: {},
       projectIdentityOverrides: {},
+      projectAttachments: {},
+      maxAttachmentsPerProject: 5,
     });
   });
 
@@ -38,11 +40,13 @@ describe("MnemonicConfigStore", () => {
 
     const store = new MnemonicConfigStore(dir);
     await expect(store.load()).resolves.toEqual({
-      schemaVersion: "1.1",
+      schemaVersion: "1.3",
       reindexEmbedConcurrency: 16,
       mutationPushMode: "main-only",
       projectMemoryPolicies: {},
       projectIdentityOverrides: {},
+      projectAttachments: {},
+      maxAttachmentsPerProject: 5,
     });
   });
 
@@ -58,11 +62,13 @@ describe("MnemonicConfigStore", () => {
 
     const store = new MnemonicConfigStore(dir);
     await expect(store.load()).resolves.toEqual({
-      schemaVersion: "1.1",
+      schemaVersion: "1.3",
       reindexEmbedConcurrency: 4,
       mutationPushMode: "main-only",
       projectMemoryPolicies: {},
       projectIdentityOverrides: {},
+      projectAttachments: {},
+      maxAttachmentsPerProject: 5,
     });
   });
 
@@ -78,11 +84,13 @@ describe("MnemonicConfigStore", () => {
 
     const store = new MnemonicConfigStore(dir);
     await expect(store.load()).resolves.toEqual({
-      schemaVersion: "1.1",
+      schemaVersion: "1.3",
       reindexEmbedConcurrency: 4,
       mutationPushMode: "none",
       projectMemoryPolicies: {},
       projectIdentityOverrides: {},
+      projectAttachments: {},
+      maxAttachmentsPerProject: 5,
     });
   });
 
@@ -98,11 +106,13 @@ describe("MnemonicConfigStore", () => {
 
     const store = new MnemonicConfigStore(dir);
     await expect(store.load()).resolves.toEqual({
-      schemaVersion: "1.1",
+      schemaVersion: "1.3",
       reindexEmbedConcurrency: 4,
       mutationPushMode: "main-only",
       projectMemoryPolicies: {},
       projectIdentityOverrides: {},
+      projectAttachments: {},
+      maxAttachmentsPerProject: 5,
     });
   });
 

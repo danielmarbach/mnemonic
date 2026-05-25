@@ -69,7 +69,7 @@ function makeVault(vaultPath: string, notes: Note[], embeddings: EmbeddingRecord
       init: vi.fn(),
     } as unknown as Vault["storage"],
     git: {} as Vault["git"],
-    isProject: false,
+    provenance: "main",
     notesRelDir: ".mnemonic/notes",
   } as unknown as Vault;
 }

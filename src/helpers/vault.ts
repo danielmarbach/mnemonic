@@ -4,14 +4,15 @@ import type { Vault } from "../vault.js";
 import type { PersistenceStatus } from "../structured-content.js";
 import { getOrBuildVaultNoteList } from "../cache.js";
 import { resolveProject } from "./project.js";
-import { formatCommitBody } from "./git-commit.js";
+import { formatCommitBody, commitVaultWithProtection, checkVaultProtectedBranch } from "./git-commit.js";
 import { pushAfterMutation, buildMutationRetryContract, buildPersistenceStatus } from "./persistence.js";
+import { ProtectedBranchError } from "../domain-errors.js";
 import { filterRelationships } from "../consolidate.js";
 import { summarizePreview } from "../project-introspection.js";
 
 
 export type SearchScope = "project" | "global" | "all";
-export type StorageScope = "project-vault" | "main-vault" | "any";
+export type StorageScope = "project-vault" | "main-vault" | "any" | "attached";
 
 export type NoteEntry = {
   note: Note;
@@ -19,15 +20,30 @@ export type NoteEntry = {
 };
 
 export function storageLabel(vault: Vault): string {
-  if (!vault.isProject) return "main-vault";
-  if (vault.vaultFolderName === ".mnemonic") return "project-vault";
-  return `sub-vault:${vault.vaultFolderName}`;
+  if (vault.provenance === "main") return "main-vault";
+  if (vault.provenance === "project-local") {
+    if (vault.vaultFolderName === ".mnemonic") return "project-vault";
+    return `sub-vault:${vault.vaultFolderName}`;
+  }
+  const ref = vault.attachmentRef;
+  if (!ref) return `attached:unknown/${vault.vaultFolderName}`;
+  return `attached:${ref.projectSlug}/${vault.vaultFolderName}`;
 }
 
 export function vaultMatchesStorageScope(vault: Vault, storedIn: StorageScope): boolean {
   if (storedIn === "any") return true;
-  if (storedIn === "main-vault") return !vault.isProject;
-  return vault.isProject;
+  if (storedIn === "main-vault") return vault.provenance === "main";
+  if (storedIn === "attached") return vault.provenance === "project-attached";
+  // "project-vault" matches only project-local vaults (not attached)
+  return vault.provenance === "project-local";
+}
+
+export function attachedVaultErrorMessage(id: string, vault: Vault): string {
+  const label = storageLabel(vault);
+  if (vault.writable) {
+    return `Memory '${id}' is in an attached vault (${label}) that is not currently mutable. This may be due to a protected branch or access restriction.`;
+  }
+  return `Memory '${id}' is in an attached vault (${label}) and cannot be modified. Attached vaults are read-only.`;
 }
 
 export async function collectVisibleNotes(
@@ -39,7 +55,8 @@ export async function collectVisibleNotes(
   sessionProjectId?: string,
 ): Promise<{ project: Awaited<ReturnType<typeof resolveProject>>; entries: NoteEntry[] }> {
   const project = await resolveProject(ctx, cwd);
-  const vaults = await ctx.vaultManager.searchOrder(cwd);
+  const projectId = project?.id;
+  const vaults = await ctx.vaultManager.searchOrder(cwd, projectId);
 
   let filterProject: string | null | undefined = undefined;
   if (scope === "project" && project) filterProject = project.id;
@@ -49,25 +66,32 @@ export async function collectVisibleNotes(
   const entries: NoteEntry[] = [];
 
   for (const vault of vaults) {
+    // Attached vaults are project-scoped; exclude them from global scope
+    if (scope === "global" && vault.provenance === "project-attached") continue;
+
+    const includeAllForScope = vault.provenance === "project-attached" && filterProject !== null && filterProject !== undefined;
+    const effectiveFilter = includeAllForScope ? undefined : filterProject;
+
     let rawNotes: Note[];
     if (sessionProjectId) {
       const cached = await getOrBuildVaultNoteList(sessionProjectId, vault);
       if (cached !== undefined) {
-        rawNotes = filterProject !== undefined
-          ? cached.filter((n) => filterProject === null ? !n.project : n.project === filterProject)
+        rawNotes = effectiveFilter !== undefined
+          ? cached.filter((n) => effectiveFilter === null ? !n.project : n.project === effectiveFilter)
           : cached;
       } else {
         rawNotes = await vault.storage.listNotes(
-          filterProject !== undefined ? { project: filterProject } : undefined
+          effectiveFilter !== undefined ? { project: effectiveFilter } : undefined
         );
       }
     } else {
       rawNotes = await vault.storage.listNotes(
-        filterProject !== undefined ? { project: filterProject } : undefined
+        effectiveFilter !== undefined ? { project: effectiveFilter } : undefined
       );
     }
     for (const note of rawNotes) {
-      if (seen.has(note.id)) {
+      const key = `${note.id}::${vault.storage.vaultPath}`;
+      if (seen.has(key)) {
         continue;
       }
       if (tags && tags.length > 0) {
@@ -79,7 +103,7 @@ export async function collectVisibleNotes(
       if (storedIn !== "any" && !vaultMatchesStorageScope(vault, storedIn)) {
         continue;
       }
-      seen.add(note.id);
+      seen.add(key);
       entries.push({ note, vault });
     }
   }
@@ -136,6 +160,17 @@ export const ROLE_LIFECYCLE_DEFAULTS = {
   reference: "permanent",
 } as const satisfies Record<NoteRole, NoteLifecycle>;
 
+export async function ensureAttachmentsLoaded(ctx: ServerContext, projectId: string): Promise<void> {
+  const existing = ctx.vaultManager.getAttachmentsForProject(projectId);
+  if (existing.length > 0) return;
+
+  const configs = await ctx.configStore.getProjectAttachments(projectId);
+  if (configs.length === 0) return;
+
+  ctx.vaultManager.setAttachmentConfigs(projectId, configs);
+  await ctx.vaultManager.loadAttachmentsForProject(projectId);
+}
+
 export function projectNotFoundResponse(cwd: string) {
   return { content: [{ type: "text" as const, text: `Could not detect a project for: ${cwd}` }], isError: true as const };
 }
@@ -146,10 +181,23 @@ export async function moveNoteBetweenVaults(
   targetVault: Vault,
   noteToWrite?: Note,
   cwd?: string,
+  allowProtectedBranch: boolean = false,
+  targetProjectId?: string,
 ): Promise<{ note: Note; persistence: PersistenceStatus }> {
   const { note, vault: sourceVault } = found;
   const finalNote = noteToWrite ?? note;
   const embedding = await sourceVault.storage.readEmbedding(note.id);
+
+  const preChecks = await Promise.all([
+    checkVaultProtectedBranch({ ctx, vault: sourceVault, allowProtectedBranch, toolName: "move_memory", noteProjectId: note.project ?? undefined }),
+    checkVaultProtectedBranch({ ctx, vault: targetVault, allowProtectedBranch, toolName: "move_memory", noteProjectId: (targetVault.provenance === "project-local" ? (targetProjectId ?? note.project) : undefined) }),
+  ]);
+
+  for (const check of preChecks) {
+    if (check.blocked) {
+      throw new ProtectedBranchError(check.message ?? undefined);
+    }
+  }
 
   await targetVault.storage.writeNote(finalNote);
   if (embedding) {
@@ -169,7 +217,15 @@ export async function moveNoteBetweenVaults(
   });
   const targetCommitMessage = `move: ${finalNote.title}`;
   const targetCommitFiles = [ctx.vaultManager.noteRelPath(targetVault, finalNote.id)];
-  const targetCommit = await targetVault.git.commitWithStatus(targetCommitMessage, targetCommitFiles, targetCommitBody);
+  const targetCommit = await commitVaultWithProtection({
+    ctx,
+    vault: targetVault,
+    commitMessage: targetCommitMessage,
+    files: targetCommitFiles,
+    commitBody: targetCommitBody,
+    allowProtectedBranch,
+    toolName: "move_memory",
+  });
 
   const sourceCommitBody = formatCommitBody({
     summary: `Moved to ${targetVaultLabel}`,
@@ -177,7 +233,15 @@ export async function moveNoteBetweenVaults(
     noteTitle: finalNote.title,
     projectName: finalNote.projectName,
   });
-  await sourceVault.git.commitWithStatus(`move: ${finalNote.title}`, [ctx.vaultManager.noteRelPath(sourceVault, finalNote.id)], sourceCommitBody);
+  await commitVaultWithProtection({
+    ctx,
+    vault: sourceVault,
+    commitMessage: `move: ${finalNote.title}`,
+    files: [ctx.vaultManager.noteRelPath(sourceVault, finalNote.id)],
+    commitBody: sourceCommitBody,
+    allowProtectedBranch,
+    toolName: "move_memory",
+  });
   const targetPush = targetCommit.status === "committed"
     ? await pushAfterMutation(ctx, targetVault)
     : { status: "skipped" as const, reason: "commit-failed" as const };
@@ -213,7 +277,7 @@ export async function removeRelationshipsToNoteIds(ctx: ServerContext, noteIds: 
   const vaultChanges = new Map<Vault, string[]>();
 
   await Promise.all(
-    ctx.vaultManager.allKnownVaults().map(async (vault) => {
+    ctx.vaultManager.allKnownVaultsMutable().map(async (vault) => {
       const notes = await vault.storage.listNotes();
       await Promise.all(
         notes.map(async (note) => {

@@ -15,7 +15,7 @@ export async function warnAboutPendingMigrationsOnStartup(ctx: ServerContext): P
     }
 
     totalPending += pending.length;
-    const label = vault.isProject ? "project" : "main";
+    const label = vault.provenance === "project-local" ? "project" : "main";
     details.push(
       `${label} (${vault.storage.vaultPath}): ${pending.length} pending from schema ${version}`,
     );

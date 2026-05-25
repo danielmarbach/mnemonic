@@ -234,6 +234,58 @@ Body`;
       expect(read).toBeNull();
     });
 
+    it("should round-trip relationships with vaultPath for cross-vault links", async () => {
+      const now = new Date().toISOString();
+      const note: Note = {
+        id: "cross-vault-note",
+        title: "Cross Vault Note",
+        content: "Has a cross-vault relationship.",
+        tags: [],
+        lifecycle: "permanent",
+        relatedTo: [
+          { id: "other-note", type: "related-to", vaultPath: "/other/vault/path" },
+          { id: "same-vault-note", type: "explains" },
+        ],
+        createdAt: now,
+        updatedAt: now,
+      };
+
+      await storage.writeNote(note);
+      const read = await storage.readNote(note.id);
+
+      expect(read).toBeTruthy();
+      expect(read!.relatedTo).toHaveLength(2);
+      expect(read!.relatedTo![0]).toEqual({ id: "other-note", type: "related-to", vaultPath: "/other/vault/path" });
+      expect(read!.relatedTo![1]).toEqual({ id: "same-vault-note", type: "explains" });
+      expect(read!.relatedTo![1]).not.toHaveProperty("vaultPath");
+    });
+
+    it("should remove cross-vault relationships by filtering relatedTo", async () => {
+      const now = new Date().toISOString();
+      const note: Note = {
+        id: "remove-rel-note",
+        title: "Remove Relationship Note",
+        content: "Testing relationship removal.",
+        tags: [],
+        lifecycle: "permanent",
+        relatedTo: [
+          { id: "target-a", type: "related-to", vaultPath: "/other/vault" },
+          { id: "target-b", type: "explains" },
+        ],
+        createdAt: now,
+        updatedAt: now,
+      };
+
+      await storage.writeNote(note);
+
+      const filtered = (note.relatedTo ?? []).filter(r => r.id !== "target-a");
+      await storage.writeNote({ ...note, relatedTo: filtered, updatedAt: new Date().toISOString() });
+
+      const read = await storage.readNote(note.id);
+      expect(read!.relatedTo).toHaveLength(1);
+      expect(read!.relatedTo![0]).toEqual({ id: "target-b", type: "explains" });
+    });
+
     it("should list all notes without filter", async () => {
       const now = new Date().toISOString();
       const notes: Note[] = [
@@ -716,6 +768,25 @@ describe("Validation functions", () => {
         { not: "an object" },
       ]);
       expect(result).toBeUndefined();
+    });
+
+    it("should preserve vaultPath when present", () => {
+      const result = validateRelatedTo([
+        { id: "rel-1", type: "related-to", vaultPath: "/path/to/vault" },
+      ]);
+      expect(result).toEqual([
+        { id: "rel-1", type: "related-to", vaultPath: "/path/to/vault" },
+      ]);
+    });
+
+    it("should omit vaultPath when absent (no undefined in object)", () => {
+      const result = validateRelatedTo([
+        { id: "rel-1", type: "related-to" },
+      ]);
+      expect(result).toEqual([
+        { id: "rel-1", type: "related-to" },
+      ]);
+      expect(result![0]).not.toHaveProperty("vaultPath");
     });
   });
 

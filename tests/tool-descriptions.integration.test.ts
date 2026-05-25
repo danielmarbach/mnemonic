@@ -83,6 +83,15 @@ describe("tool-descriptions", () => {
     expect(byName.get("consolidate")).toContain("Evidence defaults on for consolidate analysis strategies");
     expect(byName.get("move_memory")).toContain("Use `relate` if the moved memory connects to existing notes in the new vault.");
     expect(byName.get("discover_tags")).toContain("Suggest canonical tags for a note before `remember` when tag choice is ambiguous.");
+
+    const listTool = tools.find((t) => t.name === "list");
+    expect(listTool?.inputSchema).toBeDefined();
+    const listSchema = listTool!.inputSchema as Record<string, unknown>;
+    const listProps = (listSchema["properties"] ?? {}) as Record<string, Record<string, unknown>>;
+    const storedInProp = listProps["storedIn"];
+    expect(storedInProp).toBeDefined();
+    expect(storedInProp["description"]).toContain("attached");
+    expect(storedInProp["enum"]).toContain("attached");
   }, 15000);
 
   it("suggests note-oriented canonical tags by default", async () => {

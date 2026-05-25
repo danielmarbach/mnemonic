@@ -180,7 +180,7 @@ export interface ListResult extends Record<string, unknown> {
   action: "listed";
   count: number;
   scope: "project" | "global" | "all";
-  storedIn: "project-vault" | "main-vault" | "any";
+  storedIn: "project-vault" | "main-vault" | "any" | "attached";
   project?: ProjectRef;
   notes: Array<{
     id: string;
@@ -273,7 +273,7 @@ export type SyncVaultGitError =
 export interface SyncResult extends Record<string, unknown> {
   action: "synced";
   vaults: Array<{
-    vault: "main" | "project";
+    vault: "main" | "project" | "attached";
     hasRemote: boolean;
     pulled: number;
     deleted: number;
@@ -283,7 +283,87 @@ export interface SyncResult extends Record<string, unknown> {
     failed: Array<{ id: string; error: string }>;
     /** Set when a git operation (fetch/pull/push) failed during sync */
     gitError?: SyncVaultGitError;
+    /** For attached vaults: the project slug identifying the attachment */
+    attachedSlug?: string;
   }>;
+}
+
+export interface AddAttachmentResult extends Record<string, unknown> {
+  action: "attachment_added";
+  project: { id: string; name: string };
+  attachment: {
+    projectSlug: string;
+    projectName: string;
+    localPath: string;
+    vaultFolder: string;
+    enabled: boolean;
+    branch: string;
+    branchTipHash: string;
+    writable?: boolean;
+    pushBranch?: string;
+  };
+  warnings?: string[];
+  retry?: MutationRetryContract;
+}
+
+export interface RemoveAttachmentResult extends Record<string, unknown> {
+  action: "attachment_removed";
+  project: { id: string; name: string };
+  removedAttachment: {
+    projectSlug: string;
+    projectName: string;
+    localPath: string;
+    vaultFolder: string;
+    branch: string;
+  };
+  retry?: MutationRetryContract;
+}
+
+export interface ListAttachmentsResult extends Record<string, unknown> {
+  action: "attachments_listed";
+  project: { id: string; name: string };
+  attachments: Array<{
+    projectSlug: string;
+    projectName: string;
+    localPath: string;
+    vaultFolder: string;
+    enabled: boolean;
+    branch: string;
+    branchTipHash: string;
+    pathExists: boolean;
+    noteCount: number;
+    writable?: boolean;
+    pushBranch?: string;
+  }>;
+  maxAttachmentsPerProject: number;
+}
+
+export interface SetAttachmentEnabledResult extends Record<string, unknown> {
+  action: "attachment_enabled_set";
+  project: { id: string; name: string };
+  attachment: {
+    projectSlug: string;
+    projectName: string;
+    enabled: boolean;
+    branch: string;
+  };
+  retry?: MutationRetryContract;
+}
+
+export interface SetAttachmentBranchResult extends Record<string, unknown> {
+  action: "attachment_branch_set";
+  project: { id: string; name: string };
+  attachment: {
+    projectSlug: string;
+    projectName: string;
+    localPath: string;
+    vaultFolder: string;
+    enabled: boolean;
+    branch: string;
+    branchTipHash: string;
+  };
+  warnings?: string[];
+  retry?: MutationRetryContract;
 }
 
 export interface ReindexResult extends Record<string, unknown> {
@@ -402,6 +482,7 @@ export interface PolicyResult extends Record<string, unknown> {
   consolidationMode?: string;
   protectedBranchPatterns?: string[];
   protectedBranchBehavior?: string;
+  maxAttachmentsPerProject?: number;
   updatedAt?: string;
   retry?: MutationRetryContract;
 }
@@ -531,6 +612,7 @@ export interface ProjectMaintenanceWarning {
 export interface ProjectSummaryNotes {
   total: number;
   projectVault: number;
+  attachedVault?: number;
   mainVault: number;
   privateProject: number;
 }
@@ -579,7 +661,7 @@ const _ChangeCategory = z.enum(CHANGE_CATEGORIES);
  * - "project-vault" for the primary project vault (.mnemonic/).
  * - "sub-vault:.mnemonic-<name>" for submodule-specific project vaults.
  */
-const _VaultLabel = z.string().regex(/^main-vault$|^project-vault$|^sub-vault:\.mnemonic-.+$/);
+const _VaultLabel = z.string().regex(/^main-vault$|^project-vault$|^sub-vault:\.mnemonic-.+$|^attached:[a-z0-9][-a-z0-9]*\/\.mnemonic(-.+)?$/);
 const ProjectRefSchema = z.object({ id: z.string(), name: z.string() });
 
 export const RelatedNotePreviewSchema = z.object({
@@ -763,7 +845,7 @@ export const ListResultSchema = z.object({
   action: z.literal("listed"),
   count: z.number(),
   scope: z.enum(["project", "global", "all"]),
-  storedIn: z.enum(["project-vault", "main-vault", "any"]),
+  storedIn: z.enum(["project-vault", "main-vault", "any", "attached"]),
   project: ProjectRefSchema.optional(),
   notes: z.array(z.object({
     id: z.string(),
@@ -919,6 +1001,7 @@ export const RelatedGlobalNoteSchema = z.object({
 export const ProjectSummaryNotesSchema = z.object({
   total: z.number(),
   projectVault: z.number(),
+  attachedVault: z.number().optional(),
   mainVault: z.number(),
   privateProject: z.number(),
 });
@@ -996,7 +1079,7 @@ export const ProjectSummaryResultSchema = z.object({
 export const SyncResultSchema = z.object({
   action: z.literal("synced"),
   vaults: z.array(z.object({
-    vault: z.enum(["main", "project"]),
+    vault: z.enum(["main", "project", "attached"]),
     hasRemote: z.boolean(),
     pulled: z.number(),
     deleted: z.number(),
@@ -1012,6 +1095,7 @@ export const SyncResultSchema = z.object({
       isConflict: z.boolean(),
       conflictFiles: z.array(z.string()).optional(),
     }).optional(),
+    attachedSlug: z.string().optional().describe("For attached vaults: the project slug identifying the attachment."),
   })),
 });
 
@@ -1196,7 +1280,86 @@ export const PolicyResultSchema = z.object({
   consolidationMode: z.string().optional(),
   protectedBranchPatterns: z.array(z.string()).optional(),
   protectedBranchBehavior: z.string().optional(),
+  maxAttachmentsPerProject: z.number().optional(),
   updatedAt: z.string().optional(),
+  retry: PersistenceStatusSchema.shape.retry,
+});
+
+export const AddAttachmentResultSchema = z.object({
+  action: z.literal("attachment_added"),
+  project: z.object({ id: z.string(), name: z.string() }),
+  attachment: z.object({
+    projectSlug: z.string(),
+    projectName: z.string(),
+    localPath: z.string(),
+    vaultFolder: z.string(),
+    enabled: z.boolean(),
+    branch: z.string(),
+    branchTipHash: z.string(),
+    writable: z.boolean().optional(),
+    pushBranch: z.string().optional(),
+  }),
+  warnings: z.array(z.string()).optional(),
+  retry: PersistenceStatusSchema.shape.retry,
+});
+
+export const RemoveAttachmentResultSchema = z.object({
+  action: z.literal("attachment_removed"),
+  project: z.object({ id: z.string(), name: z.string() }),
+  removedAttachment: z.object({
+    projectSlug: z.string(),
+    projectName: z.string(),
+    localPath: z.string(),
+    vaultFolder: z.string(),
+    branch: z.string(),
+  }),
+  retry: PersistenceStatusSchema.shape.retry,
+});
+
+export const ListAttachmentsResultSchema = z.object({
+  action: z.literal("attachments_listed"),
+  project: z.object({ id: z.string(), name: z.string() }),
+  attachments: z.array(z.object({
+    projectSlug: z.string(),
+    projectName: z.string(),
+    localPath: z.string(),
+    vaultFolder: z.string(),
+    enabled: z.boolean(),
+    branch: z.string(),
+    branchTipHash: z.string(),
+    pathExists: z.boolean(),
+    noteCount: z.number(),
+    writable: z.boolean().optional(),
+    pushBranch: z.string().optional(),
+  })),
+  maxAttachmentsPerProject: z.number(),
+});
+
+export const SetAttachmentEnabledResultSchema = z.object({
+  action: z.literal("attachment_enabled_set"),
+  project: z.object({ id: z.string(), name: z.string() }),
+  attachment: z.object({
+    projectSlug: z.string(),
+    projectName: z.string(),
+    enabled: z.boolean(),
+    branch: z.string(),
+  }),
+  retry: PersistenceStatusSchema.shape.retry,
+});
+
+export const SetAttachmentBranchResultSchema = z.object({
+  action: z.literal("attachment_branch_set"),
+  project: z.object({ id: z.string(), name: z.string() }),
+  attachment: z.object({
+    projectSlug: z.string(),
+    projectName: z.string(),
+    localPath: z.string(),
+    vaultFolder: z.string(),
+    enabled: z.boolean(),
+    branch: z.string(),
+    branchTipHash: z.string(),
+  }),
+  warnings: z.array(z.string()).optional(),
   retry: PersistenceStatusSchema.shape.retry,
 });
 

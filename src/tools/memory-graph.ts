@@ -39,7 +39,7 @@ export function registerMemoryGraphTool(server: McpServer, ctx: ServerContext): 
       inputSchema: z.object({
         cwd: projectParam,
         scope: z.enum(["project", "global", "all"]).optional().default("all"),
-        storedIn: z.enum(["project-vault", "main-vault", "any"]).optional().default("any"),
+        storedIn: z.enum(["project-vault", "main-vault", "any", "attached"]).optional().default("any").describe("Filter by vault storage label like list tool."),
         limit: z.number().int().min(1).max(50).optional().default(25),
       }),
       outputSchema: MemoryGraphResultSchema,
@@ -59,8 +59,8 @@ export function registerMemoryGraphTool(server: McpServer, ctx: ServerContext): 
         .slice(0, limit)
         .map((entry) => {
           const edges = (entry.note.relatedTo ?? [])
-            .filter((rel) => visibleIds.has(rel.id))
-            .map((rel) => `${rel.id} (${rel.type})`);
+            .filter((rel) => visibleIds.has(rel.id) || rel.vaultPath)
+            .map((rel) => `${rel.id} (${rel.type})${rel.vaultPath ? ` [vault:${rel.vaultPath}]` : ""}`);
           return edges.length > 0 ? `- ${entry.note.id} -> ${edges.join(", ")}` : null;
         })
         .filter(Boolean);
@@ -82,7 +82,7 @@ export function registerMemoryGraphTool(server: McpServer, ctx: ServerContext): 
         .slice(0, limit)
         .map((entry: NoteEntry) => {
           const edges = (entry.note.relatedTo ?? [])
-            .filter((rel) => visibleIds.has(rel.id))
+            .filter((rel) => visibleIds.has(rel.id) || rel.vaultPath)
             .map((rel) => ({ toId: rel.id, type: rel.type }));
           return {
             id: entry.note.id,

@@ -3,22 +3,49 @@ import path from "path";
 import { simpleGit } from "simple-git";
 
 import { attempt, debugLog, getErrorMessage } from "./error-utils.js";
-import { Storage, type Note } from "./storage.js";
-import { memoryId } from "./brands.js";
+import { Storage, type Note, type NoteStorage } from "./storage.js";
+import { memoryId, type AttachmentSlug } from "./brands.js";
 import { GitOps } from "./git.js";
+import { AttachedStorage } from "./attached-storage.js";
+import { expandHomePath } from "./paths.js";
 
 // ── Public types ──────────────────────────────────────────────────────────────
 
+export type VaultProvenance = "main" | "project-local" | "project-attached";
+
+export interface AttachmentRef {
+  projectSlug: AttachmentSlug;
+  projectName: string;
+  localPath: string;
+  branch: string;
+  branchTipHash: string;
+  writable?: boolean;
+  pushBranch?: string;
+}
+
+export interface ProjectAttachmentConfig {
+  projectSlug: AttachmentSlug;
+  projectName: string;
+  localPath: string;
+  vaultFolder: string;
+  enabled: boolean;
+  branch: string;
+  addedAt: string;
+  updatedAt: string;
+  branchTipHash: string;
+  writable?: boolean;
+  pushBranch?: string;
+}
+
 export interface Vault {
-  storage: Storage;
+  storage: NoteStorage;
   git: GitOps;
   /**
    * Notes directory path relative to the vault's git root.
    * "notes" for the main vault, ".mnemonic/notes" for project vaults.
    */
   notesRelDir: string;
-  /** True when this vault lives inside a project repo (.mnemonic/). */
-  isProject: boolean;
+  provenance: VaultProvenance;
   /**
    * Vault folder name relative to the git root.
    * - "" for the main vault (it is its own standalone git repo).
@@ -26,6 +53,10 @@ export interface Vault {
    * - ".mnemonic-<name>" for submodule-specific project vaults.
    */
   vaultFolderName: string;
+  /** Ref metadata for attached vaults. Only present when provenance === "project-attached". */
+  attachmentRef?: AttachmentRef;
+  /** Whether this vault allows write operations. Computed from provenance. */
+  readonly writable: boolean;
 }
 
 // ── VaultManager ─────────────────────────────────────────────────────────────
@@ -36,18 +67,22 @@ export class VaultManager {
    * Primary project vaults (`.mnemonic/`) loaded this session, keyed by resolved git root.
    * Used for backwards-compatible single-vault access.
    */
-  private primaryProjectVaults = new Map<string, Vault>();
+  private readonly primaryProjectVaults = new Map<string, Vault>();
   /**
    * All project vaults per git root (primary + submodule vaults), keyed by resolved git root.
    * The first entry in the array is always the primary `.mnemonic` vault.
    */
-  private allProjectVaultsByRoot = new Map<string, Vault[]>();
+  private readonly allProjectVaultsByRoot = new Map<string, Vault[]>();
+  /** Attached vault configs per project slug, set by tools after reading from configStore. */
+  private readonly attachmentConfigs = new Map<string, ProjectAttachmentConfig[]>();
+  /** Attached vault objects per project slug, loaded lazily. */
+  private readonly attachedVaults = new Map<string, Vault[]>();
   /** Git root of the main vault — set after initMain(). */
   private mainGitRoot = "";
 
   constructor(mainVaultPath: string) {
     const resolved = path.resolve(mainVaultPath);
-    this.main = makeVault(resolved, resolved, "notes", false, "");
+    this.main = makeVault(resolved, resolved, "notes", "main", "");
   }
 
   async initMain(): Promise<void> {
@@ -101,10 +136,14 @@ export class VaultManager {
   /**
    * Find a note by id, checking the project vault first (when cwd is given)
    * then falling back through all other known vaults and finally the main vault.
+   * When `mutable` is true, excludes attached (read-only) vaults from the search.
    */
-  async findNote(id: string, cwd?: string): Promise<{ note: Note; vault: Vault } | null> {
+  async findNote(id: string, cwd?: string, options?: { mutable?: boolean; projectId?: string }): Promise<{ note: Note; vault: Vault } | null> {
     const memoryIdArg = memoryId(id);
-    for (const vault of await this.searchOrder(cwd)) {
+    const vaults = options?.mutable
+      ? await this.searchOrderMutable(cwd, options?.projectId)
+      : await this.searchOrder(cwd, options?.projectId);
+    for (const vault of vaults) {
       const note = await vault.storage.readNote(memoryIdArg);
       if (note) return { note, vault };
     }
@@ -112,10 +151,28 @@ export class VaultManager {
   }
 
   /** All vaults currently loaded in this session (main + all project vaults including submodule). */
-  allKnownVaults(): Vault[] {
+  allKnownVaults(projectId?: string): Vault[] {
     const all: Vault[] = [this.main];
     for (const vaults of this.allProjectVaultsByRoot.values()) {
       all.push(...vaults);
+    }
+    if (projectId) {
+      const attached = this.attachedVaults.get(projectId);
+      if (attached) all.push(...attached);
+    }
+    return all;
+  }
+
+  /** All writable vaults (includes writable attached vaults). */
+  allKnownVaultsMutable(): Vault[] {
+    const all: Vault[] = [this.main];
+    for (const vaults of this.allProjectVaultsByRoot.values()) {
+      all.push(...vaults);
+    }
+    for (const vaults of this.attachedVaults.values()) {
+      for (const vault of vaults) {
+        if (vault.writable) all.push(vault);
+      }
     }
     return all;
   }
@@ -123,9 +180,9 @@ export class VaultManager {
   /**
    * Ordered list of vaults for recall / list operations.
    * All project vaults for the cwd's git root come first (primary, then submodule),
-   * followed by the main vault.
+   * then attached vaults for the project, followed by the main vault.
    */
-  async searchOrder(cwd?: string): Promise<Vault[]> {
+  async searchOrder(cwd?: string, projectId?: string): Promise<Vault[]> {
     const vaults: Vault[] = [];
     if (cwd) {
       const gitRoot = await findGitRoot(cwd);
@@ -136,14 +193,28 @@ export class VaultManager {
           if (all) {
             vaults.push(...all);
           } else {
-            // Defensive fallback for consistency if map population ever changes.
             vaults.push(pv);
           }
         }
       }
     }
+    if (projectId) {
+      const attached = this.getAttachmentsForProject(projectId);
+      if (attached.length > 0) {
+        vaults.push(...attached);
+      }
+    }
     vaults.push(this.main);
     return vaults;
+  }
+
+  /**
+   * Same as searchOrder but excludes attached (read-only) vaults.
+   * Use for mutation operations that must never write to attached vaults.
+   */
+  async searchOrderMutable(cwd?: string, projectId?: string): Promise<Vault[]> {
+    const vaults = await this.searchOrder(cwd, projectId);
+    return vaults.filter(v => v.writable);
   }
 
   /** Build the file path for a note relative to the vault's git root. */
@@ -165,6 +236,109 @@ export class VaultManager {
       }
     }
     return pendingFiles;
+  }
+
+  // ── Attachments ──────────────────────────────────────────────────────────────
+
+  setAttachmentConfigs(projectSlug: string, configs: ProjectAttachmentConfig[]): void {
+    this.attachmentConfigs.set(projectSlug, configs);
+  }
+
+  async loadAttachmentsForProject(projectSlug: string): Promise<Vault[]> {
+    if (this.attachedVaults.has(projectSlug)) {
+      return this.attachedVaults.get(projectSlug)!;
+    }
+
+    const configs = this.attachmentConfigs.get(projectSlug) ?? [];
+    const enabledConfigs = configs.filter(c => c.enabled);
+
+    const vaultPromises = enabledConfigs.map(async (config) => {
+      const resolvedLocalPath = path.resolve(expandHomePath(config.localPath));
+      if (!await pathExists(resolvedLocalPath)) {
+        debugLog("vault:attachment", `skipping attachment ${config.projectSlug}: path not found ${resolvedLocalPath}`);
+        return null;
+      }
+
+      // Staleness detection: compare stored branchTipHash against current tip
+      let currentTipHash = config.branchTipHash;
+      if (config.branch) {
+        const tipResult = await attempt("vault:attachment-staleness", async () => {
+          const git = simpleGit(resolvedLocalPath);
+          const result = await git.raw(["rev-parse", config.branch]);
+          return result.trim();
+        });
+        if (tipResult.ok && tipResult.value) {
+          currentTipHash = tipResult.value;
+        }
+      }
+
+      const attachmentsDir = path.join(resolvedLocalPath, config.vaultFolder, "attachments", projectSlug);
+      await fs.mkdir(attachmentsDir, { recursive: true });
+
+      const baseStorage = new Storage(attachmentsDir);
+      await baseStorage.init();
+
+      const repoStorage = new Storage(path.join(resolvedLocalPath, config.vaultFolder));
+      await repoStorage.init();
+
+      const storage = new AttachedStorage(baseStorage, repoStorage, resolvedLocalPath, config.branch, `${config.vaultFolder}/notes`, config.writable === true);
+
+      const git = new GitOps(resolvedLocalPath, `${config.vaultFolder}/notes`);
+      await git.init();
+
+      const attachmentRef: AttachmentRef = {
+        projectSlug: config.projectSlug,
+        projectName: config.projectName,
+        localPath: resolvedLocalPath,
+        branch: config.branch,
+        branchTipHash: currentTipHash,
+        writable: config.writable,
+        pushBranch: config.pushBranch,
+      };
+      const vault = makeVault(
+        attachmentsDir,
+        resolvedLocalPath,
+        `${config.vaultFolder}/notes`,
+        "project-attached",
+        config.vaultFolder,
+        undefined,
+        attachmentRef,
+        storage,
+        git,
+      );
+
+      const gitignorePath = path.join(resolvedLocalPath, config.vaultFolder, ".gitignore");
+      await ensureGitignore(gitignorePath);
+
+      return vault;
+    });
+
+    const vaults = (await Promise.all(vaultPromises)).filter((v): v is Vault => v !== null);
+
+    this.attachedVaults.set(projectSlug, vaults);
+    return vaults;
+  }
+
+  getAttachmentsForProject(projectSlug: string): Vault[] {
+    return this.attachedVaults.get(projectSlug) ?? [];
+  }
+
+  removeAttachment(projectSlug: string, targetSlug: string): void {
+    const vaults = this.attachedVaults.get(projectSlug);
+    if (vaults) {
+      this.attachedVaults.set(projectSlug, vaults.filter(v =>
+        v.attachmentRef?.projectSlug !== targetSlug
+      ));
+    }
+    const configs = this.attachmentConfigs.get(projectSlug);
+    if (configs) {
+      this.attachmentConfigs.set(projectSlug, configs.filter(c => c.projectSlug !== targetSlug));
+    }
+  }
+
+  clearAttachmentCaches(): void {
+    this.attachedVaults.clear();
+    this.attachmentConfigs.clear();
   }
 
   // ── Private ─────────────────────────────────────────────────────────────────
@@ -189,7 +363,7 @@ export class VaultManager {
 
     if (!create && !(await pathExists(mnemonicPath))) return null;
 
-    const primaryVault = makeVault(mnemonicPath, resolved, ".mnemonic/notes", true, ".mnemonic");
+    const primaryVault = makeVault(mnemonicPath, resolved, ".mnemonic/notes", "project-local", ".mnemonic");
     await primaryVault.storage.init();
     await primaryVault.git.init();
 
@@ -219,7 +393,7 @@ export class VaultManager {
         subVaultPath,
         resolved,
         notesRelDir,
-        true,
+        "project-local",
         folderName,
         primaryVault.storage.embeddingsDir,
       );
@@ -239,17 +413,22 @@ function makeVault(
   vaultPath: string,
   gitRoot: string,
   notesRelDir: string,
-  isProject: boolean,
+  provenance: VaultProvenance,
   vaultFolderName: string,
   embeddingsDirOverride?: string,
+  attachmentRef?: AttachmentRef,
+  storage?: NoteStorage,
+  git?: GitOps,
 ): Vault {
   return {
-    storage: new Storage(vaultPath, embeddingsDirOverride),
-    git: new GitOps(gitRoot, notesRelDir),
+    storage: storage ?? new Storage(vaultPath, embeddingsDirOverride),
+    git: git ?? new GitOps(gitRoot, notesRelDir),
     notesRelDir,
-    isProject,
+    provenance,
     vaultFolderName,
-  };
+    attachmentRef,
+    get writable() { return this.provenance !== "project-attached" || this.attachmentRef?.writable === true; },
+  } satisfies Vault;
 }
 
 /**
@@ -271,7 +450,7 @@ async function discoverSubmoduleVaultFolders(gitRoot: string): Promise<string[]>
     .sort();
 }
 
-async function findGitRoot(cwd: string, visited: Set<string> = new Set()): Promise<string | null> {
+export async function findGitRoot(cwd: string, visited: Set<string> = new Set()): Promise<string | null> {
   const git = simpleGit(cwd);
   const rootResult = await attempt("vault:find-git-root", () =>
     git.revparse(["--show-toplevel"])
@@ -302,7 +481,7 @@ async function findGitRoot(cwd: string, visited: Set<string> = new Set()): Promi
 }
 
 export async function ensureGitignore(ignorePath: string): Promise<void> {
-  const requiredLines = ["embeddings/", "projections/"];
+  const requiredLines = ["attachments/", "embeddings/", "projections/"];
   const existingResult = await attempt("vault:ensure-gitignore", () =>
     fs.readFile(ignorePath, "utf-8")
   );

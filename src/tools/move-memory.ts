@@ -13,7 +13,7 @@ import {
   ensureBranchSynced,
 } from "../helpers/project.js";
 import { memoryId, isoDateString } from "../brands.js";
-import { shouldBlockProtectedBranchCommit } from "../helpers/git-commit.js";
+import { commitVaultWithProtection } from "../helpers/git-commit.js";
 import {
   formatPersistenceSummary,
 } from "../helpers/persistence.js";
@@ -22,6 +22,7 @@ import {
   projectNotFoundResponse,
   storageLabel,
 } from "../helpers/vault.js";
+import { attempt, getErrorMessage } from "../error-utils.js";
 import { invalidateActiveProjectCache } from "../cache.js";
 
 export function registerMoveMemoryTool(server: McpServer, ctx: ServerContext): void {
@@ -39,6 +40,7 @@ export function registerMoveMemoryTool(server: McpServer, ctx: ServerContext): v
         "- You only need to edit the note content; use `update`\n" +
         "- You want to delete the note; use `forget`\n\n" +
         "Returns: moved id, from/to vault labels, project association, persistence status.\n\n" +
+        "Writable attachments: can move notes in writable attached vaults.\n\n" +
         "[mutating: moves note between vaults, may adjust project association, git commits, may push]\n\n" +
         "Typical next step:\n" +
         "- Use `where_is_memory` or `get` to verify the final state.\n" +
@@ -73,8 +75,16 @@ export function registerMoveMemoryTool(server: McpServer, ctx: ServerContext): v
     async ({ id, target, vaultFolder, cwd, allowProtectedBranch = false }) => {
       await ensureBranchSynced(ctx, cwd);
 
-      const found = await ctx.vaultManager.findNote(id, cwd);
+      const found = await ctx.vaultManager.findNote(id, cwd, { mutable: true });
       if (!found) {
+        const foundAny = await ctx.vaultManager.findNote(id, cwd, { mutable: false });
+        if (foundAny) {
+          if (foundAny.vault.writable) {
+            // Should not happen: writable attached vaults appear in mutable search
+            return { content: [{ type: "text", text: `Memory '${id}' is in an attached vault that appears non-writable.` }], isError: true };
+          }
+          return { content: [{ type: "text", text: `Memory '${id}' is in an attached vault and cannot be moved. Attached vaults are read-only.` }], isError: true };
+        }
         return { content: [{ type: "text", text: `No memory found with id '${id}'` }], isError: true };
       }
 
@@ -126,31 +136,6 @@ export function registerMoveMemoryTool(server: McpServer, ctx: ServerContext): v
         return { content: [{ type: "text", text: `Memory '${id}' is already stored in ${targetLabel}.` }], isError: true };
       }
 
-      if (found.vault.isProject || targetVault.isProject) {
-        const resolvedProject = targetProject ?? await resolveProject(ctx, cwd);
-        const projectLabel = resolvedProject
-          ? `${resolvedProject.name} (${resolvedProject.id})`
-          : `${found.note.projectName ?? "project"} (${found.note.project ?? "unknown"})`;
-        const projectId = targetProject?.id ?? found.note.project;
-        const policy = projectId ? await ctx.configStore.getProjectPolicy(projectId) : undefined;
-        const protectedBranchCheck = await shouldBlockProtectedBranchCommit({
-          ctx,
-          cwd,
-          writeScope: "project",
-          automaticCommit: true,
-          projectLabel,
-          policy,
-          allowProtectedBranch,
-          toolName: "move_memory",
-        });
-        if (protectedBranchCheck.blocked) {
-          return {
-            content: [{ type: "text", text: protectedBranchCheck.message ?? "Protected branch policy blocked this commit." }],
-            isError: true,
-          };
-        }
-      }
-
       const targetLabel = storageLabel(targetVault);
       const existing = await targetVault.storage.readNote(memoryId(id));
       if (existing) {
@@ -171,7 +156,12 @@ export function registerMoveMemoryTool(server: McpServer, ctx: ServerContext): v
         };
       }
 
-      const moveResult = await moveNoteBetweenVaults(ctx, found, targetVault, noteToWrite, cwd);
+      const moveAttempt = await attempt("move:between-vaults", () => moveNoteBetweenVaults(ctx, found, targetVault, noteToWrite, cwd, allowProtectedBranch, targetProject?.id));
+      if (!moveAttempt.ok) {
+        const message = getErrorMessage(moveAttempt.error);
+        return { content: [{ type: "text", text: message }], isError: true };
+      }
+      let moveResult = moveAttempt.value;
       const movedNote = moveResult.note;
       const associationValue = movedNote.projectName && movedNote.project
         ? `${movedNote.projectName} (${movedNote.project})`

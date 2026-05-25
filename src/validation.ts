@@ -38,6 +38,7 @@ export const NoteProjectionSchema = z.object({
 const RelationshipSchema = z.object({
   id: z.string(),
   type: z.enum(["related-to", "explains", "example-of", "supersedes", "derives-from", "follows"]),
+  vaultPath: z.string().optional(),
 });
 
 export function validateRelatedTo(value: unknown): Relationship[] | undefined {
@@ -47,7 +48,14 @@ export function validateRelatedTo(value: unknown): Relationship[] | undefined {
   for (const item of value) {
     const result = RelationshipSchema.safeParse(item);
     if (result.success) {
-      validated.push({ id: memoryId(result.data.id), type: result.data.type as Relationship["type"] });
+      const relationship: Relationship = {
+        id: memoryId(result.data.id),
+        type: result.data.type as Relationship["type"],
+      };
+      if (result.data.vaultPath !== undefined) {
+        relationship.vaultPath = result.data.vaultPath;
+      }
+      validated.push(relationship);
     } else {
       console.error(`[validation] Skipping invalid relationship entry: ${JSON.stringify(result.error.issues)}`);
     }

@@ -49,15 +49,15 @@ export function registerDiscoverTagsTool(server: McpServer, ctx: ServerContext):
           .optional()
           .default("all")
           .describe(
-            "'project' = only this project's memories; " +
+            "'project' = this project's memories and attached vault notes; " +
             "'global' = only unscoped memories; " +
             "'all' = everything visible (default)"
           ),
         storedIn: z
-          .enum(["project-vault", "main-vault", "any"])
+          .enum(["project-vault", "main-vault", "any", "attached"])
           .optional()
           .default("any")
-          .describe("Filter by vault storage label like list tool."),
+          .describe("Storage-label filter. Use `main-vault` for main/global storage. Use `project-vault` for any project vault. Use `attached` for notes from attached external repositories only."),
         limit: z.number().int().min(1).max(50).optional(),
       }),
       outputSchema: DiscoverTagsResultSchema,

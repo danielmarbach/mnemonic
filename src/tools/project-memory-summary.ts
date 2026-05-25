@@ -158,7 +158,7 @@ export function registerProjectMemorySummaryTool(server: McpServer, ctx: ServerC
 
       // Separate project-scoped notes (for themes/anchors) from global notes
       const projectEntries = entries.filter(e =>
-        e.note.project === project.id || e.vault.isProject
+        e.note.project === project.id || e.vault.provenance !== "main"
       );
 
       // Empty-project case: no project-scoped notes exist
@@ -166,7 +166,7 @@ export function registerProjectMemorySummaryTool(server: McpServer, ctx: ServerC
         const structuredContent: ProjectSummaryResult = {
           action: "project_summary_shown",
           project: { id: project.id, name: project.name },
-          notes: { total: 0, projectVault: 0, mainVault: 0, privateProject: 0 },
+          notes: { total: 0, projectVault: 0, attachedVault: 0, mainVault: 0, privateProject: 0 },
           themes: {},
           recent: [],
           anchors: [],
@@ -246,8 +246,9 @@ export function registerProjectMemorySummaryTool(server: McpServer, ctx: ServerC
       }
 
       // Calculate notes distribution (project-scoped only)
-      const projectVaultCount = projectEntries.filter(e => e.vault.isProject).length;
-      const mainVaultProjectEntries = projectEntries.filter(e => !e.vault.isProject);
+      const projectVaultCount = projectEntries.filter(e => e.vault.provenance === "project-local").length;
+      const attachedVaultCount = projectEntries.filter(e => e.vault.provenance === "project-attached").length;
+      const mainVaultProjectEntries = projectEntries.filter(e => e.vault.provenance === "main");
       const mainVaultCount = mainVaultProjectEntries.length;
       const totalProjectNotes = projectEntries.length;
 
@@ -256,7 +257,7 @@ export function registerProjectMemorySummaryTool(server: McpServer, ctx: ServerC
       sections.push(`Project summary: **${project.name}**`);
       sections.push(`- id: \`${project.id}\``);
       sections.push(`- ${policyLine.replace(/^Policy:\s*/, "policy: ")}`);
-      sections.push(`- memories: ${totalProjectNotes} (project-vault: ${projectVaultCount}, main-vault: ${mainVaultCount})`);
+      sections.push(`- memories: ${totalProjectNotes} (project-vault: ${projectVaultCount}, main-vault: ${mainVaultCount}${attachedVaultCount > 0 ? `, attached: ${attachedVaultCount}` : ""})`);
       if (mainVaultProjectEntries.length > 0) {
         sections.push(`- private project memories: ${mainVaultProjectEntries.length}`);
       }
@@ -396,7 +397,7 @@ export function registerProjectMemorySummaryTool(server: McpServer, ctx: ServerC
       if (includeRelatedGlobal) {
         const anchorEmbeddings = await Promise.all(
           anchors.slice(0, 5).map(async a => {
-            for (const vault of ctx.vaultManager.allKnownVaults()) {
+            for (const vault of ctx.vaultManager.allKnownVaults(project.id)) {
               const emb = await vault.storage.readEmbedding(memoryId(a.id));
               if (emb) return { id: a.id, embedding: emb.embedding };
             }
@@ -481,7 +482,7 @@ export function registerProjectMemorySummaryTool(server: McpServer, ctx: ServerC
         if (!note) return {};
         const relationships = await getRelationshipPreview(
           note,
-          ctx.vaultManager.allKnownVaults(),
+          ctx.vaultManager.allKnownVaults(project.id),
           { activeProjectId: project.id, limit: 3 }
         );
         return { relationships };
@@ -531,10 +532,10 @@ export function registerProjectMemorySummaryTool(server: McpServer, ctx: ServerC
         }
         const preview = await getRelationshipPreview(
           fallbackNote,
-          ctx.vaultManager.allKnownVaults(),
-          { activeProjectId: project.id, limit: 3 }
-        );
-        if (preview) fallbackRelationships = { relationships: preview };
+           ctx.vaultManager.allKnownVaults(project.id),
+           { activeProjectId: project.id, limit: 3 }
+         );
+         if (preview) fallbackRelationships = { relationships: preview };
       }
 
       const orientation: ProjectSummaryResult["orientation"] = {
@@ -630,6 +631,7 @@ export function registerProjectMemorySummaryTool(server: McpServer, ctx: ServerC
         notes: {
           total: totalProjectNotes,
           projectVault: projectVaultCount,
+          attachedVault: attachedVaultCount,
           mainVault: mainVaultCount,
           privateProject: mainVaultProjectEntries.length,
         },

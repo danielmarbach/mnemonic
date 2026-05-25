@@ -1,6 +1,10 @@
 import { getCurrentGitBranch } from "../project.js";
 import { isProtectedBranch, resolveProtectedBranchBehavior, resolveProtectedBranchPatterns, type WriteScope, type ProjectMemoryPolicy } from "../project-memory-policy.js";
 import type { ServerContext } from "../server-context.js";
+import type { Vault } from "../vault.js";
+import type { CommitResult } from "../git.js";
+import path from "node:path";
+import { expandHomePath } from "../paths.js";
 
 
 export function extractSummary(content: string, maxLength = 100): string {
@@ -176,8 +180,8 @@ export async function shouldBlockProtectedBranchCommit(options: {
 
 export async function wouldRelationshipCleanupTouchProjectVault(ctx: ServerContext, noteIds: string[]): Promise<boolean> {
   const noteIdSet = new Set(noteIds);
-  for (const vault of ctx.vaultManager.allKnownVaults()) {
-    if (!vault.isProject) {
+  for (const vault of ctx.vaultManager.allKnownVaultsMutable()) {
+    if (vault.provenance !== "project-local") {
       continue;
     }
 
@@ -190,4 +194,115 @@ export async function wouldRelationshipCleanupTouchProjectVault(ctx: ServerConte
   }
 
   return false;
+}
+
+export async function commitVaultWithProtection(options: {
+  ctx: ServerContext;
+  vault: Vault;
+  commitMessage: string;
+  files: string[];
+  commitBody?: string;
+  allowProtectedBranch: boolean;
+  toolName: string;
+  noteProjectId?: string;
+}): Promise<CommitResult> {
+  const { ctx, vault, commitMessage, files, commitBody, allowProtectedBranch, toolName, noteProjectId } = options;
+
+  if (!vault.writable) {
+    return { status: "failed", reason: "error", error: "Vault is read-only." };
+  }
+
+  if (vault.provenance === "main") {
+    return vault.git.commitWithStatus(commitMessage, files, commitBody);
+  }
+
+  const vaultPath = vault.storage.vaultPath;
+
+  const vaultCwd = vault.provenance === "project-local"
+    ? path.resolve(vaultPath, "..")
+    : vault.attachmentRef
+      ? expandHomePath(vault.attachmentRef.localPath)
+      : vaultPath;
+
+  const projectId = vault.provenance === "project-local"
+    ? noteProjectId
+    : vault.attachmentRef?.projectSlug;
+
+  const policy = projectId ? await ctx.configStore.getProjectPolicy(projectId) : undefined;
+
+  const projectLabel = vault.provenance === "project-attached" && vault.attachmentRef
+    ? `${vault.attachmentRef.projectName} (${vault.attachmentRef.projectSlug})`
+    : "this context";
+
+  const skipCheck = !policy && vault.provenance === "project-attached";
+  if (!skipCheck) {
+    const protectedBranchCheck = await shouldBlockProtectedBranchCommit({
+      ctx,
+      cwd: vaultCwd,
+      writeScope: "project",
+      automaticCommit: true,
+      projectLabel,
+      policy,
+      allowProtectedBranch,
+      toolName,
+    });
+
+    if (protectedBranchCheck.blocked) {
+      return { status: "failed", reason: "error", error: protectedBranchCheck.message ?? "Protected branch policy blocked this commit." };
+    }
+  }
+
+  return vault.git.commitWithStatus(commitMessage, files, commitBody);
+}
+
+export async function checkVaultProtectedBranch(options: {
+  ctx: ServerContext;
+  vault: Vault;
+  allowProtectedBranch: boolean;
+  toolName: string;
+  noteProjectId?: string;
+}): Promise<{ blocked: boolean; message?: string }> {
+  const { ctx, vault, allowProtectedBranch, toolName, noteProjectId } = options;
+
+  if (!vault.writable || vault.provenance === "main") {
+    return { blocked: false };
+  }
+
+  const vaultPath = vault.storage.vaultPath;
+
+  const vaultCwd = vault.provenance === "project-local"
+    ? path.resolve(vaultPath, "..")
+    : vault.attachmentRef
+      ? expandHomePath(vault.attachmentRef.localPath)
+      : undefined;
+
+  if (!vaultCwd) {
+    return { blocked: false };
+  }
+
+  const projectId = vault.provenance === "project-local"
+    ? noteProjectId
+    : vault.attachmentRef?.projectSlug;
+
+  const policy = projectId ? await ctx.configStore.getProjectPolicy(projectId) : undefined;
+
+  const projectLabel = vault.provenance === "project-attached" && vault.attachmentRef
+    ? `${vault.attachmentRef.projectName} (${vault.attachmentRef.projectSlug})`
+    : "this context";
+
+  const skipCheck = !policy && vault.provenance === "project-attached";
+  if (skipCheck) {
+    return { blocked: false };
+  }
+
+  return shouldBlockProtectedBranchCommit({
+    ctx,
+    cwd: vaultCwd,
+    writeScope: "project",
+    automaticCommit: true,
+    projectLabel,
+    policy,
+    allowProtectedBranch,
+    toolName,
+  });
 }

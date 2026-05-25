@@ -38,7 +38,7 @@ export function registerRecentMemoriesTool(server: McpServer, ctx: ServerContext
       inputSchema: z.object({
         cwd: projectParam,
         scope: z.enum(["project", "global", "all"]).optional().default("all"),
-        storedIn: z.enum(["project-vault", "main-vault", "any"]).optional().default("any"),
+        storedIn: z.enum(["project-vault", "main-vault", "any", "attached"]).optional().default("any").describe("Filter by vault storage label like list tool."),
         limit: z.number().int().min(1).max(20).optional().default(5),
         includePreview: z.boolean().optional().default(true),
         includeStorage: z.boolean().optional().default(true),

@@ -50,7 +50,7 @@ export type CommitResult =
 
 export type PushResult =
   | { status: "pushed" }
-  | { status: "skipped"; reason: "git-disabled" | "no-remote" | "auto-push-disabled" | "commit-failed" }
+  | { status: "skipped"; reason: "git-disabled" | "no-remote" | "auto-push-disabled" | "commit-failed" | "read-only-vault" }
   | { status: "failed"; error: string };
 
 export class GitOps {
@@ -308,6 +308,24 @@ export class GitOps {
       } catch (err) {
         const message = getErrorMessage(err);
         console.error(`[git] Push failed: ${message}`);
+        return { status: "failed", error: message };
+      }
+    });
+  }
+
+  /** Push to a specific branch. Used for writable attached vaults with pushBranch configured. */
+  async pushBranch(branch: string): Promise<PushResult> {
+    if (!this.enabled) return { status: "skipped", reason: "git-disabled" };
+    return this.withMutationLock(async () => {
+      try {
+        const remotes = await this.git.getRemotes();
+        if (remotes.length === 0) return { status: "skipped", reason: "no-remote" };
+        await this.retryLockErrors("push", () => this.git.push(["--set-upstream", "origin", branch]));
+        console.error(`[git] Pushed to ${branch}`);
+        return { status: "pushed" };
+      } catch (err) {
+        const message = getErrorMessage(err);
+        console.error(`[git] Push to ${branch} failed: ${message}`);
         return { status: "failed", error: message };
       }
     });

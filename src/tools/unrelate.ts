@@ -1,15 +1,17 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ServerContext } from "../server-context.js";
-import { projectParam, ensureBranchSynced } from "../helpers/project.js";
+import { projectParam, ensureBranchSynced, resolveProject } from "../helpers/project.js";
 import { isoDateString } from "../brands.js";
+import { attachedVaultErrorMessage, ensureAttachmentsLoaded } from "../helpers/vault.js";
 import type { Vault } from "../vault.js";
+import type { Relationship } from "../storage.js";
 import {
   RelateResultSchema,
   type RelateResult,
   type MutationRetryContract,
 } from "../structured-content.js";
-import { formatCommitBody } from "../helpers/git-commit.js";
+import { formatCommitBody, commitVaultWithProtection, checkVaultProtectedBranch } from "../helpers/git-commit.js";
 import {
   buildMutationRetryContract,
   formatRetrySummary,
@@ -31,6 +33,7 @@ export function registerUnrelateTool(server: McpServer, ctx: ServerContext): voi
         "Do not use this when:\n" +
         "- You are adding a new connection; use `relate`\n\n" +
         "Returns: both ids, removed relationship details.\n\n" +
+        "Writable attachments: can unrelate notes in writable attached vaults.\n\n" +
         "[mutating: modifies both notes, git commits, may push]\n\n" +
         "Typical next step:\n" +
         "- Use `get` to verify both notes now stand on their own.",
@@ -50,14 +53,45 @@ export function registerUnrelateTool(server: McpServer, ctx: ServerContext): voi
     },
     async ({ fromId, toId, bidirectional, cwd }) => {
       await ensureBranchSynced(ctx, cwd);
+      const project = await resolveProject(ctx, cwd);
+      const projectId = project?.id;
+      if (projectId) await ensureAttachmentsLoaded(ctx, projectId);
 
       const [foundFrom, foundTo] = await Promise.all([
-        ctx.vaultManager.findNote(fromId, cwd),
-        ctx.vaultManager.findNote(toId, cwd),
+        ctx.vaultManager.findNote(fromId, cwd, { mutable: true, projectId }),
+        ctx.vaultManager.findNote(toId, cwd, { mutable: true, projectId }),
       ]);
+
+      if (!foundFrom && !foundTo) {
+        const [foundFromAny, foundToAny] = await Promise.all([
+          ctx.vaultManager.findNote(fromId, cwd, { mutable: false, projectId }),
+          ctx.vaultManager.findNote(toId, cwd, { mutable: false, projectId }),
+        ]);
+        if (foundFromAny && foundFromAny.vault.provenance === "project-attached") {
+          return { content: [{ type: "text", text: attachedVaultErrorMessage(fromId, foundFromAny.vault) }], isError: true };
+        }
+        if (foundToAny && foundToAny.vault.provenance === "project-attached") {
+          return { content: [{ type: "text", text: attachedVaultErrorMessage(toId, foundToAny.vault) }], isError: true };
+        }
+      }
 
       const now = isoDateString(new Date().toISOString());
       const vaultChanges = new Map<Vault, string[]>();
+
+      // Pre-check branch protection before mutating any vaults
+      const mutableVaults = new Set<Vault>();
+      if (foundFrom) mutableVaults.add(foundFrom.vault);
+      if (bidirectional && foundTo) mutableVaults.add(foundTo.vault);
+      const preChecks = await Promise.all(
+        Array.from(mutableVaults).map(vault =>
+          checkVaultProtectedBranch({ ctx, vault, allowProtectedBranch: false, toolName: "unrelate", noteProjectId: vault === foundFrom?.vault ? foundFrom.note.project ?? undefined : foundTo?.note.project ?? undefined })
+        )
+      );
+      for (const check of preChecks) {
+        if (check.blocked) {
+          return { content: [{ type: "text", text: check.message ?? "Protected branch policy blocked this commit." }], isError: true };
+        }
+      }
 
       if (foundFrom) {
         const { note: fromNote, vault: fromVault } = foundFrom;
@@ -108,7 +142,15 @@ export function registerUnrelateTool(server: McpServer, ctx: ServerContext): voi
                 })
               : undefined;
             const commitMessage = `unrelate: ${fromId} ↔ ${toId}`;
-            const commitStatus = await vault.git.commitWithStatus(commitMessage, pendingFiles, commitBody);
+            const commitStatus = await commitVaultWithProtection({
+              ctx,
+              vault,
+              commitMessage,
+              files: pendingFiles,
+              commitBody,
+              allowProtectedBranch: false,
+              toolName: "unrelate",
+            });
             
             if (commitStatus.status === "committed") {
               await pushAfterMutation(ctx, vault);
@@ -160,7 +202,15 @@ export function registerUnrelateTool(server: McpServer, ctx: ServerContext): voi
             })
           : undefined;
         const commitMessage = `unrelate: ${fromId} ↔ ${toId}`;
-        const commitStatus = await vault.git.commitWithStatus(commitMessage, files, commitBody);
+        const commitStatus = await commitVaultWithProtection({
+          ctx,
+          vault,
+          commitMessage,
+          files,
+          commitBody,
+          allowProtectedBranch: false,
+          toolName: "unrelate",
+        });
         if (!retry) {
           retry = buildMutationRetryContract({
             commit: commitStatus,

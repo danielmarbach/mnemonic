@@ -27,6 +27,23 @@ export function expandHomePath(rawPath: string, env: PathEnv = process.env): str
   return rawPath;
 }
 
+export function collapseHomePath(absPath: string, env: PathEnv = process.env): string {
+  const home = homeDirectory(env);
+  if (!home) {
+    return absPath;
+  }
+
+  if (absPath === home) {
+    return "~";
+  }
+
+  if (absPath.startsWith(home + path.sep)) {
+    return path.join("~", absPath.slice(home.length + 1));
+  }
+
+  return absPath;
+}
+
 export function resolveUserPath(rawPath: string, env: PathEnv = process.env): string {
   return path.resolve(expandHomePath(rawPath, env));
 }

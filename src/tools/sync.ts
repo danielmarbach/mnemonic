@@ -1,4 +1,6 @@
 import { z } from "zod";
+import path from "path";
+import { simpleGit } from "simple-git";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ServerContext } from "../server-context.js";
 import {
@@ -7,12 +9,14 @@ import {
 } from "../structured-content.js";
 import type { SyncResult } from "../git.js";
 import type { FailedEmbedding } from "../helpers/embed.js";
-import { projectParam } from "../helpers/project.js";
+import { projectParam, resolveProject as resolveProjectFromModule } from "../helpers/project.js";
 import { invalidateActiveProjectCache } from "../cache.js";
 import {
   backfillEmbeddingsAfterSync,
   removeStaleEmbeddings,
 } from "../helpers/embed.js";
+import { attempt, getErrorMessage } from "../error-utils.js";
+import { expandHomePath } from "../paths.js";
 
 function formatSyncResult(result: SyncResult, label: string, vaultPath?: string): string[] {
   if (!result.hasRemote) return [`${label}: no remote configured — git sync skipped.`];
@@ -128,6 +132,65 @@ export function registerSyncTool(server: McpServer, ctx: ServerContext): void {
           });
         } else {
           lines.push("project vault: no .mnemonic/ found — skipped.");
+        }
+      }
+
+      // Sync attached vaults: git fetch in attached repos + staleness check
+      if (cwd) {
+        const project = await resolveProjectFromModule(ctx, cwd);
+        if (project) {
+          const attachmentConfigs = await ctx.configStore.getProjectAttachments(project.id);
+          const enabledAttachments = attachmentConfigs.filter(a => a.enabled && a.branch);
+          for (const attConfig of enabledAttachments) {
+            const label = `attached:${attConfig.projectSlug}`;
+            const resolvedLocalPath = path.resolve(expandHomePath(attConfig.localPath));
+            const fetchResult = await attempt("sync:attachment-fetch", async () => {
+              const git = simpleGit(resolvedLocalPath);
+              await git.fetch("origin");
+              const newTipResult = await git.raw(["rev-parse", attConfig.branch]).catch(() => null);
+              const newTip = newTipResult?.trim() ?? "";
+              return newTip;
+            });
+            if (!fetchResult.ok) {
+              lines.push(`${label}: fetch failed — ${getErrorMessage(fetchResult.error)}`);
+              continue;
+            }
+            const newTip = fetchResult.value;
+            if (newTip && newTip !== attConfig.branchTipHash) {
+                const updatedConfigs = attachmentConfigs.map(a =>
+                  a.projectSlug === attConfig.projectSlug
+                    ? { ...a, branchTipHash: newTip, updatedAt: new Date().toISOString() }
+                    : a
+                );
+                await ctx.configStore.setProjectAttachments(project.id, updatedConfigs);
+                ctx.vaultManager.clearAttachmentCaches();
+                ctx.vaultManager.setAttachmentConfigs(project.id, updatedConfigs);
+                const loadedVaults = await ctx.vaultManager.loadAttachmentsForProject(project.id);
+               const staleVault = loadedVaults.find(v => v.attachmentRef?.projectSlug === attConfig.projectSlug);
+               if (staleVault) {
+                 const currentIds = new Set((await staleVault.storage.listNoteIds()).map(id => id as string));
+                 const allEmbeddings = await staleVault.storage.listEmbeddings();
+                 const staleIds = allEmbeddings
+                   .filter(e => !currentIds.has(e.id as string))
+                   .map(e => e.id as string);
+                 if (staleIds.length > 0) {
+                   await removeStaleEmbeddings(staleVault.storage, staleIds);
+                   lines.push(`${label}: removed ${staleIds.length} stale embedding(s).`);
+                 }
+               }
+              lines.push(`${label}: branch tip changed (${attConfig.branchTipHash.substring(0, 8)} → ${newTip.substring(0, 8)}), cache invalidated.`);
+              attConfig.branchTipHash = newTip;
+            } else if (newTip) {
+              lines.push(`${label}: no changes on branch '${attConfig.branch}'.`);
+            } else {
+              lines.push(`${label}: could not resolve branch '${attConfig.branch}'.`);
+            }
+          }
+          if (enabledAttachments.length === 0 && attachmentConfigs.length > 0) {
+            lines.push("attached vaults: all attachments disabled or using working-tree mode — skipped fetch.");
+          } else if (attachmentConfigs.length === 0) {
+            lines.push("attached vaults: none configured — skipped.");
+          }
         }
       }
 

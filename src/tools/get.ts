@@ -66,7 +66,7 @@ export function registerGetTool(server: McpServer, ctx: ServerContext): void {
         // Check session cache before hitting storage
         let result: { note: Note; vault: Vault } | null = null;
         if (project) {
-          for (const vault of ctx.vaultManager.allKnownVaults()) {
+          for (const vault of ctx.vaultManager.allKnownVaults(project.id)) {
             const cached = getSessionCachedNote(project.id, vault.storage.vaultPath, id);
             if (cached !== undefined) {
               result = { note: cached, vault };
@@ -75,7 +75,7 @@ export function registerGetTool(server: McpServer, ctx: ServerContext): void {
           }
         }
         if (!result) {
-          result = await ctx.vaultManager.findNote(id, cwd);
+          result = await ctx.vaultManager.findNote(id, cwd, { projectId: project?.id });
         }
         if (!result) {
           notFound.push(id);
@@ -87,7 +87,7 @@ export function registerGetTool(server: McpServer, ctx: ServerContext): void {
         if (includeRelationships) {
           relationships = await getRelationshipPreview(
             note,
-            ctx.vaultManager.allKnownVaults(),
+            ctx.vaultManager.allKnownVaults(project?.id),
             { activeProjectId: project?.id, limit: 3 }
           );
         }

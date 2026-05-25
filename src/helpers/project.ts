@@ -1,4 +1,6 @@
 import { z } from "zod";
+import path from "path";
+import { simpleGit } from "simple-git";
 import { detectProject, resolveProjectIdentity, type ProjectIdentityResolution } from "../project.js";
 import type { ServerContext } from "../server-context.js";
 import type { ProjectRef } from "../structured-content.js";
@@ -6,7 +8,9 @@ import type { Vault } from "../vault.js";
 import type { WriteScope } from "../project-memory-policy.js";
 import { invalidateActiveProjectCache } from "../cache.js";
 import { checkBranchChange } from "../branch-tracker.js";
-import { backfillEmbeddingsAfterSync } from "./embed.js";
+import { backfillEmbeddingsAfterSync, removeStaleEmbeddings } from "./embed.js";
+import { expandHomePath } from "../paths.js";
+import { attempt as attemptFn, getErrorMessage } from "../error-utils.js";
 
 export const projectParam = z
   .string()
@@ -86,7 +90,60 @@ export async function ensureBranchSynced(ctx: ServerContext, cwd?: string): Prom
       : Promise.resolve(undefined),
   ]);
 
+  const project = await resolveProject(ctx, cwd);
+  if (project) {
+    await syncAttachedVaultsOnBranchChange(ctx, project.id);
+  }
+
   invalidateActiveProjectCache();
 
   return true;
+}
+
+async function syncAttachedVaultsOnBranchChange(ctx: ServerContext, projectId: string): Promise<void> {
+  const attachmentConfigs = await ctx.configStore.getProjectAttachments(projectId);
+  const enabledAttachments = attachmentConfigs.filter(a => a.enabled && a.branch);
+  if (enabledAttachments.length === 0) return;
+
+  for (const attConfig of enabledAttachments) {
+    const label = `attached:${attConfig.projectSlug}`;
+    const resolvedLocalPath = path.resolve(expandHomePath(attConfig.localPath));
+    const fetchResult = await attemptFn("branch-sync:attachment-fetch", async () => {
+      const git = simpleGit(resolvedLocalPath);
+      await git.fetch("origin");
+      const newTipResult = await git.raw(["rev-parse", attConfig.branch]).catch(() => null);
+      return newTipResult?.trim() ?? "";
+    });
+
+    if (!fetchResult.ok) {
+      console.error(`[branch] ${label}: fetch failed — ${getErrorMessage(fetchResult.error)}`);
+      continue;
+    }
+
+    const newTip = fetchResult.value;
+    if (newTip && newTip !== attConfig.branchTipHash) {
+      const updatedConfigs = attachmentConfigs.map(a =>
+        a.projectSlug === attConfig.projectSlug
+          ? { ...a, branchTipHash: newTip, updatedAt: new Date().toISOString() }
+          : a
+      );
+      await ctx.configStore.setProjectAttachments(projectId, updatedConfigs);
+      ctx.vaultManager.clearAttachmentCaches();
+      ctx.vaultManager.setAttachmentConfigs(projectId, updatedConfigs);
+      const loadedVaults = await ctx.vaultManager.loadAttachmentsForProject(projectId);
+      const staleVault = loadedVaults.find(v => v.attachmentRef?.projectSlug === attConfig.projectSlug);
+      if (staleVault) {
+        const currentIds = new Set((await staleVault.storage.listNoteIds()).map(id => id as string));
+        const allEmbeddings = await staleVault.storage.listEmbeddings();
+        const staleIds = allEmbeddings
+          .filter(e => !currentIds.has(e.id as string))
+          .map(e => e.id as string);
+        if (staleIds.length > 0) {
+          await removeStaleEmbeddings(staleVault.storage, staleIds);
+          console.error(`[branch] ${label}: removed ${staleIds.length} stale embedding(s).`);
+        }
+      }
+      console.error(`[branch] ${label}: branch tip changed (${attConfig.branchTipHash.substring(0, 8)} → ${newTip.substring(0, 8)}), cache invalidated.`);
+    }
+  }
 }

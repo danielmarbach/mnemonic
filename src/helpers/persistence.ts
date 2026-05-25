@@ -1,3 +1,4 @@
+import type { NoteStorage } from "../storage.js";
 import type { CommitResult, PushResult } from "../git.js";
 import type { MutationPushMode } from "../config.js";
 import type { PersistenceStatus, MutationRetryContract } from "../structured-content.js";
@@ -7,6 +8,12 @@ import { currentEmbeddingIdentity } from "../embeddings.js";
 import { memoryId } from "../brands.js";
 import { storageLabel } from "./vault.js";
 import { UnknownRecoveryKindError, UnknownMutationPushModeError } from "../domain-errors.js";
+import { AttachedStorage } from "../attached-storage.js";
+import { simpleGit } from "simple-git";
+import { debugLog, attempt } from "../error-utils.js";
+import { expandHomePath } from "../paths.js";
+import { detectProject } from "../project.js";
+import path from "node:path";
 
 export function resolveDurability(commit: CommitResult, push: PushResult): PersistenceStatus["durability"] {
   if (push.status === "pushed") {
@@ -21,7 +28,7 @@ export function resolveDurability(commit: CommitResult, push: PushResult): Persi
 }
 
 export function buildPersistenceStatus(args: {
-  storage: import("../storage.js").Storage;
+  storage: NoteStorage;
   id: string;
   embedding: { status: "written" | "skipped"; reason?: string };
   commit: CommitResult;
@@ -203,20 +210,82 @@ export async function getMutationPushMode(ctx: ServerContext): Promise<MutationP
 }
 
 export async function pushAfterMutation(ctx: ServerContext, vault: Vault): Promise<PushResult> {
+  if (!vault.writable) {
+    return { status: "skipped" as const, reason: "read-only-vault" as const };
+  }
+
+  if (vault.storage instanceof AttachedStorage) {
+    vault.storage.invalidateCache();
+  }
+
   const mutationPushMode = await getMutationPushMode(ctx);
 
+  let pushResult: PushResult;
   switch (mutationPushMode) {
     case "all":
-      return vault.git.pushWithStatus();
+      pushResult = await doPush(vault);
+      break;
     case "main-only":
-      return vault.isProject
+      if (vault.provenance === "project-attached") {
+        return { status: "skipped" as const, reason: "auto-push-disabled" as const };
+      }
+      pushResult = vault.provenance === "project-local"
         ? { status: "skipped" as const, reason: "auto-push-disabled" as const }
-        : vault.git.pushWithStatus();
+        : await doPush(vault);
+      break;
     case "none":
       return { status: "skipped" as const, reason: "auto-push-disabled" as const };
     default: {
       const _exhaustive: never = mutationPushMode;
       throw new UnknownMutationPushModeError(_exhaustive);
     }
+  }
+
+  if (pushResult.status === "pushed" && vault.provenance === "project-attached" && vault.attachmentRef) {
+    await updateAttachedBranchTipHash(ctx, vault);
+  }
+
+  return pushResult;
+}
+
+async function doPush(vault: Vault): Promise<PushResult> {
+  const pushBranch = vault.attachmentRef?.pushBranch;
+  if (pushBranch && pushBranch.length > 0) {
+    return vault.git.pushBranch(pushBranch);
+  }
+  return vault.git.pushWithStatus();
+}
+
+async function updateAttachedBranchTipHash(ctx: ServerContext, vault: Vault): Promise<void> {
+  if (!vault.attachmentRef) return;
+  const ref = vault.attachmentRef;
+  const resolvedLocalPath = path.resolve(expandHomePath(ref.localPath));
+  const branch = ref.pushBranch || ref.branch;
+  if (!branch) return;
+
+  const result = await attempt("persistence:branch-tip", async () => {
+    const git = simpleGit(resolvedLocalPath);
+    const newTipResult = await git.raw(["rev-parse", branch]);
+    const newTip = newTipResult?.trim() ?? "";
+    if (!newTip || newTip === ref.branchTipHash) return null;
+
+    const project = await detectProject(resolvedLocalPath, {
+      getProjectIdentityOverride: async (projectId) => ctx.configStore.getProjectIdentityOverride(projectId),
+    });
+    if (!project) return null;
+
+    const configs = await ctx.configStore.getProjectAttachments(project.id);
+    const updatedConfigs = configs.map(a =>
+      a.projectSlug === ref.projectSlug
+        ? { ...a, branchTipHash: newTip, updatedAt: new Date().toISOString() }
+        : a
+    );
+    await ctx.configStore.setProjectAttachments(project.id, updatedConfigs);
+    return newTip;
+  });
+
+  if (result.ok && result.value) {
+    ref.branchTipHash = result.value;
+    debugLog("persistence:branch-tip", `${ref.projectSlug}: updated to ${result.value.substring(0, 8)}`);
   }
 }
