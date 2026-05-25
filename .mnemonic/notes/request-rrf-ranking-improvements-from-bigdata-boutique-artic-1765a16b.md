@@ -5,11 +5,14 @@ tags:
   - request
 lifecycle: temporary
 createdAt: '2026-05-25T14:05:42.422Z'
-updatedAt: '2026-05-25T14:05:42.422Z'
+updatedAt: '2026-05-25T14:06:19.207Z'
 role: context
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: research-rrf-ranking-improvements-article-analysis-vs-curren-3b8585ab
+    type: derives-from
 memoryVersion: 1
 ---
 ## Request: RRF Ranking Improvements from BigData Boutique Article Analysis
