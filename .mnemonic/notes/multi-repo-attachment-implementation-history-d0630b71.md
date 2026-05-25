@@ -8,7 +8,7 @@ tags:
   - phase3
 lifecycle: permanent
 createdAt: '2026-05-25T17:21:07.693Z'
-updatedAt: '2026-05-25T17:21:07.693Z'
+updatedAt: '2026-05-25T17:24:09.244Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
@@ -18,6 +18,8 @@ relatedTo:
     type: derives-from
   - id: multi-repo-attachment-phase-3-request-root-58d643a2
     type: derives-from
+  - id: multi-repository-attachment-research-and-known-gaps-88d9e57e
+    type: supersedes
 memoryVersion: 1
 ---
 Consolidate phase-specific multi-repo attachment notes into one chronological implementation history while preserving unique evidence and source lineage.

@@ -8,9 +8,12 @@ tags:
   - phase3
 lifecycle: permanent
 createdAt: '2026-05-25T17:21:23.812Z'
-updatedAt: '2026-05-25T17:21:23.812Z'
+updatedAt: '2026-05-25T17:24:09.244Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: multi-repository-attachment-research-and-known-gaps-88d9e57e
+    type: supersedes
 memoryVersion: 1
 ---
 Consolidate Phase 2 and Phase 3 review notes while preserving separate verdicts, constraint evidence, and follow-up gaps.

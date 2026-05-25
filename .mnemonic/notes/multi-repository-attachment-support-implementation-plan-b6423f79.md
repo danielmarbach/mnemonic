@@ -6,7 +6,7 @@ tags:
   - attachments
 lifecycle: temporary
 createdAt: '2026-05-22T19:04:08.973Z'
-updatedAt: '2026-05-23T21:43:21.122Z'
+updatedAt: '2026-05-25T17:24:09.244Z'
 role: plan
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -20,6 +20,8 @@ relatedTo:
     type: follows
   - id: apply-phase-2-remaining-integration-tests-staleness-auto-syn-9cd530e6
     type: follows
+  - id: multi-repository-attachment-research-and-known-gaps-88d9e57e
+    type: supersedes
 memoryVersion: 1
 ---
 # Multi-repository attachment support — implementation plan
