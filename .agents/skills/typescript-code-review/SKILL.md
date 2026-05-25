@@ -68,13 +68,12 @@ Search for these issues in order of severity:
 
 1. **`any` usage** — Replace with `unknown` + type guards or proper interfaces. Every `any` makes invalid states representable.
 2. **Unsafe type assertions** — `as X` bypasses the type system. Prefer type guards, `satisfies`, or narrowing.
-3. **Missing return types** — Explicit return types catch errors at function boundaries.
-4. **Improper null handling** — Use `?.` and `??` instead of manual checks. Check array index access with `noUncheckedIndexedAccess`.
-5. **Unnarrowed unions** — Discriminated unions need a `type` field for reliable narrowing. See [references/common-antipatterns.md](references/common-antipatterns.md).
-
-6. **Runtime/runtime type sync** — Are type definitions and runtime values defined separately? Use `as const` + `typeof X[number]` to derive types from a single runtime source, or Zod schemas with `z.infer<>` as the single source of truth.
-
-7. **Missing runtime validation at trust boundaries** — External data (API responses, form input, env vars) needs runtime validation. Define schemas once with Zod and infer types: `type User = z.infer<typeof UserSchema>`. Use `parse` at trust boundaries (throws on invalid) and `safeParse` for user input (expected failures).
+3. **Type predicates over `filter(Boolean)`** — Replace `.filter(Boolean) as X[]` with `.filter((n): n is X => condition)` to preserve narrowing without a manual cast.
+4. **Missing return types** — Explicit return types catch errors at function boundaries.
+5. **Improper null handling** — Use `?.` and `??` instead of manual checks. Check array index access with `noUncheckedIndexedAccess`.
+6. **Unnarrowed unions** — Discriminated unions need a `type` field for reliable narrowing. See [references/common-antipatterns.md](references/common-antipatterns.md).
+7. **Runtime/runtime type sync** — Are type definitions and runtime values defined separately? Use `as const` + `typeof X[number]` to derive types from a single runtime source, or Zod schemas with `z.infer<>` as the single source of truth.
+8. **Missing runtime validation at trust boundaries** — External data (API responses, form input, env vars) needs runtime validation. Define schemas once with Zod and infer types: `type User = z.infer<typeof UserSchema>`. Use `parse` at trust boundaries (throws on invalid) and `safeParse` for user input (expected failures).
 
 ### Step 4: Security Review
 
