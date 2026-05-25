@@ -7,11 +7,14 @@ tags:
   - phase3
 lifecycle: temporary
 createdAt: '2026-05-24T13:11:15.074Z'
-updatedAt: '2026-05-24T13:11:15.074Z'
+updatedAt: '2026-05-25T17:21:23.812Z'
 role: review
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: multi-repo-attachment-reviews-a41b210a
+    type: supersedes
 memoryVersion: 1
 ---
 # Review: Multi-repo attachment Phase 3
