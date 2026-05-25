@@ -320,6 +320,30 @@ describe("semantic-patch", () => {
     expect(result.lintWarnings).toEqual([]);
   });
 
+  it("replaces an entire section with replaceSection", async () => {
+    const note = "# Note\n\n## A\n\nOld A.\n\n### Child\n\nNested old.\n\n## B\n\nKeep B.\n";
+    const patches: SemanticPatch[] = [
+      { selector: { section: "A" }, operation: { op: "replaceSection", value: "## A\n\nNew A." } },
+    ];
+    const result = await applySemanticPatches(note, patches);
+    expect(result.content).toBe("# Note\n\n## A\n\nNew A.\n\n## B\n\nKeep B.");
+    expect(result.lintWarnings).toEqual([]);
+  });
+
+  it("rejects replaceSection without a section selector", async () => {
+    const patches: SemanticPatch[] = [
+      { selector: { heading: "Details" }, operation: { op: "replaceSection", value: "## Details\n\nNew." } },
+    ];
+    await expect(applySemanticPatches(sampleNote, patches)).rejects.toThrow("replaceSection requires a section selector");
+  });
+
+  it("rejects heading replace that looks like a section replacement", async () => {
+    const patches: SemanticPatch[] = [
+      { selector: { heading: "Details" }, operation: { op: "replace", value: "## Details\n\nNew details." } },
+    ];
+    await expect(applySemanticPatches(sampleNote, patches)).rejects.toThrow("Heading `replace` only replaces the heading node");
+  });
+
   it("fails on ambiguous headingStartsWith match (returns first match)", async () => {
     const note = "# Alpha\n\n## Alphabeta\n\nA.\n";
     const patches: SemanticPatch[] = [
