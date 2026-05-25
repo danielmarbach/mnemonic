@@ -7,7 +7,7 @@ tags:
   - ranking
 lifecycle: temporary
 createdAt: '2026-05-25T16:05:13.044Z'
-updatedAt: '2026-05-25T16:05:21.293Z'
+updatedAt: '2026-05-25T16:38:15.818Z'
 role: context
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -40,12 +40,14 @@ Implemented the RRF plan in source and tests.
 - Changed retrieval evidence channel from `graph` to `graph-rank` and now emits it whenever `graphRank !== undefined`.
 - Added `RRF_RANK_WINDOW = 100` and applied rank-window truncation through `assignDenseRanks` for semantic, lexical, and graph channels.
 - Changed lexical rank assignment to require lexical evidence so graph-only candidates do not receive fake lexical contribution.
+- Fixed review blocker: all-ranks-missing hybrid fallback now keeps canonical contribution scaled by `CANONICAL_HYBRID_WEIGHT`.
 
 ## Tests updated
 
 - Added unit coverage for graphRank contribution to hybrid scoring.
+- Added unit coverage for weighted canonical fallback when all rank channels are missing.
 - Added semantic rank window truncation and small-set no-op coverage.
-- Updated graph spreading tests to assert score/boosted/semantic promotion are not contaminated.
+- Updated graph spreading tests to assert score, boosted, and semantic promotion are not contaminated.
 - Added graph rank window truncation coverage.
 - Updated canonical promotion test to use explicit graph channel evidence.
 
@@ -57,15 +59,15 @@ Implemented the RRF plan in source and tests.
 
 - Command: `npm test -- tests/recall.unit.test.ts`
 - Result: pass
-- Details: 56/56 recall unit tests passed.
+- Details: 57/57 recall unit tests passed.
 
 - Command: `npm test`
-- Result: pass after rebuild
-- Details: first run failed due stale `build/` artifact importing removed `summarizePreview`; after `npm run build`, full suite passed 1130/1130.
+- Result: pass
+- Details: after removing ignored stale `build/` artifacts and rebuilding from source, full suite passed 1131/1131.
 
 - Command: dogfood recall query `RRF graph rank channel rank window recall ranking improvements`
 - Result: pass
-- Details: returned the active RRF plan, research, and request as top results without obvious ranking regression.
+- Details: returned the active RRF plan, research, request, and apply note as top results without obvious ranking regression.
 
 ## Constraints checked
 
@@ -75,3 +77,8 @@ Implemented the RRF plan in source and tests.
 - Semantic ranks remain based on original semantic retrieval ordering.
 - Graph evidence flows through `graphRank` instead of raw score mutation.
 - Rank window truncates channel contribution, not candidate inclusion.
+- Canonical contribution remains bounded by `CANONICAL_HYBRID_WEIGHT` even when all rank channels are missing.
+
+## Review outcome
+
+Fresh TypeScript review found one blocker: candidates beyond all rank windows could have received unscaled canonical contribution through the all-ranks-missing fallback. Fixed in `src/recall.ts` and covered in `tests/recall.unit.test.ts`.
