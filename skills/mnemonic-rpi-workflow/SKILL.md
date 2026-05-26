@@ -1,6 +1,6 @@
 ---
 name: mnemonic-rpi-workflow
-description: Executes multi-step research-plan-implement-review workflows using mnemonic for workflow artifacts. Triggers on multi-step feature or bugfix work, subagent handoffs, plan-heavy tasks, or any work needing structured RPIR artifacts with explicit handoffs and consistent role/relationship conventions. Review phase always dispatches a fresh-context subagent with adversarial posture and constraint violation hunting.
+description: mnemonic RPIR (research-plan-implement-review) workflow. Use for multi-step feature/bugfix work, subagent handoffs, plan-heavy tasks, RPIR artifacts. Review phase: fresh-context subagent with adversarial posture for constraint violation hunting.
 ---
 
 # RPIR Workflow: Research → Plan → Implement → Review

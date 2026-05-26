@@ -1,6 +1,6 @@
 ---
 name: typescript-code-review
-description: Review TypeScript code for type safety, security, performance, and maintainability. Emphasizes making invalid states unrepresentable through advanced type patterns (branded types, discriminated unions, template literals, satisfies, infer). Use when reviewing TypeScript, auditing types, checking antipatterns, or improving type-level correctness.
+description: Review TypeScript for type safety, security, performance, maintainability. Makes invalid states unrepresentable via branded types, discriminated unions, template literals, satisfies, infer. Use for TypeScript review, type audits, antipatterns, type-level correctness.
 ---
 
 # TypeScript Code Review
