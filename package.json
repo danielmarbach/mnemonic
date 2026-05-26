@@ -52,7 +52,7 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
-    "@ast-grep/cli": "^0.42.1",
+    "@ast-grep/cli": "^0.43.0",
     "@types/node": "^24.0.0",
     "typescript": "^6.0.0",
     "vitest": "^4.0.18"
