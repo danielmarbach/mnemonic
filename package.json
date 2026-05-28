@@ -65,6 +65,7 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
+    "ajv": "^8.17.1",
     "@eslint/js": "^10.0.1",
     "@types/node": "^24.0.0",
     "eslint": "^10.4.0",

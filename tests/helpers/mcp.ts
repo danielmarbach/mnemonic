@@ -387,6 +387,7 @@ export async function createPersistentMcpSession(
   vaultDir: string,
   options?: { ollamaUrl?: string; disableGit?: boolean; env?: Record<string, string> },
 ): Promise<{
+  callMethod: (method: string, params: Record<string, unknown>) => Promise<Record<string, unknown>>;
   callTool: (
     toolName: string,
     arguments_: Record<string, unknown>,
@@ -410,7 +411,10 @@ export async function createPersistentMcpSession(
   let nextId = 1;
   const pending = new Map<
     number,
-    { resolve: (value: any) => void; reject: (error: Error) => void }
+    {
+      resolve: (value: Record<string, unknown>) => void;
+      reject: (error: Error) => void;
+    }
   >();
 
   child.stdout.on("data", (chunk) => {
@@ -419,11 +423,27 @@ export async function createPersistentMcpSession(
     stdoutBuffer = lines.pop() ?? "";
     for (const line of lines) {
       if (!line.trim()) continue;
-      const message = JSON.parse(line) as { id?: number; result?: Record<string, unknown> };
+      const message = JSON.parse(line) as {
+        id?: number;
+        result?: Record<string, unknown>;
+        error?: { code?: number; message?: string };
+      };
       if (message.id === undefined) continue;
       const waiter = pending.get(message.id);
       if (!waiter) continue;
       pending.delete(message.id);
+      if (message.error) {
+        waiter.reject(
+          new Error(
+            `MCP JSON-RPC error ${message.error.code ?? "unknown"}: ${message.error.message ?? "unknown error"}`,
+          ),
+        );
+        continue;
+      }
+      if (!message.result) {
+        waiter.reject(new Error("MCP JSON-RPC response missing result"));
+        continue;
+      }
       waiter.resolve(message.result);
     }
   });
@@ -454,21 +474,29 @@ export async function createPersistentMcpSession(
     }) + "\n",
   );
 
+  const callMethod = async (
+    method: string,
+    params: Record<string, unknown>,
+  ): Promise<Record<string, unknown>> => {
+    const id = nextId++;
+    const resultPromise = new Promise<Record<string, unknown>>((resolve, reject) => {
+      pending.set(id, { resolve, reject });
+    });
+    child.stdin.write(
+      JSON.stringify({
+        jsonrpc: "2.0",
+        id,
+        method,
+        params,
+      }) + "\n",
+    );
+    return resultPromise;
+  };
+
   return {
+    callMethod,
     callTool: async (toolName, arguments_) => {
-      const id = nextId++;
-      const resultPromise = new Promise<Record<string, unknown> | undefined>((resolve, reject) => {
-        pending.set(id, { resolve, reject });
-      });
-      child.stdin.write(
-        JSON.stringify({
-          jsonrpc: "2.0",
-          id,
-          method: "tools/call",
-          params: { name: toolName, arguments: arguments_ },
-        }) + "\n",
-      );
-      const result = await resultPromise;
+      const result = await callMethod("tools/call", { name: toolName, arguments: arguments_ });
       const text = result?.content?.[0]?.text as string | undefined;
       if (!text) {
         throw new Error(`Missing tool response for ${toolName}`);
