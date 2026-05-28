@@ -700,7 +700,7 @@ mnemonic and Memory Bank MCP both provide persistent memory for agents, but diff
 
 **How does mnemonic differ from Basic Memory?**
 
-Both tools are local-first and use markdown, but with different scoping models. [Basic Memory](https://github.com/basicmachines/basicmemory) maintains a **knowledge base per project** that agents can search and update, with optional cloud sync. mnemonic splits memory into **two distinct vaults**: a global personal vault (`~/mnemonic-vault/`) for cross-project knowledge, and a project-scoped vault (`.mnemonic/`) that travels with the repo and is shared via git. This lets you capture early ideas globally before a repo exists, then migrate only project-relevant notes into the shared vault once collaboration begins.
+Both tools are local-first and use markdown, but with different scoping models. [Basic Memory](https://github.com/basicmachines-co/basic-memory) maintains a **knowledge base per project** that agents can search and update, with optional cloud sync. mnemonic splits memory into **two distinct vaults**: a global personal vault (`~/mnemonic-vault/`) for cross-project knowledge, and a project-scoped vault (`.mnemonic/`) that travels with the repo and is shared via git. This lets you capture early ideas globally before a repo exists, then migrate only project-relevant notes into the shared vault once collaboration begins.
 
 **What are temporary notes?**
 
