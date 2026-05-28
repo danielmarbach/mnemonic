@@ -38,7 +38,20 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
-    "lint:ast": "ast-grep scan"
+    "lint": "eslint src/ tests/",
+    "lint:fix": "eslint src/ tests/ --fix",
+    "format": "prettier --write \"src/**/*.ts\" \"tests/**/*.ts\"",
+    "format:check": "prettier --check \"src/**/*.ts\" \"tests/**/*.ts\"",
+    "prepare": "simple-git-hooks"
+  },
+  "simple-git-hooks": {
+    "pre-commit": "npx lint-staged"
+  },
+  "lint-staged": {
+    "*.{ts,tsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ]
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.10.1",
@@ -52,9 +65,16 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
-    "@ast-grep/cli": "^0.43.0",
+    "@eslint/js": "^10.0.1",
     "@types/node": "^24.0.0",
+    "eslint": "^10.4.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-prettier": "^5.5.5",
+    "lint-staged": "^17.0.5",
+    "prettier": "^3.8.3",
+    "simple-git-hooks": "^2.13.1",
     "typescript": "^6.0.0",
+    "typescript-eslint": "^8.60.0",
     "vitest": "^4.0.18"
   }
 }

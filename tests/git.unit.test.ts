@@ -76,7 +76,7 @@ describe("GitOps", () => {
     commit.mockRejectedValueOnce(new Error("signing failed"));
 
     await expect(git.commit("remember: test", ["notes/test.md"])).rejects.toThrow(
-      "Git commit failed: signing failed"
+      "Git commit failed: signing failed",
     );
   });
 
@@ -239,12 +239,16 @@ describe("GitOps", () => {
     commit.mockRejectedValueOnce(new Error("signing failed"));
     commit.mockResolvedValueOnce(undefined);
 
-    await expect(gitA.commitWithStatus("remember: first", ["notes/first.md"])).resolves.toMatchObject({
+    await expect(
+      gitA.commitWithStatus("remember: first", ["notes/first.md"]),
+    ).resolves.toMatchObject({
       status: "failed",
       operation: "commit",
     });
 
-    await expect(gitB.commitWithStatus("remember: second", ["notes/second.md"])).resolves.toMatchObject({
+    await expect(
+      gitB.commitWithStatus("remember: second", ["notes/second.md"]),
+    ).resolves.toMatchObject({
       status: "committed",
     });
   });
@@ -259,7 +263,12 @@ describe("GitOps", () => {
 
       const result = await git.sync();
 
-      expect(result).toEqual({ hasRemote: false, pulledNoteIds: [], deletedNoteIds: [], pushedCommits: 0 });
+      expect(result).toEqual({
+        hasRemote: false,
+        pulledNoteIds: [],
+        deletedNoteIds: [],
+        pushedCommits: 0,
+      });
       expect(fetch).not.toHaveBeenCalled();
     });
 
@@ -277,7 +286,12 @@ describe("GitOps", () => {
 
       const result = await git.sync();
 
-      expect(result).toEqual({ hasRemote: true, pulledNoteIds: [], deletedNoteIds: [], pushedCommits: 2 });
+      expect(result).toEqual({
+        hasRemote: true,
+        pulledNoteIds: [],
+        deletedNoteIds: [],
+        pushedCommits: 2,
+      });
       expect(fetch).toHaveBeenCalledOnce();
       expect(pull).toHaveBeenCalledWith(["--rebase"]);
       expect(push).toHaveBeenCalledOnce();
@@ -292,9 +306,7 @@ describe("GitOps", () => {
       raw.mockResolvedValueOnce("0\n"); // countUnpushedCommits
       log.mockResolvedValueOnce({ latest: { hash: "deadbeef" } }); // currentHead
       pull.mockResolvedValueOnce(undefined);
-      raw.mockResolvedValueOnce(
-        "A\tnotes/note-added.md\nM\tnotes/note-modified.md\n"
-      ); // diffNotesSince
+      raw.mockResolvedValueOnce("A\tnotes/note-added.md\nM\tnotes/note-modified.md\n"); // diffNotesSince
       push.mockResolvedValueOnce(undefined);
 
       const result = await git.sync();
@@ -350,7 +362,7 @@ describe("GitOps", () => {
       log.mockResolvedValueOnce({ latest: { hash: "11223344" } });
       pull.mockResolvedValueOnce(undefined);
       raw.mockResolvedValueOnce(
-        "A\tnotes/note.md\nA\tnotes/embeddings.json\nM\tnotes/config.toml\n"
+        "A\tnotes/note.md\nA\tnotes/embeddings.json\nM\tnotes/config.toml\n",
       );
       push.mockResolvedValueOnce(undefined);
 
@@ -372,7 +384,11 @@ describe("GitOps", () => {
       expect(result.pulledNoteIds).toEqual([]);
       expect(result.deletedNoteIds).toEqual([]);
       expect(result.pushedCommits).toBe(0);
-      expect(result.gitError).toEqual({ phase: "fetch", message: "remote unreachable", isConflict: false });
+      expect(result.gitError).toEqual({
+        phase: "fetch",
+        message: "remote unreachable",
+        isConflict: false,
+      });
     });
 
     it("returns gitError with isConflict:true when pull fails and status shows conflicted files", async () => {
@@ -451,7 +467,11 @@ describe("GitOps", () => {
       expect(result.hasRemote).toBe(true);
       expect(result.pulledNoteIds).toEqual(["synced-note"]);
       expect(result.pushedCommits).toBe(0);
-      expect(result.gitError).toEqual({ phase: "push", message: "rejected: non-fast-forward", isConflict: false });
+      expect(result.gitError).toEqual({
+        phase: "push",
+        message: "rejected: non-fast-forward",
+        isConflict: false,
+      });
     });
 
     it("uses custom notesRelDir when diffing notes", async () => {
@@ -588,10 +608,12 @@ describe("GitOps", () => {
       const git = new GitOps("/tmp/repo");
       await git.init();
 
-      raw.mockResolvedValueOnce([
-        "abc123\t2026-03-20T10:00:00Z\tfeat: latest",
-        "def456\t2026-03-19T10:00:00Z\tfix: previous",
-      ].join("\n"));
+      raw.mockResolvedValueOnce(
+        [
+          "abc123\t2026-03-20T10:00:00Z\tfeat: latest",
+          "def456\t2026-03-19T10:00:00Z\tfix: previous",
+        ].join("\n"),
+      );
 
       const result = await git.getRecentCommits("notes/test.md", 2);
 
@@ -656,10 +678,12 @@ describe("GitOps", () => {
       const git = new GitOps("/tmp/repo");
       await git.init();
 
-      raw.mockResolvedValueOnce([
-        "abc123\t2026-03-20T10:00:00Z\tfeat: latest",
-        "def456\t2026-03-19T10:00:00Z\tfix: previous",
-      ].join("\n"));
+      raw.mockResolvedValueOnce(
+        [
+          "abc123\t2026-03-20T10:00:00Z\tfeat: latest",
+          "def456\t2026-03-19T10:00:00Z\tfix: previous",
+        ].join("\n"),
+      );
 
       const result = await git.getFileHistory("notes/test.md", 2);
 
@@ -702,12 +726,7 @@ describe("GitOps", () => {
       const result = await git.getCommitStats("notes/test.md", "abc123");
 
       expect(result).toEqual({ additions: 17, deletions: 3, filesChanged: 2 });
-      expect(raw).toHaveBeenCalledWith([
-        "show",
-        "--format=",
-        "--numstat",
-        "abc123",
-      ]);
+      expect(raw).toHaveBeenCalledWith(["show", "--format=", "--numstat", "abc123"]);
     });
 
     it("returns null when stats lookup fails", async () => {

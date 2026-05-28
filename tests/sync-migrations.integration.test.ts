@@ -34,12 +34,17 @@ describe("sync-migrations", () => {
     const embeddingServer = await startFakeEmbeddingServer();
 
     try {
-      const rememberText = await callLocalMcp(vaultDir, "remember", {
-        title: "Sync disabled test note",
-        content: "Test note for sync with git disabled.",
-        scope: "global",
-        summary: "Seed note for sync disabled test",
-      }, embeddingServer.url);
+      const rememberText = await callLocalMcp(
+        vaultDir,
+        "remember",
+        {
+          title: "Sync disabled test note",
+          content: "Test note for sync with git disabled.",
+          scope: "global",
+          summary: "Seed note for sync disabled test",
+        },
+        embeddingServer.url,
+      );
 
       const response = await callLocalMcpResponse(vaultDir, "sync", {}, embeddingServer.url);
 
@@ -60,20 +65,30 @@ describe("sync-migrations", () => {
     const embeddingServer = await startFakeEmbeddingServer();
 
     try {
-      const rememberText = await callLocalMcp(vaultDir, "remember", {
-        title: "Project note pending embedding",
-        content: "This project note needs an embedding.",
-        cwd: repoDir,
-        scope: "project",
-        summary: "Create project note for embedding backfill",
-      }, embeddingServer.url);
+      const rememberText = await callLocalMcp(
+        vaultDir,
+        "remember",
+        {
+          title: "Project note pending embedding",
+          content: "This project note needs an embedding.",
+          cwd: repoDir,
+          scope: "project",
+          summary: "Create project note for embedding backfill",
+        },
+        embeddingServer.url,
+      );
 
       const noteId = extractRememberedId(rememberText);
       const embeddingPath = path.join(repoDir, ".mnemonic", "embeddings", `${noteId}.json`);
 
       await expect(stat(embeddingPath)).resolves.toBeDefined();
 
-      const response = await callLocalMcpResponse(vaultDir, "sync", { cwd: repoDir }, embeddingServer.url);
+      const response = await callLocalMcpResponse(
+        vaultDir,
+        "sync",
+        { cwd: repoDir },
+        embeddingServer.url,
+      );
 
       expect(response.text).toContain("project vault:");
       const structured = response.structuredContent;
@@ -103,25 +118,37 @@ describe("sync-migrations", () => {
     const embeddingServer = await startFakeEmbeddingServer();
 
     try {
-      await callLocalMcp(vaultDir, "remember", {
-        title: "Schema audit note",
-        content: "Note for schema alignment test.",
-        tags: ["audit"],
-        lifecycle: "permanent",
-        cwd: repoDir,
-        scope: "project",
-        summary: "Seed note for schema audit",
-      }, embeddingServer.url);
+      await callLocalMcp(
+        vaultDir,
+        "remember",
+        {
+          title: "Schema audit note",
+          content: "Note for schema alignment test.",
+          tags: ["audit"],
+          lifecycle: "permanent",
+          cwd: repoDir,
+          scope: "project",
+          summary: "Seed note for schema audit",
+        },
+        embeddingServer.url,
+      );
 
       const migrationResponse = await callLocalMcpResponse(vaultDir, "list_migrations", {});
-      expect(() => MigrationListResultSchema.parse(migrationResponse.structuredContent)).not.toThrow();
+      expect(() =>
+        MigrationListResultSchema.parse(migrationResponse.structuredContent),
+      ).not.toThrow();
 
-      const graphResponse = await callLocalMcpResponse(vaultDir, "memory_graph", {
-        cwd: repoDir,
-        scope: "project",
-        storedIn: "any",
-        limit: 10,
-      }, embeddingServer.url);
+      const graphResponse = await callLocalMcpResponse(
+        vaultDir,
+        "memory_graph",
+        {
+          cwd: repoDir,
+          scope: "project",
+          storedIn: "any",
+          limit: 10,
+        },
+        embeddingServer.url,
+      );
       expect(() => MemoryGraphResultSchema.parse(graphResponse.structuredContent)).not.toThrow();
     } finally {
       await embeddingServer.close();
@@ -137,26 +164,58 @@ describe("sync-migrations", () => {
     const embeddingServer = await startFakeEmbeddingServer();
 
     try {
-      const rememberText = await callLocalMcp(vaultDir, "remember", {
-        title: "Canonical project metadata note",
-        content: "Project-scoped note used to validate structured project identity and alwaysLoad.",
-        tags: ["audit", "structured-content"],
-        lifecycle: "permanent",
-        alwaysLoad: true,
-        cwd: repoDir,
-        scope: "project",
-        summary: "Create note for structured project metadata audit",
-      }, embeddingServer.url);
+      const rememberText = await callLocalMcp(
+        vaultDir,
+        "remember",
+        {
+          title: "Canonical project metadata note",
+          content:
+            "Project-scoped note used to validate structured project identity and alwaysLoad.",
+          tags: ["audit", "structured-content"],
+          lifecycle: "permanent",
+          alwaysLoad: true,
+          cwd: repoDir,
+          scope: "project",
+          summary: "Create note for structured project metadata audit",
+        },
+        embeddingServer.url,
+      );
 
       const noteId = extractRememberedId(rememberText);
 
-      const [listResponse, getResponse, recallResponse, recentResponse, whereIsResponse] = await Promise.all([
-        callLocalMcpResponse(vaultDir, "list", { cwd: repoDir, scope: "project" }, embeddingServer.url),
-        callLocalMcpResponse(vaultDir, "get", { ids: [noteId], cwd: repoDir }, embeddingServer.url),
-        callLocalMcpResponse(vaultDir, "recall", { query: "canonical project metadata", cwd: repoDir, scope: "project" }, embeddingServer.url),
-        callLocalMcpResponse(vaultDir, "recent_memories", { cwd: repoDir, scope: "project", limit: 5 }, embeddingServer.url),
-        callLocalMcpResponse(vaultDir, "where_is_memory", { id: noteId, cwd: repoDir }, embeddingServer.url),
-      ]);
+      const [listResponse, getResponse, recallResponse, recentResponse, whereIsResponse] =
+        await Promise.all([
+          callLocalMcpResponse(
+            vaultDir,
+            "list",
+            { cwd: repoDir, scope: "project" },
+            embeddingServer.url,
+          ),
+          callLocalMcpResponse(
+            vaultDir,
+            "get",
+            { ids: [noteId], cwd: repoDir },
+            embeddingServer.url,
+          ),
+          callLocalMcpResponse(
+            vaultDir,
+            "recall",
+            { query: "canonical project metadata", cwd: repoDir, scope: "project" },
+            embeddingServer.url,
+          ),
+          callLocalMcpResponse(
+            vaultDir,
+            "recent_memories",
+            { cwd: repoDir, scope: "project", limit: 5 },
+            embeddingServer.url,
+          ),
+          callLocalMcpResponse(
+            vaultDir,
+            "where_is_memory",
+            { id: noteId, cwd: repoDir },
+            embeddingServer.url,
+          ),
+        ]);
 
       const listed = ListResultSchema.parse(listResponse.structuredContent);
       expect(listed.project).toBeDefined();
@@ -189,15 +248,20 @@ describe("sync-migrations", () => {
     const embeddingServer = await startFakeEmbeddingServer();
 
     try {
-      const rememberText = await callLocalMcp(vaultDir, "remember", {
-        title: "Legacy project metadata note",
-        content: "Project-scoped note rewritten to simulate missing projectName metadata.",
-        tags: ["audit", "legacy"],
-        lifecycle: "permanent",
-        cwd: repoDir,
-        scope: "project",
-        summary: "Create note for legacy project metadata audit",
-      }, embeddingServer.url);
+      const rememberText = await callLocalMcp(
+        vaultDir,
+        "remember",
+        {
+          title: "Legacy project metadata note",
+          content: "Project-scoped note rewritten to simulate missing projectName metadata.",
+          tags: ["audit", "legacy"],
+          lifecycle: "permanent",
+          cwd: repoDir,
+          scope: "project",
+          summary: "Create note for legacy project metadata audit",
+        },
+        embeddingServer.url,
+      );
 
       const noteId = extractRememberedId(rememberText);
       const notePath = path.join(repoDir, ".mnemonic", "notes", `${noteId}.md`);
@@ -205,7 +269,12 @@ describe("sync-migrations", () => {
       await writeFile(notePath, noteContents.replace(/^projectName: .*\n/m, ""), "utf-8");
 
       const [listResponse, getResponse] = await Promise.all([
-        callLocalMcpResponse(vaultDir, "list", { cwd: repoDir, scope: "project" }, embeddingServer.url),
+        callLocalMcpResponse(
+          vaultDir,
+          "list",
+          { cwd: repoDir, scope: "project" },
+          embeddingServer.url,
+        ),
         callLocalMcpResponse(vaultDir, "get", { ids: [noteId], cwd: repoDir }, embeddingServer.url),
       ]);
 
@@ -226,27 +295,42 @@ describe("sync-migrations", () => {
     const embeddingServer = await startFakeEmbeddingServer();
 
     try {
-      await callLocalMcp(vaultDir, "remember", {
-        title: "Cluster note A",
-        content: "First note for clustering.",
-        tags: ["audit", "cluster"],
-        lifecycle: "permanent",
-        scope: "global",
-        summary: "Create first cluster note",
-      }, embeddingServer.url);
+      await callLocalMcp(
+        vaultDir,
+        "remember",
+        {
+          title: "Cluster note A",
+          content: "First note for clustering.",
+          tags: ["audit", "cluster"],
+          lifecycle: "permanent",
+          scope: "global",
+          summary: "Create first cluster note",
+        },
+        embeddingServer.url,
+      );
 
-      await callLocalMcp(vaultDir, "remember", {
-        title: "Cluster note B",
-        content: "Second note for clustering.",
-        tags: ["audit", "cluster"],
-        lifecycle: "permanent",
-        scope: "global",
-        summary: "Create second cluster note",
-      }, embeddingServer.url);
+      await callLocalMcp(
+        vaultDir,
+        "remember",
+        {
+          title: "Cluster note B",
+          content: "Second note for clustering.",
+          tags: ["audit", "cluster"],
+          lifecycle: "permanent",
+          scope: "global",
+          summary: "Create second cluster note",
+        },
+        embeddingServer.url,
+      );
 
-      const response = await callLocalMcpResponse(vaultDir, "consolidate", {
-        strategy: "find-clusters",
-      }, embeddingServer.url);
+      const response = await callLocalMcpResponse(
+        vaultDir,
+        "consolidate",
+        {
+          strategy: "find-clusters",
+        },
+        embeddingServer.url,
+      );
 
       const structured = response.structuredContent;
       expect(structured?.["action"]).toBeDefined();
@@ -263,18 +347,28 @@ describe("sync-migrations", () => {
     const embeddingServer = await startFakeEmbeddingServer();
 
     try {
-      const rememberText = await callLocalMcp(vaultDir, "remember", {
-        title: "Sync force rebuild note",
-        content: "This note will have its embedding rebuilt by sync force mode.",
-        scope: "global",
-        summary: "Seed note for sync force rebuild test",
-      }, embeddingServer.url);
+      const rememberText = await callLocalMcp(
+        vaultDir,
+        "remember",
+        {
+          title: "Sync force rebuild note",
+          content: "This note will have its embedding rebuilt by sync force mode.",
+          scope: "global",
+          summary: "Seed note for sync force rebuild test",
+        },
+        embeddingServer.url,
+      );
 
       const noteId = extractRememberedId(rememberText);
       const embeddingPath = path.join(vaultDir, "embeddings", `${noteId}.json`);
       const before = await readFile(embeddingPath, "utf-8");
 
-      const response = await callLocalMcpResponse(vaultDir, "sync", { force: true }, embeddingServer.url);
+      const response = await callLocalMcpResponse(
+        vaultDir,
+        "sync",
+        { force: true },
+        embeddingServer.url,
+      );
 
       expect(response.text).toContain("main vault: no remote configured — git sync skipped.");
       expect(response.text).toContain("main vault: embedded 1 note(s) (force rebuild).");
@@ -301,25 +395,35 @@ describe("sync-migrations", () => {
     const openAICompatibleServer = await startFakeOpenAICompatibleEmbeddingServer();
 
     try {
-      const rememberText = await callLocalMcp(vaultDir, "remember", {
-        title: "Provider switch rebuild note",
-        content: "This note changes embedding providers during sync force mode.",
-        scope: "global",
-        summary: "Seed provider switch rebuild test",
-      }, ollamaServer.url);
+      const rememberText = await callLocalMcp(
+        vaultDir,
+        "remember",
+        {
+          title: "Provider switch rebuild note",
+          content: "This note changes embedding providers during sync force mode.",
+          scope: "global",
+          summary: "Seed provider switch rebuild test",
+        },
+        ollamaServer.url,
+      );
 
       const noteId = extractRememberedId(rememberText);
       const embeddingPath = path.join(vaultDir, "embeddings", `${noteId}.json`);
       const before = JSON.parse(await readFile(embeddingPath, "utf-8")) as Record<string, unknown>;
       expect(before["provider"]).toBe("ollama");
 
-      const response = await callLocalMcpResponse(vaultDir, "sync", { force: true }, {
-        env: {
-          EMBED_PROVIDER: "openai-compatible",
-          EMBED_BASE_URL: openAICompatibleServer.url,
-          EMBED_MODEL: "fake-openai-compatible-model",
+      const response = await callLocalMcpResponse(
+        vaultDir,
+        "sync",
+        { force: true },
+        {
+          env: {
+            EMBED_PROVIDER: "openai-compatible",
+            EMBED_BASE_URL: openAICompatibleServer.url,
+            EMBED_MODEL: "fake-openai-compatible-model",
+          },
         },
-      });
+      );
 
       expect(response.text).toContain("main vault: embedded 1 note(s) (force rebuild).");
       const after = JSON.parse(await readFile(embeddingPath, "utf-8")) as Record<string, unknown>;
@@ -336,12 +440,17 @@ describe("sync-migrations", () => {
     const embeddingServer = await startFakeEmbeddingServer();
 
     try {
-      await callLocalMcp(vaultDir, "remember", {
-        title: "Schema audit sync note",
-        content: "Used to validate SyncResultSchema alignment.",
-        scope: "global",
-        summary: "Seed note for sync schema audit",
-      }, embeddingServer.url);
+      await callLocalMcp(
+        vaultDir,
+        "remember",
+        {
+          title: "Schema audit sync note",
+          content: "Used to validate SyncResultSchema alignment.",
+          scope: "global",
+          summary: "Seed note for sync schema audit",
+        },
+        embeddingServer.url,
+      );
 
       const response = await callLocalMcpResponse(vaultDir, "sync", {}, embeddingServer.url);
 
@@ -365,36 +474,51 @@ describe("sync-migrations", () => {
     const embeddingServer = await startFakeEmbeddingServer();
 
     try {
-      const globalRemember = await callLocalMcp(vaultDir, "remember", {
-        title: "Cross scope source A (global)",
-        content: "A purely global note with no project association.",
-        tags: ["integration", "cross-scope"],
-        lifecycle: "permanent",
-        summary: "Create global note for cross-scope consolidation test",
-        scope: "global",
-      }, embeddingServer.url);
+      const globalRemember = await callLocalMcp(
+        vaultDir,
+        "remember",
+        {
+          title: "Cross scope source A (global)",
+          content: "A purely global note with no project association.",
+          tags: ["integration", "cross-scope"],
+          lifecycle: "permanent",
+          summary: "Create global note for cross-scope consolidation test",
+          scope: "global",
+        },
+        embeddingServer.url,
+      );
       const globalId = extractRememberedId(globalRemember);
 
-      const projectRemember = await callLocalMcp(vaultDir, "remember", {
-        title: "Cross scope source B (project-associated, main-vault)",
-        content: "A project-associated note stored privately in main-vault.",
-        tags: ["integration", "cross-scope"],
-        lifecycle: "permanent",
-        summary: "Create project-associated note for cross-scope consolidation test",
-        cwd: repoDir,
-        scope: "global",
-      }, embeddingServer.url);
+      const projectRemember = await callLocalMcp(
+        vaultDir,
+        "remember",
+        {
+          title: "Cross scope source B (project-associated, main-vault)",
+          content: "A project-associated note stored privately in main-vault.",
+          tags: ["integration", "cross-scope"],
+          lifecycle: "permanent",
+          summary: "Create project-associated note for cross-scope consolidation test",
+          cwd: repoDir,
+          scope: "global",
+        },
+        embeddingServer.url,
+      );
       const projectAssociatedId = extractRememberedId(projectRemember);
 
-      const consolidateText = await callLocalMcp(vaultDir, "consolidate", {
-        strategy: "execute-merge",
-        mode: "delete",
-        mergePlan: {
-          sourceIds: [globalId, projectAssociatedId],
-          targetTitle: "Cross scope consolidated note",
-          content: "Merged content from a global note and a project-associated note.",
+      const consolidateText = await callLocalMcp(
+        vaultDir,
+        "consolidate",
+        {
+          strategy: "execute-merge",
+          mode: "delete",
+          mergePlan: {
+            sourceIds: [globalId, projectAssociatedId],
+            targetTitle: "Cross scope consolidated note",
+            content: "Merged content from a global note and a project-associated note.",
+          },
         },
-      }, embeddingServer.url);
+        embeddingServer.url,
+      );
 
       expect(consolidateText).not.toContain("not found");
       expect(consolidateText).toContain("Mode: delete");
@@ -406,10 +530,14 @@ describe("sync-migrations", () => {
 
       const consolidatedPath = path.join(vaultDir, "notes", `${consolidatedId}.md`);
       const consolidatedContents = await readFile(consolidatedPath, "utf-8");
-      expect(consolidatedContents).toContain("Merged content from a global note and a project-associated note.");
+      expect(consolidatedContents).toContain(
+        "Merged content from a global note and a project-associated note.",
+      );
 
       await expect(stat(path.join(vaultDir, "notes", `${globalId}.md`))).rejects.toThrow();
-      await expect(stat(path.join(vaultDir, "notes", `${projectAssociatedId}.md`))).rejects.toThrow();
+      await expect(
+        stat(path.join(vaultDir, "notes", `${projectAssociatedId}.md`)),
+      ).rejects.toThrow();
     } finally {
       await embeddingServer.close();
     }

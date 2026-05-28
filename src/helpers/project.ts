@@ -1,7 +1,11 @@
 import { z } from "zod";
 import path from "path";
 import { simpleGit } from "simple-git";
-import { detectProject, resolveProjectIdentity, type ProjectIdentityResolution } from "../project.js";
+import {
+  detectProject,
+  resolveProjectIdentity,
+  type ProjectIdentityResolution,
+} from "../project.js";
 import type { ServerContext } from "../server-context.js";
 import type { ProjectRef } from "../structured-content.js";
 import type { Vault } from "../vault.js";
@@ -16,21 +20,27 @@ export const projectParam = z
   .string()
   .optional()
   .describe(
-    "Absolute path of the project working directory. Required for project-scoped routing, vault selection, and search boosting."
+    "Absolute path of the project working directory. Required for project-scoped routing, vault selection, and search boosting.",
   );
 
 export async function resolveProject(ctx: ServerContext, cwd?: string) {
   if (!cwd) return undefined;
   return detectProject(cwd, {
-    getProjectIdentityOverride: async (projectId) => ctx.configStore.getProjectIdentityOverride(projectId),
+    getProjectIdentityOverride: async (projectId) =>
+      ctx.configStore.getProjectIdentityOverride(projectId),
   });
 }
 
-export function toProjectRef(project?: { id: string; name: string } | null): ProjectRef | undefined {
+export function toProjectRef(
+  project?: { id: string; name: string } | null,
+): ProjectRef | undefined {
   return project ? { id: project.id, name: project.name } : undefined;
 }
 
-export function noteProjectRef(note: { project?: string; projectName?: string }): ProjectRef | undefined {
+export function noteProjectRef(note: {
+  project?: string;
+  projectName?: string;
+}): ProjectRef | undefined {
   if (!note.project || !note.projectName) {
     return undefined;
   }
@@ -41,18 +51,26 @@ export function noteProjectRef(note: { project?: string; projectName?: string })
   };
 }
 
-export async function resolveProjectIdentityForCwd(ctx: ServerContext, cwd?: string): Promise<ProjectIdentityResolution | undefined> {
+export async function resolveProjectIdentityForCwd(
+  ctx: ServerContext,
+  cwd?: string,
+): Promise<ProjectIdentityResolution | undefined> {
   if (!cwd) return undefined;
   const identity = await resolveProjectIdentity(cwd, {
-    getProjectIdentityOverride: async (projectId) => ctx.configStore.getProjectIdentityOverride(projectId),
+    getProjectIdentityOverride: async (projectId) =>
+      ctx.configStore.getProjectIdentityOverride(projectId),
   });
   return identity ?? undefined;
 }
 
-export async function resolveWriteVault(ctx: ServerContext, cwd: string | undefined, scope: WriteScope): Promise<Vault> {
+export async function resolveWriteVault(
+  ctx: ServerContext,
+  cwd: string | undefined,
+  scope: WriteScope,
+): Promise<Vault> {
   if (scope === "project") {
     return cwd
-      ? (await ctx.vaultManager.getOrCreateProjectVault(cwd)) ?? ctx.vaultManager.main
+      ? ((await ctx.vaultManager.getOrCreateProjectVault(cwd)) ?? ctx.vaultManager.main)
       : ctx.vaultManager.main;
   }
 
@@ -76,15 +94,39 @@ export async function ensureBranchSynced(ctx: ServerContext, cwd?: string): Prom
   await Promise.all([
     ctx.vaultManager.main.git.sync().then(async (result) => {
       console.error(`[branch] Main vault sync: ${JSON.stringify(result)}`);
-      const backfill = await backfillEmbeddingsAfterSync(ctx, ctx.vaultManager.main.storage, "main vault", [], true);
-      console.error(`[branch] Main vault embedded ${backfill.embedded} notes${backfill.failed.length > 0 ? `, ${backfill.failed.length} failed (e.g. "${backfill.failed[0]!.error}")` : ""}`);
+      const backfill = await backfillEmbeddingsAfterSync(
+        ctx,
+        ctx.vaultManager.main.storage,
+        "main vault",
+        [],
+        true,
+      );
+      console.error(
+        `[branch] Main vault embedded ${backfill.embedded} notes${
+          backfill.failed.length > 0
+            ? `, ${backfill.failed.length} failed (e.g. "${backfill.failed[0]?.error ?? "unknown"}")`
+            : ""
+        }`,
+      );
       return result;
     }),
     projectVault
       ? projectVault.git.sync().then(async (result) => {
           console.error(`[branch] Project vault sync: ${JSON.stringify(result)}`);
-          const backfill = await backfillEmbeddingsAfterSync(ctx, projectVault.storage, "project vault", [], true);
-          console.error(`[branch] Project vault embedded ${backfill.embedded} notes${backfill.failed.length > 0 ? `, ${backfill.failed.length} failed (e.g. "${backfill.failed[0]!.error}")` : ""}`);
+          const backfill = await backfillEmbeddingsAfterSync(
+            ctx,
+            projectVault.storage,
+            "project vault",
+            [],
+            true,
+          );
+          console.error(
+            `[branch] Project vault embedded ${backfill.embedded} notes${
+              backfill.failed.length > 0
+                ? `, ${backfill.failed.length} failed (e.g. "${backfill.failed[0]?.error ?? "unknown"}")`
+                : ""
+            }`,
+          );
           return result;
         })
       : Promise.resolve(undefined),
@@ -100,9 +142,12 @@ export async function ensureBranchSynced(ctx: ServerContext, cwd?: string): Prom
   return true;
 }
 
-async function syncAttachedVaultsOnBranchChange(ctx: ServerContext, projectId: string): Promise<void> {
+async function syncAttachedVaultsOnBranchChange(
+  ctx: ServerContext,
+  projectId: string,
+): Promise<void> {
   const attachmentConfigs = await ctx.configStore.getProjectAttachments(projectId);
-  const enabledAttachments = attachmentConfigs.filter(a => a.enabled && a.branch);
+  const enabledAttachments = attachmentConfigs.filter((a) => a.enabled && a.branch);
   if (enabledAttachments.length === 0) return;
 
   for (const attConfig of enabledAttachments) {
@@ -122,28 +167,34 @@ async function syncAttachedVaultsOnBranchChange(ctx: ServerContext, projectId: s
 
     const newTip = fetchResult.value;
     if (newTip && newTip !== attConfig.branchTipHash) {
-      const updatedConfigs = attachmentConfigs.map(a =>
+      const updatedConfigs = attachmentConfigs.map((a) =>
         a.projectSlug === attConfig.projectSlug
           ? { ...a, branchTipHash: newTip, updatedAt: new Date().toISOString() }
-          : a
+          : a,
       );
       await ctx.configStore.setProjectAttachments(projectId, updatedConfigs);
       ctx.vaultManager.clearAttachmentCaches();
       ctx.vaultManager.setAttachmentConfigs(projectId, updatedConfigs);
       const loadedVaults = await ctx.vaultManager.loadAttachmentsForProject(projectId);
-      const staleVault = loadedVaults.find(v => v.attachmentRef?.projectSlug === attConfig.projectSlug);
+      const staleVault = loadedVaults.find(
+        (v) => v.attachmentRef?.projectSlug === attConfig.projectSlug,
+      );
       if (staleVault) {
-        const currentIds = new Set((await staleVault.storage.listNoteIds()).map(id => id as string));
+        const currentIds = new Set(
+          (await staleVault.storage.listNoteIds()).map((id) => id as string),
+        );
         const allEmbeddings = await staleVault.storage.listEmbeddings();
         const staleIds = allEmbeddings
-          .filter(e => !currentIds.has(e.id as string))
-          .map(e => e.id as string);
+          .filter((e) => !currentIds.has(e.id as string))
+          .map((e) => e.id as string);
         if (staleIds.length > 0) {
           await removeStaleEmbeddings(staleVault.storage, staleIds);
           console.error(`[branch] ${label}: removed ${staleIds.length} stale embedding(s).`);
         }
       }
-      console.error(`[branch] ${label}: branch tip changed (${attConfig.branchTipHash.substring(0, 8)} → ${newTip.substring(0, 8)}), cache invalidated.`);
+      console.error(
+        `[branch] ${label}: branch tip changed (${attConfig.branchTipHash.substring(0, 8)} → ${newTip.substring(0, 8)}), cache invalidated.`,
+      );
     }
   }
 }

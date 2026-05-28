@@ -22,7 +22,10 @@ describe("lexical rescue comparison", () => {
     const documents = buildSyntheticCorpus();
     const rareTermQueries: RescueQuery[] = [
       { query: "projectiontext staleness", targetId: "projection-staleness-target" },
-      { query: "projectiontext staleness derived retrieval text", targetId: "projection-staleness-target" },
+      {
+        query: "projectiontext staleness derived retrieval text",
+        targetId: "projection-staleness-target",
+      },
       { query: "cache refresh projectiontext staleness", targetId: "projection-staleness-target" },
       { query: "workingstate continuity checkpoint", targetId: "working-state-target" },
       { query: "checkpoint continuity next action", targetId: "working-state-target" },
@@ -34,17 +37,25 @@ describe("lexical rescue comparison", () => {
     ];
 
     const t0Baseline = performance.now();
-    const baselineRare = computeMeanReciprocalRank(rareTermQueries, (query) => rankByPreviousLexicalRescue(query, documents));
-    const baselineBroad = computeMeanReciprocalRank(broadQueries, (query) => rankByPreviousLexicalRescue(query, documents));
+    const baselineRare = computeMeanReciprocalRank(rareTermQueries, (query) =>
+      rankByPreviousLexicalRescue(query, documents),
+    );
+    const baselineBroad = computeMeanReciprocalRank(broadQueries, (query) =>
+      rankByPreviousLexicalRescue(query, documents),
+    );
     const baselineMs = performance.now() - t0Baseline;
 
     const t0TfIdf = performance.now();
-    const tfIdfRare = computeMeanReciprocalRank(rareTermQueries, (query) => rankDocumentsByTfIdf(query, documents, documents.length));
-    const tfIdfBroad = computeMeanReciprocalRank(broadQueries, (query) => rankDocumentsByTfIdf(query, documents, documents.length));
+    const tfIdfRare = computeMeanReciprocalRank(rareTermQueries, (query) =>
+      rankDocumentsByTfIdf(query, documents, documents.length),
+    );
+    const tfIdfBroad = computeMeanReciprocalRank(broadQueries, (query) =>
+      rankDocumentsByTfIdf(query, documents, documents.length),
+    );
     const tfIdfMs = performance.now() - t0TfIdf;
 
     console.error(
-      `[measurement] lexical-rescue rareTermMrr previous=${baselineRare.toFixed(3)} tfidf=${tfIdfRare.toFixed(3)} broadMrr previous=${baselineBroad.toFixed(3)} tfidf=${tfIdfBroad.toFixed(3)} previousMs=${baselineMs.toFixed(2)} tfidfMs=${tfIdfMs.toFixed(2)}`
+      `[measurement] lexical-rescue rareTermMrr previous=${baselineRare.toFixed(3)} tfidf=${tfIdfRare.toFixed(3)} broadMrr previous=${baselineBroad.toFixed(3)} tfidf=${tfIdfBroad.toFixed(3)} previousMs=${baselineMs.toFixed(2)} tfidfMs=${tfIdfMs.toFixed(2)}`,
     );
 
     expect(tfIdfRare).toBeGreaterThan(baselineRare);
@@ -66,17 +77,25 @@ describe("lexical rescue comparison", () => {
     ];
 
     const t0Previous = performance.now();
-    const previousRare = computeMeanReciprocalRank(rareTermQueries, (query) => rankByPreviousLexicalRescue(query, documents));
-    const previousBroad = computeMeanReciprocalRank(broadQueries, (query) => rankByPreviousLexicalRescue(query, documents));
+    const previousRare = computeMeanReciprocalRank(rareTermQueries, (query) =>
+      rankByPreviousLexicalRescue(query, documents),
+    );
+    const previousBroad = computeMeanReciprocalRank(broadQueries, (query) =>
+      rankByPreviousLexicalRescue(query, documents),
+    );
     const previousMs = performance.now() - t0Previous;
 
     const t0TfIdf = performance.now();
-    const tfIdfRare = computeMeanReciprocalRank(rareTermQueries, (query) => rankDocumentsByTfIdf(query, documents, documents.length));
-    const tfIdfBroad = computeMeanReciprocalRank(broadQueries, (query) => rankDocumentsByTfIdf(query, documents, documents.length));
+    const tfIdfRare = computeMeanReciprocalRank(rareTermQueries, (query) =>
+      rankDocumentsByTfIdf(query, documents, documents.length),
+    );
+    const tfIdfBroad = computeMeanReciprocalRank(broadQueries, (query) =>
+      rankDocumentsByTfIdf(query, documents, documents.length),
+    );
     const tfIdfMs = performance.now() - t0TfIdf;
 
     console.error(
-      `[measurement] lexical-rescue realistic rareTermMrr previous=${previousRare.toFixed(3)} tfidf=${tfIdfRare.toFixed(3)} broadMrr previous=${previousBroad.toFixed(3)} tfidf=${tfIdfBroad.toFixed(3)} previousMs=${previousMs.toFixed(2)} tfidfMs=${tfIdfMs.toFixed(2)}`
+      `[measurement] lexical-rescue realistic rareTermMrr previous=${previousRare.toFixed(3)} tfidf=${tfIdfRare.toFixed(3)} broadMrr previous=${previousBroad.toFixed(3)} tfidf=${tfIdfBroad.toFixed(3)} previousMs=${previousMs.toFixed(2)} tfidfMs=${tfIdfMs.toFixed(2)}`,
     );
 
     expect(previousRare).toBeGreaterThan(0);
@@ -86,7 +105,10 @@ describe("lexical rescue comparison", () => {
   });
 });
 
-function rankByPreviousLexicalRescue(query: string, documents: RescueDocument[]): Array<{ id: string; score: number }> {
+function rankByPreviousLexicalRescue(
+  query: string,
+  documents: RescueDocument[],
+): Array<{ id: string; score: number }> {
   const shortlisted: Array<{ id: string; score: number }> = [];
 
   for (const document of documents) {
@@ -106,7 +128,7 @@ function rankByPreviousLexicalRescue(query: string, documents: RescueDocument[])
 
 function computeMeanReciprocalRank(
   queries: RescueQuery[],
-  ranker: (query: string) => Array<{ id: string; score: number }>
+  ranker: (query: string) => Array<{ id: string; score: number }>,
 ): number {
   let reciprocalRankSum = 0;
 
@@ -159,7 +181,7 @@ function buildSyntheticCorpus(): RescueDocument[] {
     {
       id: "projection-overview-target",
       text: "Projection overview for derived retrieval text and lexical indexing behavior.",
-    }
+    },
   );
 
   return documents;
@@ -280,7 +302,7 @@ function buildRealisticCorpus(): RescueDocument[] {
         "Summary: Language independent heuristics keep wording cues supplementary and avoid English-only bias.",
         "Headings: Rationale | Signals | Constraints",
       ].join("\n"),
-    }
+    },
   );
 
   return documents;

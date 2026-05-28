@@ -27,7 +27,13 @@ describe("ensureBuiltEntryPointReady", () => {
     });
 
     await Promise.all([
-      ensureBuiltEntryPointReady({ entryPoint, lockDir, runBuild, timeoutMs: 5_000, resetMemoizedState: true }),
+      ensureBuiltEntryPointReady({
+        entryPoint,
+        lockDir,
+        runBuild,
+        timeoutMs: 5_000,
+        resetMemoizedState: true,
+      }),
       ensureBuiltEntryPointReady({ entryPoint, lockDir, runBuild, timeoutMs: 5_000 }),
     ]);
 

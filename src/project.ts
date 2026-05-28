@@ -41,7 +41,10 @@ export interface ProjectIdentityResolution {
  * Uses the git remote URL when available so the same project is recognized
  * across machines regardless of local clone path.
  */
-export async function detectProject(cwd: string, options: ProjectDetectionOptions = {}): Promise<ProjectInfo | null> {
+export async function detectProject(
+  cwd: string,
+  options: ProjectDetectionOptions = {},
+): Promise<ProjectInfo | null> {
   const resolved = await resolveProjectIdentity(cwd, options);
   return resolved?.project ?? null;
 }
@@ -97,7 +100,7 @@ export async function resolveProjectIdentity(
 
 export async function getCurrentGitBranch(cwd: string): Promise<string | undefined> {
   const result = await attempt("project:branch", () =>
-    execFileAsync("git", ["branch", "--show-current"], { cwd })
+    execFileAsync("git", ["branch", "--show-current"], { cwd }),
   );
   if (!result.ok) return undefined;
   const branch = result.value.stdout.trim();
@@ -140,9 +143,12 @@ async function detectDefaultProject(cwd: string): Promise<ProjectInfo | null> {
  * any git submodule boundaries. Returns null when the directory is not inside
  * a git repository at all.
  */
-async function findTopLevelGitRoot(cwd: string, visited: Set<string> = new Set()): Promise<string | null> {
+async function findTopLevelGitRoot(
+  cwd: string,
+  visited: Set<string> = new Set(),
+): Promise<string | null> {
   const rootResult = await attempt("project:git-root", () =>
-    execFileAsync("git", ["rev-parse", "--show-toplevel"], { cwd })
+    execFileAsync("git", ["rev-parse", "--show-toplevel"], { cwd }),
   );
   if (!rootResult.ok) return null;
   const root = rootResult.value.stdout.trim();
@@ -152,7 +158,7 @@ async function findTopLevelGitRoot(cwd: string, visited: Set<string> = new Set()
   visited.add(root);
 
   const superResult = await attempt("project:superproject", () =>
-    execFileAsync("git", ["rev-parse", "--show-superproject-working-tree"], { cwd })
+    execFileAsync("git", ["rev-parse", "--show-superproject-working-tree"], { cwd }),
   );
   if (superResult.ok) {
     const superproject = superResult.value.stdout.trim();
@@ -166,7 +172,7 @@ async function findTopLevelGitRoot(cwd: string, visited: Set<string> = new Set()
 
 async function getGitRemoteUrl(cwd: string, remoteName: string): Promise<string | null> {
   const result = await attempt("project:remote-url", () =>
-    execFileAsync("git", ["remote", "get-url", remoteName], { cwd })
+    execFileAsync("git", ["remote", "get-url", remoteName], { cwd }),
   );
   if (!result.ok) return null;
   const remote = result.value.stdout.trim();
@@ -203,5 +209,8 @@ function extractRepoName(remote: string): string {
 }
 
 function slugify(s: string): string {
-  return s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  return s
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
 }

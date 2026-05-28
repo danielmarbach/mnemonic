@@ -9,11 +9,11 @@ export const CLI_COMMANDS = [
 export type CliCommand = (typeof CLI_COMMANDS)[number]["name"];
 
 export function isCliCommand(arg: string): arg is CliCommand {
-  return CLI_COMMANDS.some(c => c.name === arg);
+  return CLI_COMMANDS.some((c) => c.name === arg);
 }
 
 export function showHelp(): never {
-  const commandList = CLI_COMMANDS.map(c => `  ${c.name.padEnd(24)}${c.description}`).join("\n");
+  const commandList = CLI_COMMANDS.map((c) => `  ${c.name.padEnd(24)}${c.description}`).join("\n");
   console.log(`mnemonic — local MCP memory server backed by markdown + git
 
 Usage:
@@ -44,7 +44,7 @@ Examples:
 export function rejectUnknownCommand(command: string): never {
   console.error(`Unknown command: ${command}`);
   console.error();
-  console.error(`Available CLI commands: ${CLI_COMMANDS.map(c => c.name).join(", ")}`);
+  console.error(`Available CLI commands: ${CLI_COMMANDS.map((c) => c.name).join(", ")}`);
   console.error();
   console.error("Tools like sync, remember, recall, etc. are MCP-only and");
   console.error("require an MCP client session. Run 'mnemonic --help' for details.");
@@ -54,17 +54,19 @@ export function rejectUnknownCommand(command: string): never {
 export async function runCliCommand(command: CliCommand): Promise<void> {
   switch (command) {
     case "migrate":
-      await runMigrateCli().catch(err => {
+      await runMigrateCli().catch((err) => {
         console.error("Migration failed:", err);
         process.exit(1);
       });
       process.exit(0);
+    // falls through
     case "import-claude-memory":
-      await runImportCli().catch(err => {
+      await runImportCli().catch((err) => {
         console.error("Import failed:", err);
         process.exit(1);
       });
       process.exit(0);
+    // falls through
     default: {
       const _exhaustive: never = command;
       throw new Error(`Unhandled CLI command: ${_exhaustive}`);

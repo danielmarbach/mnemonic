@@ -12,8 +12,13 @@ import { debugLog, getErrorMessage } from "../error-utils.js";
 import type { Note } from "../storage.js";
 
 export function makeImportNoteId(title: string): MemoryId {
-  const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60);
-  const suffix = randomUUID().split("-")[0]!;
+  const slug = title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 60);
+  const suffix = randomUUID().split("-")[0];
+  if (!suffix) throw new Error("Failed to generate UUID");
   return memoryId(slug ? `${slug}-${suffix}` : suffix);
 }
 
@@ -50,11 +55,13 @@ Examples:
   }
 
   const dryRun = argv.includes("--dry-run");
-  const cwdOption = argv.find(arg => arg.startsWith("--cwd="));
-  const targetCwd = cwdOption ? resolveUserPath(cwdOption.split("=")[1]!) : process.cwd();
-  const claudeHomeOption = argv.find(arg => arg.startsWith("--claude-home="));
+  const cwdOption = argv.find((arg) => arg.startsWith("--cwd="));
+  const targetCwd = cwdOption
+    ? resolveUserPath(cwdOption.split("=").slice(1).join("="))
+    : process.cwd();
+  const claudeHomeOption = argv.find((arg) => arg.startsWith("--claude-home="));
   const claudeHome = claudeHomeOption
-    ? resolveUserPath(claudeHomeOption.split("=")[1]!)
+    ? resolveUserPath(claudeHomeOption.split("=").slice(1).join("="))
     : process.env["CLAUDE_HOME"]
       ? resolveUserPath(process.env["CLAUDE_HOME"])
       : defaultClaudeHome();
@@ -78,7 +85,7 @@ Examples:
     process.exit(0);
   }
 
-  const files = (await fs.readdir(memoryDir)).filter(f => f.endsWith(".md")).sort();
+  const files = (await fs.readdir(memoryDir)).filter((f) => f.endsWith(".md")).sort();
   if (files.length === 0) {
     console.log("No markdown files found in Claude memory directory.");
     process.exit(0);
@@ -91,7 +98,7 @@ Examples:
   const vault = vaultManager.main;
 
   const existingNotes = await vault.storage.listNotes();
-  const existingTitles = new Set(existingNotes.map(n => n.title.toLowerCase()));
+  const existingTitles = new Set(existingNotes.map((n) => n.title.toLowerCase()));
 
   const now = isoDateString(new Date().toISOString());
   const notesToWrite: Note[] = [];
@@ -100,7 +107,10 @@ Examples:
   for (const file of files) {
     const raw = await fs.readFile(path.join(memoryDir, file), "utf-8");
     const sections = parseMemorySections(raw);
-    const sourceTag = file.replace(/\.md$/i, "").toLowerCase().replace(/[^a-z0-9]+/g, "-");
+    const sourceTag = file
+      .replace(/\.md$/i, "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-");
 
     for (const section of sections) {
       if (existingTitles.has(section.title.toLowerCase())) {
@@ -123,7 +133,7 @@ Examples:
 
   if (skipped.length > 0) {
     console.log(`\nSkipped (title already exists in vault):`);
-    skipped.forEach(t => console.log(`  ~ ${t}`));
+    skipped.forEach((t) => console.log(`  ~ ${t}`));
   }
 
   if (notesToWrite.length === 0) {
@@ -132,7 +142,7 @@ Examples:
   }
 
   console.log(`\nSections to import (${notesToWrite.length}):`);
-  notesToWrite.forEach(n => console.log(`  + ${n.title}`));
+  notesToWrite.forEach((n) => console.log(`  + ${n.title}`));
 
   if (dryRun) {
     console.log("\n✓ Dry-run complete — no changes written");
@@ -166,6 +176,8 @@ Examples:
     console.error(`\nNotes written but git operation failed: ${err}`);
   }
 
-  console.log(`\n✓ Imported ${notesToWrite.length} note${notesToWrite.length === 1 ? "" : "s"} into main vault`);
+  console.log(
+    `\n✓ Imported ${notesToWrite.length} note${notesToWrite.length === 1 ? "" : "s"} into main vault`,
+  );
   process.exit(0);
 }

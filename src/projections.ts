@@ -21,7 +21,7 @@ export function extractProjectionSummary(note: Note): string {
   // Strip leading heading lines (# Title, ## Title, etc.) from the body
   const lines = body.split("\n");
   let start = 0;
-  while (start < lines.length && /^#{1,6}\s/.test(lines[start]!.trim())) {
+  while (start < lines.length && /^#{1,6}\s/.test(lines[start]?.trim() ?? "")) {
     start++;
   }
   const bodyWithoutLeadingHeading = lines.slice(start).join("\n").trim();
@@ -36,7 +36,9 @@ export function extractProjectionSummary(note: Note): string {
     if (trimmed.startsWith("```")) continue;
     // If it's purely a list block, skip to step 2
     const paraLines = trimmed.split("\n");
-    const isListBlock = paraLines.every(l => /^\s*[-*+]|\s*\d+\.\s/.test(l.trim()) || l.trim() === "");
+    const isListBlock = paraLines.every(
+      (l) => /^\s*[-*+]|\s*\d+\.\s/.test(l.trim()) || l.trim() === "",
+    );
     if (!isListBlock) {
       const plain = stripMarkdownInline(trimmed);
       return truncate(collapseWhitespace(plain), MAX_SUMMARY_LENGTH);
@@ -48,10 +50,15 @@ export function extractProjectionSummary(note: Note): string {
     const trimmed = para.trim();
     if (!trimmed) continue;
     const paraLines = trimmed.split("\n");
-    const isListBlock = paraLines.some(l => /^\s*[-*+]|\s*\d+\.\s/.test(l.trim()));
+    const isListBlock = paraLines.some((l) => /^\s*[-*+]|\s*\d+\.\s/.test(l.trim()));
     if (isListBlock) {
       const plain = paraLines
-        .map(l => l.replace(/^\s*[-*+]\s*/, "").replace(/^\s*\d+\.\s*/, "").trim())
+        .map((l) =>
+          l
+            .replace(/^\s*[-*+]\s*/, "")
+            .replace(/^\s*\d+\.\s*/, "")
+            .trim(),
+        )
         .filter(Boolean)
         .join("; ");
       return truncate(collapseWhitespace(stripMarkdownInline(plain)), MAX_SUMMARY_LENGTH);
@@ -93,7 +100,9 @@ export function extractHeadings(markdown: string): string[] {
  * Build the projection text string used for embeddings.
  * Max 1200 chars; truncates headings section if needed.
  */
-export function buildProjectionText(projection: Pick<NoteProjection, "title" | "lifecycle" | "tags" | "summary" | "headings">): string {
+export function buildProjectionText(
+  projection: Pick<NoteProjection, "title" | "lifecycle" | "tags" | "summary" | "headings">,
+): string {
   const parts: string[] = [
     `Title: ${projection.title}`,
     projection.lifecycle ? `Lifecycle: ${projection.lifecycle}` : "",
@@ -115,7 +124,8 @@ export function buildProjectionText(projection: Pick<NoteProjection, "title" | "
 
   const headingsPrefix = "Headings: ";
   const available = MAX_PROJECTION_TEXT_LENGTH - withoutHeadings.length - 1; // -1 for \n
-  const truncatedHeadings = headingsPrefix + projection.headings.join(" | ").slice(0, available - headingsPrefix.length);
+  const truncatedHeadings =
+    headingsPrefix + projection.headings.join(" | ").slice(0, available - headingsPrefix.length);
   return `${withoutHeadings}\n${truncatedHeadings}`;
 }
 
@@ -178,7 +188,10 @@ export function isProjectionStale(note: Note, projection: NoteProjection): boole
 /**
  * Read a stored projection, or null if not found.
  */
-export async function getProjection(storage: NoteStorage, noteId: string): Promise<NoteProjection | null> {
+export async function getProjection(
+  storage: NoteStorage,
+  noteId: string,
+): Promise<NoteProjection | null> {
   return storage.readProjection(memoryId(noteId));
 }
 
@@ -187,7 +200,10 @@ export async function getProjection(storage: NoteStorage, noteId: string): Promi
  * Always returns a valid projection; builds on demand if missing or stale.
  * Saves the fresh projection to storage.
  */
-export async function getOrBuildProjection(storage: NoteStorage, note: Note): Promise<NoteProjection> {
+export async function getOrBuildProjection(
+  storage: NoteStorage,
+  note: Note,
+): Promise<NoteProjection> {
   const existing = await storage.readProjection(note.id);
   if (existing && !isProjectionStale(note, existing)) {
     return existing;
@@ -202,7 +218,10 @@ export async function getOrBuildProjection(storage: NoteStorage, note: Note): Pr
 /**
  * Save a projection to storage.
  */
-export async function saveProjection(storage: NoteStorage, projection: NoteProjection): Promise<void> {
+export async function saveProjection(
+  storage: NoteStorage,
+  projection: NoteProjection,
+): Promise<void> {
   return storage.writeProjection(projection);
 }
 
@@ -223,12 +242,12 @@ function truncate(text: string, maxLength: number): string {
 function stripMarkdownInline(text: string): string {
   return text
     .replace(/!\[([^\]]*)\]\([^)]*\)/g, "$1") // images
-    .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")  // links
-    .replace(/`([^`]+)`/g, "$1")              // inline code
-    .replace(/\*\*([^*]+)\*\*/g, "$1")        // bold **
-    .replace(/__([^_]+)__/g, "$1")            // bold __
-    .replace(/\*([^*]+)\*/g, "$1")            // italic *
-    .replace(/_([^_]+)_/g, "$1")              // italic _
-    .replace(/~~([^~]+)~~/g, "$1")            // strikethrough
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1") // links
+    .replace(/`([^`]+)`/g, "$1") // inline code
+    .replace(/\*\*([^*]+)\*\*/g, "$1") // bold **
+    .replace(/__([^_]+)__/g, "$1") // bold __
+    .replace(/\*([^*]+)\*/g, "$1") // italic *
+    .replace(/_([^_]+)_/g, "$1") // italic _
+    .replace(/~~([^~]+)~~/g, "$1") // strikethrough
     .trim();
 }

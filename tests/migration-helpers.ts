@@ -13,7 +13,10 @@ export async function assertMigrationIdempotent(
   vault: Vault,
 ): Promise<MigrationResult> {
   const second = await migration.run(vault, false);
-  expect(second.notesModified, `migration "${migration.name}" is not idempotent — second run modified ${second.notesModified} note(s)`).toBe(0);
+  expect(
+    second.notesModified,
+    `migration "${migration.name}" is not idempotent — second run modified ${second.notesModified} note(s)`,
+  ).toBe(0);
   expect(second.errors, `migration "${migration.name}" produced errors on second run`).toEqual([]);
   return second;
 }

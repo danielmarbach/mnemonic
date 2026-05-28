@@ -14,7 +14,8 @@ describe("markdown-ast round-trip", () => {
   });
 
   it("preserves nested content through parse-serialize cycle", () => {
-    const input = "# Title\n\n## Section\n\nSome text with **bold** and *italic*.\n\n> A blockquote\n\n1. ordered\n2. list";
+    const input =
+      "# Title\n\n## Section\n\nSome text with **bold** and *italic*.\n\n> A blockquote\n\n1. ordered\n2. list";
     expect(roundTrip(input)).toBe(input + "\n");
   });
 });

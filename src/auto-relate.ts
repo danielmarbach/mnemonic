@@ -14,11 +14,11 @@ const MAX_AUTO_RELATIONSHIPS = 2;
 const STRONG_OVERLAP_THRESHOLD = 0.42;
 
 // Scoring weights for auto-relationship suggestion
-const AUTO_RELATE_LEXICAL_WEIGHT = 0.45;    // Weight for lexical overlap score
+const AUTO_RELATE_LEXICAL_WEIGHT = 0.45; // Weight for lexical overlap score
 const AUTO_RELATE_TITLE_OVERLAP_WEIGHT = 0.2; // Weight for title token overlap
 const AUTO_RELATE_TAG_WEIGHT_PER_SHARED = 0.08; // Per shared tag (capped at 3 tags)
-const AUTO_RELATE_RECENCY_WEIGHT = 0.05;   // Weight for recency-based boost
-const AUTO_RELATE_MIN_SCORE = 0.32;         // Minimum combined score to suggest relationship
+const AUTO_RELATE_RECENCY_WEIGHT = 0.05; // Weight for recency-based boost
+const AUTO_RELATE_MIN_SCORE = 0.32; // Minimum combined score to suggest relationship
 
 function hasExplicitTitleMention(source: Note, candidate: Note): boolean {
   const normalizedTitle = normalizeText(candidate.title);
@@ -81,7 +81,9 @@ export function suggestAutoRelationships(
       const lexical = computeLexicalScore(sourceSummary || source.title, candidateProjection);
       const titleOverlap = computeTitleTokenOverlap(source, candidate.note);
       const sharedTags = computeSharedTagScore(source, candidate.note);
-      const recencyBoost = candidate.score ? Math.min(candidate.score, 1) * AUTO_RELATE_RECENCY_WEIGHT : 0;
+      const recencyBoost = candidate.score
+        ? Math.min(candidate.score, 1) * AUTO_RELATE_RECENCY_WEIGHT
+        : 0;
       const score =
         (explicitMention ? 1 : 0) +
         lexical * AUTO_RELATE_LEXICAL_WEIGHT +
@@ -91,7 +93,10 @@ export function suggestAutoRelationships(
 
       return { candidate, explicitMention, lexical, score };
     })
-    .filter(({ explicitMention, lexical, score }) => explicitMention || (lexical >= STRONG_OVERLAP_THRESHOLD && score >= AUTO_RELATE_MIN_SCORE))
+    .filter(
+      ({ explicitMention, lexical, score }) =>
+        explicitMention || (lexical >= STRONG_OVERLAP_THRESHOLD && score >= AUTO_RELATE_MIN_SCORE),
+    )
     .sort((left, right) => {
       if (right.score !== left.score) return right.score - left.score;
       return right.candidate.accessedAt.localeCompare(left.candidate.accessedAt);

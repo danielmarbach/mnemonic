@@ -55,7 +55,19 @@ Content from the attached vault.`;
   await writeFile(path.join(notesDir, "attached-note.md"), noteContent, "utf-8");
 
   await execFileAsync("git", ["add", ".mnemonic/"], { cwd: attachedDir });
-  await execFileAsync("git", ["-c", "user.email=test@example.com", "-c", "user.name=Test User", "commit", "-m", "chore: add mnemonic notes"], { cwd: attachedDir });
+  await execFileAsync(
+    "git",
+    [
+      "-c",
+      "user.email=test@example.com",
+      "-c",
+      "user.name=Test User",
+      "commit",
+      "-m",
+      "chore: add mnemonic notes",
+    ],
+    { cwd: attachedDir },
+  );
   await execFileAsync("git", ["remote", "add", "origin", bareDir], { cwd: attachedDir });
   await execFileAsync("git", ["push", "-u", "origin", "main"], { cwd: attachedDir });
   await execFileAsync("git", ["remote", "set-head", "origin", "--auto"], { cwd: attachedDir });
@@ -71,12 +83,19 @@ describe("recall attachment integration", () => {
   it("attached vault notes receive ATTACHMENT_BOOST scoring, between project-local and global", async () => {
     const { vaultDir, repoDir, attachedDir } = await createAttachmentFixture();
     const embeddingServer = await startFakeEmbeddingServer();
-    const session = await createPersistentMcpSession(vaultDir, { ollamaUrl: embeddingServer.url, disableGit: false });
+    const session = await createPersistentMcpSession(vaultDir, {
+      ollamaUrl: embeddingServer.url,
+      disableGit: false,
+    });
 
     try {
       await session.callTool("add_attachment", { cwd: repoDir, localPath: attachedDir });
 
-      const result = await session.callTool("recall", { cwd: repoDir, query: "attached vault", scope: "project" });
+      const result = await session.callTool("recall", {
+        cwd: repoDir,
+        query: "attached vault",
+        scope: "project",
+      });
 
       expect(result.text).toContain("Attached vault note");
     } finally {
@@ -88,12 +107,19 @@ describe("recall attachment integration", () => {
   it("scope project includes attached vault notes even when note.project differs", async () => {
     const { vaultDir, repoDir, attachedDir } = await createAttachmentFixture();
     const embeddingServer = await startFakeEmbeddingServer();
-    const session = await createPersistentMcpSession(vaultDir, { ollamaUrl: embeddingServer.url, disableGit: false });
+    const session = await createPersistentMcpSession(vaultDir, {
+      ollamaUrl: embeddingServer.url,
+      disableGit: false,
+    });
 
     try {
       await session.callTool("add_attachment", { cwd: repoDir, localPath: attachedDir });
 
-      const result = await session.callTool("recall", { cwd: repoDir, query: "attached vault", scope: "project" });
+      const result = await session.callTool("recall", {
+        cwd: repoDir,
+        query: "attached vault",
+        scope: "project",
+      });
 
       expect(result.text).toContain("attached-note");
     } finally {
@@ -105,7 +131,10 @@ describe("recall attachment integration", () => {
   it("scope global excludes attached vault notes", async () => {
     const { vaultDir, repoDir, attachedDir } = await createAttachmentFixture();
     const embeddingServer = await startFakeEmbeddingServer();
-    const session = await createPersistentMcpSession(vaultDir, { ollamaUrl: embeddingServer.url, disableGit: false });
+    const session = await createPersistentMcpSession(vaultDir, {
+      ollamaUrl: embeddingServer.url,
+      disableGit: false,
+    });
 
     try {
       await session.callTool("add_attachment", { cwd: repoDir, localPath: attachedDir });
@@ -122,12 +151,19 @@ describe("recall attachment integration", () => {
   it("storedIn attached in list returns only attached vault notes", async () => {
     const { vaultDir, repoDir, attachedDir } = await createAttachmentFixture();
     const embeddingServer = await startFakeEmbeddingServer();
-    const session = await createPersistentMcpSession(vaultDir, { ollamaUrl: embeddingServer.url, disableGit: false });
+    const session = await createPersistentMcpSession(vaultDir, {
+      ollamaUrl: embeddingServer.url,
+      disableGit: false,
+    });
 
     try {
       await session.callTool("add_attachment", { cwd: repoDir, localPath: attachedDir });
 
-      const result = await session.callTool("list", { cwd: repoDir, scope: "project", storedIn: "attached" });
+      const result = await session.callTool("list", {
+        cwd: repoDir,
+        scope: "project",
+        storedIn: "attached",
+      });
 
       expect(result.text).toContain("attached-note");
     } finally {
@@ -145,12 +181,20 @@ describe("attached vault output rendering", () => {
   it("list with includeStorage renders attached: prefix for attached vault notes", async () => {
     const { vaultDir, repoDir, attachedDir } = await createAttachmentFixture();
     const embeddingServer = await startFakeEmbeddingServer();
-    const session = await createPersistentMcpSession(vaultDir, { ollamaUrl: embeddingServer.url, disableGit: false });
+    const session = await createPersistentMcpSession(vaultDir, {
+      ollamaUrl: embeddingServer.url,
+      disableGit: false,
+    });
 
     try {
       await session.callTool("add_attachment", { cwd: repoDir, localPath: attachedDir });
 
-      const result = await session.callTool("list", { cwd: repoDir, scope: "project", storedIn: "attached", includeStorage: true });
+      const result = await session.callTool("list", {
+        cwd: repoDir,
+        scope: "project",
+        storedIn: "attached",
+        includeStorage: true,
+      });
 
       expect(result.text).toMatch(/attached:/);
     } finally {
@@ -162,7 +206,10 @@ describe("attached vault output rendering", () => {
   it("project_memory_summary counts attached vault notes", async () => {
     const { vaultDir, repoDir, attachedDir } = await createAttachmentFixture();
     const embeddingServer = await startFakeEmbeddingServer();
-    const session = await createPersistentMcpSession(vaultDir, { ollamaUrl: embeddingServer.url, disableGit: false });
+    const session = await createPersistentMcpSession(vaultDir, {
+      ollamaUrl: embeddingServer.url,
+      disableGit: false,
+    });
 
     try {
       await session.callTool("add_attachment", { cwd: repoDir, localPath: attachedDir });
@@ -179,15 +226,24 @@ describe("attached vault output rendering", () => {
   it("recall structured output contains attached: vault label", async () => {
     const { vaultDir, repoDir, attachedDir } = await createAttachmentFixture();
     const embeddingServer = await startFakeEmbeddingServer();
-    const session = await createPersistentMcpSession(vaultDir, { ollamaUrl: embeddingServer.url, disableGit: false });
+    const session = await createPersistentMcpSession(vaultDir, {
+      ollamaUrl: embeddingServer.url,
+      disableGit: false,
+    });
 
     try {
       await session.callTool("add_attachment", { cwd: repoDir, localPath: attachedDir });
 
-      const result = await session.callTool("recall", { cwd: repoDir, query: "attached vault", scope: "project" });
+      const result = await session.callTool("recall", {
+        cwd: repoDir,
+        query: "attached vault",
+        scope: "project",
+      });
 
       expect(result.structuredContent).toBeDefined();
-      const results = (result.structuredContent as Record<string, unknown>)?.results as Array<Record<string, unknown>> | undefined;
+      const results = (result.structuredContent as Record<string, unknown>)?.results as
+        | Array<Record<string, unknown>>
+        | undefined;
       expect(results).toBeDefined();
       const attachedResult = results?.find((r) => String(r.id).includes("attached-note"));
       expect(attachedResult).toBeDefined();

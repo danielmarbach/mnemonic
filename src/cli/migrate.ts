@@ -43,7 +43,7 @@ Examples:
   }
 
   const dryRun = argv.includes("--dry-run");
-  const cwdOption = argv.find(arg => arg.startsWith("--cwd="));
+  const cwdOption = argv.find((arg) => arg.startsWith("--cwd="));
   const targetCwd = cwdOption ? cwdOption.split("=")[1] : undefined;
 
   const vaultManager = new VaultManager(VAULT_PATH);
@@ -54,7 +54,7 @@ Examples:
   if (argv.includes("--list")) {
     const migrations = migrator.listAvailableMigrations();
     console.log("Available migrations:");
-    migrations.forEach(m => console.log(`  ${m.name}: ${m.description}`));
+    migrations.forEach((m) => console.log(`  ${m.name}: ${m.description}`));
 
     console.log("\nVault schema versions:");
     let totalPending = 0;
@@ -63,7 +63,9 @@ Examples:
       const pending = await migrator.getPendingMigrations(version);
       totalPending += pending.length;
       const label = vault.provenance === "project-local" ? "project" : "main";
-      console.log(`  ${label} (${vault.storage.vaultPath}): ${version} — ${pending.length} pending`);
+      console.log(
+        `  ${label} (${vault.storage.vaultPath}): ${version} — ${pending.length} pending`,
+      );
     }
 
     if (dryRun && totalPending > 0) {
@@ -80,9 +82,10 @@ Examples:
     console.log("   Use --dry-run first if you want to preview changes\n");
   }
 
-  const { migrationResults, vaultsProcessed } = await migrator.runAllPending(
-    { dryRun, cwd: targetCwd }
-  );
+  const { migrationResults, vaultsProcessed } = await migrator.runAllPending({
+    dryRun,
+    cwd: targetCwd,
+  });
 
   for (const [vaultPath, results] of migrationResults) {
     console.log(`\nVault: ${vaultPath}`);
@@ -91,15 +94,17 @@ Examples:
       console.log(`    Notes processed: ${result.notesProcessed}`);
       console.log(`    Notes modified: ${result.notesModified}`);
       if (!dryRun && result.notesModified > 0) {
-        console.log(`    Auto-committed: ${result.warnings.length === 0 ? "✓" : "⚠ (see warnings)"}`);
+        console.log(
+          `    Auto-committed: ${result.warnings.length === 0 ? "✓" : "⚠ (see warnings)"}`,
+        );
       }
       if (result.errors.length > 0) {
         console.log(`    Errors: ${result.errors.length}`);
-        result.errors.forEach(e => console.log(`      - ${e.noteId}: ${e.error}`));
+        result.errors.forEach((e) => console.log(`      - ${e.noteId}: ${e.error}`));
       }
       if (result.warnings.length > 0) {
         console.log(`    Warnings: ${result.warnings.length}`);
-        result.warnings.forEach(w => console.log(`      - ${w}`));
+        result.warnings.forEach((w) => console.log(`      - ${w}`));
       }
     }
   }

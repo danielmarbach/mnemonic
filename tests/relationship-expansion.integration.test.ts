@@ -6,14 +6,29 @@ import { execFile } from "child_process";
 import { promisify } from "util";
 import { fileURLToPath } from "url";
 
-import { GetResultSchema, ProjectSummaryResultSchema, RecallResultSchema } from "../src/structured-content.js";
-import { callLocalMcpResponse, extractRememberedId, startFakeEmbeddingServer, tempDirs } from "./helpers/mcp.js";
+import {
+  GetResultSchema,
+  ProjectSummaryResultSchema,
+  RecallResultSchema,
+} from "../src/structured-content.js";
+import {
+  callLocalMcpResponse,
+  extractRememberedId,
+  startFakeEmbeddingServer,
+  tempDirs,
+} from "./helpers/mcp.js";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const execFileAsync = promisify(execFile);
 
 afterEach(async () => {
-  await Promise.all(tempDirs.splice(0).map((dir) => import("fs/promises").then(fs => fs.rm(dir, { recursive: true, force: true }))));
+  await Promise.all(
+    tempDirs
+      .splice(0)
+      .map((dir) =>
+        import("fs/promises").then((fs) => fs.rm(dir, { recursive: true, force: true })),
+      ),
+  );
 });
 
 beforeAll(async () => {
@@ -46,7 +61,10 @@ describe("Phase 4 relationship expansion", () => {
       });
 
       // Relate Note A to Note B
-      const noteAList = await callLocalMcpTool(vaultDir, "list", { cwd: vaultDir, scope: "project" });
+      const noteAList = await callLocalMcpTool(vaultDir, "list", {
+        cwd: vaultDir,
+        scope: "project",
+      });
       const noteAId = noteAList.structuredContent?.notes?.[0]?.id;
       if (!noteAId) throw new Error("Note A not found");
 
@@ -138,38 +156,58 @@ describe("Phase 4 relationship expansion", () => {
       const embeddingServer = await startFakeEmbeddingServer();
       try {
         // Create anchor note
-        const anchor = await callLocalMcpTool(vaultDir, "remember", {
-          title: "Anchor Note",
-          content: "Anchor content",
-          cwd: vaultDir,
-          scope: "project",
-          lifecycle: "permanent",
-          tags: ["anchor"],
-        }, { ollamaUrl: embeddingServer.url });
+        const anchor = await callLocalMcpTool(
+          vaultDir,
+          "remember",
+          {
+            title: "Anchor Note",
+            content: "Anchor content",
+            cwd: vaultDir,
+            scope: "project",
+            lifecycle: "permanent",
+            tags: ["anchor"],
+          },
+          { ollamaUrl: embeddingServer.url },
+        );
 
         // Create related note
-        const related = await callLocalMcpTool(vaultDir, "remember", {
-          title: "Related to Anchor",
-          content: "Related content",
-          cwd: vaultDir,
-          scope: "project",
-          lifecycle: "permanent",
-        }, { ollamaUrl: embeddingServer.url });
+        const related = await callLocalMcpTool(
+          vaultDir,
+          "remember",
+          {
+            title: "Related to Anchor",
+            content: "Related content",
+            cwd: vaultDir,
+            scope: "project",
+            lifecycle: "permanent",
+          },
+          { ollamaUrl: embeddingServer.url },
+        );
 
         // Relate
-        await callLocalMcpTool(vaultDir, "relate", {
-          fromId: related.structuredContent?.id,
-          toId: anchor.structuredContent?.id,
-          type: "related-to",
-          cwd: vaultDir,
-        }, { ollamaUrl: embeddingServer.url });
+        await callLocalMcpTool(
+          vaultDir,
+          "relate",
+          {
+            fromId: related.structuredContent?.id,
+            toId: anchor.structuredContent?.id,
+            type: "related-to",
+            cwd: vaultDir,
+          },
+          { ollamaUrl: embeddingServer.url },
+        );
 
         // Recall
-        const result = await callLocalMcpTool(vaultDir, "recall", {
-          query: "anchor",
-          cwd: vaultDir,
-          limit: 1,
-        }, { ollamaUrl: embeddingServer.url });
+        const result = await callLocalMcpTool(
+          vaultDir,
+          "recall",
+          {
+            query: "anchor",
+            cwd: vaultDir,
+            limit: 1,
+          },
+          { ollamaUrl: embeddingServer.url },
+        );
 
         const parsed = RecallResultSchema.parse(result.structuredContent);
         expect(parsed.results).toHaveLength(1);
@@ -235,7 +273,9 @@ describe("Phase 4 relationship expansion", () => {
       const parsed = ProjectSummaryResultSchema.parse(result.structuredContent);
       expect(parsed.orientation.primaryEntry.relationships).toBeDefined();
       expect(parsed.orientation.primaryEntry.relationships?.shown).toBeDefined();
-      expect(parsed.orientation.primaryEntry.relationships?.totalDirectRelations).toBeGreaterThanOrEqual(2);
+      expect(
+        parsed.orientation.primaryEntry.relationships?.totalDirectRelations,
+      ).toBeGreaterThanOrEqual(2);
     }, 30000);
 
     it("includes relationships on suggestedNext entries", async () => {
@@ -313,7 +353,9 @@ describe("Phase 4 relationship expansion", () => {
 
       const parsed = ProjectSummaryResultSchema.parse(result.structuredContent);
       // At least one suggestedNext should have relationships
-      const withRelationships = parsed.orientation.suggestedNext.filter(e => e.relationships !== undefined);
+      const withRelationships = parsed.orientation.suggestedNext.filter(
+        (e) => e.relationships !== undefined,
+      );
       expect(withRelationships.length).toBeGreaterThan(0);
     }, 30000);
   });
@@ -359,7 +401,7 @@ describe("Phase 4 relationship expansion", () => {
       const parsed = GetResultSchema.parse(result.structuredContent);
       expect(parsed.notes[0].relationships).toBeDefined();
       expect(parsed.notes[0].relationships?.totalDirectRelations).toBe(1);
-      const shownIds = parsed.notes[0].relationships?.shown.map(r => r.id);
+      const shownIds = parsed.notes[0].relationships?.shown.map((r) => r.id);
       expect(shownIds).toContain(globalNote.structuredContent?.id);
     }, 30000);
 
@@ -434,7 +476,7 @@ describe("Phase 4 relationship expansion", () => {
       // The shown entries (limit 3) should include both project notes; global note may be shown
       // but project notes must rank before global when limit < total
       const shown = parsed.notes[0].relationships!.shown;
-      const shownIds = shown.map(r => r.id);
+      const shownIds = shown.map((r) => r.id);
       // Both project notes should appear before the global note (same-project boost of 100)
       expect(shownIds).toContain(projectNote1.structuredContent?.id);
       expect(shownIds).toContain(projectNote2.structuredContent?.id);

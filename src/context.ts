@@ -19,7 +19,9 @@ const TEMPORAL_HISTORY_COMMIT_LIMIT = 5;
 
 async function readPackageVersion(): Promise<string> {
   const packageJsonPath = path.resolve(import.meta.dirname, "../package.json");
-  const readResult = await attempt("context:package-json", () => fs.readFile(packageJsonPath, "utf8"));
+  const readResult = await attempt("context:package-json", () =>
+    fs.readFile(packageJsonPath, "utf8"),
+  );
   if (!readResult.ok) return "0.1.0";
   const parsed = PackageJsonSchema.safeParse(JSON.parse(readResult.value));
   return parsed.success ? (parsed.data.version ?? "0.1.0") : "0.1.0";

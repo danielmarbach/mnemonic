@@ -119,14 +119,17 @@ export function getActiveProjectCache(projectId: string): SessionProjectCache | 
  */
 export async function getOrBuildVaultNoteList(
   projectId: string,
-  vault: Vault
+  vault: Vault,
 ): Promise<Note[] | undefined> {
   const vaultPath = vault.storage.vaultPath;
   const cache = ensureActiveProjectCache(projectId);
 
   const existing = cache.vaultCaches.get(vaultPath);
   if (existing) {
-    debugLog("cache:hit", `project=${projectId} vault=${vaultPath} notes=${existing.noteList.length}`);
+    debugLog(
+      "cache:hit",
+      `project=${projectId} vault=${vaultPath} notes=${existing.noteList.length}`,
+    );
     return existing.noteList;
   }
 
@@ -142,7 +145,7 @@ export async function getOrBuildVaultNoteList(
     const ms = (performance.now() - t0).toFixed(1);
     debugLog(
       "cache:build",
-      `project=${projectId} vault=${vaultPath} notes=${noteList.length} embeddings=${embeddings.length} time=${ms}ms`
+      `project=${projectId} vault=${vaultPath} notes=${noteList.length} embeddings=${embeddings.length} time=${ms}ms`,
     );
     return noteList;
   });
@@ -162,14 +165,17 @@ export async function getOrBuildVaultNoteList(
  */
 export async function getOrBuildVaultEmbeddings(
   projectId: string,
-  vault: Vault
+  vault: Vault,
 ): Promise<EmbeddingRecord[] | undefined> {
   const vaultPath = vault.storage.vaultPath;
   const cache = ensureActiveProjectCache(projectId);
 
   const existing = cache.vaultCaches.get(vaultPath);
   if (existing) {
-    debugLog("cache:hit", `project=${projectId} vault=${vaultPath} embeddings=${existing.embeddings.length}`);
+    debugLog(
+      "cache:hit",
+      `project=${projectId} vault=${vaultPath} embeddings=${existing.embeddings.length}`,
+    );
     return existing.embeddings;
   }
 
@@ -185,7 +191,7 @@ export async function getOrBuildVaultEmbeddings(
     const ms = (performance.now() - t0).toFixed(1);
     debugLog(
       "cache:build",
-      `project=${projectId} vault=${vaultPath} notes=${noteList.length} embeddings=${embeddings.length} time=${ms}ms`
+      `project=${projectId} vault=${vaultPath} notes=${noteList.length} embeddings=${embeddings.length} time=${ms}ms`,
     );
     return embeddings;
   });
@@ -204,7 +210,7 @@ export async function getOrBuildVaultEmbeddings(
 export function getSessionCachedNote(
   projectId: string,
   vaultPath: string,
-  noteId: string
+  noteId: string,
 ): Note | undefined {
   const cache = sessionCaches.activeProject;
   if (!cache || cache.projectId !== projectId) return undefined;
@@ -217,18 +223,14 @@ export function getSessionCachedNote(
  */
 export function getSessionCachedProjection(
   projectId: string,
-  noteId: string
+  noteId: string,
 ): NoteProjection | undefined {
   const cache = sessionCaches.activeProject;
   if (!cache || cache.projectId !== projectId) return undefined;
   return cache.projectionsById.get(noteId);
 }
 
-export function setSessionCachedNote(
-  projectId: string,
-  vaultPath: string,
-  note: Note,
-): void {
+export function setSessionCachedNote(projectId: string, vaultPath: string, note: Note): void {
   const cache = ensureActiveProjectCache(projectId);
   cache.recentNotesByKey.set(`${vaultPath}::${note.id}`, note);
   const existing = cache.vaultCaches.get(vaultPath);
@@ -267,7 +269,7 @@ export function getRecentSessionAccessNote(
 export function setSessionCachedProjection(
   projectId: string,
   noteId: string,
-  projection: NoteProjection
+  projection: NoteProjection,
 ): void {
   const cache = sessionCaches.activeProject;
   if (!cache || cache.projectId !== projectId) return;
@@ -282,7 +284,7 @@ export function getSessionCachedProjectionTokens(
   projectId: string,
   vaultPath: string,
   noteId: string,
-  projectionText: string
+  projectionText: string,
 ): string[] | undefined {
   const cache = sessionCaches.activeProject;
   if (!cache || cache.projectId !== projectId) return undefined;
@@ -296,7 +298,7 @@ export function setSessionCachedProjectionTokens(
   vaultPath: string,
   noteId: string,
   projectionText: string,
-  tokens: string[]
+  tokens: string[],
 ): void {
   const cache = sessionCaches.activeProject;
   if (!cache || cache.projectId !== projectId) return;

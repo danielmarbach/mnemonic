@@ -4,12 +4,19 @@ import type { Vault } from "../vault.js";
 import type { PersistenceStatus } from "../structured-content.js";
 import { getOrBuildVaultNoteList } from "../cache.js";
 import { resolveProject } from "./project.js";
-import { formatCommitBody, commitVaultWithProtection, checkVaultProtectedBranch } from "./git-commit.js";
-import { pushAfterMutation, buildMutationRetryContract, buildPersistenceStatus } from "./persistence.js";
+import {
+  formatCommitBody,
+  commitVaultWithProtection,
+  checkVaultProtectedBranch,
+} from "./git-commit.js";
+import {
+  pushAfterMutation,
+  buildMutationRetryContract,
+  buildPersistenceStatus,
+} from "./persistence.js";
 import { ProtectedBranchError } from "../domain-errors.js";
 import { filterRelationships } from "../consolidate.js";
 import { summarizePreview } from "../project-introspection.js";
-
 
 export type SearchScope = "project" | "global" | "all";
 export type StorageScope = "project-vault" | "main-vault" | "any" | "attached";
@@ -69,24 +76,30 @@ export async function collectVisibleNotes(
     // Attached vaults are project-scoped; exclude them from global scope
     if (scope === "global" && vault.provenance === "project-attached") continue;
 
-    const includeAllForScope = vault.provenance === "project-attached" && filterProject !== null && filterProject !== undefined;
+    const includeAllForScope =
+      vault.provenance === "project-attached" &&
+      filterProject !== null &&
+      filterProject !== undefined;
     const effectiveFilter = includeAllForScope ? undefined : filterProject;
 
     let rawNotes: Note[];
     if (sessionProjectId) {
       const cached = await getOrBuildVaultNoteList(sessionProjectId, vault);
       if (cached !== undefined) {
-        rawNotes = effectiveFilter !== undefined
-          ? cached.filter((n) => effectiveFilter === null ? !n.project : n.project === effectiveFilter)
-          : cached;
+        rawNotes =
+          effectiveFilter !== undefined
+            ? cached.filter((n) =>
+                effectiveFilter === null ? !n.project : n.project === effectiveFilter,
+              )
+            : cached;
       } else {
         rawNotes = await vault.storage.listNotes(
-          effectiveFilter !== undefined ? { project: effectiveFilter } : undefined
+          effectiveFilter !== undefined ? { project: effectiveFilter } : undefined,
         );
       }
     } else {
       rawNotes = await vault.storage.listNotes(
-        effectiveFilter !== undefined ? { project: effectiveFilter } : undefined
+        effectiveFilter !== undefined ? { project: effectiveFilter } : undefined,
       );
     }
     for (const note of rawNotes) {
@@ -119,7 +132,12 @@ export async function collectVisibleNotes(
 
 export function formatListEntry(
   entry: NoteEntry,
-  options: { includeRelations?: boolean; includePreview?: boolean; includeStorage?: boolean; includeUpdated?: boolean } = {}
+  options: {
+    includeRelations?: boolean;
+    includePreview?: boolean;
+    includeStorage?: boolean;
+    includeUpdated?: boolean;
+  } = {},
 ): string {
   const { note, vault } = entry;
   const proj = note.project ? `[${note.projectName ?? note.project}]` : "[global]";
@@ -129,7 +147,9 @@ export function formatListEntry(
   if (note.role) extras.push(`role: ${note.role}`);
   if (options.includeStorage) extras.push(`stored: ${storageLabel(vault)}`);
   if (options.includeUpdated) extras.push(`updated: ${note.updatedAt}`);
-  const lines = [`- **${note.title}** \`${note.id}\` ${proj}${extras.length > 0 ? ` — ${extras.join(" | ")}` : ""}`];
+  const lines = [
+    `- **${note.title}** \`${note.id}\` ${proj}${extras.length > 0 ? ` — ${extras.join(" | ")}` : ""}`,
+  ];
   if (options.includeRelations && note.relatedTo && note.relatedTo.length > 0) {
     lines.push(`  related: ${note.relatedTo.map((rel) => `${rel.id} (${rel.type})`).join(", ")}`);
   }
@@ -139,7 +159,10 @@ export function formatListEntry(
   return lines.join("\n");
 }
 
-export async function formatProjectPolicyLine(ctx: ServerContext, projectId?: string): Promise<string> {
+export async function formatProjectPolicyLine(
+  ctx: ServerContext,
+  projectId?: string,
+): Promise<string> {
   if (!projectId) {
     return "Policy: none";
   }
@@ -160,7 +183,10 @@ export const ROLE_LIFECYCLE_DEFAULTS = {
   reference: "permanent",
 } as const satisfies Record<NoteRole, NoteLifecycle>;
 
-export async function ensureAttachmentsLoaded(ctx: ServerContext, projectId: string): Promise<void> {
+export async function ensureAttachmentsLoaded(
+  ctx: ServerContext,
+  projectId: string,
+): Promise<void> {
   const existing = ctx.vaultManager.getAttachmentsForProject(projectId);
   if (existing.length > 0) return;
 
@@ -172,7 +198,10 @@ export async function ensureAttachmentsLoaded(ctx: ServerContext, projectId: str
 }
 
 export function projectNotFoundResponse(cwd: string) {
-  return { content: [{ type: "text" as const, text: `Could not detect a project for: ${cwd}` }], isError: true as const };
+  return {
+    content: [{ type: "text" as const, text: `Could not detect a project for: ${cwd}` }],
+    isError: true as const,
+  };
 }
 
 export async function moveNoteBetweenVaults(
@@ -189,8 +218,21 @@ export async function moveNoteBetweenVaults(
   const embedding = await sourceVault.storage.readEmbedding(note.id);
 
   const preChecks = await Promise.all([
-    checkVaultProtectedBranch({ ctx, vault: sourceVault, allowProtectedBranch, toolName: "move_memory", noteProjectId: note.project ?? undefined }),
-    checkVaultProtectedBranch({ ctx, vault: targetVault, allowProtectedBranch, toolName: "move_memory", noteProjectId: (targetVault.provenance === "project-local" ? (targetProjectId ?? note.project) : undefined) }),
+    checkVaultProtectedBranch({
+      ctx,
+      vault: sourceVault,
+      allowProtectedBranch,
+      toolName: "move_memory",
+      noteProjectId: note.project ?? undefined,
+    }),
+    checkVaultProtectedBranch({
+      ctx,
+      vault: targetVault,
+      allowProtectedBranch,
+      toolName: "move_memory",
+      noteProjectId:
+        targetVault.provenance === "project-local" ? (targetProjectId ?? note.project) : undefined,
+    }),
   ]);
 
   for (const check of preChecks) {
@@ -242,9 +284,10 @@ export async function moveNoteBetweenVaults(
     allowProtectedBranch,
     toolName: "move_memory",
   });
-  const targetPush = targetCommit.status === "committed"
-    ? await pushAfterMutation(ctx, targetVault)
-    : { status: "skipped" as const, reason: "commit-failed" as const };
+  const targetPush =
+    targetCommit.status === "committed"
+      ? await pushAfterMutation(ctx, targetVault)
+      : { status: "skipped" as const, reason: "commit-failed" as const };
   const retry = buildMutationRetryContract({
     commit: targetCommit,
     commitMessage: targetCommitMessage,
@@ -263,7 +306,9 @@ export async function moveNoteBetweenVaults(
     persistence: buildPersistenceStatus({
       storage: targetVault.storage,
       id: finalNote.id,
-      embedding: embedding ? { status: "written" } : { status: "skipped", reason: "no-source-embedding" },
+      embedding: embedding
+        ? { status: "written" }
+        : { status: "skipped", reason: "no-source-embedding" },
       commit: targetCommit,
       push: targetPush,
       commitMessage: targetCommitMessage,
@@ -273,7 +318,10 @@ export async function moveNoteBetweenVaults(
   };
 }
 
-export async function removeRelationshipsToNoteIds(ctx: ServerContext, noteIds: string[]): Promise<Map<Vault, string[]>> {
+export async function removeRelationshipsToNoteIds(
+  ctx: ServerContext,
+  noteIds: string[],
+): Promise<Map<Vault, string[]>> {
   const vaultChanges = new Map<Vault, string[]>();
 
   await Promise.all(
@@ -299,7 +347,11 @@ export async function removeRelationshipsToNoteIds(ctx: ServerContext, noteIds: 
   return vaultChanges;
 }
 
-export function addVaultChange(vaultChanges: Map<Vault, string[]>, vault: Vault, file: string): void {
+export function addVaultChange(
+  vaultChanges: Map<Vault, string[]>,
+  vault: Vault,
+  file: string,
+): void {
   const files = vaultChanges.get(vault) ?? [];
   if (!files.includes(file)) {
     files.push(file);

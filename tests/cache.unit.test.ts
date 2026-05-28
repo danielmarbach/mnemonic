@@ -271,7 +271,9 @@ describe("projection cache", () => {
   });
 
   it("setSessionCachedProjection is a no-op when no cache exists", () => {
-    expect(() => setSessionCachedProjection("test-project", "note-1", makeProjection("note-1"))).not.toThrow();
+    expect(() =>
+      setSessionCachedProjection("test-project", "note-1", makeProjection("note-1")),
+    ).not.toThrow();
   });
 
   it("stores and retrieves projection tokens when projection text matches", async () => {
@@ -288,7 +290,7 @@ describe("projection cache", () => {
     ]);
 
     expect(
-      getSessionCachedProjectionTokens("test-project", "/vault/project", "note-1", projectionText)
+      getSessionCachedProjectionTokens("test-project", "/vault/project", "note-1", projectionText),
     ).toEqual(["title", "note", "hybrid", "recall", "design"]);
   });
 
@@ -307,8 +309,8 @@ describe("projection cache", () => {
         "test-project",
         "/vault/project",
         "note-1",
-        "Title: Note note-1\nSummary: updated"
-      )
+        "Title: Note note-1\nSummary: updated",
+      ),
     ).toBeUndefined();
   });
 
@@ -325,7 +327,7 @@ describe("projection cache", () => {
     invalidateActiveProjectCache();
 
     expect(
-      getSessionCachedProjectionTokens("test-project", "/vault/project", "note-1", projectionText)
+      getSessionCachedProjectionTokens("test-project", "/vault/project", "note-1", projectionText),
     ).toBeUndefined();
   });
 
@@ -336,8 +338,8 @@ describe("projection cache", () => {
         "/vault/project",
         "note-1",
         "Title: Note note-1",
-        ["title", "note"]
-      )
+        ["title", "note"],
+      ),
     ).not.toThrow();
   });
 });

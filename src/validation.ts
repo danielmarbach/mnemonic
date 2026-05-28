@@ -57,28 +57,41 @@ export function validateRelatedTo(value: unknown): Relationship[] | undefined {
       }
       validated.push(relationship);
     } else {
-      console.error(`[validation] Skipping invalid relationship entry: ${JSON.stringify(result.error.issues)}`);
+      console.error(
+        `[validation] Skipping invalid relationship entry: ${JSON.stringify(result.error.issues)}`,
+      );
     }
   }
   return validated.length > 0 ? validated : undefined;
 }
 
-export function validateEmbeddingRecord(raw: unknown): import("./storage.js").EmbeddingRecord | null {
+export function validateEmbeddingRecord(
+  raw: unknown,
+): import("./storage.js").EmbeddingRecord | null {
   const result = EmbeddingRecordSchema.safeParse(raw);
   if (result.success) {
     return {
       id: memoryId(result.data.id),
       model: embeddingModelId(result.data.model),
-      provider: result.data.provider !== undefined ? embeddingProviderId(result.data.provider) : undefined,
-      dimensions: result.data.dimensions !== undefined ? embeddingDimensions(result.data.dimensions) : undefined,
+      provider:
+        result.data.provider !== undefined ? embeddingProviderId(result.data.provider) : undefined,
+      dimensions:
+        result.data.dimensions !== undefined
+          ? embeddingDimensions(result.data.dimensions)
+          : undefined,
       metric: result.data.metric !== undefined ? embeddingMetric(result.data.metric) : undefined,
       inputMode: result.data.inputMode,
-      compatibilityKey: result.data.compatibilityKey !== undefined ? embeddingCompatibilityKey(result.data.compatibilityKey) : undefined,
+      compatibilityKey:
+        result.data.compatibilityKey !== undefined
+          ? embeddingCompatibilityKey(result.data.compatibilityKey)
+          : undefined,
       embedding: result.data.embedding,
       updatedAt: isoDateString(result.data.updatedAt),
     };
   }
-  console.error(`[validation] Embedding record validation failed: ${JSON.stringify(result.error.issues)}`);
+  console.error(
+    `[validation] Embedding record validation failed: ${JSON.stringify(result.error.issues)}`,
+  );
   return null;
 }
 
@@ -87,6 +100,8 @@ export function validateNoteProjection(raw: unknown): NoteProjection | null {
   if (result.success) {
     return result.data as NoteProjection;
   }
-  console.error(`[validation] Note projection validation failed: ${JSON.stringify(result.error.issues)}`);
+  console.error(
+    `[validation] Note projection validation failed: ${JSON.stringify(result.error.issues)}`,
+  );
   return null;
 }

@@ -1,11 +1,16 @@
 import { getCurrentGitBranch } from "../project.js";
-import { isProtectedBranch, resolveProtectedBranchBehavior, resolveProtectedBranchPatterns, type WriteScope, type ProjectMemoryPolicy } from "../project-memory-policy.js";
+import {
+  isProtectedBranch,
+  resolveProtectedBranchBehavior,
+  resolveProtectedBranchPatterns,
+  type WriteScope,
+  type ProjectMemoryPolicy,
+} from "../project-memory-policy.js";
 import type { ServerContext } from "../server-context.js";
 import type { Vault } from "../vault.js";
 import type { CommitResult } from "../git.js";
 import path from "node:path";
 import { expandHomePath } from "../paths.js";
-
 
 export function extractSummary(content: string, maxLength = 100): string {
   const normalized = content.replace(/\s+/g, " ").trim();
@@ -78,7 +83,9 @@ export function formatCommitBody(options: CommitBodyOptions): string {
   }
 
   if (options.relationship) {
-    lines.push(`- Relationship: ${options.relationship.fromId} ${options.relationship.type} ${options.relationship.toId}`);
+    lines.push(
+      `- Relationship: ${options.relationship.fromId} ${options.relationship.type} ${options.relationship.toId}`,
+    );
   }
 
   if (options.mode) {
@@ -104,8 +111,8 @@ export function formatAskForWriteScope(
   return [
     header,
     "Choose where to store this memory and call `remember` again with one of:",
-    "- `scope: \"project\"` — create `.mnemonic/` in this repo and store there (adopts mnemonic)",
-    "- `scope: \"global\"` — private main vault with project association",
+    '- `scope: "project"` — create `.mnemonic/` in this repo and store there (adopts mnemonic)',
+    '- `scope: "global"` — private main vault with project association',
     "",
     "To avoid being asked again: call `set_project_memory_policy` with your preferred scope.",
   ].join("\n");
@@ -121,8 +128,8 @@ export function formatAskForProtectedBranch(
     `Protected branch check for ${projectLabel}: current branch \`${branch}\` matches ${patterns.join(", ")}.`,
     "Choose how to proceed:",
     `- One-time override: call \`${toolName}\` again with \`allowProtectedBranch: true\``,
-    "- Persist policy: call `set_project_memory_policy` with `protectedBranchBehavior: \"block\"`",
-    "- Persist policy: call `set_project_memory_policy` with `protectedBranchBehavior: \"allow\"`",
+    '- Persist policy: call `set_project_memory_policy` with `protectedBranchBehavior: "block"`',
+    '- Persist policy: call `set_project_memory_policy` with `protectedBranchBehavior: "allow"`',
     "",
     "Optional: set `protectedBranchPatterns` to customize which branches are protected.",
   ].join("\n");
@@ -136,9 +143,9 @@ export function formatProtectedBranchBlocked(
 ): string {
   return [
     `Auto-commit blocked for ${projectLabel}: current branch \`${branch}\` matches protected patterns ${patterns.join(", ")}.`,
-    "Policy is set to `protectedBranchBehavior: \"block\"`.",
+    'Policy is set to `protectedBranchBehavior: "block"`.',
     `To proceed once, call \`${toolName}\` again with \`allowProtectedBranch: true\`.`,
-    "To change the default, call `set_project_memory_policy` with `protectedBranchBehavior: \"allow\"`.",
+    'To change the default, call `set_project_memory_policy` with `protectedBranchBehavior: "allow"`.',
   ].join("\n");
 }
 
@@ -152,7 +159,8 @@ export async function shouldBlockProtectedBranchCommit(options: {
   allowProtectedBranch: boolean;
   toolName: string;
 }): Promise<{ blocked: boolean; message?: string }> {
-  const { cwd, writeScope, automaticCommit, projectLabel, policy, allowProtectedBranch, toolName } = options;
+  const { cwd, writeScope, automaticCommit, projectLabel, policy, allowProtectedBranch, toolName } =
+    options;
   if (!cwd || writeScope !== "project" || !automaticCommit) {
     return { blocked: false };
   }
@@ -172,13 +180,17 @@ export async function shouldBlockProtectedBranchCommit(options: {
     return { blocked: false };
   }
 
-  const message = behavior === "block"
-    ? formatProtectedBranchBlocked(projectLabel, branch, patterns, toolName)
-    : formatAskForProtectedBranch(projectLabel, branch, patterns, toolName);
+  const message =
+    behavior === "block"
+      ? formatProtectedBranchBlocked(projectLabel, branch, patterns, toolName)
+      : formatAskForProtectedBranch(projectLabel, branch, patterns, toolName);
   return { blocked: true, message };
 }
 
-export async function wouldRelationshipCleanupTouchProjectVault(ctx: ServerContext, noteIds: string[]): Promise<boolean> {
+export async function wouldRelationshipCleanupTouchProjectVault(
+  ctx: ServerContext,
+  noteIds: string[],
+): Promise<boolean> {
   const noteIdSet = new Set(noteIds);
   for (const vault of ctx.vaultManager.allKnownVaultsMutable()) {
     if (vault.provenance !== "project-local") {
@@ -206,7 +218,16 @@ export async function commitVaultWithProtection(options: {
   toolName: string;
   noteProjectId?: string;
 }): Promise<CommitResult> {
-  const { ctx, vault, commitMessage, files, commitBody, allowProtectedBranch, toolName, noteProjectId } = options;
+  const {
+    ctx,
+    vault,
+    commitMessage,
+    files,
+    commitBody,
+    allowProtectedBranch,
+    toolName,
+    noteProjectId,
+  } = options;
 
   if (!vault.writable) {
     return { status: "failed", reason: "error", error: "Vault is read-only." };
@@ -218,21 +239,22 @@ export async function commitVaultWithProtection(options: {
 
   const vaultPath = vault.storage.vaultPath;
 
-  const vaultCwd = vault.provenance === "project-local"
-    ? path.resolve(vaultPath, "..")
-    : vault.attachmentRef
-      ? expandHomePath(vault.attachmentRef.localPath)
-      : vaultPath;
+  const vaultCwd =
+    vault.provenance === "project-local"
+      ? path.resolve(vaultPath, "..")
+      : vault.attachmentRef
+        ? expandHomePath(vault.attachmentRef.localPath)
+        : vaultPath;
 
-  const projectId = vault.provenance === "project-local"
-    ? noteProjectId
-    : vault.attachmentRef?.projectSlug;
+  const projectId =
+    vault.provenance === "project-local" ? noteProjectId : vault.attachmentRef?.projectSlug;
 
   const policy = projectId ? await ctx.configStore.getProjectPolicy(projectId) : undefined;
 
-  const projectLabel = vault.provenance === "project-attached" && vault.attachmentRef
-    ? `${vault.attachmentRef.projectName} (${vault.attachmentRef.projectSlug})`
-    : "this context";
+  const projectLabel =
+    vault.provenance === "project-attached" && vault.attachmentRef
+      ? `${vault.attachmentRef.projectName} (${vault.attachmentRef.projectSlug})`
+      : "this context";
 
   const skipCheck = !policy && vault.provenance === "project-attached";
   if (!skipCheck) {
@@ -248,7 +270,11 @@ export async function commitVaultWithProtection(options: {
     });
 
     if (protectedBranchCheck.blocked) {
-      return { status: "failed", reason: "error", error: protectedBranchCheck.message ?? "Protected branch policy blocked this commit." };
+      return {
+        status: "failed",
+        reason: "error",
+        error: protectedBranchCheck.message ?? "Protected branch policy blocked this commit.",
+      };
     }
   }
 
@@ -270,25 +296,26 @@ export async function checkVaultProtectedBranch(options: {
 
   const vaultPath = vault.storage.vaultPath;
 
-  const vaultCwd = vault.provenance === "project-local"
-    ? path.resolve(vaultPath, "..")
-    : vault.attachmentRef
-      ? expandHomePath(vault.attachmentRef.localPath)
-      : undefined;
+  const vaultCwd =
+    vault.provenance === "project-local"
+      ? path.resolve(vaultPath, "..")
+      : vault.attachmentRef
+        ? expandHomePath(vault.attachmentRef.localPath)
+        : undefined;
 
   if (!vaultCwd) {
     return { blocked: false };
   }
 
-  const projectId = vault.provenance === "project-local"
-    ? noteProjectId
-    : vault.attachmentRef?.projectSlug;
+  const projectId =
+    vault.provenance === "project-local" ? noteProjectId : vault.attachmentRef?.projectSlug;
 
   const policy = projectId ? await ctx.configStore.getProjectPolicy(projectId) : undefined;
 
-  const projectLabel = vault.provenance === "project-attached" && vault.attachmentRef
-    ? `${vault.attachmentRef.projectName} (${vault.attachmentRef.projectSlug})`
-    : "this context";
+  const projectLabel =
+    vault.provenance === "project-attached" && vault.attachmentRef
+      ? `${vault.attachmentRef.projectName} (${vault.attachmentRef.projectSlug})`
+      : "this context";
 
   const skipCheck = !policy && vault.provenance === "project-attached";
   if (skipCheck) {

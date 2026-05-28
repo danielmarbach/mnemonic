@@ -2,16 +2,9 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ServerContext } from "../server-context.js";
 import { ConsolidateResultSchema } from "../structured-content.js";
-import {
-  projectParam,
-  resolveProject,
-  ensureBranchSynced,
-} from "../helpers/project.js";
+import { projectParam, resolveProject, ensureBranchSynced } from "../helpers/project.js";
 import { collectVisibleNotes, projectNotFoundResponse } from "../helpers/vault.js";
-import {
-  CONSOLIDATION_MODES,
-  resolveConsolidationMode,
-} from "../project-memory-policy.js";
+import { CONSOLIDATION_MODES, resolveConsolidationMode } from "../project-memory-policy.js";
 import { invalidateActiveProjectCache } from "../cache.js";
 import {
   detectDuplicates,
@@ -59,14 +52,16 @@ export function registerConsolidateTool(server: McpServer, ctx: ServerContext): 
           ])
           .describe(
             "What to do: 'dry-run' = full analysis without changes, 'detect-duplicates' = find similar pairs, " +
-            "'find-clusters' = group by theme and relationships, 'suggest-merges' = actionable merge recommendations, " +
-            "'execute-merge' = perform a merge (requires mergePlan), 'prune-superseded' = delete notes marked as superseded. " +
-            "Use `evidence: true` on analysis strategies for trust/risk signals."
+              "'find-clusters' = group by theme and relationships, 'suggest-merges' = actionable merge recommendations, " +
+              "'execute-merge' = perform a merge (requires mergePlan), 'prune-superseded' = delete notes marked as superseded. " +
+              "Use `evidence: true` on analysis strategies for trust/risk signals.",
           ),
         mode: z
           .enum(CONSOLIDATION_MODES)
           .optional()
-          .describe("Override the project's default: 'supersedes' preserves history, 'delete' removes sources immediately"),
+          .describe(
+            "Override the project's default: 'supersedes' preserves history, 'delete' removes sources immediately",
+          ),
         threshold: z
           .number()
           .min(0)
@@ -77,29 +72,63 @@ export function registerConsolidateTool(server: McpServer, ctx: ServerContext): 
         evidence: z
           .boolean()
           .optional()
-          .describe("Confidence signals for analysis strategies and execute-merge (lifecycle, risk, warnings). Default true for safety."),
+          .describe(
+            "Confidence signals for analysis strategies and execute-merge (lifecycle, risk, warnings). Default true for safety.",
+          ),
         mergePlan: z
           .object({
-            sourceIds: z.array(z.string()).min(2).describe("Ids of notes to merge into one consolidated note"),
+            sourceIds: z
+              .array(z.string())
+              .min(2)
+              .describe("Ids of notes to merge into one consolidated note"),
             targetTitle: z.string().describe("Title for the consolidated note"),
-            content: z.string().max(100000, "Content must be at most 100,000 characters").optional().describe("Custom body for the consolidated note — distill durable knowledge rather than dumping all source content verbatim"),
-            description: z.string().optional().describe("Context explaining the consolidation rationale (stored in the note)"),
-            summary: z.string().optional().describe("Git commit summary only. Imperative mood, concise, and focused on why the change matters."),
-            tags: z.array(z.string()).optional().describe("Optional tags for later filtering. Use a small number of stable, meaningful tags."),
+            content: z
+              .string()
+              .max(100000, "Content must be at most 100,000 characters")
+              .optional()
+              .describe(
+                "Custom body for the consolidated note — distill durable knowledge rather than dumping all source content verbatim",
+              ),
+            description: z
+              .string()
+              .optional()
+              .describe("Context explaining the consolidation rationale (stored in the note)"),
+            summary: z
+              .string()
+              .optional()
+              .describe(
+                "Git commit summary only. Imperative mood, concise, and focused on why the change matters.",
+              ),
+            tags: z
+              .array(z.string())
+              .optional()
+              .describe(
+                "Optional tags for later filtering. Use a small number of stable, meaningful tags.",
+              ),
           })
           .optional()
-          .describe("Required for 'execute-merge' strategy. Get sourceIds from 'suggest-merges' output."),
+          .describe(
+            "Required for 'execute-merge' strategy. Get sourceIds from 'suggest-merges' output.",
+          ),
         allowProtectedBranch: z
           .boolean()
           .optional()
           .describe(
             "One-time override for protected branch checks. " +
-            "When true, consolidate can commit on a protected branch without changing project policy."
+              "When true, consolidate can commit on a protected branch without changing project policy.",
           ),
       }),
       outputSchema: ConsolidateResultSchema,
     },
-    async ({ cwd, strategy, mode, threshold, evidence = true, mergePlan, allowProtectedBranch = false }) => {
+    async ({
+      cwd,
+      strategy,
+      mode,
+      threshold,
+      evidence = true,
+      mergePlan,
+      allowProtectedBranch = false,
+    }) => {
       await ensureBranchSynced(ctx, cwd);
 
       const project = await resolveProject(ctx, cwd);
@@ -114,7 +143,10 @@ export function registerConsolidateTool(server: McpServer, ctx: ServerContext): 
         : entries.filter((e) => !e.note.project);
 
       if (projectNotes.length === 0) {
-        return { content: [{ type: "text", text: "No memories found to consolidate." }], isError: true };
+        return {
+          content: [{ type: "text", text: "No memories found to consolidate." }],
+          isError: true,
+        };
       }
 
       // Resolve project/default consolidation mode. Temporary-only merges may still
@@ -122,7 +154,7 @@ export function registerConsolidateTool(server: McpServer, ctx: ServerContext): 
       const policy = project ? await ctx.configStore.getProjectPolicy(project.id) : undefined;
       const defaultConsolidationMode = resolveConsolidationMode(policy);
 
-        switch (strategy) {
+      switch (strategy) {
         case "detect-duplicates":
           return detectDuplicates(projectNotes, threshold, project ?? undefined, evidence);
 
@@ -130,32 +162,75 @@ export function registerConsolidateTool(server: McpServer, ctx: ServerContext): 
           return findClusters(projectNotes, project ?? undefined);
 
         case "suggest-merges":
-          return suggestMerges(projectNotes, threshold, defaultConsolidationMode, project ?? undefined, mode, evidence);
+          return suggestMerges(
+            projectNotes,
+            threshold,
+            defaultConsolidationMode,
+            project ?? undefined,
+            mode,
+            evidence,
+          );
 
         case "execute-merge": {
           if (!mergePlan) {
-            return { content: [{ type: "text", text: "execute-merge strategy requires a mergePlan with sourceIds and targetTitle." }], isError: true };
+            return {
+              content: [
+                {
+                  type: "text",
+                  text: "execute-merge strategy requires a mergePlan with sourceIds and targetTitle.",
+                },
+              ],
+              isError: true,
+            };
           }
-          const mergeResult = await executeMerge(ctx, entries, mergePlan, defaultConsolidationMode, project ?? undefined, cwd, mode, policy, allowProtectedBranch, evidence);
+          const mergeResult = await executeMerge(
+            ctx,
+            entries,
+            mergePlan,
+            defaultConsolidationMode,
+            project ?? undefined,
+            cwd,
+            mode,
+            policy,
+            allowProtectedBranch,
+            evidence,
+          );
           invalidateActiveProjectCache();
           return mergeResult;
         }
 
         case "prune-superseded": {
-          const pruneResult = await pruneSuperseded(ctx, projectNotes, mode ?? defaultConsolidationMode, project ?? undefined, cwd, policy, allowProtectedBranch);
+          const pruneResult = await pruneSuperseded(
+            ctx,
+            projectNotes,
+            mode ?? defaultConsolidationMode,
+            project ?? undefined,
+            cwd,
+            policy,
+            allowProtectedBranch,
+          );
           invalidateActiveProjectCache();
           return pruneResult;
         }
 
         case "dry-run":
-          return dryRunAll(projectNotes, threshold, defaultConsolidationMode, project ?? undefined, mode, evidence);
+          return dryRunAll(
+            projectNotes,
+            threshold,
+            defaultConsolidationMode,
+            project ?? undefined,
+            mode,
+            evidence,
+          );
 
         default: {
           const _exhaustive: never = strategy;
-          return { content: [{ type: "text", text: `Unknown strategy: ${_exhaustive}` }], isError: true };
+          return {
+            content: [{ type: "text", text: `Unknown strategy: ${_exhaustive}` }],
+            isError: true,
+          };
         }
       }
-    }
+    },
   );
-
 }

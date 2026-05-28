@@ -22,9 +22,9 @@ import type { EmbeddingRecord } from "./storage.js";
 import { z } from "zod";
 
 export const EMBEDDING_PROVIDER_IDS = ["ollama", "openai-compatible", "openai", "gemini"] as const;
-export type EmbeddingProviderKind = typeof EMBEDDING_PROVIDER_IDS[number];
+export type EmbeddingProviderKind = (typeof EMBEDDING_PROVIDER_IDS)[number];
 export const EMBEDDING_METRICS = ["cosine"] as const;
-export type EmbeddingMetricValue = typeof EMBEDDING_METRICS[number];
+export type EmbeddingMetricValue = (typeof EMBEDDING_METRICS)[number];
 
 export interface EmbeddingIdentity {
   readonly provider: EmbeddingProviderId;
@@ -46,14 +46,43 @@ export interface EmbeddingProvider {
 }
 
 export type EmbeddingProviderConfig =
-  | { readonly kind: "ollama"; readonly baseUrl: string; readonly model: EmbeddingModelId; readonly metric: EmbeddingMetric }
-  | { readonly kind: "openai-compatible"; readonly baseUrl: string; readonly apiKey?: string; readonly model: EmbeddingModelId; readonly dimensions?: EmbeddingDimensions; readonly metric: EmbeddingMetric }
-  | { readonly kind: "openai"; readonly baseUrl: string; readonly apiKey: string; readonly model: EmbeddingModelId; readonly dimensions?: EmbeddingDimensions; readonly metric: EmbeddingMetric }
-  | { readonly kind: "gemini"; readonly baseUrl: string; readonly apiKey: string; readonly model: EmbeddingModelId; readonly dimensions?: EmbeddingDimensions; readonly metric: EmbeddingMetric };
+  | {
+      readonly kind: "ollama";
+      readonly baseUrl: string;
+      readonly model: EmbeddingModelId;
+      readonly metric: EmbeddingMetric;
+    }
+  | {
+      readonly kind: "openai-compatible";
+      readonly baseUrl: string;
+      readonly apiKey?: string;
+      readonly model: EmbeddingModelId;
+      readonly dimensions?: EmbeddingDimensions;
+      readonly metric: EmbeddingMetric;
+    }
+  | {
+      readonly kind: "openai";
+      readonly baseUrl: string;
+      readonly apiKey: string;
+      readonly model: EmbeddingModelId;
+      readonly dimensions?: EmbeddingDimensions;
+      readonly metric: EmbeddingMetric;
+    }
+  | {
+      readonly kind: "gemini";
+      readonly baseUrl: string;
+      readonly apiKey: string;
+      readonly model: EmbeddingModelId;
+      readonly dimensions?: EmbeddingDimensions;
+      readonly metric: EmbeddingMetric;
+    };
 
 export type EmbeddingCompatibility =
   | { readonly status: "compatible" }
-  | { readonly status: "skipped"; readonly reason: "provider-mismatch" | "dimension-mismatch" | "metric-mismatch" };
+  | {
+      readonly status: "skipped";
+      readonly reason: "provider-mismatch" | "dimension-mismatch" | "metric-mismatch";
+    };
 
 const DEFAULT_OLLAMA_MODEL = "nomic-embed-text-v2-moe";
 const DEFAULT_OPENAI_MODEL = "text-embedding-3-small";
@@ -64,7 +93,9 @@ const DEFAULT_OLLAMA_BASE_URL = "http://localhost:11434";
 const COSINE_METRIC = embeddingMetric("cosine");
 
 const EmbeddingVectorSchema = z.array(z.number()).nonempty();
-const OllamaEmbedResponseSchema = z.object({ embeddings: z.array(EmbeddingVectorSchema).optional() });
+const OllamaEmbedResponseSchema = z.object({
+  embeddings: z.array(EmbeddingVectorSchema).optional(),
+});
 const OpenAIEmbeddingResponseSchema = z.object({
   data: z.array(z.object({ embedding: EmbeddingVectorSchema })),
 });
@@ -80,23 +111,28 @@ function validateOllamaUrl(url: string): string {
     throw new OllamaUrlError("OLLAMA_URL is not a valid URL", url);
   }
   if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-    throw new OllamaUrlError("OLLAMA_URL must use http: or https: scheme", `got ${parsed.protocol}`);
+    throw new OllamaUrlError(
+      "OLLAMA_URL must use http: or https: scheme",
+      `got ${parsed.protocol}`,
+    );
   }
   const host = parsed.hostname;
   const isLocalhost = host === "localhost" || host === "127.0.0.1" || host === "::1";
   const isPrivate =
-    /^10\./.test(host) ||
-    /^172\.(1[6-9]|2\d|3[01])\./.test(host) ||
-    /^192\.168\./.test(host);
+    /^10\./.test(host) || /^172\.(1[6-9]|2\d|3[01])\./.test(host) || /^192\.168\./.test(host);
   if (!isLocalhost && !isPrivate) {
-    throw new OllamaUrlError("OLLAMA_URL must resolve to a localhost or private-network address", `got ${host}`);
+    throw new OllamaUrlError(
+      "OLLAMA_URL must resolve to a localhost or private-network address",
+      `got ${host}`,
+    );
   }
   return url;
 }
 
 function parseProviderKind(value: string | undefined): EmbeddingProviderKind {
   if (value === undefined || value === "") return "ollama";
-  if ((EMBEDDING_PROVIDER_IDS as readonly string[]).includes(value)) return value as EmbeddingProviderKind;
+  if ((EMBEDDING_PROVIDER_IDS as readonly string[]).includes(value))
+    return value as EmbeddingProviderKind;
   throw new EmbeddingConfigurationError(`Unsupported EMBED_PROVIDER '${value}'`);
 }
 
@@ -149,7 +185,9 @@ function createIdentity(config: EmbeddingProviderConfig): EmbeddingIdentity {
   };
 }
 
-export function resolveEmbeddingProviderConfig(env: NodeJS.ProcessEnv = process.env): EmbeddingProviderConfig {
+export function resolveEmbeddingProviderConfig(
+  env: NodeJS.ProcessEnv = process.env,
+): EmbeddingProviderConfig {
   const kind = parseProviderKind(env["EMBED_PROVIDER"]);
   const dimensions = parseDimensions(env["EMBED_DIMENSIONS"]);
 
@@ -212,27 +250,39 @@ class OllamaEmbeddingProvider implements EmbeddingProvider {
     if (!res.ok) {
       throw new EmbeddingProviderError(
         `Ollama embedding failed: ${res.status} ${res.statusText}. ` +
-        `Is Ollama running at ${this.config.baseUrl} with model '${this.config.model}' pulled?`
+          `Is Ollama running at ${this.config.baseUrl} with model '${this.config.model}' pulled?`,
       );
     }
 
     const parseResult = OllamaEmbedResponseSchema.safeParse(await res.json());
     if (!parseResult.success) {
-      throw new EmbeddingProviderError(`Ollama embedding response had unexpected shape: ${parseResult.error.message}`);
+      throw new EmbeddingProviderError(
+        `Ollama embedding response had unexpected shape: ${parseResult.error.message}`,
+      );
     }
     const embedding = parseResult.data.embeddings?.[0];
     if (!embedding) {
-      throw new EmbeddingProviderError(`Ollama embedding response did not include an embedding for model '${this.config.model}'`);
+      throw new EmbeddingProviderError(
+        `Ollama embedding response did not include an embedding for model '${this.config.model}'`,
+      );
     }
 
-    return { embedding, identity: { ...this.identity, dimensions: embeddingDimensions(embedding.length) } };
+    return {
+      embedding,
+      identity: { ...this.identity, dimensions: embeddingDimensions(embedding.length) },
+    };
   }
 }
 
 class OpenAICompatibleEmbeddingProvider implements EmbeddingProvider {
   readonly identity: EmbeddingIdentity;
 
-  constructor(private readonly config: Extract<EmbeddingProviderConfig, { kind: "openai-compatible" | "openai" }>) {
+  constructor(
+    private readonly config: Extract<
+      EmbeddingProviderConfig,
+      { kind: "openai-compatible" | "openai" }
+    >,
+  ) {
     this.identity = createIdentity(config);
   }
 
@@ -266,14 +316,21 @@ class OpenAICompatibleEmbeddingProvider implements EmbeddingProvider {
 
     const parseResult = OpenAIEmbeddingResponseSchema.safeParse(await res.json());
     if (!parseResult.success) {
-      throw new EmbeddingProviderError(`${this.config.kind} embedding response had unexpected shape: ${parseResult.error.message}`);
+      throw new EmbeddingProviderError(
+        `${this.config.kind} embedding response had unexpected shape: ${parseResult.error.message}`,
+      );
     }
     const embedding = parseResult.data.data[0]?.embedding;
     if (!embedding) {
-      throw new EmbeddingProviderError(`${this.config.kind} embedding response did not include an embedding for model '${this.config.model}'`);
+      throw new EmbeddingProviderError(
+        `${this.config.kind} embedding response did not include an embedding for model '${this.config.model}'`,
+      );
     }
 
-    return { embedding, identity: { ...this.identity, dimensions: embeddingDimensions(embedding.length) } };
+    return {
+      embedding,
+      identity: { ...this.identity, dimensions: embeddingDimensions(embedding.length) },
+    };
   }
 }
 
@@ -285,7 +342,9 @@ class GeminiEmbeddingProvider implements EmbeddingProvider {
   }
 
   async embed(text: string): Promise<EmbeddingResult> {
-    const modelPath = this.config.model.startsWith("models/") ? this.config.model : `models/${this.config.model}`;
+    const modelPath = this.config.model.startsWith("models/")
+      ? this.config.model
+      : `models/${this.config.model}`;
     const endpoint = new URL(`/v1beta/${modelPath}:embedContent`, this.config.baseUrl);
     const body: Record<string, unknown> = {
       model: modelPath,
@@ -312,15 +371,22 @@ class GeminiEmbeddingProvider implements EmbeddingProvider {
 
     const parseResult = GeminiEmbeddingResponseSchema.safeParse(await res.json());
     if (!parseResult.success) {
-      throw new EmbeddingProviderError(`gemini embedding response had unexpected shape: ${parseResult.error.message}`);
+      throw new EmbeddingProviderError(
+        `gemini embedding response had unexpected shape: ${parseResult.error.message}`,
+      );
     }
 
     const embedding = parseResult.data.embedding.values;
-    return { embedding, identity: { ...this.identity, dimensions: embeddingDimensions(embedding.length) } };
+    return {
+      embedding,
+      identity: { ...this.identity, dimensions: embeddingDimensions(embedding.length) },
+    };
   }
 }
 
-export function createEmbeddingProvider(config: EmbeddingProviderConfig = resolveEmbeddingProviderConfig()): EmbeddingProvider {
+export function createEmbeddingProvider(
+  config: EmbeddingProviderConfig = resolveEmbeddingProviderConfig(),
+): EmbeddingProvider {
   switch (config.kind) {
     case "ollama":
       return new OllamaEmbeddingProvider(config);
@@ -331,7 +397,9 @@ export function createEmbeddingProvider(config: EmbeddingProviderConfig = resolv
       return new GeminiEmbeddingProvider(config);
     default: {
       const exhaustive: never = config;
-      throw new EmbeddingConfigurationError(`Unhandled embedding provider: ${JSON.stringify(exhaustive)}`);
+      throw new EmbeddingConfigurationError(
+        `Unhandled embedding provider: ${JSON.stringify(exhaustive)}`,
+      );
     }
   }
 }
@@ -347,7 +415,13 @@ export async function embedWithMetadata(text: string): Promise<EmbeddingResult> 
   return provider.embed(text);
 }
 
-export function embeddingMetadata(vector: number[], identity: EmbeddingIdentity = currentEmbeddingIdentity): Pick<EmbeddingRecord, "model" | "provider" | "dimensions" | "metric" | "inputMode" | "compatibilityKey"> {
+export function embeddingMetadata(
+  vector: number[],
+  identity: EmbeddingIdentity = currentEmbeddingIdentity,
+): Pick<
+  EmbeddingRecord,
+  "model" | "provider" | "dimensions" | "metric" | "inputMode" | "compatibilityKey"
+> {
   const dimensions = embeddingDimensions(vector.length);
   return {
     model: identity.model,
@@ -369,9 +443,13 @@ export function cosineSimilarity(a: number[], b: number[]): number {
   if (a.length !== b.length) {
     throw new EmbeddingDimensionMismatchError(a.length, b.length);
   }
-  let dot = 0, normA = 0, normB = 0;
+  let dot = 0,
+    normA = 0,
+    normB = 0;
   for (let i = 0; i < a.length; i++) {
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- loop bound guarantees existence
     const av = a[i]!;
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
     const bv = b[i]!;
     dot += av * bv;
     normA += av * av;
@@ -382,11 +460,18 @@ export function cosineSimilarity(a: number[], b: number[]): number {
 }
 
 export function checkEmbeddingCompatibility(
-  record: Pick<EmbeddingRecord, "model" | "provider" | "dimensions" | "metric" | "compatibilityKey" | "embedding">,
+  record: Pick<
+    EmbeddingRecord,
+    "model" | "provider" | "dimensions" | "metric" | "compatibilityKey" | "embedding"
+  >,
   identity: EmbeddingIdentity = currentEmbeddingIdentity,
   expectedDimensions?: number,
 ): EmbeddingCompatibility {
-  if (record.compatibilityKey !== undefined && identity.dimensions !== undefined && record.compatibilityKey !== identity.compatibilityKey) {
+  if (
+    record.compatibilityKey !== undefined &&
+    identity.dimensions !== undefined &&
+    record.compatibilityKey !== identity.compatibilityKey
+  ) {
     return { status: "skipped", reason: "provider-mismatch" };
   }
 
@@ -394,7 +479,10 @@ export function checkEmbeddingCompatibility(
     if (record.provider !== identity.provider || record.model !== identity.model) {
       return { status: "skipped", reason: "provider-mismatch" };
     }
-  } else if (identity.provider !== embeddingProviderId("ollama") || record.model !== identity.model) {
+  } else if (
+    identity.provider !== embeddingProviderId("ollama") ||
+    record.model !== identity.model
+  ) {
     return { status: "skipped", reason: "provider-mismatch" };
   }
 
@@ -403,7 +491,9 @@ export function checkEmbeddingCompatibility(
   }
 
   const actualDimensions = record.dimensions ?? embeddingDimensions(record.embedding.length);
-  const targetDimensions = identity.dimensions ?? (expectedDimensions !== undefined ? embeddingDimensions(expectedDimensions) : undefined);
+  const targetDimensions =
+    identity.dimensions ??
+    (expectedDimensions !== undefined ? embeddingDimensions(expectedDimensions) : undefined);
   if (targetDimensions !== undefined && actualDimensions !== targetDimensions) {
     return { status: "skipped", reason: "dimension-mismatch" };
   }

@@ -11,21 +11,47 @@ import {
 } from "../consolidate.js";
 import { computeDecayInfo } from "../provenance.js";
 import type { EffectiveNoteMetadata } from "../role-suggestions.js";
-import { checkEmbeddingCompatibility, currentEmbeddingIdentity, embed, embeddingMetadata, safeCosineSimilarity } from "../embeddings.js";
+import {
+  checkEmbeddingCompatibility,
+  currentEmbeddingIdentity,
+  embed,
+  embeddingMetadata,
+  safeCosineSimilarity,
+} from "../embeddings.js";
 import { classifyTheme, titleCaseTheme } from "../project-introspection.js";
 import { getErrorMessage, attempt } from "../error-utils.js";
 import { makeId, slugify } from "../helpers/index.js";
 import { memoryId, isoDateString } from "../brands.js";
-import { formatCommitBody, commitVaultWithProtection as commitVaultWithProtectionFromModule, wouldRelationshipCleanupTouchProjectVault as wouldRelationshipCleanupTouchProjectVaultFromModule, checkVaultProtectedBranch } from "../helpers/git-commit.js";
-import { buildPersistenceStatus, buildMutationRetryContract, formatPersistenceSummary, pushAfterMutation as pushAfterMutationFromModule } from "../helpers/persistence.js";
+import {
+  formatCommitBody,
+  commitVaultWithProtection as commitVaultWithProtectionFromModule,
+  checkVaultProtectedBranch,
+} from "../helpers/git-commit.js";
+import {
+  buildPersistenceStatus,
+  buildMutationRetryContract,
+  formatPersistenceSummary,
+  pushAfterMutation as pushAfterMutationFromModule,
+} from "../helpers/persistence.js";
 import type { MutationRetryContract } from "../structured-content.js";
-import { type NoteEntry, storageLabel, addVaultChange, attachedVaultErrorMessage, removeRelationshipsToNoteIds as removeRelationshipsToNoteIdsFromModule } from "../helpers/vault.js";
+import {
+  type NoteEntry,
+  storageLabel,
+  addVaultChange,
+  attachedVaultErrorMessage,
+  removeRelationshipsToNoteIds as removeRelationshipsToNoteIdsFromModule,
+} from "../helpers/vault.js";
 import { toProjectRef } from "../helpers/project.js";
 import { embedTextForNote as embedTextForNoteFromModule } from "../helpers/embed.js";
 import type { EmbeddingRecord, Note, NoteStorage } from "../storage.js";
 import type { Vault } from "../vault.js";
 import type { ConsolidationMode, ProjectMemoryPolicy } from "../project-memory-policy.js";
-import type { ConsolidateResult, ConsolidateExecuteMergeEvidence, ConsolidateMaintenanceWarning, PersistenceStatus } from "../structured-content.js";
+import type {
+  ConsolidateResult,
+  ConsolidateExecuteMergeEvidence,
+  ConsolidateMaintenanceWarning,
+  PersistenceStatus,
+} from "../structured-content.js";
 import type { MergeRisk } from "../consolidate.js";
 import type { CommitResult, PushResult } from "../git.js";
 import { UnknownConsolidationModeError } from "../domain-errors.js";
@@ -53,10 +79,6 @@ async function commitVaultWithProtection(
   });
 }
 
-async function wouldRelationshipCleanupTouchProjectVault(ctx: ServerContext, noteIds: string[]) {
-  return wouldRelationshipCleanupTouchProjectVaultFromModule(ctx, noteIds);
-}
-
 async function pushAfterMutation(ctx: ServerContext, vault: Vault) {
   return pushAfterMutationFromModule(ctx, vault);
 }
@@ -71,15 +93,13 @@ async function embedTextForNote(storage: NoteStorage, note: Note) {
 
 // ── Merge validation helpers ────────────────────────────────────────────────
 
-type MergeValidationResult =
-  | { ok: true }
-  | { ok: false; message: string; warning: string };
+type MergeValidationResult = { ok: true } | { ok: false; message: string; warning: string };
 
 function validateMergePlan(
   sourceIds: string[],
   targetTitle: string,
   entries: NoteEntry[],
-  project: ProjectInfo | undefined,
+  _project: ProjectInfo | undefined,
 ): MergeValidationResult {
   if (sourceIds.length < 2) {
     return {
@@ -154,7 +174,10 @@ function computeActionLabels(mode: ConsolidationMode): { action: string; sourceS
     case "delete":
       return { action: "consolidate(delete)", sourceSummary: "Deleted as part of consolidation" };
     case "supersedes":
-      return { action: "consolidate(supersedes)", sourceSummary: "Marked as superseded by consolidation" };
+      return {
+        action: "consolidate(supersedes)",
+        sourceSummary: "Marked as superseded by consolidation",
+      };
     default: {
       const _exhaustive: never = mode;
       throw new UnknownConsolidationModeError(_exhaustive);
@@ -166,11 +189,21 @@ function buildMergeEvidence(
   sourceEntries: NoteEntry[],
   entries: NoteEntry[],
   sourceIds: string[],
-): { noteEvidence: ReturnType<typeof buildConsolidateNoteEvidence>[]; mergeWarnings: string[]; mergeRisk: MergeRisk } {
+): {
+  noteEvidence: ReturnType<typeof buildConsolidateNoteEvidence>[];
+  mergeWarnings: string[];
+  mergeRisk: MergeRisk;
+} {
   const allNotes = entries.map((entry) => entry.note);
   const sourceIdsSet = new Set(sourceIds);
   const noteEvidence = sourceEntries.map((entry) =>
-    buildConsolidateNoteEvidence(entry.note, allNotes, sourceEntries[0]?.note, undefined, sourceIdsSet),
+    buildConsolidateNoteEvidence(
+      entry.note,
+      allNotes,
+      sourceEntries[0]?.note,
+      undefined,
+      sourceIdsSet,
+    ),
   );
   const mergeWarnings = buildGroupWarnings(
     sourceEntries.map((entry) => entry.note),
@@ -216,7 +249,9 @@ function formatMergeLines(
     lines.push("  Evidence:");
     for (const note of evidence.notes) {
       const classStr = note.classification ? ` | ${classificationLabel(note.classification)}` : "";
-      lines.push(`    ${note.title} | ${note.lifecycle}, ${note.role ?? "untyped"} | ${Math.round(note.ageDays)}d | rel:${note.relatedCount} | risk:${note.mergeRisk}${classStr}`);
+      lines.push(
+        `    ${note.title} | ${note.lifecycle}, ${note.role ?? "untyped"} | ${Math.round(note.ageDays)}d | rel:${note.relatedCount} | risk:${note.mergeRisk}${classStr}`,
+      );
     }
     if (evidence.warnings && evidence.warnings.length > 0) {
       lines.push(`  Warnings: ${evidence.warnings.join("; ")}`);
@@ -339,21 +374,24 @@ async function commitVaultMergeChanges(
         })
       : formatCommitBody({
           summary: commitSummary,
-          noteIds: files.map((f) => f.replace(/\.mnemonic\/notes\/(.+)\.md$/, "$1").replace(/notes\/(.+)\.md$/, "$1")),
+          noteIds: files.map((f) =>
+            f.replace(/\.mnemonic\/notes\/(.+)\.md$/, "$1").replace(/notes\/(.+)\.md$/, "$1"),
+          ),
         });
     const commitMessage = `${action}: ${targetTitle}`;
-      const commitStatus = await commitVaultWithProtection(
-        ctx,
-        vault,
-        commitMessage,
-        files,
-        commitBody,
-        allowProtectedBranch,
-        "consolidate",
-      );
-    const pushStatus = commitStatus.status === "committed"
-      ? await pushAfterMutation(ctx, vault)
-      : { status: "skipped" as const, reason: "commit-failed" as const };
+    const commitStatus = await commitVaultWithProtection(
+      ctx,
+      vault,
+      commitMessage,
+      files,
+      commitBody,
+      allowProtectedBranch,
+      "consolidate",
+    );
+    const pushStatus =
+      commitStatus.status === "committed"
+        ? await pushAfterMutation(ctx, vault)
+        : { status: "skipped" as const, reason: "commit-failed" as const };
 
     if (isTargetVault) {
       targetCommitStatus = commitStatus;
@@ -364,7 +402,13 @@ async function commitVaultMergeChanges(
     }
   }
 
-  return { targetCommitStatus, targetPushStatus, targetCommitBody, targetCommitMessage, targetCommitFiles };
+  return {
+    targetCommitStatus,
+    targetPushStatus,
+    targetCommitBody,
+    targetCommitMessage,
+    targetCommitFiles,
+  };
 }
 
 // ── executeMerge ────────────────────────────────────────────────────────────
@@ -372,7 +416,14 @@ async function commitVaultMergeChanges(
 export async function executeMerge(
   ctx: ServerContext,
   entries: NoteEntry[],
-  mergePlan: { sourceIds: string[]; targetTitle: string; content?: string; description?: string; summary?: string; tags?: string[] },
+  mergePlan: {
+    sourceIds: string[];
+    targetTitle: string;
+    content?: string;
+    description?: string;
+    summary?: string;
+    tags?: string[];
+  },
   defaultConsolidationMode: ConsolidationMode,
   project: ProjectInfo | undefined,
   cwd?: string,
@@ -380,7 +431,10 @@ export async function executeMerge(
   policy?: ProjectMemoryPolicy,
   allowProtectedBranch: boolean = false,
   evidence: boolean = true,
-): Promise<{ content: Array<{ type: "text"; text: string }>; structuredContent: ConsolidateResult }> {
+): Promise<{
+  content: Array<{ type: "text"; text: string }>;
+  structuredContent: ConsolidateResult;
+}> {
   const { vaultManager } = ctx;
   const sourceIds = normalizeMergePlanSourceIds(mergePlan.sourceIds);
   const targetTitle = mergePlan.targetTitle.trim();
@@ -454,10 +508,17 @@ export async function executeMerge(
         project: toProjectRef(project),
         notesProcessed: entries.length,
         notesModified: 0,
-        warnings: [protectedBranchCheck.message ?? "Protected branch policy blocked this operation."],
+        warnings: [
+          protectedBranchCheck.message ?? "Protected branch policy blocked this operation.",
+        ],
       };
       return {
-        content: [{ type: "text", text: protectedBranchCheck.message ?? "Protected branch policy blocked this operation." }],
+        content: [
+          {
+            type: "text",
+            text: protectedBranchCheck.message ?? "Protected branch policy blocked this operation.",
+          },
+        ],
         structuredContent,
       };
     }
@@ -481,7 +542,12 @@ export async function executeMerge(
         notesModified: 0,
         warnings: [check.message ?? "Protected branch policy blocked this commit."],
       };
-      return { content: [{ type: "text", text: check.message ?? "Protected branch policy blocked this commit." }], structuredContent };
+      return {
+        content: [
+          { type: "text", text: check.message ?? "Protected branch policy blocked this commit." },
+        ],
+        structuredContent,
+      };
     }
   }
 
@@ -506,7 +572,16 @@ export async function executeMerge(
 
   // Apply consolidation mode to source notes
   const vaultChanges = new Map<Vault, string[]>();
-  await applyConsolidationMode(ctx, consolidationMode, sourceEntries, sourceIds, targetId, now, vaultChanges, vaultManager);
+  await applyConsolidationMode(
+    ctx,
+    consolidationMode,
+    sourceEntries,
+    sourceIds,
+    targetId,
+    now,
+    vaultChanges,
+    vaultManager,
+  );
 
   // Add consolidated note to changes
   addVaultChange(vaultChanges, targetVault, vaultManager.noteRelPath(targetVault, targetId));
@@ -518,19 +593,32 @@ export async function executeMerge(
     targetCommitBody,
     targetCommitMessage,
     targetCommitFiles,
-  } = await commitVaultMergeChanges(ctx, vaultChanges, targetVault, targetId, targetTitle, sourceIds, summary, consolidationMode, project, cwd, allowProtectedBranch);
+  } = await commitVaultMergeChanges(
+    ctx,
+    vaultChanges,
+    targetVault,
+    targetId,
+    targetTitle,
+    sourceIds,
+    summary,
+    consolidationMode,
+    project,
+    cwd,
+    allowProtectedBranch,
+  );
 
-  const retry = targetCommitMessage && targetCommitFiles
-    ? buildMutationRetryContract({
-        commit: targetCommitStatus,
-        commitMessage: targetCommitMessage,
-        commitBody: targetCommitBody,
-        files: targetCommitFiles,
-        cwd,
-        vault: targetVault,
-        mutationApplied: true,
-      })
-    : undefined;
+  const retry =
+    targetCommitMessage && targetCommitFiles
+      ? buildMutationRetryContract({
+          commit: targetCommitStatus,
+          commitMessage: targetCommitMessage,
+          commitBody: targetCommitBody,
+          files: targetCommitFiles,
+          cwd,
+          vault: targetVault,
+          mutationApplied: true,
+        })
+      : undefined;
 
   const persistence = buildPersistenceStatus({
     storage: targetVault.storage,
@@ -546,7 +634,11 @@ export async function executeMerge(
   // Build evidence
   let executeMergeEvidence: ConsolidateExecuteMergeEvidence | undefined;
   if (evidence) {
-    const { noteEvidence, mergeWarnings, mergeRisk } = buildMergeEvidence(sourceEntries, entries, sourceIds);
+    const { noteEvidence, mergeWarnings, mergeRisk } = buildMergeEvidence(
+      sourceEntries,
+      entries,
+      sourceIds,
+    );
     executeMergeEvidence = {
       notes: noteEvidence,
       warnings: mergeWarnings.length > 0 ? mergeWarnings : undefined,
@@ -554,7 +646,15 @@ export async function executeMerge(
     };
   }
 
-  const lines = formatMergeLines(sourceIds, targetId, consolidationMode, targetVault, existingTargetEntry, persistence, executeMergeEvidence);
+  const lines = formatMergeLines(
+    sourceIds,
+    targetId,
+    consolidationMode,
+    targetVault,
+    existingTargetEntry,
+    persistence,
+    executeMergeEvidence,
+  );
 
   const structuredContent: ConsolidateResult = {
     action: "consolidated",
@@ -572,7 +672,10 @@ export async function executeMerge(
 
 function buildConsolidateMaintenanceWarnings(
   entries: NoteEntry[],
-  noteContext?: Map<string, { metadata: EffectiveNoteMetadata; inbound: number; visibleOutbound: number }>,
+  noteContext?: Map<
+    string,
+    { metadata: EffectiveNoteMetadata; inbound: number; visibleOutbound: number }
+  >,
 ): ConsolidateMaintenanceWarning[] | undefined {
   const staleTemporary: NoteEntry[] = [];
   const supersededCandidates: NoteEntry[] = [];
@@ -580,7 +683,8 @@ function buildConsolidateMaintenanceWarnings(
   for (const entry of entries) {
     const superseded = (entry.note.relatedTo ?? []).some((rel) => rel.type === "supersedes");
     const centrality = noteContext
-      ? ((noteContext.get(entry.note.id)?.inbound ?? 0) + (noteContext.get(entry.note.id)?.visibleOutbound ?? entry.note.relatedTo?.length ?? 0))
+      ? (noteContext.get(entry.note.id)?.inbound ?? 0) +
+        (noteContext.get(entry.note.id)?.visibleOutbound ?? entry.note.relatedTo?.length ?? 0)
       : (entry.note.relatedTo?.length ?? 0);
     const decayInfo = computeDecayInfo({
       lifecycle: entry.note.lifecycle,
@@ -605,7 +709,8 @@ function buildConsolidateMaintenanceWarnings(
       message: `${staleTemporary.length} stale temporary note${staleTemporary.length === 1 ? "" : "s"} may need review or consolidation.`,
       count: staleTemporary.length,
       sampleNotes: staleTemporary.slice(0, 3).map((e) => ({ id: e.note.id, title: e.note.title })),
-      suggestedAction: "Inspect temporary notes, then update, consolidate, or remove scaffolding explicitly.",
+      suggestedAction:
+        "Inspect temporary notes, then update, consolidate, or remove scaffolding explicitly.",
     });
   }
 
@@ -613,12 +718,16 @@ function buildConsolidateMaintenanceWarnings(
     warnings.push({
       code: "superseded-prune-candidates",
       severity: "info",
-      message: supersededCandidates.length === 1
-        ? "1 superseded note may be a prune candidate."
-        : `${supersededCandidates.length} superseded notes may be prune candidates.`,
+      message:
+        supersededCandidates.length === 1
+          ? "1 superseded note may be a prune candidate."
+          : `${supersededCandidates.length} superseded notes may be prune candidates.`,
       count: supersededCandidates.length,
-      sampleNotes: supersededCandidates.slice(0, 3).map((e) => ({ id: e.note.id, title: e.note.title })),
-      suggestedAction: "Review sources, then use consolidate prune-superseded only when deletion is intentional.",
+      sampleNotes: supersededCandidates
+        .slice(0, 3)
+        .map((e) => ({ id: e.note.id, title: e.note.title })),
+      suggestedAction:
+        "Review sources, then use consolidate prune-superseded only when deletion is intentional.",
     });
   }
 
@@ -628,7 +737,7 @@ function buildConsolidateMaintenanceWarnings(
 function classificationLabel(classification: string | undefined): string {
   if (!classification) return "";
   const labels: Record<string, string> = {
-    "lineage": "lineage (expected overlap)",
+    lineage: "lineage (expected overlap)",
     "duplicate-pressure": "duplicate-pressure",
     "unique-evidence-risk": "unique-evidence-risk",
     "supersession-pressure": "supersession-pressure",
@@ -641,27 +750,34 @@ export async function detectDuplicates(
   threshold: number,
   project: ProjectInfo | undefined,
   evidence: boolean,
-): Promise<{ content: Array<{ type: "text"; text: string }>; structuredContent: ConsolidateResult }> {
+): Promise<{
+  content: Array<{ type: "text"; text: string }>;
+  structuredContent: ConsolidateResult;
+}> {
   const lines: string[] = [];
   lines.push(`Duplicate detection for ${project?.name ?? "global"} (similarity > ${threshold}):`);
   lines.push("");
 
   const checked = new Set<string>();
   let foundCount = 0;
-  const duplicates: Array<{ noteA: { id: string; title: string }; noteB: { id: string; title: string }; similarity: number }> = [];
+  const duplicates: Array<{
+    noteA: { id: string; title: string };
+    noteB: { id: string; title: string };
+    similarity: number;
+  }> = [];
   const duplicatePairs: NonNullable<ConsolidateResult["duplicatePairs"]> = [];
   const embeddings = await loadEmbeddingsByNoteId(entries);
   const allNotes = entries.map((entry) => entry.note);
 
   for (let i = 0; i < entries.length; i++) {
-    const entryA = entries[i]!;
+    const entryA = entries[i]!; // eslint-disable-line @typescript-eslint/no-non-null-assertion
     if (checked.has(entryA.note.id)) continue;
 
     const embeddingA = embeddings.get(entryA.note.id);
     if (!embeddingA) continue;
 
     for (let j = i + 1; j < entries.length; j++) {
-      const entryB = entries[j]!;
+      const entryB = entries[j]!; // eslint-disable-line @typescript-eslint/no-non-null-assertion
       if (checked.has(entryB.note.id)) continue;
 
       const embeddingB = embeddings.get(entryB.note.id);
@@ -671,18 +787,36 @@ export async function detectDuplicates(
       if (similarity === undefined) continue;
       if (similarity >= threshold) {
         const pairContextIds = new Set([entryA.note.id, entryB.note.id]);
-        const noteAEvidence = buildConsolidateNoteEvidence(entryA.note, allNotes, entryA.note, undefined, pairContextIds);
-        const noteBEvidence = buildConsolidateNoteEvidence(entryB.note, allNotes, entryA.note, undefined, pairContextIds);
+        const noteAEvidence = buildConsolidateNoteEvidence(
+          entryA.note,
+          allNotes,
+          entryA.note,
+          undefined,
+          pairContextIds,
+        );
+        const noteBEvidence = buildConsolidateNoteEvidence(
+          entryB.note,
+          allNotes,
+          entryA.note,
+          undefined,
+          pairContextIds,
+        );
         const pairClassification = classifyConsolidationPair(entryA.note, entryB.note);
         const groupWarnings = buildGroupWarnings([entryA.note, entryB.note], entryA.note);
         const pairRisk = aggregateMergeRisk([noteAEvidence.mergeRisk, noteBEvidence.mergeRisk]);
         foundCount++;
         lines.push(`${foundCount}. ${entryA.note.title} (${entryA.note.id})`);
         lines.push(`   └── ${entryB.note.title} (${entryB.note.id})`);
-        lines.push(`   Similarity: ${similarity.toFixed(3)} | ${classificationLabel(pairClassification)}`);
+        lines.push(
+          `   Similarity: ${similarity.toFixed(3)} | ${classificationLabel(pairClassification)}`,
+        );
         if (evidence) {
-          lines.push(`   A: ${noteAEvidence.lifecycle}, ${noteAEvidence.role ?? "untyped"} | ${Math.round(noteAEvidence.ageDays)}d old | rel: ${noteAEvidence.relatedCount} | supersedes: ${noteAEvidence.supersededCount ?? 0} | risk: ${noteAEvidence.mergeRisk}${noteAEvidence.classification ? ` | ${classificationLabel(noteAEvidence.classification)}` : ""}`);
-          lines.push(`   B: ${noteBEvidence.lifecycle}, ${noteBEvidence.role ?? "untyped"} | ${Math.round(noteBEvidence.ageDays)}d old | rel: ${noteBEvidence.relatedCount} | supersedes: ${noteBEvidence.supersededCount ?? 0} | risk: ${noteBEvidence.mergeRisk}${noteBEvidence.classification ? ` | ${classificationLabel(noteBEvidence.classification)}` : ""}`);
+          lines.push(
+            `   A: ${noteAEvidence.lifecycle}, ${noteAEvidence.role ?? "untyped"} | ${Math.round(noteAEvidence.ageDays)}d old | rel: ${noteAEvidence.relatedCount} | supersedes: ${noteAEvidence.supersededCount ?? 0} | risk: ${noteAEvidence.mergeRisk}${noteAEvidence.classification ? ` | ${classificationLabel(noteAEvidence.classification)}` : ""}`,
+          );
+          lines.push(
+            `   B: ${noteBEvidence.lifecycle}, ${noteBEvidence.role ?? "untyped"} | ${Math.round(noteBEvidence.ageDays)}d old | rel: ${noteBEvidence.relatedCount} | supersedes: ${noteBEvidence.supersededCount ?? 0} | risk: ${noteBEvidence.mergeRisk}${noteBEvidence.classification ? ` | ${classificationLabel(noteBEvidence.classification)}` : ""}`,
+          );
           if (groupWarnings.length > 0) {
             lines.push(`   Warnings: ${groupWarnings.join("; ")}`);
           }
@@ -691,7 +825,7 @@ export async function detectDuplicates(
         lines.push("");
         checked.add(entryA.note.id);
         checked.add(entryB.note.id);
-        
+
         duplicates.push({
           noteA: { id: entryA.note.id, title: entryA.note.title },
           noteB: { id: entryB.note.id, title: entryB.note.title },
@@ -758,7 +892,8 @@ export function findClusters(
     const queue = [entry];
 
     while (queue.length > 0) {
-      const current = queue.shift()!;
+      const current = queue.shift();
+      if (!current) break;
       if (visited.has(current.note.id)) continue;
       visited.add(current.note.id);
       cluster.push(current);
@@ -795,15 +930,18 @@ export function findClusters(
   }
 
   // Output relationship clusters
-  const relationshipClusters: Array<{ hub: { id: string; title: string }; notes: { id: string; title: string }[] }> = [];
+  const relationshipClusters: Array<{
+    hub: { id: string; title: string };
+    notes: { id: string; title: string }[];
+  }> = [];
   if (clusters.length > 0) {
     lines.push("");
     lines.push("Connected Clusters (via relationships):");
     for (let i = 0; i < clusters.length; i++) {
-      const cluster = clusters[i]!;
+      const cluster = clusters[i]!; // eslint-disable-line @typescript-eslint/no-non-null-assertion
       lines.push(`  Cluster ${i + 1} (${cluster.length} notes):`);
       const hub = cluster.reduce((max, e) =>
-        (e.note.relatedTo?.length ?? 0) > (max.note.relatedTo?.length ?? 0) ? e : max
+        (e.note.relatedTo?.length ?? 0) > (max.note.relatedTo?.length ?? 0) ? e : max,
       );
       lines.push(`    Hub: ${hub.note.title}`);
       const clusterNotes: { id: string; title: string }[] = [];
@@ -840,9 +978,14 @@ export async function suggestMerges(
   project: ProjectInfo | undefined,
   explicitMode?: ConsolidationMode,
   evidence: boolean = false,
-): Promise<{ content: Array<{ type: "text"; text: string }>; structuredContent: ConsolidateResult }> {
+): Promise<{
+  content: Array<{ type: "text"; text: string }>;
+  structuredContent: ConsolidateResult;
+}> {
   const lines: string[] = [];
-  const modeLabel = explicitMode ?? `${defaultConsolidationMode} (project/default; all-temporary merges auto-delete)`;
+  const modeLabel =
+    explicitMode ??
+    `${defaultConsolidationMode} (project/default; all-temporary merges auto-delete)`;
   lines.push(`Merge suggestions for ${project?.name ?? "global"} (mode: ${modeLabel}):`);
   lines.push("");
 
@@ -858,7 +1001,7 @@ export async function suggestMerges(
   const allNotes = entries.map((entry) => entry.note);
 
   for (let i = 0; i < entries.length; i++) {
-    const entryA = entries[i]!;
+    const entryA = entries[i]!; // eslint-disable-line @typescript-eslint/no-non-null-assertion
     if (checked.has(entryA.note.id)) continue;
 
     const embeddingA = embeddings.get(entryA.note.id);
@@ -867,7 +1010,7 @@ export async function suggestMerges(
     const similar: Array<{ entry: NoteEntry; similarity: number }> = [];
 
     for (let j = i + 1; j < entries.length; j++) {
-      const entryB = entries[j]!;
+      const entryB = entries[j]!; // eslint-disable-line @typescript-eslint/no-non-null-assertion
       if (checked.has(entryB.note.id)) continue;
 
       const embeddingB = embeddings.get(entryB.note.id);
@@ -894,7 +1037,10 @@ export async function suggestMerges(
       lines.push(`   Into: "${entryA.note.title} (consolidated)"`);
       lines.push("   Sources:");
       for (const src of sources) {
-        const simStr = src.note.id === entryA.note.id ? "" : ` (${similar.find((s) => s.entry.note.id === src.note.id)?.similarity.toFixed(3)})`;
+        const simStr =
+          src.note.id === entryA.note.id
+            ? ""
+            : ` (${similar.find((s) => s.entry.note.id === src.note.id)?.similarity.toFixed(3)})`;
         lines.push(`     - ${src.note.title} (${src.note.id})${simStr}`);
       }
       const modeDescription = ((): string => {
@@ -903,15 +1049,26 @@ export async function suggestMerges(
             return "preserves history";
           case "delete":
             return "removes sources";
-    default: {
-      const _exhaustive: never = effectiveMode;
-      throw new UnknownConsolidationModeError(_exhaustive);
-    }
+          default: {
+            const _exhaustive: never = effectiveMode;
+            throw new UnknownConsolidationModeError(_exhaustive);
+          }
         }
       })();
 
-      const noteEvidence = sources.map((source) => buildConsolidateNoteEvidence(source.note, allNotes, entryA.note, undefined, new Set(sources.map((s) => s.note.id))));
-      const mergeWarnings = buildGroupWarnings(sources.map((source) => source.note), entryA.note);
+      const noteEvidence = sources.map((source) =>
+        buildConsolidateNoteEvidence(
+          source.note,
+          allNotes,
+          entryA.note,
+          undefined,
+          new Set(sources.map((s) => s.note.id)),
+        ),
+      );
+      const mergeWarnings = buildGroupWarnings(
+        sources.map((source) => source.note),
+        entryA.note,
+      );
       const mergeRisk = aggregateMergeRisk(noteEvidence.map((e) => e.mergeRisk));
       const groupClassification = noteEvidence.find((e) => e.classification)?.classification;
 
@@ -921,8 +1078,12 @@ export async function suggestMerges(
       }
       if (evidence) {
         for (const note of noteEvidence) {
-          const classStr = note.classification ? ` | ${classificationLabel(note.classification)}` : "";
-          lines.push(`   Evidence: ${note.title} | ${note.lifecycle}, ${note.role ?? "untyped"} | ${Math.round(note.ageDays)}d | rel:${note.relatedCount} | risk:${note.mergeRisk}${classStr}`);
+          const classStr = note.classification
+            ? ` | ${classificationLabel(note.classification)}`
+            : "";
+          lines.push(
+            `   Evidence: ${note.title} | ${note.lifecycle}, ${note.role ?? "untyped"} | ${Math.round(note.ageDays)}d | rel:${note.relatedCount} | risk:${note.mergeRisk}${classStr}`,
+          );
         }
         if (mergeWarnings.length > 0) {
           lines.push(`   Warnings: ${mergeWarnings.join("; ")}`);
@@ -960,7 +1121,9 @@ export async function suggestMerges(
   if (suggestionCount === 0) {
     lines.push("No merge suggestions found. Try lowering the threshold or manual review.");
   } else {
-    lines.push(`Generated ${suggestionCount} merge suggestion(s). Review carefully before executing.`);
+    lines.push(
+      `Generated ${suggestionCount} merge suggestion(s). Review carefully before executing.`,
+    );
   }
 
   const structuredContent: ConsolidateResult = {
@@ -978,12 +1141,17 @@ export async function suggestMerges(
 async function loadEmbeddingsByNoteId(entries: NoteEntry[]): Promise<Map<string, EmbeddingRecord>> {
   const embeddings = new Map<string, EmbeddingRecord>();
 
-  await Promise.all(entries.map(async (entry) => {
-    const record = await entry.vault.storage.readEmbedding(entry.note.id);
-    if (record && checkEmbeddingCompatibility(record, currentEmbeddingIdentity).status === "compatible") {
-      embeddings.set(entry.note.id, record);
-    }
-  }));
+  await Promise.all(
+    entries.map(async (entry) => {
+      const record = await entry.vault.storage.readEmbedding(entry.note.id);
+      if (
+        record &&
+        checkEmbeddingCompatibility(record, currentEmbeddingIdentity).status === "compatible"
+      ) {
+        embeddings.set(entry.note.id, record);
+      }
+    }),
+  );
 
   return embeddings;
 }
@@ -1022,7 +1190,10 @@ function findExistingExecuteMergeTarget(
   const candidates = entries
     .filter((entry) => sharedTargetIds?.has(entry.note.id))
     .filter((entry) => entry.note.title.trim() === normalizedTitle)
-    .filter((entry) => !targetSlug || entry.note.id === targetSlug || entry.note.id.startsWith(`${targetSlug}-`))
+    .filter(
+      (entry) =>
+        !targetSlug || entry.note.id === targetSlug || entry.note.id.startsWith(`${targetSlug}-`),
+    )
     .sort((left, right) => right.note.updatedAt.localeCompare(left.note.updatedAt));
 
   return candidates[0];
@@ -1036,7 +1207,10 @@ export async function pruneSuperseded(
   cwd?: string,
   policy?: ProjectMemoryPolicy,
   allowProtectedBranch: boolean = false,
-): Promise<{ content: Array<{ type: "text"; text: string }>; structuredContent: ConsolidateResult }> {
+): Promise<{
+  content: Array<{ type: "text"; text: string }>;
+  structuredContent: ConsolidateResult;
+}> {
   const { vaultManager } = ctx;
 
   if (consolidationMode !== "delete") {
@@ -1046,13 +1220,17 @@ export async function pruneSuperseded(
       project: toProjectRef(project),
       notesProcessed: entries.length,
       notesModified: 0,
-      warnings: [`prune-superseded requires consolidationMode="delete". Current mode: ${consolidationMode}.`],
+      warnings: [
+        `prune-superseded requires consolidationMode="delete". Current mode: ${consolidationMode}.`,
+      ],
     };
     return {
-      content: [{
-        type: "text",
-        text: `prune-superseded requires consolidationMode="delete". Current mode: ${consolidationMode}.\nSet mode explicitly or update project policy.`,
-      }],
+      content: [
+        {
+          type: "text",
+          text: `prune-superseded requires consolidationMode="delete". Current mode: ${consolidationMode}.\nSet mode explicitly or update project policy.`,
+        },
+      ],
       structuredContent,
     };
   }
@@ -1086,11 +1264,10 @@ export async function pruneSuperseded(
     return { content: [{ type: "text", text: lines.join("\n") }], structuredContent };
   }
 
-  const supersededList = Array.from(supersededIds);
-  const touchesProjectVault = supersededList.some((id) => entries.find((e) => e.note.id === id)?.vault.provenance === "project-local");
-
   // Pre-check protected branches
-  for (const vault of new Set(entries.filter((e) => supersededIds.has(e.note.id)).map((e) => e.vault))) {
+  for (const vault of new Set(
+    entries.filter((e) => supersededIds.has(e.note.id)).map((e) => e.vault),
+  )) {
     const check = await checkVaultProtectedBranch({
       ctx,
       vault,
@@ -1107,7 +1284,12 @@ export async function pruneSuperseded(
         notesModified: 0,
         warnings: [check.message ?? "Protected branch policy blocked this commit."],
       };
-      return { content: [{ type: "text", text: check.message ?? "Protected branch policy blocked this commit." }], structuredContent };
+      return {
+        content: [
+          { type: "text", text: check.message ?? "Protected branch policy blocked this commit." },
+        ],
+        structuredContent,
+      };
     }
   }
 
@@ -1139,21 +1321,23 @@ export async function pruneSuperseded(
   // Commit changes per vault
   let retry: MutationRetryContract | undefined;
   for (const [vault, files] of vaultChanges) {
-    const prunedIds = files.map((f) => f.replace(/\.mnemonic\/notes\/(.+)\.md$/, "$1").replace(/notes\/(.+)\.md$/, "$1"));
+    const prunedIds = files.map((f) =>
+      f.replace(/\.mnemonic\/notes\/(.+)\.md$/, "$1").replace(/notes\/(.+)\.md$/, "$1"),
+    );
     const commitBody = formatCommitBody({
       noteIds: prunedIds,
       description: `Pruned ${prunedIds.length} superseded note(s)\nNotes: ${prunedIds.join(", ")}`,
     });
     const commitMessage = `prune: removed ${files.length} superseded note(s)`;
-      const commitStatus = await commitVaultWithProtection(
-        ctx,
-        vault,
-        commitMessage,
-        files,
-        commitBody,
-        allowProtectedBranch,
-        "consolidate",
-      );
+    const commitStatus = await commitVaultWithProtection(
+      ctx,
+      vault,
+      commitMessage,
+      files,
+      commitBody,
+      allowProtectedBranch,
+      "consolidate",
+    );
     if (!retry) {
       retry = buildMutationRetryContract({
         commit: commitStatus,
@@ -1192,10 +1376,15 @@ export async function dryRunAll(
   project: ProjectInfo | undefined,
   explicitMode?: ConsolidationMode,
   evidence: boolean = false,
-): Promise<{ content: Array<{ type: "text"; text: string }>; structuredContent: ConsolidateResult }> {
+): Promise<{
+  content: Array<{ type: "text"; text: string }>;
+  structuredContent: ConsolidateResult;
+}> {
   const lines: string[] = [];
   lines.push(`Consolidation analysis for ${project?.name ?? "global"}:`);
-  const modeLabel = explicitMode ?? `${defaultConsolidationMode} (project/default; all-temporary merges auto-delete)`;
+  const modeLabel =
+    explicitMode ??
+    `${defaultConsolidationMode} (project/default; all-temporary merges auto-delete)`;
   lines.push(`Mode: ${modeLabel} | Threshold: ${threshold}`);
   lines.push("");
 
@@ -1219,7 +1408,14 @@ export async function dryRunAll(
   lines.push(clusters.content[0]?.text ?? "No output");
   lines.push("");
 
-  const merges = await suggestMerges(entries, threshold, defaultConsolidationMode, project, explicitMode, evidence);
+  const merges = await suggestMerges(
+    entries,
+    threshold,
+    defaultConsolidationMode,
+    project,
+    explicitMode,
+    evidence,
+  );
   lines.push("=== MERGE SUGGESTIONS ===");
   lines.push(merges.content[0]?.text ?? "No output");
 

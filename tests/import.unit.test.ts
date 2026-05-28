@@ -96,7 +96,7 @@ describe("parseMemorySections", () => {
   it("handles multiple H2 sections under the same H1", () => {
     const input = `# Project\n## Section A\ncontent a\n## Section B\ncontent b\n## Section C\ncontent c`;
     const result = parseMemorySections(input);
-    expect(result.map(s => s.title)).toEqual([
+    expect(result.map((s) => s.title)).toEqual([
       "Project: Section A",
       "Project: Section B",
       "Project: Section C",

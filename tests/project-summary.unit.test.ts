@@ -99,12 +99,14 @@ describe("project summary scoring helpers", () => {
         relatedTo: [{ id: "other", type: "related-to" }],
       });
 
-      expect(withinThemeScore(note, {
-        role: "summary",
-        roleSource: "suggested",
-        importanceSource: "none",
-        alwaysLoadSource: "none",
-      })).toBeGreaterThan(withinThemeScore(note, noMetadata));
+      expect(
+        withinThemeScore(note, {
+          role: "summary",
+          roleSource: "suggested",
+          importanceSource: "none",
+          alwaysLoadSource: "none",
+        }),
+      ).toBeGreaterThan(withinThemeScore(note, noMetadata));
     });
 
     it("keeps explicit metadata stronger than suggested metadata within a theme", () => {
@@ -153,7 +155,9 @@ describe("project summary scoring helpers", () => {
         relatedTo: [],
       });
 
-      expect(withinThemeScore(hub, noMetadata)).toBeGreaterThan(withinThemeScore(wordyIsolated, noMetadata));
+      expect(withinThemeScore(hub, noMetadata)).toBeGreaterThan(
+        withinThemeScore(wordyIsolated, noMetadata),
+      );
     });
   });
 
@@ -191,14 +195,16 @@ describe("project summary scoring helpers", () => {
         ["b", "decisions"],
       ]);
 
-      expect(anchorScore(temporaryPlan, themeCache, {
-        role: "plan",
-        roleSource: "explicit",
-        importance: "high",
-        importanceSource: "explicit",
-        alwaysLoad: true,
-        alwaysLoadSource: "explicit",
-      })).toBe(-Infinity);
+      expect(
+        anchorScore(temporaryPlan, themeCache, {
+          role: "plan",
+          roleSource: "explicit",
+          importance: "high",
+          importanceSource: "explicit",
+          alwaysLoad: true,
+          alwaysLoadSource: "explicit",
+        }),
+      ).toBe(-Infinity);
     });
 
     it("prefers notes that connect multiple themes over same-count single-theme hubs", () => {
@@ -230,7 +236,9 @@ describe("project summary scoring helpers", () => {
         ["z", "decisions"],
       ]);
 
-      expect(anchorScore(diverseHub, diverseCache)).toBeGreaterThan(anchorScore(narrowHub, narrowCache));
+      expect(anchorScore(diverseHub, diverseCache)).toBeGreaterThan(
+        anchorScore(narrowHub, narrowCache),
+      );
     });
 
     it("boosts explicit alwaysLoad and importance metadata when scoring anchors", () => {
@@ -239,13 +247,15 @@ describe("project summary scoring helpers", () => {
         relatedTo: [{ id: "other", type: "related-to" }],
       });
 
-      expect(anchorScore(note, new Map(), {
-        ...noMetadata,
-        importance: "high",
-        alwaysLoad: true,
-        importanceSource: "explicit",
-        alwaysLoadSource: "explicit",
-      })).toBeGreaterThan(anchorScore(note, new Map(), noMetadata));
+      expect(
+        anchorScore(note, new Map(), {
+          ...noMetadata,
+          importance: "high",
+          alwaysLoad: true,
+          importanceSource: "explicit",
+          alwaysLoadSource: "explicit",
+        }),
+      ).toBeGreaterThan(anchorScore(note, new Map(), noMetadata));
     });
 
     it("gives suggested role and importance metadata a smaller anchor boost", () => {
@@ -254,13 +264,15 @@ describe("project summary scoring helpers", () => {
         relatedTo: [{ id: "other", type: "related-to" }],
       });
 
-      expect(anchorScore(note, new Map(), {
-        role: "summary",
-        roleSource: "suggested",
-        importance: "high",
-        importanceSource: "suggested",
-        alwaysLoadSource: "none",
-      })).toBeGreaterThan(anchorScore(note, new Map(), noMetadata));
+      expect(
+        anchorScore(note, new Map(), {
+          role: "summary",
+          roleSource: "suggested",
+          importance: "high",
+          importanceSource: "suggested",
+          alwaysLoadSource: "none",
+        }),
+      ).toBeGreaterThan(anchorScore(note, new Map(), noMetadata));
     });
 
     it("keeps explicit anchor metadata stronger than suggested metadata", () => {
@@ -313,7 +325,9 @@ describe("project summary scoring helpers", () => {
         content: "Old scratch note.",
       });
 
-      expect(workingStateScore(recentWithNextStep)).toBeGreaterThan(workingStateScore(staleWithoutSignal));
+      expect(workingStateScore(recentWithNextStep)).toBeGreaterThan(
+        workingStateScore(staleWithoutSignal),
+      );
     });
 
     it("keeps identical structure language-independent", () => {
@@ -322,16 +336,21 @@ describe("project summary scoring helpers", () => {
         id: "english-structure",
         lifecycle: "temporary",
         updatedAt: sharedUpdatedAt,
-        content: "## Status\n\nBlocked on one issue.\n\n- verify integration path\n- capture checkpoint",
+        content:
+          "## Status\n\nBlocked on one issue.\n\n- verify integration path\n- capture checkpoint",
       });
       const german = makeNote({
         id: "german-structure",
         lifecycle: "temporary",
         updatedAt: sharedUpdatedAt,
-        content: "## Status\n\nBlockiert durch ein Problem.\n\n- Integrationspfad pruefen\n- Checkpoint erfassen",
+        content:
+          "## Status\n\nBlockiert durch ein Problem.\n\n- Integrationspfad pruefen\n- Checkpoint erfassen",
       });
 
-      expect(workingStateScore(english, noMetadata)).toBeCloseTo(workingStateScore(german, noMetadata), 10);
+      expect(workingStateScore(english, noMetadata)).toBeCloseTo(
+        workingStateScore(german, noMetadata),
+        10,
+      );
     });
 
     it("gives plan metadata a boost for temporary checkpoints", () => {
@@ -341,32 +360,40 @@ describe("project summary scoring helpers", () => {
         updatedAt: "2026-03-20T10:00:00.000Z",
       });
 
-      expect(workingStateScore(note, {
-        role: "plan",
-        roleSource: "explicit",
-        importanceSource: "none",
-        alwaysLoadSource: "none",
-      })).toBeGreaterThan(workingStateScore(note, noMetadata));
+      expect(
+        workingStateScore(note, {
+          role: "plan",
+          roleSource: "explicit",
+          importanceSource: "none",
+          alwaysLoadSource: "none",
+        }),
+      ).toBeGreaterThan(workingStateScore(note, noMetadata));
     });
   });
 
   describe("extractNextAction", () => {
     it("extracts explicit next action labels", () => {
-      expect(extractNextAction({
-        content: "Status update.\n\nNext action: verify the summary output.",
-      })).toBe("verify the summary output.");
+      expect(
+        extractNextAction({
+          content: "Status update.\n\nNext action: verify the summary output.",
+        }),
+      ).toBe("verify the summary output.");
     });
 
     it("falls back to imperative action lines", () => {
-      expect(extractNextAction({
-        content: "Tried one approach.\n\nContinue with the project summary integration test.",
-      })).toBe("Continue with the project summary integration test.");
+      expect(
+        extractNextAction({
+          content: "Tried one approach.\n\nContinue with the project summary integration test.",
+        }),
+      ).toBe("Continue with the project summary integration test.");
     });
 
     it("can recover next actions from list structure without labels", () => {
-      expect(extractNextAction({
-        content: "## Status\n\nDone so far.\n\n- verify summary output\n- update the checkpoint",
-      })).toBe("update the checkpoint");
+      expect(
+        extractNextAction({
+          content: "## Status\n\nDone so far.\n\n- verify summary output\n- update the checkpoint",
+        }),
+      ).toBe("update the checkpoint");
     });
   });
 
@@ -423,11 +450,13 @@ describe("project summary scoring helpers", () => {
         makeNote({ id: "tool-note", title: "Tool", tags: ["mcp"] }),
       ]);
 
-      expect(cache).toEqual(new Map([
-        ["overview-note", "overview"],
-        ["decision-note", "decisions"],
-        ["tool-note", "tooling"],
-      ]));
+      expect(cache).toEqual(
+        new Map([
+          ["overview-note", "overview"],
+          ["decision-note", "decisions"],
+          ["tool-note", "tooling"],
+        ]),
+      );
     });
   });
 

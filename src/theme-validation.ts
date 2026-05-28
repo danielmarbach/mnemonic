@@ -32,23 +32,31 @@ export function analyzeThemeQuality(notes: Note[]): ThemeQualityReport {
   const warnings: string[] = [];
 
   if (otherRatio >= 0.4) {
-    warnings.push(`High 'other' ratio (${Math.round(otherRatio * 100)}%): consider improving keyword extraction or checking tag coverage`);
+    warnings.push(
+      `High 'other' ratio (${Math.round(otherRatio * 100)}%): consider improving keyword extraction or checking tag coverage`,
+    );
   } else if (otherRatio >= 0.25) {
     warnings.push(`Moderate 'other' ratio (${Math.round(otherRatio * 100)}%)`);
   }
 
-  const singleNoteThemes = Array.from(themeBuckets.entries())
-    .filter(([theme, count]) => theme !== "other" && count === 1);
+  const singleNoteThemes = Array.from(themeBuckets.entries()).filter(
+    ([theme, count]) => theme !== "other" && count === 1,
+  );
   if (singleNoteThemes.length >= 3) {
-    warnings.push(`Too many single-note themes (${singleNoteThemes.length}): graduation threshold may be too low`);
+    warnings.push(
+      `Too many single-note themes (${singleNoteThemes.length}): graduation threshold may be too low`,
+    );
   }
 
   const maxThemeCount = Math.max(...themeBuckets.values());
   if (totalNotes > 0 && maxThemeCount / totalNotes > 0.6 && themeBuckets.size > 1) {
-    const dominantTheme = Array.from(themeBuckets.entries())
-      .find(([, count]) => count === maxThemeCount)?.[0];
+    const dominantTheme = Array.from(themeBuckets.entries()).find(
+      ([, count]) => count === maxThemeCount,
+    )?.[0];
     if (dominantTheme) {
-      warnings.push(`Theme distribution is highly skewed (${dominantTheme}: ${Math.round(maxThemeCount / totalNotes * 100)}%)`);
+      warnings.push(
+        `Theme distribution is highly skewed (${dominantTheme}: ${Math.round((maxThemeCount / totalNotes) * 100)}%)`,
+      );
     }
   }
 

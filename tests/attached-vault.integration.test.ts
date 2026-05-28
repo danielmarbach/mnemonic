@@ -50,7 +50,19 @@ Content from the attached vault.`;
   await writeFile(path.join(notesDir, "attached-note.md"), noteContent, "utf-8");
 
   await execFileAsync("git", ["add", ".mnemonic/"], { cwd: attachedDir });
-  await execFileAsync("git", ["-c", "user.email=test@example.com", "-c", "user.name=Test User", "commit", "-m", "chore: add mnemonic notes"], { cwd: attachedDir });
+  await execFileAsync(
+    "git",
+    [
+      "-c",
+      "user.email=test@example.com",
+      "-c",
+      "user.name=Test User",
+      "commit",
+      "-m",
+      "chore: add mnemonic notes",
+    ],
+    { cwd: attachedDir },
+  );
   await execFileAsync("git", ["remote", "add", "origin", bareDir], { cwd: attachedDir });
   await execFileAsync("git", ["push", "-u", "origin", "main"], { cwd: attachedDir });
   await execFileAsync("git", ["remote", "set-head", "origin", "--auto"], { cwd: attachedDir });
@@ -69,10 +81,15 @@ describe("attached vault integration", () => {
       const embeddingServer = await startFakeEmbeddingServer();
 
       try {
-        const result = await callLocalMcpResponse(vaultDir, "add_attachment", {
-          cwd: repoDir,
-          localPath: attachedDir,
-        }, { ollamaUrl: embeddingServer.url, disableGit: false });
+        const result = await callLocalMcpResponse(
+          vaultDir,
+          "add_attachment",
+          {
+            cwd: repoDir,
+            localPath: attachedDir,
+          },
+          { ollamaUrl: embeddingServer.url, disableGit: false },
+        );
 
         expect(result.text).toContain("Attachment added");
       } finally {
@@ -85,11 +102,16 @@ describe("attached vault integration", () => {
       const embeddingServer = await startFakeEmbeddingServer();
 
       try {
-        const result = await callLocalMcpResponse(vaultDir, "add_attachment", {
-          cwd: repoDir,
-          localPath: attachedDir,
-          branch: "main",
-        }, { ollamaUrl: embeddingServer.url, disableGit: false });
+        const result = await callLocalMcpResponse(
+          vaultDir,
+          "add_attachment",
+          {
+            cwd: repoDir,
+            localPath: attachedDir,
+            branch: "main",
+          },
+          { ollamaUrl: embeddingServer.url, disableGit: false },
+        );
 
         expect(result.text).toContain("Attachment added");
       } finally {
@@ -108,10 +130,15 @@ describe("attached vault integration", () => {
 
       const embeddingServer = await startFakeEmbeddingServer();
       try {
-        const result = await callLocalMcpResponse(vaultDir, "add_attachment", {
-          cwd: repoDir,
-          localPath: badDir,
-        }, { ollamaUrl: embeddingServer.url, disableGit: false });
+        const result = await callLocalMcpResponse(
+          vaultDir,
+          "add_attachment",
+          {
+            cwd: repoDir,
+            localPath: badDir,
+          },
+          { ollamaUrl: embeddingServer.url, disableGit: false },
+        );
 
         expect(result.text).toMatch(/Cannot attach|notes directory/i);
       } finally {
@@ -125,10 +152,15 @@ describe("attached vault integration", () => {
       const embeddingServer = await startFakeEmbeddingServer();
 
       try {
-        const result = await callLocalMcpResponse(vaultDir, "add_attachment", {
-          cwd: repoDir,
-          localPath: homeRelativePath,
-        }, { ollamaUrl: embeddingServer.url, disableGit: false });
+        const result = await callLocalMcpResponse(
+          vaultDir,
+          "add_attachment",
+          {
+            cwd: repoDir,
+            localPath: homeRelativePath,
+          },
+          { ollamaUrl: embeddingServer.url, disableGit: false },
+        );
 
         expect(result.text).toContain("Attachment added");
       } finally {
@@ -143,14 +175,24 @@ describe("attached vault integration", () => {
       const embeddingServer = await startFakeEmbeddingServer();
 
       try {
-        await callLocalMcp(vaultDir, "add_attachment", {
-          cwd: repoDir,
-          localPath: attachedDir,
-        }, { ollamaUrl: embeddingServer.url, disableGit: false });
+        await callLocalMcp(
+          vaultDir,
+          "add_attachment",
+          {
+            cwd: repoDir,
+            localPath: attachedDir,
+          },
+          { ollamaUrl: embeddingServer.url, disableGit: false },
+        );
 
-        const result = await callLocalMcpResponse(vaultDir, "list_attachments", {
-          cwd: repoDir,
-        }, { ollamaUrl: embeddingServer.url, disableGit: false });
+        const result = await callLocalMcpResponse(
+          vaultDir,
+          "list_attachments",
+          {
+            cwd: repoDir,
+          },
+          { ollamaUrl: embeddingServer.url, disableGit: false },
+        );
 
         expect(result.text).toContain("active");
         expect(result.text).toContain("main");
@@ -166,19 +208,29 @@ describe("attached vault integration", () => {
       const embeddingServer = await startFakeEmbeddingServer();
 
       try {
-        const addResult = await callLocalMcpResponse(vaultDir, "add_attachment", {
-          cwd: repoDir,
-          localPath: attachedDir,
-        }, { ollamaUrl: embeddingServer.url, disableGit: false });
+        const addResult = await callLocalMcpResponse(
+          vaultDir,
+          "add_attachment",
+          {
+            cwd: repoDir,
+            localPath: attachedDir,
+          },
+          { ollamaUrl: embeddingServer.url, disableGit: false },
+        );
 
         const structuredContent = addResult.structuredContent as any;
         const slug = structuredContent?.attachment?.projectSlug;
         expect(slug).toBeDefined();
 
-        const removeResult = await callLocalMcpResponse(vaultDir, "remove_attachment", {
-          cwd: repoDir,
-          projectSlug: slug,
-        }, { ollamaUrl: embeddingServer.url, disableGit: false });
+        const removeResult = await callLocalMcpResponse(
+          vaultDir,
+          "remove_attachment",
+          {
+            cwd: repoDir,
+            projectSlug: slug,
+          },
+          { ollamaUrl: embeddingServer.url, disableGit: false },
+        );
 
         expect(removeResult.text).toContain("Attachment removed");
       } finally {
@@ -193,19 +245,29 @@ describe("attached vault integration", () => {
       const embeddingServer = await startFakeEmbeddingServer();
 
       try {
-        const addResult = await callLocalMcpResponse(vaultDir, "add_attachment", {
-          cwd: repoDir,
-          localPath: attachedDir,
-        }, { ollamaUrl: embeddingServer.url, disableGit: false });
+        const addResult = await callLocalMcpResponse(
+          vaultDir,
+          "add_attachment",
+          {
+            cwd: repoDir,
+            localPath: attachedDir,
+          },
+          { ollamaUrl: embeddingServer.url, disableGit: false },
+        );
 
         const structuredContent = addResult.structuredContent as any;
         const slug = structuredContent?.attachment?.projectSlug;
 
-        const disableResult = await callLocalMcpResponse(vaultDir, "set_attachment_enabled", {
-          cwd: repoDir,
-          projectSlug: slug,
-          enabled: false,
-        }, { ollamaUrl: embeddingServer.url, disableGit: false });
+        const disableResult = await callLocalMcpResponse(
+          vaultDir,
+          "set_attachment_enabled",
+          {
+            cwd: repoDir,
+            projectSlug: slug,
+            enabled: false,
+          },
+          { ollamaUrl: embeddingServer.url, disableGit: false },
+        );
 
         expect(disableResult.text).toContain("disabled");
       } finally {
@@ -220,16 +282,26 @@ describe("attached vault integration", () => {
       const embeddingServer = await startFakeEmbeddingServer();
 
       try {
-        await callLocalMcp(vaultDir, "add_attachment", {
-          cwd: repoDir,
-          localPath: attachedDir,
-        }, { ollamaUrl: embeddingServer.url, disableGit: false });
+        await callLocalMcp(
+          vaultDir,
+          "add_attachment",
+          {
+            cwd: repoDir,
+            localPath: attachedDir,
+          },
+          { ollamaUrl: embeddingServer.url, disableGit: false },
+        );
 
-        const updateResult = await callLocalMcpResponse(vaultDir, "update", {
-          id: "attached-note",
-          content: "Attempted update.",
-          cwd: repoDir,
-        }, { ollamaUrl: embeddingServer.url, disableGit: false });
+        const updateResult = await callLocalMcpResponse(
+          vaultDir,
+          "update",
+          {
+            id: "attached-note",
+            content: "Attempted update.",
+            cwd: repoDir,
+          },
+          { ollamaUrl: embeddingServer.url, disableGit: false },
+        );
 
         expect(updateResult.text).toMatch(/attached vault|cannot be modified|read-only|not found/i);
       } finally {
@@ -242,15 +314,25 @@ describe("attached vault integration", () => {
       const embeddingServer = await startFakeEmbeddingServer();
 
       try {
-        await callLocalMcp(vaultDir, "add_attachment", {
-          cwd: repoDir,
-          localPath: attachedDir,
-        }, { ollamaUrl: embeddingServer.url, disableGit: false });
+        await callLocalMcp(
+          vaultDir,
+          "add_attachment",
+          {
+            cwd: repoDir,
+            localPath: attachedDir,
+          },
+          { ollamaUrl: embeddingServer.url, disableGit: false },
+        );
 
-        const forgetResult = await callLocalMcpResponse(vaultDir, "forget", {
-          id: "attached-note",
-          cwd: repoDir,
-        }, { ollamaUrl: embeddingServer.url, disableGit: false });
+        const forgetResult = await callLocalMcpResponse(
+          vaultDir,
+          "forget",
+          {
+            id: "attached-note",
+            cwd: repoDir,
+          },
+          { ollamaUrl: embeddingServer.url, disableGit: false },
+        );
 
         expect(forgetResult.text).toMatch(/attached vault|cannot be modified|read-only|not found/i);
       } finally {

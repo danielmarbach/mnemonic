@@ -18,11 +18,7 @@ import {
 } from "../helpers/project.js";
 import { storageLabel } from "../helpers/vault.js";
 import { formatRelationshipPreview } from "../helpers/index.js";
-import {
-  getSessionCachedNote,
-  setSessionCachedNote,
-  recordSessionNoteAccess,
-} from "../cache.js";
+import { getSessionCachedNote, setSessionCachedNote, recordSessionNoteAccess } from "../cache.js";
 import { getRelationshipPreview } from "../relationships.js";
 
 export function registerGetTool(server: McpServer, ctx: ServerContext): void {
@@ -50,7 +46,11 @@ export function registerGetTool(server: McpServer, ctx: ServerContext): void {
       inputSchema: z.object({
         ids: z.array(NoteIdSchema).min(1).describe("One or more memory ids to fetch"),
         cwd: projectParam,
-        includeRelationships: z.boolean().optional().default(false).describe("Include bounded direct relationship previews (1-hop expansion, max 3 shown)"),
+        includeRelationships: z
+          .boolean()
+          .optional()
+          .default(false)
+          .describe("Include bounded direct relationship previews (1-hop expansion, max 3 shown)"),
       }),
       outputSchema: GetResultSchema,
     },
@@ -88,7 +88,7 @@ export function registerGetTool(server: McpServer, ctx: ServerContext): void {
           relationships = await getRelationshipPreview(
             note,
             ctx.vaultManager.allKnownVaults(project?.id),
-            { activeProjectId: project?.id, limit: 3 }
+            { activeProjectId: project?.id, limit: 3 },
           );
         }
 
@@ -117,7 +117,9 @@ export function registerGetTool(server: McpServer, ctx: ServerContext): void {
       const lines: string[] = [];
       for (const note of found) {
         lines.push(`## ${note.title} (${note.id})`);
-        lines.push(`project: ${note.project?.name ?? "global"} | stored: ${note.vault} | lifecycle: ${note.lifecycle}${note.role ? ` | role: ${note.role}` : ""}`);
+        lines.push(
+          `project: ${note.project?.name ?? "global"} | stored: ${note.vault} | lifecycle: ${note.lifecycle}${note.role ? ` | role: ${note.role}` : ""}`,
+        );
         if (note.tags.length > 0) lines.push(`tags: ${note.tags.join(", ")}`);
         lines.push("");
         lines.push(note.content);
@@ -140,6 +142,6 @@ export function registerGetTool(server: McpServer, ctx: ServerContext): void {
 
       console.error(`[get:timing] ${(performance.now() - t0Get).toFixed(1)}ms`);
       return { content: [{ type: "text", text: lines.join("\n").trim() }], structuredContent };
-    }
+    },
   );
 }

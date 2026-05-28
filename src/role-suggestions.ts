@@ -38,7 +38,7 @@ const ROLE_MARGIN = 2;
 
 export function getEffectiveMetadata(
   note: Note,
-  context: RoleSuggestionContext = {}
+  context: RoleSuggestionContext = {},
 ): EffectiveNoteMetadata {
   const effectiveRole = note.role ?? suggestRole(note, context);
   const effectiveImportance = note.importance ?? suggestImportance(note, context);
@@ -53,14 +53,13 @@ export function getEffectiveMetadata(
   };
 }
 
-export function suggestRole(
-  note: Note,
-  context: RoleSuggestionContext = {}
-): NoteRole | undefined {
+export function suggestRole(note: Note, context: RoleSuggestionContext = {}): NoteRole | undefined {
   const shape = analyzeContent(note.content, note.title);
   const inbound = context.inboundReferences ?? 0;
   const linkedByPermanentNotes = context.linkedByPermanentNotes ?? 0;
-  const explanatoryRelations = note.relatedTo?.filter((rel) => rel.type === "explains" || rel.type === "supersedes").length ?? 0;
+  const explanatoryRelations =
+    note.relatedTo?.filter((rel) => rel.type === "explains" || rel.type === "supersedes").length ??
+    0;
   const totalRelations = note.relatedTo?.length ?? 0;
 
   const scores: RoleScore[] = [
@@ -117,7 +116,7 @@ export function suggestRole(
     return undefined;
   }
 
-  if ((best.score - (second?.score ?? 0)) < ROLE_MARGIN) {
+  if (best.score - (second?.score ?? 0) < ROLE_MARGIN) {
     return undefined;
   }
 
@@ -126,7 +125,7 @@ export function suggestRole(
 
 export function suggestImportance(
   note: Note,
-  context: RoleSuggestionContext = {}
+  context: RoleSuggestionContext = {},
 ): SuggestedImportance | undefined {
   const inbound = context.inboundReferences ?? 0;
   const linkedByPermanentNotes = context.linkedByPermanentNotes ?? 0;
@@ -146,7 +145,7 @@ export function suggestImportance(
     note.lifecycle === "permanent" &&
     inbound >= 4 &&
     linkedByPermanentNotes >= 2 &&
-    (connections + structuralStrength + anchorBaseline) >= 10
+    connections + structuralStrength + anchorBaseline >= 10
   ) {
     return "high";
   }
@@ -162,8 +161,11 @@ export function suggestImportance(
   return undefined;
 }
 
-function analyzeContent(content: string, title: string): ContentShape {
-  const lines = content.split(/\r?\n/).map((line) => line.trim()).filter((line) => line.length > 0);
+function analyzeContent(content: string, _title: string): ContentShape {
+  const lines = content
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
   const headingCount = lines.filter((line) => /^#{1,6}\s+/.test(line)).length;
   const checklistCount = lines.filter((line) => /^[-*+]\s+\[(?: |x|X)\]\s+/.test(line)).length;
   const numberedCount = lines.filter((line) => /^\d+[.)]\s+/.test(line)).length;
@@ -176,8 +178,7 @@ function analyzeContent(content: string, title: string): ContentShape {
     .filter((block) => block.length > 0)
     .filter((block) => !/^#{1,6}\s+/m.test(block))
     .filter((block) => !/^[-*+]\s+/m.test(block))
-    .filter((block) => !/^\d+[.)]\s+/m.test(block))
-    .length;
+    .filter((block) => !/^\d+[.)]\s+/m.test(block)).length;
   const shortLineCount = lines.filter((line) => line.length <= 32).length;
   return {
     headingCount,

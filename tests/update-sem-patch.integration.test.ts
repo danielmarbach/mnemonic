@@ -3,7 +3,12 @@ import { describe, expect, it } from "vitest";
 import os from "os";
 import path from "path";
 
-import { callLocalMcpResponse, createPersistentMcpSession, initTestRepo, tempDirs } from "./helpers/mcp.js";
+import {
+  callLocalMcpResponse,
+  createPersistentMcpSession,
+  initTestRepo,
+  tempDirs,
+} from "./helpers/mcp.js";
 
 describe("update with semanticPatch", () => {
   it("applies a semantic patch to append content under a heading", async () => {
@@ -18,7 +23,8 @@ describe("update with semanticPatch", () => {
     // First remember a note with structure
     const rememberResult = await session.callTool("remember", {
       title: "Test Note for Semantic Patch",
-      content: "# Test Note\n\n## Section A\n\nExisting content under A.\n\n## Section B\n\nExisting content under B.\n",
+      content:
+        "# Test Note\n\n## Section A\n\nExisting content under A.\n\n## Section B\n\nExisting content under B.\n",
       lifecycle: "temporary",
     });
     const idMatch = rememberResult.text.match(/`([^`]+)`/);
@@ -67,7 +73,9 @@ describe("update with semanticPatch", () => {
     const updateResult = await session.callTool("update", {
       id: noteId,
       content: "New content.",
-      semanticPatch: [{ selector: { heading: "Mutex Test" }, operation: { op: "insertAfter", value: "Patch." } }],
+      semanticPatch: [
+        { selector: { heading: "Mutex Test" }, operation: { op: "insertAfter", value: "Patch." } },
+      ],
     });
 
     expect(updateResult.text).toContain("Exactly one of content or semanticPatch must be provided");
@@ -93,7 +101,9 @@ describe("update with semanticPatch", () => {
 
     const updateResult = await session.callTool("update", {
       id: noteId,
-      semanticPatch: [{ selector: { heading: "Scope" }, operation: { op: "appendChild", value: "new item" } }],
+      semanticPatch: [
+        { selector: { heading: "Scope" }, operation: { op: "appendChild", value: "new item" } },
+      ],
     });
 
     expect(updateResult.text).toContain("Cannot appendChild to node of type 'heading'");
@@ -119,7 +129,12 @@ describe("update with semanticPatch", () => {
 
     const updateResult = await session.callTool("update", {
       id: noteId,
-      semanticPatch: [{ selector: { heading: "NonExistent" }, operation: { op: "insertAfter", value: "Won't work." } }],
+      semanticPatch: [
+        {
+          selector: { heading: "NonExistent" },
+          operation: { op: "insertAfter", value: "Won't work." },
+        },
+      ],
     });
 
     expect(updateResult.text).toContain("Semantic patch failed");
@@ -172,7 +187,12 @@ describe("update with semanticPatch", () => {
 
     const updateResult = await session.callTool("update", {
       id: noteId,
-      semanticPatch: JSON.stringify([{ selector: { heading: "Findings" }, operation: { op: "insertAfter", value: "Patched via string." } }]) as any,
+      semanticPatch: JSON.stringify([
+        {
+          selector: { heading: "Findings" },
+          operation: { op: "insertAfter", value: "Patched via string." },
+        },
+      ]) as any,
     });
 
     expect(updateResult.text).toContain("Updated memory");

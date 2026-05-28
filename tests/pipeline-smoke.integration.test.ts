@@ -39,59 +39,94 @@ describe("pipeline smoke assertions", () => {
     const embeddingServer = await startFakeEmbeddingServer();
 
     try {
-      const hubRemember = await callLocalMcp(vaultDir, "remember", {
-        title: "Stability Hub Note",
-        content: "Central note that should consistently be the primary entry.",
-        tags: ["integration", "stability"],
-        summary: "Create hub note for stability test",
-        cwd: repoDir,
-        scope: "project",
-        lifecycle: "permanent",
-      }, embeddingServer.url);
+      const hubRemember = await callLocalMcp(
+        vaultDir,
+        "remember",
+        {
+          title: "Stability Hub Note",
+          content: "Central note that should consistently be the primary entry.",
+          tags: ["integration", "stability"],
+          summary: "Create hub note for stability test",
+          cwd: repoDir,
+          scope: "project",
+          lifecycle: "permanent",
+        },
+        embeddingServer.url,
+      );
       const hubId = extractRememberedId(hubRemember);
 
-      const leaf1Remember = await callLocalMcp(vaultDir, "remember", {
-        title: "Stability Leaf 1",
-        content: "Leaf note connected to hub.",
-        tags: ["integration", "stability"],
-        summary: "Create leaf note 1 for stability test",
-        cwd: repoDir,
-        scope: "project",
-        lifecycle: "permanent",
-      }, embeddingServer.url);
+      const leaf1Remember = await callLocalMcp(
+        vaultDir,
+        "remember",
+        {
+          title: "Stability Leaf 1",
+          content: "Leaf note connected to hub.",
+          tags: ["integration", "stability"],
+          summary: "Create leaf note 1 for stability test",
+          cwd: repoDir,
+          scope: "project",
+          lifecycle: "permanent",
+        },
+        embeddingServer.url,
+      );
       const leaf1Id = extractRememberedId(leaf1Remember);
 
-      const leaf2Remember = await callLocalMcp(vaultDir, "remember", {
-        title: "Stability Leaf 2",
-        content: "Another leaf note connected to hub.",
-        tags: ["integration", "stability"],
-        summary: "Create leaf note 2 for stability test",
-        cwd: repoDir,
-        scope: "project",
-        lifecycle: "permanent",
-      }, embeddingServer.url);
+      const leaf2Remember = await callLocalMcp(
+        vaultDir,
+        "remember",
+        {
+          title: "Stability Leaf 2",
+          content: "Another leaf note connected to hub.",
+          tags: ["integration", "stability"],
+          summary: "Create leaf note 2 for stability test",
+          cwd: repoDir,
+          scope: "project",
+          lifecycle: "permanent",
+        },
+        embeddingServer.url,
+      );
       const leaf2Id = extractRememberedId(leaf2Remember);
 
-      await callLocalMcp(vaultDir, "relate", {
-        fromId: hubId,
-        toId: leaf1Id,
-        type: "related-to",
-        cwd: repoDir,
-      }, embeddingServer.url);
-      await callLocalMcp(vaultDir, "relate", {
-        fromId: hubId,
-        toId: leaf2Id,
-        type: "related-to",
-        cwd: repoDir,
-      }, embeddingServer.url);
+      await callLocalMcp(
+        vaultDir,
+        "relate",
+        {
+          fromId: hubId,
+          toId: leaf1Id,
+          type: "related-to",
+          cwd: repoDir,
+        },
+        embeddingServer.url,
+      );
+      await callLocalMcp(
+        vaultDir,
+        "relate",
+        {
+          fromId: hubId,
+          toId: leaf2Id,
+          type: "related-to",
+          cwd: repoDir,
+        },
+        embeddingServer.url,
+      );
 
-      const summary1 = await callLocalMcpResponse(vaultDir, "project_memory_summary", {
-        cwd: repoDir,
-      }, embeddingServer.url);
+      const summary1 = await callLocalMcpResponse(
+        vaultDir,
+        "project_memory_summary",
+        {
+          cwd: repoDir,
+        },
+        embeddingServer.url,
+      );
 
-      const summary2 = await callLocalMcpResponse(vaultDir, "project_memory_summary", {
-        cwd: repoDir,
-      }, embeddingServer.url);
+      const summary2 = await callLocalMcpResponse(
+        vaultDir,
+        "project_memory_summary",
+        {
+          cwd: repoDir,
+        },
+        embeddingServer.url,
+      );
 
       const orientation1 = summary1.structuredContent?.["orientation"] as Record<string, unknown>;
       const orientation2 = summary2.structuredContent?.["orientation"] as Record<string, unknown>;
@@ -109,23 +144,34 @@ describe("pipeline smoke assertions", () => {
     const embeddingServer = await startFakeEmbeddingServer();
 
     try {
-      const rememberText = await callLocalMcp(vaultDir, "remember", {
-        title: "Recent temporal decision note",
-        content: "A recently created note about design decisions that should appear in temporal recall.",
-        tags: ["integration", "temporal"],
-        summary: "Create recent note for temporal recall test",
-        scope: "global",
-        lifecycle: "permanent",
-      }, embeddingServer.url);
+      const rememberText = await callLocalMcp(
+        vaultDir,
+        "remember",
+        {
+          title: "Recent temporal decision note",
+          content:
+            "A recently created note about design decisions that should appear in temporal recall.",
+          tags: ["integration", "temporal"],
+          summary: "Create recent note for temporal recall test",
+          scope: "global",
+          lifecycle: "permanent",
+        },
+        embeddingServer.url,
+      );
 
       const noteId = extractRememberedId(rememberText);
 
-      const response = await callLocalMcpResponse(vaultDir, "recall", {
-        query: "recent design decisions",
-        limit: 5,
-        scope: "global",
-        mode: "temporal",
-      }, embeddingServer.url);
+      const response = await callLocalMcpResponse(
+        vaultDir,
+        "recall",
+        {
+          query: "recent design decisions",
+          limit: 5,
+          scope: "global",
+          mode: "temporal",
+        },
+        embeddingServer.url,
+      );
 
       const parsed = RecallResultSchema.parse(response.structuredContent);
       const ids = parsed.results.map((r: { id: string }) => r.id);

@@ -14,9 +14,7 @@ export function debugLog(scope: string, message: string): void {
 
 // ── Result type ───────────────────────────────────────────────────────────────
 
-export type Result<T, E = Error> =
-  | { ok: true; value: T }
-  | { ok: false; error: E };
+export type Result<T, E = Error> = { ok: true; value: T } | { ok: false; error: E };
 
 export function ok<T>(value: T): Result<T, never> {
   return { ok: true, value };
@@ -34,7 +32,7 @@ export function err<E>(error: E): Result<never, E> {
  *
  * Use `attempt` for every fail-soft path where the operation should not crash
  * the program. The returned `Result` forces callers to handle both outcomes
- * explicitly and makes fail-soft behavior scannable via ast-grep.
+ * explicitly and makes fail-soft behavior scannable via ESLint.
  *
  * @example
  * // Fail-soft with explicit handling
@@ -65,11 +63,7 @@ export async function attempt<T, E = Error>(
   }
 }
 
-export function attemptSync<T, E = Error>(
-  scope: string,
-  fn: () => T,
-  fallback?: T,
-): Result<T, E> {
+export function attemptSync<T, E = Error>(scope: string, fn: () => T, fallback?: T): Result<T, E> {
   try {
     const value = fn();
     return { ok: true, value };

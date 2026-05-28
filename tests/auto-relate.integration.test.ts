@@ -27,17 +27,24 @@ describe("auto relationships from session context", () => {
       await initTestVaultRepo(vaultDir);
       await initTestRepo(repoDir);
 
-      const session = await createPersistentMcpSession(vaultDir, { ollamaUrl: embeddingServer.url, disableGit: true });
+      const session = await createPersistentMcpSession(vaultDir, {
+        ollamaUrl: embeddingServer.url,
+        disableGit: true,
+      });
       try {
-        const architectureId = extractRememberedId((await session.callTool("remember", {
-          title: "Architecture anchor",
-          content: "Canonical architecture guidance for the project.",
-          tags: ["architecture", "design"],
-          lifecycle: "permanent",
-          scope: "project",
-          cwd: repoDir,
-          summary: "Create architecture anchor",
-        })).text);
+        const architectureId = extractRememberedId(
+          (
+            await session.callTool("remember", {
+              title: "Architecture anchor",
+              content: "Canonical architecture guidance for the project.",
+              tags: ["architecture", "design"],
+              lifecycle: "permanent",
+              scope: "project",
+              cwd: repoDir,
+              summary: "Create architecture anchor",
+            })
+          ).text,
+        );
 
         await session.callTool("get", {
           ids: [architectureId],
@@ -45,15 +52,20 @@ describe("auto relationships from session context", () => {
           includeRelationships: true,
         });
 
-        const resultId = extractRememberedId((await session.callTool("remember", {
-          title: "Investigation results",
-          content: "Follow-up on Architecture anchor. This result validates the earlier design and captures what changed.",
-          tags: ["investigation", "results"],
-          lifecycle: "permanent",
-          scope: "project",
-          cwd: repoDir,
-          summary: "Capture investigation results",
-        })).text);
+        const resultId = extractRememberedId(
+          (
+            await session.callTool("remember", {
+              title: "Investigation results",
+              content:
+                "Follow-up on Architecture anchor. This result validates the earlier design and captures what changed.",
+              tags: ["investigation", "results"],
+              lifecycle: "permanent",
+              scope: "project",
+              cwd: repoDir,
+              summary: "Capture investigation results",
+            })
+          ).text,
+        );
 
         const result = await session.callTool("get", {
           ids: [resultId],
@@ -61,7 +73,9 @@ describe("auto relationships from session context", () => {
           includeRelationships: false,
         });
 
-        const notes = (result.structuredContent?.notes ?? []) as Array<{ relatedTo?: Array<{ id: string; type: string }> }>;
+        const notes = (result.structuredContent?.notes ?? []) as Array<{
+          relatedTo?: Array<{ id: string; type: string }>;
+        }>;
         const relatedTo = notes[0]?.relatedTo ?? [];
         expect(relatedTo).toContainEqual({ id: architectureId, type: "related-to" });
       } finally {
@@ -82,17 +96,24 @@ describe("auto relationships from session context", () => {
       await initTestVaultRepo(vaultDir);
       await initTestRepo(repoDir);
 
-      const session = await createPersistentMcpSession(vaultDir, { ollamaUrl: embeddingServer.url, disableGit: true });
+      const session = await createPersistentMcpSession(vaultDir, {
+        ollamaUrl: embeddingServer.url,
+        disableGit: true,
+      });
       try {
-        const architectureId = extractRememberedId((await session.callTool("remember", {
-          title: "Architecture anchor",
-          content: "Canonical architecture guidance for the project.",
-          tags: ["architecture", "design"],
-          lifecycle: "permanent",
-          scope: "project",
-          cwd: repoDir,
-          summary: "Create architecture anchor",
-        })).text);
+        const architectureId = extractRememberedId(
+          (
+            await session.callTool("remember", {
+              title: "Architecture anchor",
+              content: "Canonical architecture guidance for the project.",
+              tags: ["architecture", "design"],
+              lifecycle: "permanent",
+              scope: "project",
+              cwd: repoDir,
+              summary: "Create architecture anchor",
+            })
+          ).text,
+        );
 
         await session.callTool("get", {
           ids: [architectureId],
@@ -110,15 +131,20 @@ describe("auto relationships from session context", () => {
           summary: "Create temporary checkpoint",
         });
 
-        const resultId = extractRememberedId((await session.callTool("remember", {
-          title: "Investigation results after checkpoint",
-          content: "Follow-up on Architecture anchor. This result still builds on the earlier design.",
-          tags: ["investigation", "results"],
-          lifecycle: "permanent",
-          scope: "project",
-          cwd: repoDir,
-          summary: "Capture investigation results after checkpoint",
-        })).text);
+        const resultId = extractRememberedId(
+          (
+            await session.callTool("remember", {
+              title: "Investigation results after checkpoint",
+              content:
+                "Follow-up on Architecture anchor. This result still builds on the earlier design.",
+              tags: ["investigation", "results"],
+              lifecycle: "permanent",
+              scope: "project",
+              cwd: repoDir,
+              summary: "Capture investigation results after checkpoint",
+            })
+          ).text,
+        );
 
         const result = await session.callTool("get", {
           ids: [resultId],
@@ -126,7 +152,9 @@ describe("auto relationships from session context", () => {
           includeRelationships: false,
         });
 
-        const notes = (result.structuredContent?.notes ?? []) as Array<{ relatedTo?: Array<{ id: string; type: string }> }>;
+        const notes = (result.structuredContent?.notes ?? []) as Array<{
+          relatedTo?: Array<{ id: string; type: string }>;
+        }>;
         const relatedTo = notes[0]?.relatedTo ?? [];
         expect(relatedTo).toContainEqual({ id: architectureId, type: "related-to" });
       } finally {

@@ -1,8 +1,17 @@
 import { metadataPrefixes } from "./git-constants.js";
 import { UnknownChangeCategoryError } from "./domain-errors.js";
 
-export const CHANGE_CATEGORIES = ["create", "refine", "expand", "clarify", "connect", "restructure", "reverse", "unknown"] as const;
-export type ChangeCategory = typeof CHANGE_CATEGORIES[number];
+export const CHANGE_CATEGORIES = [
+  "create",
+  "refine",
+  "expand",
+  "clarify",
+  "connect",
+  "restructure",
+  "reverse",
+  "unknown",
+] as const;
+export type ChangeCategory = (typeof CHANGE_CATEGORIES)[number];
 
 export interface InterpretHistoryContext {
   isFirstCommit?: boolean;
@@ -38,13 +47,15 @@ export interface InterpretedHistoryEntry {
   changeDescription: string;
 }
 
-function hasStats(entry: TemporalHistoryEntry): entry is TemporalHistoryEntry & { stats: NonNullable<TemporalHistoryEntry["stats"]> } {
+function hasStats(
+  entry: TemporalHistoryEntry,
+): entry is TemporalHistoryEntry & { stats: NonNullable<TemporalHistoryEntry["stats"]> } {
   return entry.stats !== undefined;
 }
 
 export function classifyChange(
   entry: TemporalHistoryEntry,
-  context?: InterpretHistoryContext
+  context?: InterpretHistoryContext,
 ): ChangeCategory {
   if (context?.isFirstCommit) {
     return "create";
@@ -116,12 +127,14 @@ export function classifyChange(
 function generateChangeDescription(
   category: ChangeCategory,
   entry: TemporalHistoryEntry,
-  context?: InterpretHistoryContext
+  _context?: InterpretHistoryContext,
 ): string {
   const hasContent = hasStats(entry);
-  const isSubstantial = hasContent && entry.stats &&
+  const isSubstantial =
+    hasContent &&
+    entry.stats &&
     (entry.stats.changeType === "substantial update" ||
-     entry.stats.additions + entry.stats.deletions > 50);
+      entry.stats.additions + entry.stats.deletions > 50);
 
   switch (category) {
     case "create":
@@ -162,7 +175,7 @@ function generateChangeDescription(
 
 export function interpretHistoryEntry(
   entry: TemporalHistoryEntry,
-  context?: InterpretHistoryContext
+  context?: InterpretHistoryContext,
 ): InterpretedHistoryEntry {
   const changeCategory = classifyChange(entry, context);
   const changeDescription = generateChangeDescription(changeCategory, entry, context);
@@ -178,9 +191,7 @@ export function interpretHistoryEntry(
   };
 }
 
-export function summarizeHistory(
-  entries: InterpretedHistoryEntry[]
-): string | undefined {
+export function summarizeHistory(entries: InterpretedHistoryEntry[]): string | undefined {
   if (entries.length === 0) {
     return undefined;
   }
@@ -190,21 +201,25 @@ export function summarizeHistory(
     if (first?.changeCategory === "create") {
       return "This note was created and has not been modified since.";
     }
-    return `This note was ${first?.changeCategory === "unknown" ? "updated" : first?.changeCategory ?? "unknown"}d.`;
+    return `This note was ${first?.changeCategory === "unknown" ? "updated" : (first?.changeCategory ?? "unknown")}d.`;
   }
 
   const first = entries[entries.length - 1];
   if (!first) return undefined;
   const categories = entries.map((e) => e.changeCategory);
-  const categoryCounts = categories.reduce((acc, cat) => {
-    acc[cat] = (acc[cat] || 0) + 1;
-    return acc;
-  }, {} as Record<ChangeCategory, number>);
+  const categoryCounts = categories.reduce(
+    (acc, cat) => {
+      acc[cat] = (acc[cat] || 0) + 1;
+      return acc;
+    },
+    {} as Record<ChangeCategory, number>,
+  );
 
   const nonCreateCategories = categories.filter((c) => c !== "create");
-  const dominantCategory = nonCreateCategories.length > 0
-    ? nonCreateCategories.sort((a, b) => (categoryCounts[b] || 0) - (categoryCounts[a] || 0))[0]
-    : "create";
+  const dominantCategory =
+    nonCreateCategories.length > 0
+      ? nonCreateCategories.sort((a, b) => (categoryCounts[b] || 0) - (categoryCounts[a] || 0))[0]
+      : "create";
 
   const hasConnect = categoryCounts["connect"] > 0;
   const hasExpansion = (categoryCounts["expand"] || 0) + (categoryCounts["clarify"] || 0) > 0;
@@ -251,7 +266,7 @@ export function summarizeHistory(
 
   if (dominantCategory === "unknown") {
     const substantialCount = entries.filter(
-      e => e.stats?.changeType === "substantial update"
+      (e) => e.stats?.changeType === "substantial update",
     ).length;
     if (substantialCount >= 2) {
       return "The note grew through multiple substantial updates.";
@@ -265,9 +280,7 @@ export function summarizeHistory(
   return "This note has been updated several times.";
 }
 
-export function enrichTemporalHistory(
-  entries: TemporalHistoryEntry[]
-): {
+export function enrichTemporalHistory(entries: TemporalHistoryEntry[]): {
   interpretedHistory: InterpretedHistoryEntry[];
   historySummary?: string;
 } {
@@ -277,8 +290,8 @@ export function enrichTemporalHistory(
 
   const relationshipPrefixes = ["relate:", "unrelate:"];
   const interpretedHistory = entries.map((entry, index) => {
-    const relationshipChanged = relationshipPrefixes.some(
-      (prefix) => entry.message.toLowerCase().startsWith(prefix)
+    const relationshipChanged = relationshipPrefixes.some((prefix) =>
+      entry.message.toLowerCase().startsWith(prefix),
     );
     const context: InterpretHistoryContext = {
       isFirstCommit: index === entries.length - 1,

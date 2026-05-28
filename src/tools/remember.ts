@@ -67,95 +67,139 @@ export function registerRememberTool(server: McpServer, ctx: ServerContext): voi
         openWorldHint: true,
       },
       inputSchema: z.object({
-        title: z.string().max(500, "Title must be at most 500 characters").describe("Specific, retrieval-friendly title. Prefer the concrete topic or decision, not a vague label."),
-        content: z.string().max(100000, "Content must be at most 100,000 characters").describe(
-          "Markdown note body. Put the key fact, decision, or outcome in the opening lines, then supporting detail. Embeddings weight early content more heavily. " +
-          "Content must pass markdown lint. Auto-fixable issues are fixed automatically. Common unfixable issues: fenced code blocks need a language tag (e.g. use ```text not bare ```), and broken links are rejected. " +
-          "If lint fails, fix the specific issues listed in the error and retry the same call."
-        ),
-        tags: z.array(z.string()).optional().default([]).describe("Optional tags for later filtering. Use a small number of stable, meaningful tags."),
+        title: z
+          .string()
+          .max(500, "Title must be at most 500 characters")
+          .describe(
+            "Specific, retrieval-friendly title. Prefer the concrete topic or decision, not a vague label.",
+          ),
+        content: z
+          .string()
+          .max(100000, "Content must be at most 100,000 characters")
+          .describe(
+            "Markdown note body. Put the key fact, decision, or outcome in the opening lines, then supporting detail. Embeddings weight early content more heavily. " +
+              "Content must pass markdown lint. Auto-fixable issues are fixed automatically. Common unfixable issues: fenced code blocks need a language tag (e.g. use ```text not bare ```), and broken links are rejected. " +
+              "If lint fails, fix the specific issues listed in the error and retry the same call.",
+          ),
+        tags: z
+          .array(z.string())
+          .optional()
+          .default([])
+          .describe(
+            "Optional tags for later filtering. Use a small number of stable, meaningful tags.",
+          ),
         lifecycle: z
           .enum(NOTE_LIFECYCLES)
           .optional()
           .describe(
             "Memory lifetime. Use `temporary` for short-lived working context such as active investigations or transient status. " +
-            "Use `permanent` for durable knowledge such as decisions, fixes, patterns, and preferences. " +
-            "When omitted, defaults based on role: research/plan/review → temporary, decision/summary/reference → permanent."
+              "Use `permanent` for durable knowledge such as decisions, fixes, patterns, and preferences. " +
+              "When omitted, defaults based on role: research/plan/review → temporary, decision/summary/reference → permanent.",
           ),
         role: z
           .enum(NOTE_ROLES)
           .optional()
           .describe(
             "Optional prioritization hint for the note. Inferred automatically when omitted. " +
-            "Set explicitly for workflow artifacts like research or review notes."
+              "Set explicitly for workflow artifacts like research or review notes.",
           ),
-        summary: z.string().optional().describe(
-          "Git commit summary only. Imperative mood, concise, and focused on why the change matters."
-        ),
+        summary: z
+          .string()
+          .optional()
+          .describe(
+            "Git commit summary only. Imperative mood, concise, and focused on why the change matters.",
+          ),
         alwaysLoad: z
           .boolean()
           .optional()
           .describe(
             "When true, this note loads automatically at session start and receives priority in recall and relationship expansion. " +
-            "Use for session anchors and critical context that should always be available."
+              "Use for session anchors and critical context that should always be available.",
           ),
         cwd: z
           .string()
           .optional()
           .describe(
-            "Absolute project working directory. Pass this whenever the task is related to a repository so routing, search boosting, policy lookup, and vault selection work correctly."
+            "Absolute project working directory. Pass this whenever the task is related to a repository so routing, search boosting, policy lookup, and vault selection work correctly.",
           ),
         scope: z
           .enum(WRITE_SCOPES)
           .optional()
           .describe(
             "Where to store: 'project' writes to the shared project vault visible to all contributors; " +
-            "'global' writes to the private main vault visible only on this machine. " +
-            "Attached vaults are read-only and cannot be written to. " +
-            "When omitted, uses the project's saved policy or defaults to 'project'."
+              "'global' writes to the private main vault visible only on this machine. " +
+              "Attached vaults are read-only and cannot be written to. " +
+              "When omitted, uses the project's saved policy or defaults to 'project'.",
           ),
         allowProtectedBranch: z
           .boolean()
           .optional()
           .describe(
             "One-time override for protected branch checks. " +
-            "When true, remember can commit on a protected branch without changing project policy."
+              "When true, remember can commit on a protected branch without changing project policy.",
           ),
         checkedForExisting: z
           .boolean()
           .optional()
           .describe(
-            "Optional agent hint indicating that `recall` or `list` was already used to check for an existing memory on this topic."
+            "Optional agent hint indicating that `recall` or `list` was already used to check for an existing memory on this topic.",
           ),
       }),
       outputSchema: RememberToolResultSchema,
     },
-    async ({ title, content, tags, lifecycle, role, summary, alwaysLoad, cwd, scope, allowProtectedBranch = false }) => {
+    async ({
+      title,
+      content,
+      tags,
+      lifecycle,
+      role,
+      summary,
+      alwaysLoad,
+      cwd,
+      scope,
+      allowProtectedBranch = false,
+    }) => {
       await ensureBranchSynced(ctx, cwd);
 
       const project = await resolveProject(ctx, cwd);
-      let cleanedContent: string;
-      const cleanResult = await attempt("remember:clean-markdown", async () => cleanMarkdown(content));
+
+      const cleanResult = await attempt("remember:clean-markdown", async () =>
+        cleanMarkdown(content),
+      );
       if (!cleanResult.ok) {
         const err = cleanResult.error;
         if (err instanceof MarkdownLintError) {
           const message = `Markdown lint issues prevented this note from being stored. Fix the specific lint errors listed below in your content and retry the remember call — the note was NOT stored.\n\n${err.message}`;
           return {
             content: [{ type: "text" as const, text: message }],
-            structuredContent: { action: "lint_error", tool: "remember", issues: err.issues } satisfies RememberLintErrorResult,
+            structuredContent: {
+              action: "lint_error",
+              tool: "remember",
+              issues: err.issues,
+            } satisfies RememberLintErrorResult,
             isError: true,
           };
         }
         throw err;
       }
-      cleanedContent = cleanResult.value;
+      const cleanedContent = cleanResult.value;
       const policy = project ? await ctx.configStore.getProjectPolicy(project.id) : undefined;
       const policyScope = policy?.defaultScope;
-      const projectVaultExists = cwd ? Boolean(await ctx.vaultManager.getProjectVaultIfExists(cwd)) : true;
-      const writeScope = resolveWriteScope(scope, policyScope, Boolean(project), projectVaultExists);
+      const projectVaultExists = cwd
+        ? Boolean(await ctx.vaultManager.getProjectVaultIfExists(cwd))
+        : true;
+      const writeScope = resolveWriteScope(
+        scope,
+        policyScope,
+        Boolean(project),
+        projectVaultExists,
+      );
       if (writeScope === "ask") {
         const unadopted = !projectVaultExists && !policyScope;
-        return { content: [{ type: "text", text: formatAskForWriteScope(project, unadopted) }], isError: true };
+        return {
+          content: [{ type: "text", text: formatAskForWriteScope(project, unadopted) }],
+          isError: true,
+        };
       }
 
       const vault = await resolveWriteVault(ctx, cwd, writeScope);
@@ -164,7 +208,10 @@ export function registerRememberTool(server: McpServer, ctx: ServerContext): voi
       const now = isoDateString(new Date().toISOString());
 
       const note: Note = {
-        id, title, content: cleanedContent, tags,
+        id,
+        title,
+        content: cleanedContent,
+        tags,
         lifecycle: lifecycle ?? (role ? ROLE_LIFECYCLE_DEFAULTS[role] : undefined) ?? "permanent",
         ...(role ? { role } : {}),
         alwaysLoad: alwaysLoad ?? false,
@@ -178,10 +225,16 @@ export function registerRememberTool(server: McpServer, ctx: ServerContext): voi
       if (project) {
         const accessCandidates = getRecentSessionNoteAccesses(project.id)
           .map((entry) => {
-            const cachedNote = getSessionCachedNote(project.id, entry.vaultPath, entry.noteId)
-              ?? getRecentSessionAccessNote(project.id, entry.vaultPath, entry.noteId);
+            const cachedNote =
+              getSessionCachedNote(project.id, entry.vaultPath, entry.noteId) ??
+              getRecentSessionAccessNote(project.id, entry.vaultPath, entry.noteId);
             return cachedNote
-              ? { note: cachedNote, accessedAt: entry.accessedAt, accessKind: entry.accessKind, score: entry.score }
+              ? {
+                  note: cachedNote,
+                  accessedAt: entry.accessedAt,
+                  accessKind: entry.accessKind,
+                  score: entry.score,
+                }
               : null;
           })
           .filter((entry): entry is NonNullable<typeof entry> => entry !== null);
@@ -193,12 +246,19 @@ export function registerRememberTool(server: McpServer, ctx: ServerContext): voi
 
       await vault.storage.writeNote(note);
 
-      let embeddingStatus: { status: "written" | "skipped"; reason?: string } = { status: "written" };
+      let embeddingStatus: { status: "written" | "skipped"; reason?: string } = {
+        status: "written",
+      };
 
       const embedResult = await attempt("remember:embed", async () => {
         const text = await embedTextForNote(vault.storage, note);
         const vector = await embed(text);
-        await vault.storage.writeEmbedding({ id, ...embeddingMetadata(vector), embedding: vector, updatedAt: now });
+        await vault.storage.writeEmbedding({
+          id,
+          ...embeddingMetadata(vector),
+          embedding: vector,
+          updatedAt: now,
+        });
       });
       if (!embedResult.ok) {
         embeddingStatus = { status: "skipped", reason: getErrorMessage(embedResult.error) };
@@ -227,9 +287,10 @@ export function registerRememberTool(server: McpServer, ctx: ServerContext): voi
         toolName: "remember",
         noteProjectId: project?.id,
       });
-      const pushStatus = commitStatus.status === "committed"
-        ? await pushAfterMutation(ctx, vault)
-        : { status: "skipped" as const, reason: "commit-failed" as const };
+      const pushStatus =
+        commitStatus.status === "committed"
+          ? await pushAfterMutation(ctx, vault)
+          : { status: "skipped" as const, reason: "commit-failed" as const };
       const retry = buildMutationRetryContract({
         commit: commitStatus,
         commitMessage,
@@ -252,7 +313,7 @@ export function registerRememberTool(server: McpServer, ctx: ServerContext): voi
 
       const vaultLabel = ` [${storageLabel(vault)}]`;
       const textContent = `Remembered as \`${id}\` [${projectScope}, stored=${writeScope}]${vaultLabel}\n${formatPersistenceSummary(persistence)}`;
-      
+
       const structuredContent: RememberResult = {
         action: "remembered",
         id,
@@ -271,6 +332,6 @@ export function registerRememberTool(server: McpServer, ctx: ServerContext): voi
         content: [{ type: "text", text: textContent }],
         structuredContent,
       };
-    }
+    },
   );
 }

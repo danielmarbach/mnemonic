@@ -3,23 +3,23 @@ import type { EffectiveNoteMetadata } from "./role-suggestions.js";
 import { MS_PER_DAY } from "./date-utils.js";
 
 // Recency scoring thresholds
-const RECENCY_CAP_DAYS = 30;           // Maximum days considered for recency decay
+const RECENCY_CAP_DAYS = 30; // Maximum days considered for recency decay
 const WITHIN_THEME_CENTRALITY_LOG_FACTOR = 0.1; // log(relatedCount+1) multiplier for centrality bonus
-const WITHIN_THEME_CENTRALITY_MAX = 0.2;        // Maximum centrality bonus within themes
+const WITHIN_THEME_CENTRALITY_MAX = 0.2; // Maximum centrality bonus within themes
 
 // Anchor scoring weights
-const ANCHOR_RECENCY_HALF_LIFE_DAYS = 7;   // Days for 50% recency decay in anchor scoring
-const ANCHOR_CENTRALITY_WEIGHT = 0.4;      // Weight of centrality in anchor score
-const ANCHOR_DIVERSITY_WEIGHT = 0.4;       // Weight of connection diversity in anchor score
-const ANCHOR_RECENCY_WEIGHT = 0.2;         // Weight of recency in anchor score
-const ANCHOR_ALWAYS_LOAD_BONUS = 0.45;     // Bonus for explicitly always-loaded notes
+const ANCHOR_RECENCY_HALF_LIFE_DAYS = 7; // Days for 50% recency decay in anchor scoring
+const ANCHOR_CENTRALITY_WEIGHT = 0.4; // Weight of centrality in anchor score
+const ANCHOR_DIVERSITY_WEIGHT = 0.4; // Weight of connection diversity in anchor score
+const ANCHOR_RECENCY_WEIGHT = 0.2; // Weight of recency in anchor score
+const ANCHOR_ALWAYS_LOAD_BONUS = 0.45; // Bonus for explicitly always-loaded notes
 
 // Working state scoring thresholds
-const WORKING_STATE_RECENCY_SCALE = 1.2;       // Recency scaling factor for working state notes
+const WORKING_STATE_RECENCY_SCALE = 1.2; // Recency scaling factor for working state notes
 const WORKING_STATE_RECENCY_HALF_LIFE_DAYS = 3; // Days for 50% recency decay in working state
-const WORKING_STATE_MAX_RECENCY = 1.2;         // Cap on recency component for working state
+const WORKING_STATE_MAX_RECENCY = 1.2; // Cap on recency component for working state
 const WORKING_STATE_CONNECTIVITY_LOG_FACTOR = 0.12; // log(relatedCount+1) multiplier
-const WORKING_STATE_MAX_CONNECTIVITY = 0.3;    // Cap on connectivity bonus
+const WORKING_STATE_MAX_CONNECTIVITY = 0.3; // Cap on connectivity bonus
 
 // Structure bonus weights for working state
 const WORKING_STATE_MAX_STRUCTURE_BONUS = 0.22;
@@ -30,7 +30,10 @@ const WORKING_STATE_TASK_WEIGHT = 0.03;
 const WORKING_STATE_PARAGRAPH_WEIGHT = 0.01;
 const WORKING_STATE_MAX_PARAGRAPH_BONUS = 0.04;
 
-type ScoringMetadata = Pick<EffectiveNoteMetadata, "role" | "roleSource" | "importance" | "importanceSource" | "alwaysLoad" | "alwaysLoadSource">;
+type ScoringMetadata = Pick<
+  EffectiveNoteMetadata,
+  "role" | "roleSource" | "importance" | "importanceSource" | "alwaysLoad" | "alwaysLoadSource"
+>;
 
 function explicitAlwaysLoad(metadata?: ScoringMetadata) {
   return metadata?.alwaysLoadSource === "explicit" ? metadata.alwaysLoad === true : false;
@@ -61,18 +64,95 @@ function importanceBonus(
 }
 
 const STOPWORDS = new Set([
-  "a", "an", "the", "and", "or", "but", "if", "then", "else", "for", "to", "of",
-  "in", "on", "at", "by", "with", "from", "as", "is", "was", "are", "were", "been",
-  "be", "have", "has", "had", "do", "does", "did", "will", "would", "could", "should",
-  "may", "might", "must", "shall", "can", "need", "needs", "note", "notes", "data",
-  "this", "that", "these", "those", "it", "its", "we", "our", "you", "your",
-  "when", "where", "which", "who", "whom", "whose", "why", "how", "what",
+  "a",
+  "an",
+  "the",
+  "and",
+  "or",
+  "but",
+  "if",
+  "then",
+  "else",
+  "for",
+  "to",
+  "of",
+  "in",
+  "on",
+  "at",
+  "by",
+  "with",
+  "from",
+  "as",
+  "is",
+  "was",
+  "are",
+  "were",
+  "been",
+  "be",
+  "have",
+  "has",
+  "had",
+  "do",
+  "does",
+  "did",
+  "will",
+  "would",
+  "could",
+  "should",
+  "may",
+  "might",
+  "must",
+  "shall",
+  "can",
+  "need",
+  "needs",
+  "note",
+  "notes",
+  "data",
+  "this",
+  "that",
+  "these",
+  "those",
+  "it",
+  "its",
+  "we",
+  "our",
+  "you",
+  "your",
+  "when",
+  "where",
+  "which",
+  "who",
+  "whom",
+  "whose",
+  "why",
+  "how",
+  "what",
 ]);
 
 const GENERIC_TERMS = new Set([
-  "system", "note", "notes", "data", "file", "files", "config", "configuration",
-  "setup", "update", "change", "fix", "bug", "feature", "task", "work",
-  "project", "app", "application", "code", "implementation", "thing",
+  "system",
+  "note",
+  "notes",
+  "data",
+  "file",
+  "files",
+  "config",
+  "configuration",
+  "setup",
+  "update",
+  "change",
+  "fix",
+  "bug",
+  "feature",
+  "task",
+  "work",
+  "project",
+  "app",
+  "application",
+  "code",
+  "implementation",
+  "thing",
 ]);
 
 const SYNONYMS: Record<string, string> = {
@@ -109,17 +189,17 @@ export function extractKeywords(note: Note): string[] {
   const titleWords = note.title.toLowerCase().split(/\s+/);
   words.push(...titleWords);
 
-  words.push(...note.tags.map(t => t.toLowerCase()));
+  words.push(...note.tags.map((t) => t.toLowerCase()));
 
   const contentPrefix = note.content.slice(0, 200).toLowerCase();
   const contentWords = contentPrefix.split(/\s+/);
   words.push(...contentWords);
 
   const normalized = words
-    .map(w => w.replace(/[^a-z0-9]/g, ""))
-    .filter(w => w.length >= 2)
-    .map(w => normalizeKeyword(w))
-    .filter(w => !STOPWORDS.has(w));
+    .map((w) => w.replace(/[^a-z0-9]/g, ""))
+    .filter((w) => w.length >= 2)
+    .map((w) => normalizeKeyword(w))
+    .filter((w) => !STOPWORDS.has(w));
 
   return [...new Set(normalized)];
 }
@@ -137,10 +217,18 @@ export function classifyTheme(note: Note): string {
   const tags = new Set(note.tags.map((tag) => tag.toLowerCase()));
 
   if (tags.has("overview") || title.includes("overview")) return "overview";
-  if (tags.has("decisions") || tags.has("design") || tags.has("policy") || tags.has("ux")) return "decisions";
-  if (tags.has("tools") || tags.has("mcp") || tags.has("docker") || tags.has("deployment")) return "tooling";
+  if (tags.has("decisions") || tags.has("design") || tags.has("policy") || tags.has("ux"))
+    return "decisions";
+  if (tags.has("tools") || tags.has("mcp") || tags.has("docker") || tags.has("deployment"))
+    return "tooling";
   if (tags.has("bugs") || tags.has("setup")) return "bugs";
-  if (tags.has("relationships") || tags.has("graph") || tags.has("architecture") || tags.has("structure")) return "architecture";
+  if (
+    tags.has("relationships") ||
+    tags.has("graph") ||
+    tags.has("architecture") ||
+    tags.has("structure")
+  )
+    return "architecture";
   if (tags.has("linting") || tags.has("tests") || tags.has("quality")) return "quality";
   return "other";
 }
@@ -164,28 +252,44 @@ export function recencyScore(daysSince: number): number {
 }
 
 export function centralityBonus(relatedCount: number): number {
-  return Math.min(WITHIN_THEME_CENTRALITY_MAX, Math.log(relatedCount + 1) * WITHIN_THEME_CENTRALITY_LOG_FACTOR);
+  return Math.min(
+    WITHIN_THEME_CENTRALITY_MAX,
+    Math.log(relatedCount + 1) * WITHIN_THEME_CENTRALITY_LOG_FACTOR,
+  );
 }
 
 // Metadata role/importance bonuses for within-theme scoring
-const WITHIN_THEME_ROLE_EXPLICIT: Record<string, number> = { summary: 0.18, decision: 0.12, reference: 0.06, context: 0.03 };
-const WITHIN_THEME_ROLE_SUGGESTED: Record<string, number> = { summary: 0.06, decision: 0.04, reference: 0.02, context: 0.01 };
+const WITHIN_THEME_ROLE_EXPLICIT: Record<string, number> = {
+  summary: 0.18,
+  decision: 0.12,
+  reference: 0.06,
+  context: 0.03,
+};
+const WITHIN_THEME_ROLE_SUGGESTED: Record<string, number> = {
+  summary: 0.06,
+  decision: 0.04,
+  reference: 0.02,
+  context: 0.01,
+};
 const WITHIN_THEME_IMPORTANCE_EXPLICIT: Record<string, number> = { high: 0.12, normal: 0.06 };
 const WITHIN_THEME_IMPORTANCE_SUGGESTED: Record<string, number> = { high: 0.04, normal: 0.02 };
 
 function summaryMetadataBonus(metadata?: ScoringMetadata): number {
   if (!metadata) return 0;
 
-  return roleBonus(
-    metadata.role,
-    metadata.roleSource,
-    WITHIN_THEME_ROLE_EXPLICIT,
-    WITHIN_THEME_ROLE_SUGGESTED,
-  ) + importanceBonus(
-    metadata.importance,
-    metadata.importanceSource,
-    WITHIN_THEME_IMPORTANCE_EXPLICIT,
-    WITHIN_THEME_IMPORTANCE_SUGGESTED,
+  return (
+    roleBonus(
+      metadata.role,
+      metadata.roleSource,
+      WITHIN_THEME_ROLE_EXPLICIT,
+      WITHIN_THEME_ROLE_SUGGESTED,
+    ) +
+    importanceBonus(
+      metadata.importance,
+      metadata.importanceSource,
+      WITHIN_THEME_IMPORTANCE_EXPLICIT,
+      WITHIN_THEME_IMPORTANCE_SUGGESTED,
+    )
   );
 }
 
@@ -196,10 +300,7 @@ export function withinThemeScore(note: Note, metadata?: ScoringMetadata, now?: D
   return recency + centrality + summaryMetadataBonus(metadata);
 }
 
-export function computeConnectionDiversity(
-  note: Note,
-  themeCache: Map<string, string>
-): number {
+export function computeConnectionDiversity(note: Note, themeCache: Map<string, string>): number {
   if (!note.relatedTo || note.relatedTo.length === 0) return 0;
 
   const themes = new Set<string>();
@@ -211,8 +312,18 @@ export function computeConnectionDiversity(
 }
 
 // Anchor metadata role/importance bonuses
-const ANCHOR_ROLE_EXPLICIT: Record<string, number> = { summary: 0.22, decision: 0.16, reference: 0.08, context: 0.04 };
-const ANCHOR_ROLE_SUGGESTED: Record<string, number> = { summary: 0.08, decision: 0.06, reference: 0.03, context: 0.015 };
+const ANCHOR_ROLE_EXPLICIT: Record<string, number> = {
+  summary: 0.22,
+  decision: 0.16,
+  reference: 0.08,
+  context: 0.04,
+};
+const ANCHOR_ROLE_SUGGESTED: Record<string, number> = {
+  summary: 0.08,
+  decision: 0.06,
+  reference: 0.03,
+  context: 0.015,
+};
 const ANCHOR_IMPORTANCE_EXPLICIT: Record<string, number> = { high: 0.2, normal: 0.1 };
 const ANCHOR_IMPORTANCE_SUGGESTED: Record<string, number> = { high: 0.06, normal: 0.03 };
 
@@ -220,7 +331,7 @@ export function anchorScore(
   note: Note,
   themeCache: Map<string, string>,
   metadata?: ScoringMetadata,
-  now?: Date
+  now?: Date,
 ): number {
   if (note.lifecycle !== "permanent") return -Infinity;
 
@@ -245,28 +356,50 @@ export function anchorScore(
   );
   const alwaysLoadBonus = explicitAlwaysLoad(metadata) ? ANCHOR_ALWAYS_LOAD_BONUS : 0;
 
-  return ANCHOR_CENTRALITY_WEIGHT * centrality + ANCHOR_DIVERSITY_WEIGHT * connectionDiversity + ANCHOR_RECENCY_WEIGHT * recency + metadataRoleBonus + metadataImportanceBonus + alwaysLoadBonus;
+  return (
+    ANCHOR_CENTRALITY_WEIGHT * centrality +
+    ANCHOR_DIVERSITY_WEIGHT * connectionDiversity +
+    ANCHOR_RECENCY_WEIGHT * recency +
+    metadataRoleBonus +
+    metadataImportanceBonus +
+    alwaysLoadBonus
+  );
 }
 
 // Working state metadata role/importance bonuses
-const WORKING_STATE_ROLE_EXPLICIT: Record<string, number> = { plan: 0.18, context: 0.12, summary: 0.08, decision: 0.04, reference: 0.02 };
-const WORKING_STATE_ROLE_SUGGESTED: Record<string, number> = { plan: 0.06, context: 0.04, summary: 0.025, decision: 0.015, reference: 0.01 };
+const WORKING_STATE_ROLE_EXPLICIT: Record<string, number> = {
+  plan: 0.18,
+  context: 0.12,
+  summary: 0.08,
+  decision: 0.04,
+  reference: 0.02,
+};
+const WORKING_STATE_ROLE_SUGGESTED: Record<string, number> = {
+  plan: 0.06,
+  context: 0.04,
+  summary: 0.025,
+  decision: 0.015,
+  reference: 0.01,
+};
 const WORKING_STATE_IMPORTANCE_EXPLICIT: Record<string, number> = { high: 0.16, normal: 0.08 };
 const WORKING_STATE_IMPORTANCE_SUGGESTED: Record<string, number> = { high: 0.05, normal: 0.025 };
 
 function workingStateMetadataBonus(metadata?: ScoringMetadata): number {
   if (!metadata) return 0;
 
-  return roleBonus(
-    metadata.role,
-    metadata.roleSource,
-    WORKING_STATE_ROLE_EXPLICIT,
-    WORKING_STATE_ROLE_SUGGESTED,
-  ) + importanceBonus(
-    metadata.importance,
-    metadata.importanceSource,
-    WORKING_STATE_IMPORTANCE_EXPLICIT,
-    WORKING_STATE_IMPORTANCE_SUGGESTED,
+  return (
+    roleBonus(
+      metadata.role,
+      metadata.roleSource,
+      WORKING_STATE_ROLE_EXPLICIT,
+      WORKING_STATE_ROLE_SUGGESTED,
+    ) +
+    importanceBonus(
+      metadata.importance,
+      metadata.importanceSource,
+      WORKING_STATE_IMPORTANCE_EXPLICIT,
+      WORKING_STATE_IMPORTANCE_SUGGESTED,
+    )
   );
 }
 
@@ -291,7 +424,10 @@ function workingStateStructureBonus(note: Note): number {
       bulletCount * WORKING_STATE_BULLET_WEIGHT +
       numberedCount * WORKING_STATE_NUMBERED_WEIGHT +
       taskCount * WORKING_STATE_TASK_WEIGHT +
-      Math.min(WORKING_STATE_MAX_PARAGRAPH_BONUS, Math.max(0, paragraphCount - 1) * WORKING_STATE_PARAGRAPH_WEIGHT),
+      Math.min(
+        WORKING_STATE_MAX_PARAGRAPH_BONUS,
+        Math.max(0, paragraphCount - 1) * WORKING_STATE_PARAGRAPH_WEIGHT,
+      ),
   );
 }
 
@@ -299,8 +435,14 @@ export function workingStateScore(note: Note, metadata?: ScoringMetadata, now?: 
   if (note.lifecycle !== "temporary") return -Infinity;
 
   const days = daysSinceUpdate(note.updatedAt, now ?? new Date());
-  const recency = Math.min(WORKING_STATE_MAX_RECENCY, WORKING_STATE_RECENCY_SCALE / (1 + days / WORKING_STATE_RECENCY_HALF_LIFE_DAYS));
-  const connectivity = Math.min(WORKING_STATE_MAX_CONNECTIVITY, Math.log((note.relatedTo?.length ?? 0) + 1) * WORKING_STATE_CONNECTIVITY_LOG_FACTOR);
+  const recency = Math.min(
+    WORKING_STATE_MAX_RECENCY,
+    WORKING_STATE_RECENCY_SCALE / (1 + days / WORKING_STATE_RECENCY_HALF_LIFE_DAYS),
+  );
+  const connectivity = Math.min(
+    WORKING_STATE_MAX_CONNECTIVITY,
+    Math.log((note.relatedTo?.length ?? 0) + 1) * WORKING_STATE_CONNECTIVITY_LOG_FACTOR,
+  );
   const structureBonus = workingStateStructureBonus(note);
 
   return recency + connectivity + structureBonus + workingStateMetadataBonus(metadata);
@@ -315,20 +457,34 @@ export function extractNextAction(note: Pick<Note, "content">): string | undefin
   for (const line of lines) {
     const normalized = line.replace(/^[-*]\s*/, "");
     if (/^(next step|next action|todo|follow-up)\s*:/i.test(normalized)) {
-      return normalized.replace(/^(next step|next action|todo|follow-up)\s*:\s*/i, "").trim() || undefined;
+      return (
+        normalized.replace(/^(next step|next action|todo|follow-up)\s*:\s*/i, "").trim() ||
+        undefined
+      );
     }
   }
 
   for (let i = lines.length - 1; i >= 0; i -= 1) {
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- loop bound guarantees existence
     const line = lines[i]!;
     if (/^\d+\.\s+/.test(line) || /^[-*]\s+\[[ xX]\]\s+/.test(line) || /^[-*]\s+/.test(line)) {
-      return line.replace(/^\d+\.\s+/, "").replace(/^[-*]\s+\[[ xX]\]\s+/, "").replace(/^[-*]\s+/, "").trim() || undefined;
+      return (
+        line
+          .replace(/^\d+\.\s+/, "")
+          .replace(/^[-*]\s+\[[ xX]\]\s+/, "")
+          .replace(/^[-*]\s+/, "")
+          .trim() || undefined
+      );
     }
   }
 
   for (const line of lines) {
     const normalized = line.replace(/^[-*]\s*/, "");
-    if (/^(continue|implement|investigate|fix|update|verify|run|add|remove|check|resume)\b/i.test(normalized)) {
+    if (
+      /^(continue|implement|investigate|fix|update|verify|run|add|remove|check|resume)\b/i.test(
+        normalized,
+      )
+    ) {
       return normalized;
     }
   }
@@ -356,7 +512,7 @@ export interface GraduationResult {
 
 export function computeThemesWithGraduation(
   notes: Note[],
-  options: GraduationOptions = {}
+  options: GraduationOptions = {},
 ): GraduationResult {
   const minKeywordFrequency = options.minKeywordFrequency ?? 3;
 
@@ -375,11 +531,7 @@ export function computeThemesWithGraduation(
 
   const candidates: string[] = [];
   for (const [keyword, count] of keywordFrequencies) {
-    if (
-      count >= minKeywordFrequency &&
-      !GENERIC_TERMS.has(keyword) &&
-      !STOPWORDS.has(keyword)
-    ) {
+    if (count >= minKeywordFrequency && !GENERIC_TERMS.has(keyword) && !STOPWORDS.has(keyword)) {
       candidates.push(keyword);
     }
   }
@@ -422,7 +574,7 @@ export function computeThemesWithGraduation(
 
 export function classifyThemeWithGraduation(
   note: Note,
-  promotedThemes: Set<string> | string[]
+  promotedThemes: Set<string> | string[],
 ): string {
   const promotedSet = promotedThemes instanceof Set ? promotedThemes : new Set(promotedThemes);
   const tagBased = classifyTheme(note);

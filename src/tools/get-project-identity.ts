@@ -27,7 +27,11 @@ export function registerGetProjectIdentityTool(server: McpServer, ctx: ServerCon
         openWorldHint: false,
       },
       inputSchema: z.object({
-        cwd: z.string().describe("Absolute path of the project working directory. Required for project-scoped routing, vault selection, and search boosting."),
+        cwd: z
+          .string()
+          .describe(
+            "Absolute path of the project working directory. Required for project-scoped routing, vault selection, and search boosting.",
+          ),
       }),
       outputSchema: ProjectIdentityResultSchema,
     },
@@ -45,21 +49,25 @@ export function registerGetProjectIdentityTool(server: McpServer, ctx: ServerCon
           source: identity.project.source,
           remoteName: identity.project.remoteName,
         },
-        defaultProject: identity.defaultProject ? {
-          id: identity.defaultProject.id,
-          name: identity.defaultProject.name,
-          remoteName: identity.defaultProject.remoteName,
-        } : undefined,
+        defaultProject: identity.defaultProject
+          ? {
+              id: identity.defaultProject.id,
+              name: identity.defaultProject.name,
+              remoteName: identity.defaultProject.remoteName,
+            }
+          : undefined,
         identityOverride: identity.identityOverride,
       };
 
       return {
-        content: [{
-          type: "text",
-          text: formatProjectIdentityText(identity),
-        }],
+        content: [
+          {
+            type: "text",
+            text: formatProjectIdentityText(identity),
+          },
+        ],
         structuredContent,
       };
-    }
+    },
   );
 }

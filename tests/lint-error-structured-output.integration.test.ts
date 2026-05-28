@@ -34,7 +34,9 @@ describe("lint error structured output", () => {
         { disableGit: false, ollamaUrl: fakeEmbedding.url },
       );
 
-      expect(rememberLint.text).toContain("Markdown lint issues prevented this note from being stored");
+      expect(rememberLint.text).toContain(
+        "Markdown lint issues prevented this note from being stored",
+      );
       expect(rememberLint.structuredContent).toBeDefined();
       expect(rememberLint.structuredContent?.action).toBe("lint_error");
       expect(rememberLint.structuredContent?.tool).toBe("remember");

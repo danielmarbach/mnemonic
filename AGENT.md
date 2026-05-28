@@ -481,18 +481,24 @@ All new MCP tools MUST be documented in both AGENT.md and README.md:
 
 **Keep README.md, AGENT.md, and SYSTEM_PROMPT.md in sync** - they serve different audiences (README.md for users, AGENT.md for agents/developers, SYSTEM_PROMPT.md for LLM system prompts).
 
-## Error handling & ast-grep rules
+## Error handling & linting
 
 Use `attempt()` from `src/error-utils.ts` for all fail-soft operations. It auto-logs failures via `debugLog` and returns `Result<T, E>` or a fallback value. Never write raw try/catch for fail-soft paths — use `attempt("scope:label", fn)` instead.
 
-Run `npm run lint:ast` to check. Violations fail CI. Rules live in `rules/` — each rule's YAML has the fix examples built in.
+ESLint + Prettier enforce code quality and formatting. Run `npm run lint` to check. Violations fail CI. The ESLint config (`eslint.config.js`) includes domain-specific rules:
 
-### File-level allowlists
+- `no-console` (allow `console.error`) — library code uses `debugLog`
+- `@typescript-eslint/no-non-null-assertion` — use guards/optional chaining instead
+- `@typescript-eslint/only-throw-error` — throw Error instances only
+- `no-restricted-syntax` — no enums, no eval/Function constructor, no `as` casts on JSON.parse
+- `no-eval`, `no-implied-eval`, `no-new-func` — security
+- `prettier/prettier` — formatting enforced via pre-commit hooks
 
-- `src/git.ts`, `src/cli/`, `src/index.ts`, `src/startup.ts`, `src/migration.ts`, `src/embeddings.ts`, `src/error-utils.ts` — excluded from `no-bare-try-catch`
-- `src/cli/` — excluded from `no-console-log`
-- `src/brands.ts` — excluded from `no-bare-new-error`
-- `src/__tests__/` — excluded from all rules
+### File-level overrides
+
+- `src/cli/`, `src/startup.ts` — `no-console` off (entry-point diagnostics)
+- `tests/` — relaxed unused vars, `any` allowed, `no-console` off
+- `scripts/**/*.mjs`, `tests/**/*.mjs` — plain JS globals, no TS rules
 
 ## Critical constraints
 

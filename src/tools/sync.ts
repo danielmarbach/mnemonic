@@ -8,13 +8,9 @@ import {
   type SyncResult as StructuredSyncResult,
 } from "../structured-content.js";
 import type { SyncResult } from "../git.js";
-import type { FailedEmbedding } from "../helpers/embed.js";
 import { projectParam, resolveProject as resolveProjectFromModule } from "../helpers/project.js";
 import { invalidateActiveProjectCache } from "../cache.js";
-import {
-  backfillEmbeddingsAfterSync,
-  removeStaleEmbeddings,
-} from "../helpers/embed.js";
+import { backfillEmbeddingsAfterSync, removeStaleEmbeddings } from "../helpers/embed.js";
 import { attempt, getErrorMessage } from "../error-utils.js";
 import { expandHomePath } from "../paths.js";
 
@@ -40,14 +36,18 @@ function formatSyncResult(result: SyncResult, label: string, vaultPath?: string)
     return lines;
   }
 
-  lines.push(result.pushedCommits > 0
-    ? `${label}: ↑ pushed ${result.pushedCommits} commit(s).`
-    : `${label}: ↑ nothing to push.`);
+  lines.push(
+    result.pushedCommits > 0
+      ? `${label}: ↑ pushed ${result.pushedCommits} commit(s).`
+      : `${label}: ↑ nothing to push.`,
+  );
   if (result.deletedNoteIds.length > 0)
     lines.push(`${label}: ✕ ${result.deletedNoteIds.length} note(s) deleted on remote.`);
-  lines.push(result.pulledNoteIds.length > 0
-    ? `${label}: ↓ ${result.pulledNoteIds.length} note(s) pulled.`
-    : `${label}: ↓ no new notes from remote.`);
+  lines.push(
+    result.pulledNoteIds.length > 0
+      ? `${label}: ↓ ${result.pulledNoteIds.length} note(s) pulled.`
+      : `${label}: ↓ no new notes from remote.`,
+  );
   return lines;
 }
 
@@ -74,7 +74,11 @@ export function registerSyncTool(server: McpServer, ctx: ServerContext): void {
       },
       inputSchema: z.object({
         cwd: projectParam,
-        force: z.boolean().optional().default(false).describe("Rebuild all embeddings even if the current model already generated them"),
+        force: z
+          .boolean()
+          .optional()
+          .default(false)
+          .describe("Rebuild all embeddings even if the current model already generated them"),
       }),
       outputSchema: SyncResultSchema,
     },
@@ -86,11 +90,15 @@ export function registerSyncTool(server: McpServer, ctx: ServerContext): void {
       const mainVaultPath = ctx.vaultManager.main.storage.vaultPath;
       const mainResult = await ctx.vaultManager.main.git.sync();
       lines.push(...formatSyncResult(mainResult, "main vault", mainVaultPath));
-      let mainEmbedded = 0;
-      let mainFailed: FailedEmbedding[] = [];
-      const mainBackfill = await backfillEmbeddingsAfterSync(ctx, ctx.vaultManager.main.storage, "main vault", lines, force);
-      mainEmbedded = mainBackfill.embedded;
-      mainFailed = mainBackfill.failed;
+      const mainBackfill = await backfillEmbeddingsAfterSync(
+        ctx,
+        ctx.vaultManager.main.storage,
+        "main vault",
+        lines,
+        force,
+      );
+      const mainEmbedded = mainBackfill.embedded;
+      const mainFailed = mainBackfill.failed;
       if (mainResult.deletedNoteIds.length > 0) {
         await removeStaleEmbeddings(ctx.vaultManager.main.storage, mainResult.deletedNoteIds);
       }
@@ -112,11 +120,15 @@ export function registerSyncTool(server: McpServer, ctx: ServerContext): void {
           const projectVaultPath = projectVault.storage.vaultPath;
           const projectResult = await projectVault.git.sync();
           lines.push(...formatSyncResult(projectResult, "project vault", projectVaultPath));
-          let projEmbedded = 0;
-          let projFailed: FailedEmbedding[] = [];
-          const projectBackfill = await backfillEmbeddingsAfterSync(ctx, projectVault.storage, "project vault", lines, force);
-          projEmbedded = projectBackfill.embedded;
-          projFailed = projectBackfill.failed;
+          const projectBackfill = await backfillEmbeddingsAfterSync(
+            ctx,
+            projectVault.storage,
+            "project vault",
+            lines,
+            force,
+          );
+          const projEmbedded = projectBackfill.embedded;
+          const projFailed = projectBackfill.failed;
           if (projectResult.deletedNoteIds.length > 0) {
             await removeStaleEmbeddings(projectVault.storage, projectResult.deletedNoteIds);
           }
@@ -140,7 +152,7 @@ export function registerSyncTool(server: McpServer, ctx: ServerContext): void {
         const project = await resolveProjectFromModule(ctx, cwd);
         if (project) {
           const attachmentConfigs = await ctx.configStore.getProjectAttachments(project.id);
-          const enabledAttachments = attachmentConfigs.filter(a => a.enabled && a.branch);
+          const enabledAttachments = attachmentConfigs.filter((a) => a.enabled && a.branch);
           for (const attConfig of enabledAttachments) {
             const label = `attached:${attConfig.projectSlug}`;
             const resolvedLocalPath = path.resolve(expandHomePath(attConfig.localPath));
@@ -157,28 +169,34 @@ export function registerSyncTool(server: McpServer, ctx: ServerContext): void {
             }
             const newTip = fetchResult.value;
             if (newTip && newTip !== attConfig.branchTipHash) {
-                const updatedConfigs = attachmentConfigs.map(a =>
-                  a.projectSlug === attConfig.projectSlug
-                    ? { ...a, branchTipHash: newTip, updatedAt: new Date().toISOString() }
-                    : a
+              const updatedConfigs = attachmentConfigs.map((a) =>
+                a.projectSlug === attConfig.projectSlug
+                  ? { ...a, branchTipHash: newTip, updatedAt: new Date().toISOString() }
+                  : a,
+              );
+              await ctx.configStore.setProjectAttachments(project.id, updatedConfigs);
+              ctx.vaultManager.clearAttachmentCaches();
+              ctx.vaultManager.setAttachmentConfigs(project.id, updatedConfigs);
+              const loadedVaults = await ctx.vaultManager.loadAttachmentsForProject(project.id);
+              const staleVault = loadedVaults.find(
+                (v) => v.attachmentRef?.projectSlug === attConfig.projectSlug,
+              );
+              if (staleVault) {
+                const currentIds = new Set(
+                  (await staleVault.storage.listNoteIds()).map((id) => id as string),
                 );
-                await ctx.configStore.setProjectAttachments(project.id, updatedConfigs);
-                ctx.vaultManager.clearAttachmentCaches();
-                ctx.vaultManager.setAttachmentConfigs(project.id, updatedConfigs);
-                const loadedVaults = await ctx.vaultManager.loadAttachmentsForProject(project.id);
-               const staleVault = loadedVaults.find(v => v.attachmentRef?.projectSlug === attConfig.projectSlug);
-               if (staleVault) {
-                 const currentIds = new Set((await staleVault.storage.listNoteIds()).map(id => id as string));
-                 const allEmbeddings = await staleVault.storage.listEmbeddings();
-                 const staleIds = allEmbeddings
-                   .filter(e => !currentIds.has(e.id as string))
-                   .map(e => e.id as string);
-                 if (staleIds.length > 0) {
-                   await removeStaleEmbeddings(staleVault.storage, staleIds);
-                   lines.push(`${label}: removed ${staleIds.length} stale embedding(s).`);
-                 }
-               }
-              lines.push(`${label}: branch tip changed (${attConfig.branchTipHash.substring(0, 8)} → ${newTip.substring(0, 8)}), cache invalidated.`);
+                const allEmbeddings = await staleVault.storage.listEmbeddings();
+                const staleIds = allEmbeddings
+                  .filter((e) => !currentIds.has(e.id as string))
+                  .map((e) => e.id as string);
+                if (staleIds.length > 0) {
+                  await removeStaleEmbeddings(staleVault.storage, staleIds);
+                  lines.push(`${label}: removed ${staleIds.length} stale embedding(s).`);
+                }
+              }
+              lines.push(
+                `${label}: branch tip changed (${attConfig.branchTipHash.substring(0, 8)} → ${newTip.substring(0, 8)}), cache invalidated.`,
+              );
               attConfig.branchTipHash = newTip;
             } else if (newTip) {
               lines.push(`${label}: no changes on branch '${attConfig.branch}'.`);
@@ -187,7 +205,9 @@ export function registerSyncTool(server: McpServer, ctx: ServerContext): void {
             }
           }
           if (enabledAttachments.length === 0 && attachmentConfigs.length > 0) {
-            lines.push("attached vaults: all attachments disabled or using working-tree mode — skipped fetch.");
+            lines.push(
+              "attached vaults: all attachments disabled or using working-tree mode — skipped fetch.",
+            );
           } else if (attachmentConfigs.length === 0) {
             lines.push("attached vaults: none configured — skipped.");
           }
@@ -202,6 +222,6 @@ export function registerSyncTool(server: McpServer, ctx: ServerContext): void {
       // Vault contents may have changed via pull — discard session cache
       invalidateActiveProjectCache();
       return { content: [{ type: "text", text: lines.join("\n") }], structuredContent };
-    }
+    },
   );
 }

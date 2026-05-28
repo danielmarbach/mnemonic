@@ -71,11 +71,15 @@ export function computeFieldsModified(input: FieldsModifiedInput): string[] {
     }
   }
 
-  if (input.titleExplicitlyProvided && input.newTitle !== input.originalTitle) changes.push("title");
-  if (input.lifecycleExplicitlyProvided && input.newLifecycle !== input.originalLifecycle) changes.push("lifecycle");
+  if (input.titleExplicitlyProvided && input.newTitle !== input.originalTitle)
+    changes.push("title");
+  if (input.lifecycleExplicitlyProvided && input.newLifecycle !== input.originalLifecycle)
+    changes.push("lifecycle");
   if (input.roleExplicitlySet && input.newRole !== input.originalRole) changes.push("role");
-  if (input.tagsExplicitlyProvided && !arraysEqual(input.newTags, input.originalTags)) changes.push("tags");
-  if (input.alwaysLoadExplicitlyProvided && input.newAlwaysLoad !== input.originalAlwaysLoad) changes.push("alwaysLoad");
+  if (input.tagsExplicitlyProvided && !arraysEqual(input.newTags, input.originalTags))
+    changes.push("tags");
+  if (input.alwaysLoadExplicitlyProvided && input.newAlwaysLoad !== input.originalAlwaysLoad)
+    changes.push("alwaysLoad");
   if (input.relatedToChanged) changes.push("relatedTo");
 
   return changes;

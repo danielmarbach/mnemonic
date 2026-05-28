@@ -174,9 +174,21 @@ describe("TF-IDF primitives", () => {
       "cooking recipes weekly menu",
     ];
 
-    const rareTargetScore = computeTfIdfCosineSimilarity("projectiontext staleness", corpus[0]!, corpus);
-    const broadRelatedScore = computeTfIdfCosineSimilarity("projectiontext staleness", corpus[1]!, corpus);
-    const unrelatedScore = computeTfIdfCosineSimilarity("projectiontext staleness", corpus[2]!, corpus);
+    const rareTargetScore = computeTfIdfCosineSimilarity(
+      "projectiontext staleness",
+      corpus[0]!,
+      corpus,
+    );
+    const broadRelatedScore = computeTfIdfCosineSimilarity(
+      "projectiontext staleness",
+      corpus[1]!,
+      corpus,
+    );
+    const unrelatedScore = computeTfIdfCosineSimilarity(
+      "projectiontext staleness",
+      corpus[2]!,
+      corpus,
+    );
 
     expect(rareTargetScore).toBeGreaterThan(broadRelatedScore);
     expect(broadRelatedScore).toBeGreaterThan(unrelatedScore);
@@ -200,7 +212,11 @@ describe("TF-IDF primitives", () => {
       text: "projectiontext staleness derived retrieval text precise design",
     });
 
-    const ranked = rankDocumentsByTfIdf("projectiontext staleness derived retrieval text", documents, 3);
+    const ranked = rankDocumentsByTfIdf(
+      "projectiontext staleness derived retrieval text",
+      documents,
+      3,
+    );
 
     expect(ranked[0]?.id).toBe("late-target");
     expect(ranked.map((entry) => entry.id)).toContain("late-target");
@@ -214,8 +230,17 @@ describe("TF-IDF primitives", () => {
     ];
 
     const prepared = prepareTfIdfCorpus(documents);
-    const preparedRanked = rankDocumentsByTfIdf("projectiontext staleness", documents, documents.length, prepared);
-    const directRanked = rankDocumentsByTfIdf("projectiontext staleness", documents, documents.length);
+    const preparedRanked = rankDocumentsByTfIdf(
+      "projectiontext staleness",
+      documents,
+      documents.length,
+      prepared,
+    );
+    const directRanked = rankDocumentsByTfIdf(
+      "projectiontext staleness",
+      documents,
+      documents.length,
+    );
 
     expect(preparedRanked).toEqual(directRanked);
   });
@@ -233,20 +258,20 @@ describe("TF-IDF primitives", () => {
         id: document.id,
         text: document.text,
         tokens: tokenize(document.text),
-      }))
+      })),
     );
 
     const rankedFromTokenizer = rankDocumentsByTfIdf(
       "projectiontext staleness",
       documents,
       documents.length,
-      preparedFromTokenizer
+      preparedFromTokenizer,
     );
     const rankedFromTokens = rankDocumentsByTfIdf(
       "projectiontext staleness",
       documents,
       documents.length,
-      preparedFromTokens
+      preparedFromTokens,
     );
 
     expect(rankedFromTokens).toEqual(rankedFromTokenizer);
@@ -278,7 +303,7 @@ describe("TF-IDF primitives", () => {
       {
         id: "unrelated",
         text: "Title: Cooking notes\nSummary: Weekly menu planning and recipes.",
-      }
+      },
     );
 
     const ranked = rankDocumentsByTfIdf("hybrid recall design", documents, documents.length);

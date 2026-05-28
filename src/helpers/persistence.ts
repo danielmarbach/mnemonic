@@ -15,7 +15,10 @@ import { expandHomePath } from "../paths.js";
 import { detectProject } from "../project.js";
 import path from "node:path";
 
-export function resolveDurability(commit: CommitResult, push: PushResult): PersistenceStatus["durability"] {
+export function resolveDurability(
+  commit: CommitResult,
+  push: PushResult,
+): PersistenceStatus["durability"] {
   if (push.status === "pushed") {
     return "pushed";
   }
@@ -51,7 +54,12 @@ export function buildPersistenceStatus(args: {
       commitOperation: args.commit.status === "failed" ? args.commit.operation : undefined,
       commitMessage: args.commitMessage,
       commitBody: args.commitBody,
-      commitReason: args.commit.status === "failed" ? args.commit.reason : args.commit.status === "skipped" ? args.commit.reason : undefined,
+      commitReason:
+        args.commit.status === "failed"
+          ? args.commit.reason
+          : args.commit.status === "skipped"
+            ? args.commit.reason
+            : undefined,
       commitError: args.commit.status === "failed" ? args.commit.error : undefined,
       pushReason: args.push.status === "skipped" ? args.push.reason : undefined,
       pushError: args.push.status === "failed" ? args.push.error : undefined,
@@ -75,15 +83,16 @@ export function buildMutationRetryContract(args: {
     return undefined;
   }
 
-  const recoveryKind = args.preferredRecovery ?? (args.mutationApplied
-    ? "manual-exact-git-recovery"
-    : "no-manual-recovery");
+  const recoveryKind =
+    args.preferredRecovery ??
+    (args.mutationApplied ? "manual-exact-git-recovery" : "no-manual-recovery");
 
-  const recoveryReason = recoveryKind === "rerun-tool-call-serial"
-    ? "Tool-level reconciliation exists for this mutation; rerun the same tool call serially for the affected vault."
-    : recoveryKind === "manual-exact-git-recovery"
-      ? "Mutation is already persisted on disk; manual git recovery is allowed only with the exact attemptedCommit values."
-      : "Mutation was not applied deterministically; manual git recovery is not authorized.";
+  const recoveryReason =
+    recoveryKind === "rerun-tool-call-serial"
+      ? "Tool-level reconciliation exists for this mutation; rerun the same tool call serially for the affected vault."
+      : recoveryKind === "manual-exact-git-recovery"
+        ? "Mutation is already persisted on disk; manual git recovery is allowed only with the exact attemptedCommit values."
+        : "Mutation was not applied deterministically; manual git recovery is not authorized.";
 
   return {
     recovery: {
@@ -106,7 +115,8 @@ export function buildMutationRetryContract(args: {
       ? "Mutation is already persisted on disk; commit can be retried deterministically."
       : "Mutation was not applied; retry may require re-running the operation.",
     instructions: {
-      sourceOfTruth: recoveryKind === "manual-exact-git-recovery" ? "attemptedCommit" : "tool-response",
+      sourceOfTruth:
+        recoveryKind === "manual-exact-git-recovery" ? "attemptedCommit" : "tool-response",
       useExactSubject: recoveryKind === "manual-exact-git-recovery",
       useExactBody: recoveryKind === "manual-exact-git-recovery",
       useExactFiles: recoveryKind === "manual-exact-git-recovery",
@@ -141,7 +151,9 @@ export function formatRetrySummary(retry?: MutationRetryContract): string | unde
     case "manual-exact-git-recovery":
       lines.push("Recovery: manual exact git recovery allowed");
       lines.push(retry.recovery.reason);
-      lines.push("Use only the exact values below. Do not infer from git history, note title, summary, or repo state.");
+      lines.push(
+        "Use only the exact values below. Do not infer from git history, note title, summary, or repo state.",
+      );
       lines.push("");
       lines.push("Commit subject:");
       lines.push(retry.attemptedCommit.subject);
@@ -229,9 +241,10 @@ export async function pushAfterMutation(ctx: ServerContext, vault: Vault): Promi
       if (vault.provenance === "project-attached") {
         return { status: "skipped" as const, reason: "auto-push-disabled" as const };
       }
-      pushResult = vault.provenance === "project-local"
-        ? { status: "skipped" as const, reason: "auto-push-disabled" as const }
-        : await doPush(vault);
+      pushResult =
+        vault.provenance === "project-local"
+          ? { status: "skipped" as const, reason: "auto-push-disabled" as const }
+          : await doPush(vault);
       break;
     case "none":
       return { status: "skipped" as const, reason: "auto-push-disabled" as const };
@@ -241,7 +254,11 @@ export async function pushAfterMutation(ctx: ServerContext, vault: Vault): Promi
     }
   }
 
-  if (pushResult.status === "pushed" && vault.provenance === "project-attached" && vault.attachmentRef) {
+  if (
+    pushResult.status === "pushed" &&
+    vault.provenance === "project-attached" &&
+    vault.attachmentRef
+  ) {
     await updateAttachedBranchTipHash(ctx, vault);
   }
 
@@ -270,15 +287,16 @@ async function updateAttachedBranchTipHash(ctx: ServerContext, vault: Vault): Pr
     if (!newTip || newTip === ref.branchTipHash) return null;
 
     const project = await detectProject(resolvedLocalPath, {
-      getProjectIdentityOverride: async (projectId) => ctx.configStore.getProjectIdentityOverride(projectId),
+      getProjectIdentityOverride: async (projectId) =>
+        ctx.configStore.getProjectIdentityOverride(projectId),
     });
     if (!project) return null;
 
     const configs = await ctx.configStore.getProjectAttachments(project.id);
-    const updatedConfigs = configs.map(a =>
+    const updatedConfigs = configs.map((a) =>
       a.projectSlug === ref.projectSlug
         ? { ...a, branchTipHash: newTip, updatedAt: new Date().toISOString() }
-        : a
+        : a,
     );
     await ctx.configStore.setProjectAttachments(project.id, updatedConfigs);
     return newTip;
@@ -286,6 +304,9 @@ async function updateAttachedBranchTipHash(ctx: ServerContext, vault: Vault): Pr
 
   if (result.ok && result.value) {
     ref.branchTipHash = result.value;
-    debugLog("persistence:branch-tip", `${ref.projectSlug}: updated to ${result.value.substring(0, 8)}`);
+    debugLog(
+      "persistence:branch-tip",
+      `${ref.projectSlug}: updated to ${result.value.substring(0, 8)}`,
+    );
   }
 }

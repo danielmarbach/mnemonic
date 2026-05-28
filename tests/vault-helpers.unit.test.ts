@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { Vault } from "../src/vault.js";
-import { storageLabel, vaultMatchesStorageScope, attachedVaultErrorMessage } from "../src/helpers/vault.js";
+import {
+  storageLabel,
+  vaultMatchesStorageScope,
+  attachedVaultErrorMessage,
+} from "../src/helpers/vault.js";
 import { ProjectSummaryNotesSchema } from "../src/structured-content.js";
 
 function makeVault(overrides: Partial<Vault> & { provenance: Vault["provenance"] }): Vault {
@@ -58,7 +62,10 @@ describe("storageLabel", () => {
 
 describe("vaultMatchesStorageScope", () => {
   const mainVault = makeVault({ provenance: "main", vaultFolderName: "" });
-  const projectLocalVault = makeVault({ provenance: "project-local", vaultFolderName: ".mnemonic" });
+  const projectLocalVault = makeVault({
+    provenance: "project-local",
+    vaultFolderName: ".mnemonic",
+  });
   const projectAttachedVault = makeVault({
     provenance: "project-attached",
     vaultFolderName: ".mnemonic",

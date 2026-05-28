@@ -50,7 +50,15 @@ export type CommitResult =
 
 export type PushResult =
   | { status: "pushed" }
-  | { status: "skipped"; reason: "git-disabled" | "no-remote" | "auto-push-disabled" | "commit-failed" | "read-only-vault" }
+  | {
+      status: "skipped";
+      reason:
+        | "git-disabled"
+        | "no-remote"
+        | "auto-push-disabled"
+        | "commit-failed"
+        | "read-only-vault";
+    }
   | { status: "failed"; error: string };
 
 export class GitOps {
@@ -194,7 +202,10 @@ export class GitOps {
       const remotes = await this.git.getRemotes();
       if (remotes.length === 0) return empty;
 
-      const withRemote: Pick<SyncResult, "hasRemote" | "pulledNoteIds" | "deletedNoteIds" | "pushedCommits"> = {
+      const withRemote: Pick<
+        SyncResult,
+        "hasRemote" | "pulledNoteIds" | "deletedNoteIds" | "pushedCommits"
+      > = {
         hasRemote: true,
         pulledNoteIds: [],
         deletedNoteIds: [],
@@ -219,7 +230,7 @@ export class GitOps {
         const message = getErrorMessage(err);
         console.error(`[git] Sync pull failed: ${message}`);
         const conflictFiles = await this.getConflictFiles();
-        const isConflict = conflictFiles.length > 0 || await this.isConflictInProgress();
+        const isConflict = conflictFiles.length > 0 || (await this.isConflictInProgress());
         if (isConflict) {
           return {
             ...withRemote,
@@ -275,9 +286,9 @@ export class GitOps {
   private async isConflictInProgress(): Promise<boolean> {
     const gitDir = path.join(this.gitRoot, ".git");
     const statePaths = [
-      path.join(gitDir, "rebase-merge"),   // interactive / --merge rebase
-      path.join(gitDir, "rebase-apply"),   // --apply strategy rebase
-      path.join(gitDir, "MERGE_HEAD"),     // plain merge conflict
+      path.join(gitDir, "rebase-merge"), // interactive / --merge rebase
+      path.join(gitDir, "rebase-apply"), // --apply strategy rebase
+      path.join(gitDir, "MERGE_HEAD"), // plain merge conflict
     ];
     for (const p of statePaths) {
       try {
@@ -320,7 +331,9 @@ export class GitOps {
       try {
         const remotes = await this.git.getRemotes();
         if (remotes.length === 0) return { status: "skipped", reason: "no-remote" };
-        await this.retryLockErrors("push", () => this.git.push(["--set-upstream", "origin", branch]));
+        await this.retryLockErrors("push", () =>
+          this.git.push(["--set-upstream", "origin", branch]),
+        );
         console.error(`[git] Pushed to ${branch}`);
         return { status: "pushed" };
       } catch (err) {
@@ -363,7 +376,9 @@ export class GitOps {
         const errMessage = getErrorMessage(err);
         if (this.isLockError(errMessage) && attempt < maxRetries - 1) {
           const delayMs = baseDelayMs * Math.pow(2, attempt);
-          console.error(`[git] ${operationName}() lock contention, retrying in ${delayMs}ms (attempt ${attempt + 1}/${maxRetries})`);
+          console.error(
+            `[git] ${operationName}() lock contention, retrying in ${delayMs}ms (attempt ${attempt + 1}/${maxRetries})`,
+          );
           await new Promise((resolve) => setTimeout(resolve, delayMs));
           continue;
         }
@@ -453,12 +468,7 @@ export class GitOps {
     void filePath;
 
     try {
-      const output = await this.git.raw([
-        "show",
-        "--format=",
-        "--numstat",
-        commitHash,
-      ]);
+      const output = await this.git.raw(["show", "--format=", "--numstat", commitHash]);
 
       let additions = 0;
       let deletions = 0;
@@ -510,7 +520,7 @@ export class GitOps {
    * scoped to this vault's notesRelDir.
    */
   private async diffNotesSince(
-    sinceHash: string
+    sinceHash: string,
   ): Promise<{ pulledNoteIds: string[]; deletedNoteIds: string[] }> {
     if (!sinceHash) return { pulledNoteIds: [], deletedNoteIds: [] };
 

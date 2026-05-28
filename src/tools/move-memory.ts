@@ -2,26 +2,11 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ServerContext } from "../server-context.js";
 import type { Vault } from "../vault.js";
-import {
-  NoteIdSchema,
-  MoveResultSchema,
-  type MoveResult,
-} from "../structured-content.js";
-import {
-  projectParam,
-  resolveProject,
-  ensureBranchSynced,
-} from "../helpers/project.js";
+import { NoteIdSchema, MoveResultSchema, type MoveResult } from "../structured-content.js";
+import { projectParam, resolveProject, ensureBranchSynced } from "../helpers/project.js";
 import { memoryId, isoDateString } from "../brands.js";
-import { commitVaultWithProtection } from "../helpers/git-commit.js";
-import {
-  formatPersistenceSummary,
-} from "../helpers/persistence.js";
-import {
-  moveNoteBetweenVaults,
-  projectNotFoundResponse,
-  storageLabel,
-} from "../helpers/vault.js";
+import { formatPersistenceSummary } from "../helpers/persistence.js";
+import { moveNoteBetweenVaults, projectNotFoundResponse, storageLabel } from "../helpers/vault.js";
 import { attempt, getErrorMessage } from "../error-utils.js";
 import { invalidateActiveProjectCache } from "../cache.js";
 
@@ -52,14 +37,20 @@ export function registerMoveMemoryTool(server: McpServer, ctx: ServerContext): v
         openWorldHint: false,
       },
       inputSchema: z.object({
-        id: NoteIdSchema.describe("Exact memory id. Use an id returned by `recall`, `list`, `recent_memories`, or `where_is`."),
-        target: z.enum(["main-vault", "project-vault"]).describe("Destination: 'main-vault' for private/global storage, 'project-vault' for shared project storage"),
+        id: NoteIdSchema.describe(
+          "Exact memory id. Use an id returned by `recall`, `list`, `recent_memories`, or `where_is`.",
+        ),
+        target: z
+          .enum(["main-vault", "project-vault"])
+          .describe(
+            "Destination: 'main-vault' for private/global storage, 'project-vault' for shared project storage",
+          ),
         vaultFolder: z
           .string()
           .optional()
           .describe(
             "Optional target project vault folder name, such as `.mnemonic-lib`. " +
-            "Use this only when moving into a specific sub-vault instead of the primary project vault."
+              "Use this only when moving into a specific sub-vault instead of the primary project vault.",
           ),
         cwd: projectParam,
         allowProtectedBranch: z
@@ -67,7 +58,7 @@ export function registerMoveMemoryTool(server: McpServer, ctx: ServerContext): v
           .optional()
           .describe(
             "One-time override for protected branch checks. " +
-            "When true, move_memory can commit on a protected branch without changing project policy."
+              "When true, move_memory can commit on a protected branch without changing project policy.",
           ),
       }),
       outputSchema: MoveResultSchema,
@@ -81,11 +72,30 @@ export function registerMoveMemoryTool(server: McpServer, ctx: ServerContext): v
         if (foundAny) {
           if (foundAny.vault.writable) {
             // Should not happen: writable attached vaults appear in mutable search
-            return { content: [{ type: "text", text: `Memory '${id}' is in an attached vault that appears non-writable.` }], isError: true };
+            return {
+              content: [
+                {
+                  type: "text",
+                  text: `Memory '${id}' is in an attached vault that appears non-writable.`,
+                },
+              ],
+              isError: true,
+            };
           }
-          return { content: [{ type: "text", text: `Memory '${id}' is in an attached vault and cannot be moved. Attached vaults are read-only.` }], isError: true };
+          return {
+            content: [
+              {
+                type: "text",
+                text: `Memory '${id}' is in an attached vault and cannot be moved. Attached vaults are read-only.`,
+              },
+            ],
+            isError: true,
+          };
         }
-        return { content: [{ type: "text", text: `No memory found with id '${id}'` }], isError: true };
+        return {
+          content: [{ type: "text", text: `No memory found with id '${id}'` }],
+          isError: true,
+        };
       }
 
       const currentStorage = storageLabel(found.vault);
@@ -97,10 +107,12 @@ export function registerMoveMemoryTool(server: McpServer, ctx: ServerContext): v
       } else {
         if (!cwd) {
           return {
-            content: [{
-              type: "text",
-              text: "Moving into a project vault requires `cwd` so mnemonic can resolve the destination project.",
-            }],
+            content: [
+              {
+                type: "text",
+                text: "Moving into a project vault requires `cwd` so mnemonic can resolve the destination project.",
+              },
+            ],
             isError: true,
           };
         }
@@ -110,7 +122,12 @@ export function registerMoveMemoryTool(server: McpServer, ctx: ServerContext): v
           const subVault = await ctx.vaultManager.getVaultByFolder(cwd, vaultFolder);
           if (!subVault) {
             return {
-              content: [{ type: "text", text: `Vault folder '${vaultFolder}' not found under the git root for: ${cwd}` }],
+              content: [
+                {
+                  type: "text",
+                  text: `Vault folder '${vaultFolder}' not found under the git root for: ${cwd}`,
+                },
+              ],
               isError: true,
             };
           }
@@ -119,7 +136,10 @@ export function registerMoveMemoryTool(server: McpServer, ctx: ServerContext): v
           // Default: primary project vault (.mnemonic).
           const projectVault = await ctx.vaultManager.getOrCreateProjectVault(cwd);
           if (!projectVault) {
-            return { content: [{ type: "text", text: `Could not resolve a project vault for: ${cwd}` }], isError: true };
+            return {
+              content: [{ type: "text", text: `Could not resolve a project vault for: ${cwd}` }],
+              isError: true,
+            };
           }
           targetVault = projectVault;
         }
@@ -133,13 +153,24 @@ export function registerMoveMemoryTool(server: McpServer, ctx: ServerContext): v
       // Check if the note is already in the target vault.
       if (found.vault.storage.vaultPath === targetVault.storage.vaultPath) {
         const targetLabel = storageLabel(targetVault);
-        return { content: [{ type: "text", text: `Memory '${id}' is already stored in ${targetLabel}.` }], isError: true };
+        return {
+          content: [{ type: "text", text: `Memory '${id}' is already stored in ${targetLabel}.` }],
+          isError: true,
+        };
       }
 
       const targetLabel = storageLabel(targetVault);
       const existing = await targetVault.storage.readNote(memoryId(id));
       if (existing) {
-        return { content: [{ type: "text", text: `Cannot move '${id}' because a note with that id already exists in ${targetLabel}.` }], isError: true };
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Cannot move '${id}' because a note with that id already exists in ${targetLabel}.`,
+            },
+          ],
+          isError: true,
+        };
       }
 
       let noteToWrite = found.note;
@@ -147,7 +178,9 @@ export function registerMoveMemoryTool(server: McpServer, ctx: ServerContext): v
       if (target === "project-vault" && targetProject) {
         const rewrittenProject = targetProject.id;
         const rewrittenProjectName = targetProject.name;
-        metadataRewritten = noteToWrite.project !== rewrittenProject || noteToWrite.projectName !== rewrittenProjectName;
+        metadataRewritten =
+          noteToWrite.project !== rewrittenProject ||
+          noteToWrite.projectName !== rewrittenProjectName;
         noteToWrite = {
           ...noteToWrite,
           project: rewrittenProject,
@@ -156,17 +189,28 @@ export function registerMoveMemoryTool(server: McpServer, ctx: ServerContext): v
         };
       }
 
-      const moveAttempt = await attempt("move:between-vaults", () => moveNoteBetweenVaults(ctx, found, targetVault, noteToWrite, cwd, allowProtectedBranch, targetProject?.id));
+      const moveAttempt = await attempt("move:between-vaults", () =>
+        moveNoteBetweenVaults(
+          ctx,
+          found,
+          targetVault,
+          noteToWrite,
+          cwd,
+          allowProtectedBranch,
+          targetProject?.id,
+        ),
+      );
       if (!moveAttempt.ok) {
         const message = getErrorMessage(moveAttempt.error);
         return { content: [{ type: "text", text: message }], isError: true };
       }
-      let moveResult = moveAttempt.value;
+      const moveResult = moveAttempt.value;
       const movedNote = moveResult.note;
-      const associationValue = movedNote.projectName && movedNote.project
-        ? `${movedNote.projectName} (${movedNote.project})`
-        : movedNote.projectName ?? movedNote.project ?? "global";
-      
+      const associationValue =
+        movedNote.projectName && movedNote.project
+          ? `${movedNote.projectName} (${movedNote.project})`
+          : (movedNote.projectName ?? movedNote.project ?? "global");
+
       const structuredContent: MoveResult = {
         action: "moved",
         id,
@@ -184,12 +228,14 @@ export function registerMoveMemoryTool(server: McpServer, ctx: ServerContext): v
 
       invalidateActiveProjectCache();
       return {
-        content: [{
-          type: "text",
-          text: `Moved '${id}' from ${currentStorage} to ${targetLabel}. ${associationText}\n${formatPersistenceSummary(moveResult.persistence)}`,
-        }],
+        content: [
+          {
+            type: "text",
+            text: `Moved '${id}' from ${currentStorage} to ${targetLabel}. ${associationText}\n${formatPersistenceSummary(moveResult.persistence)}`,
+          },
+        ],
         structuredContent,
       };
-    }
+    },
   );
 }

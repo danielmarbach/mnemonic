@@ -76,67 +76,109 @@ export function registerUpdateTool(server: McpServer, ctx: ServerContext): void 
         openWorldHint: true,
       },
       inputSchema: z.object({
-        id: NoteIdSchema.describe("Exact memory id. Use an id returned by `recall`, `list`, `recent_memories`, or `where_is`."),
+        id: NoteIdSchema.describe(
+          "Exact memory id. Use an id returned by `recall`, `list`, `recent_memories`, or `where_is`.",
+        ),
         semanticPatch: z
           .preprocess(
             preprocessSemanticPatch,
-            z.array(z.object({
-            selector: z.object({
-              heading: z.string().optional(),
-              headingStartsWith: z.string().optional(),
-              section: z.string().optional(),
-              nthChild: z.number().int().optional(),
-              lastChild: z.literal(true).optional(),
-            }).refine(
-              (sel) => {
-                const keys = [sel.heading, sel.headingStartsWith, sel.section, sel.nthChild, sel.lastChild].filter((v) => v !== undefined);
-                return keys.length === 1;
-              },
-              { message: "Selector must have exactly one of: heading, headingStartsWith, section, nthChild, lastChild" }
+            z.array(
+              z.object({
+                selector: z
+                  .object({
+                    heading: z.string().optional(),
+                    headingStartsWith: z.string().optional(),
+                    section: z.string().optional(),
+                    nthChild: z.number().int().optional(),
+                    lastChild: z.literal(true).optional(),
+                  })
+                  .refine(
+                    (sel) => {
+                      const keys = [
+                        sel.heading,
+                        sel.headingStartsWith,
+                        sel.section,
+                        sel.nthChild,
+                        sel.lastChild,
+                      ].filter((v) => v !== undefined);
+                      return keys.length === 1;
+                    },
+                    {
+                      message:
+                        "Selector must have exactly one of: heading, headingStartsWith, section, nthChild, lastChild",
+                    },
+                  ),
+                operation: z.discriminatedUnion("op", [
+                  z.object({ op: z.literal("appendChild"), value: z.string() }),
+                  z.object({ op: z.literal("prependChild"), value: z.string() }),
+                  z.object({ op: z.literal("replace"), value: z.string() }),
+                  z.object({ op: z.literal("replaceSection"), value: z.string() }),
+                  z.object({ op: z.literal("replaceChildren"), value: z.string() }),
+                  z.object({ op: z.literal("insertAfter"), value: z.string() }),
+                  z.object({ op: z.literal("insertBefore"), value: z.string() }),
+                  z.object({ op: z.literal("remove") }),
+                ]),
+              }),
             ),
-            operation: z.discriminatedUnion("op", [
-              z.object({ op: z.literal("appendChild"), value: z.string() }),
-              z.object({ op: z.literal("prependChild"), value: z.string() }),
-              z.object({ op: z.literal("replace"), value: z.string() }),
-              z.object({ op: z.literal("replaceSection"), value: z.string() }),
-              z.object({ op: z.literal("replaceChildren"), value: z.string() }),
-              z.object({ op: z.literal("insertAfter"), value: z.string() }),
-              z.object({ op: z.literal("insertBefore"), value: z.string() }),
-              z.object({ op: z.literal("remove") }),
-            ]),
-          })))
+          )
           .optional()
           .describe(
             "Targeted edits to note sections. Array of {selector, operation} objects. Mutually exclusive with content. " +
-            "If this fails, fix the issue in your patch values and retry — do NOT fall back to full content rewrite.\n\n" +
-            "selector: exactly one of { heading: \"exact heading text\" } | { headingStartsWith: \"prefix\" } | { section: \"exact heading text\" } | { lastChild: true } | { nthChild: 0-based-index }\n" +
-            "operation: { op: \"appendChild\", value: \"content\" } | { op: \"prependChild\", value: \"content\" } | { op: \"replace\", value: \"new content\" } | { op: \"replaceSection\", value: \"new section\" } | { op: \"replaceChildren\", value: \"new children\" } | { op: \"insertAfter\", value: \"content\" } | { op: \"insertBefore\", value: \"content\" } | { op: \"remove\" }\n\n" +
-            "Example — add a paragraph under ## Findings, replace body under ## Recommendation, remove ## Old Section:\n" +
-            "[\n" +
-            "  { \"selector\": { \"heading\": \"Findings\" }, \"operation\": { \"op\": \"insertAfter\", \"value\": \"A new paragraph.\" } },\n" +
-            "  { \"selector\": { \"section\": \"Recommendation\" }, \"operation\": { \"op\": \"replaceSection\", \"value\": \"## Recommendation\\n\\nUpdated recommendation.\" } },\n" +
-            "  { \"selector\": { \"heading\": \"Old Section\" }, \"operation\": { \"op\": \"remove\" } }\n" +
-            "]\n\n" +
-            "IMPORTANT: `appendChild`, `prependChild`, and `replaceChildren` do NOT work with `heading` selectors (headings only contain inline text, not block content). To add content under a heading, use `insertAfter`. To replace a full section including its body, use `section` + `replaceSection`."
+              "If this fails, fix the issue in your patch values and retry — do NOT fall back to full content rewrite.\n\n" +
+              'selector: exactly one of { heading: "exact heading text" } | { headingStartsWith: "prefix" } | { section: "exact heading text" } | { lastChild: true } | { nthChild: 0-based-index }\n' +
+              'operation: { op: "appendChild", value: "content" } | { op: "prependChild", value: "content" } | { op: "replace", value: "new content" } | { op: "replaceSection", value: "new section" } | { op: "replaceChildren", value: "new children" } | { op: "insertAfter", value: "content" } | { op: "insertBefore", value: "content" } | { op: "remove" }\n\n' +
+              "Example — add a paragraph under ## Findings, replace body under ## Recommendation, remove ## Old Section:\n" +
+              "[\n" +
+              '  { "selector": { "heading": "Findings" }, "operation": { "op": "insertAfter", "value": "A new paragraph." } },\n' +
+              '  { "selector": { "section": "Recommendation" }, "operation": { "op": "replaceSection", "value": "## Recommendation\\n\\nUpdated recommendation." } },\n' +
+              '  { "selector": { "heading": "Old Section" }, "operation": { "op": "remove" } }\n' +
+              "]\n\n" +
+              "IMPORTANT: `appendChild`, `prependChild`, and `replaceChildren` do NOT work with `heading` selectors (headings only contain inline text, not block content). To add content under a heading, use `insertAfter`. To replace a full section including its body, use `section` + `replaceSection`.",
           ),
-        content: z.string().max(100000, "Content must be at most 100,000 characters").optional().describe("Full note body replacement. Use only for complete rewrites or when the note is small. Mutually exclusive with semanticPatch. Content must pass markdown lint. Auto-fixable issues are fixed automatically. Common unfixable issues: fenced code blocks need a language tag (e.g. use ```text not bare ```), and broken links are rejected. If lint fails, fix the specific issues and retry — do NOT fall back to semanticPatch for this."),
-        title: z.string().max(500, "Title must be at most 500 characters").optional().describe("Specific, retrieval-friendly title. Prefer the concrete topic or decision, not a vague label."),
-        tags: z.array(z.string()).optional().describe("Optional tags for later filtering. Use a small number of stable, meaningful tags."),
+        content: z
+          .string()
+          .max(100000, "Content must be at most 100,000 characters")
+          .optional()
+          .describe(
+            "Full note body replacement. Use only for complete rewrites or when the note is small. Mutually exclusive with semanticPatch. Content must pass markdown lint. Auto-fixable issues are fixed automatically. Common unfixable issues: fenced code blocks need a language tag (e.g. use ```text not bare ```), and broken links are rejected. If lint fails, fix the specific issues and retry — do NOT fall back to semanticPatch for this.",
+          ),
+        title: z
+          .string()
+          .max(500, "Title must be at most 500 characters")
+          .optional()
+          .describe(
+            "Specific, retrieval-friendly title. Prefer the concrete topic or decision, not a vague label.",
+          ),
+        tags: z
+          .array(z.string())
+          .optional()
+          .describe(
+            "Optional tags for later filtering. Use a small number of stable, meaningful tags.",
+          ),
         lifecycle: z
           .enum(NOTE_LIFECYCLES)
           .optional()
-          .describe("Change lifecycle. Preserve the existing value unless you're intentionally switching it."),
+          .describe(
+            "Change lifecycle. Preserve the existing value unless you're intentionally switching it.",
+          ),
         role: z
           .enum(NOTE_ROLES)
           .optional()
-          .describe("Change role. Preserve the existing value unless you're intentionally switching it."),
-        summary: z.string().optional().describe("Git commit summary only. Imperative mood, concise, and focused on why the change matters."),
+          .describe(
+            "Change role. Preserve the existing value unless you're intentionally switching it.",
+          ),
+        summary: z
+          .string()
+          .optional()
+          .describe(
+            "Git commit summary only. Imperative mood, concise, and focused on why the change matters.",
+          ),
         alwaysLoad: z
           .boolean()
           .optional()
           .describe(
             "When true, this note loads automatically at session start and receives priority in recall and relationship expansion. " +
-            "Use for session anchors and critical context that should always be available."
+              "Use for session anchors and critical context that should always be available.",
           ),
         cwd: projectParam,
         allowProtectedBranch: z
@@ -144,12 +186,24 @@ export function registerUpdateTool(server: McpServer, ctx: ServerContext): void 
           .optional()
           .describe(
             "One-time override for protected branch checks. " +
-            "When true, update can commit on a protected branch without changing project policy."
+              "When true, update can commit on a protected branch without changing project policy.",
           ),
       }),
       outputSchema: UpdateToolResultSchema,
     },
-    async ({ id, content, semanticPatch, title, tags, lifecycle, role, summary, alwaysLoad, cwd, allowProtectedBranch = false }) => {
+    async ({
+      id,
+      content,
+      semanticPatch,
+      title,
+      tags,
+      lifecycle,
+      role,
+      summary,
+      alwaysLoad,
+      cwd,
+      allowProtectedBranch = false,
+    }) => {
       await ensureBranchSynced(ctx, cwd);
       const noteId = memoryId(id);
       const project = await resolveProject(ctx, cwd);
@@ -160,16 +214,30 @@ export function registerUpdateTool(server: McpServer, ctx: ServerContext): void 
       if (!found) {
         const foundAny = await ctx.vaultManager.findNote(id, cwd, { mutable: false, projectId });
         if (foundAny) {
-          return { content: [{ type: "text", text: attachedVaultErrorMessage(id, foundAny.vault) }], isError: true };
+          return {
+            content: [{ type: "text", text: attachedVaultErrorMessage(id, foundAny.vault) }],
+            isError: true,
+          };
         }
-        return { content: [{ type: "text", text: `No memory found with id '${id}'` }], isError: true };
+        return {
+          content: [{ type: "text", text: `No memory found with id '${id}'` }],
+          isError: true,
+        };
       }
 
       // Validate: content and semanticPatch are mutually exclusive
       const hasContent = content !== undefined;
       const hasSemanticPatch = semanticPatch !== undefined && semanticPatch.length > 0;
       if (hasContent && hasSemanticPatch) {
-        return { content: [{ type: "text", text: "Exactly one of content or semanticPatch must be provided, not both." }], isError: true };
+        return {
+          content: [
+            {
+              type: "text",
+              text: "Exactly one of content or semanticPatch must be provided, not both.",
+            },
+          ],
+          isError: true,
+        };
       }
 
       const { note, vault } = found;
@@ -188,12 +256,19 @@ export function registerUpdateTool(server: McpServer, ctx: ServerContext): void 
             const message = `Semantic patch produced content with markdown lint issues. Fix the lint issues in your patch values and retry — do NOT fall back to full content rewrite.\n\n${err.message}`;
             return {
               content: [{ type: "text" as const, text: message }],
-              structuredContent: { action: "lint_error", tool: "update", issues: err.issues } satisfies UpdateLintErrorResult,
+              structuredContent: {
+                action: "lint_error",
+                tool: "update",
+                issues: err.issues,
+              } satisfies UpdateLintErrorResult,
               isError: true,
             };
           }
           const message = getErrorMessage(err);
-          return { content: [{ type: "text", text: `Semantic patch failed: ${message}` }], isError: true };
+          return {
+            content: [{ type: "text", text: `Semantic patch failed: ${message}` }],
+            isError: true,
+          };
         }
         patchedContent = patchResult.value.content;
         lintWarnings = patchResult.value.lintWarnings;
@@ -207,7 +282,11 @@ export function registerUpdateTool(server: McpServer, ctx: ServerContext): void 
             const message = `Markdown lint issues prevented the update. Fix the specific lint errors in your content and retry — do NOT fall back to semanticPatch for this.\n\n${err.message}`;
             return {
               content: [{ type: "text" as const, text: message }],
-              structuredContent: { action: "lint_error", tool: "update", issues: err.issues } satisfies UpdateLintErrorResult,
+              structuredContent: {
+                action: "lint_error",
+                tool: "update",
+                issues: err.issues,
+              } satisfies UpdateLintErrorResult,
               isError: true,
             };
           }
@@ -229,25 +308,36 @@ export function registerUpdateTool(server: McpServer, ctx: ServerContext): void 
         const project = note.project;
         const accessCandidates = getRecentSessionNoteAccesses(project)
           .map((entry) => {
-            const cachedNote = getSessionCachedNote(project, entry.vaultPath, entry.noteId)
-              ?? getRecentSessionAccessNote(project, entry.vaultPath, entry.noteId);
+            const cachedNote =
+              getSessionCachedNote(project, entry.vaultPath, entry.noteId) ??
+              getRecentSessionAccessNote(project, entry.vaultPath, entry.noteId);
             return cachedNote
-              ? { note: cachedNote, accessedAt: entry.accessedAt, accessKind: entry.accessKind, score: entry.score }
+              ? {
+                  note: cachedNote,
+                  accessedAt: entry.accessedAt,
+                  accessKind: entry.accessKind,
+                  score: entry.score,
+                }
               : null;
           })
           .filter((entry): entry is NonNullable<typeof entry> => entry !== null);
-        const autoRelationships = suggestAutoRelationships({
-          ...note,
-          title: resolvedTitle,
-          content: resolvedContent,
-          tags: resolvedTags,
-          lifecycle: resolvedLifecycle,
-          alwaysLoad: resolvedAlwaysLoad,
-        }, accessCandidates);
+        const autoRelationships = suggestAutoRelationships(
+          {
+            ...note,
+            title: resolvedTitle,
+            content: resolvedContent,
+            tags: resolvedTags,
+            lifecycle: resolvedLifecycle,
+            alwaysLoad: resolvedAlwaysLoad,
+          },
+          accessCandidates,
+        );
         if (autoRelationships.length > 0) {
           const existing = [...(note.relatedTo ?? [])];
           for (const relationship of autoRelationships) {
-            if (!existing.some((rel) => rel.id === relationship.id && rel.type === relationship.type)) {
+            if (
+              !existing.some((rel) => rel.id === relationship.id && rel.type === relationship.type)
+            ) {
               existing.push(relationship);
             }
           }
@@ -332,7 +422,7 @@ export function registerUpdateTool(server: McpServer, ctx: ServerContext): void 
         content: resolvedContent,
         tags: resolvedTags,
         lifecycle: resolvedLifecycle,
-        ...(role !== undefined ? { role: resolvedRole } : (note.role ? { role: note.role } : {})),
+        ...(role !== undefined ? { role: resolvedRole } : note.role ? { role: note.role } : {}),
         alwaysLoad: resolvedAlwaysLoad,
         updatedAt: now,
         relatedTo: resolvedRelatedTo,
@@ -347,7 +437,12 @@ export function registerUpdateTool(server: McpServer, ctx: ServerContext): void 
       });
       if (protectedBranchCheck.blocked) {
         return {
-          content: [{ type: "text", text: protectedBranchCheck.message ?? "Protected branch policy blocked this commit." }],
+          content: [
+            {
+              type: "text",
+              text: protectedBranchCheck.message ?? "Protected branch policy blocked this commit.",
+            },
+          ],
           isError: true,
         };
       }
@@ -355,13 +450,21 @@ export function registerUpdateTool(server: McpServer, ctx: ServerContext): void 
       await vault.storage.writeNote(updated);
 
       const shouldReembed = patchedContent !== undefined || cleanedContent !== undefined;
-      let embeddingStatus: { status: "written" | "skipped"; reason?: string } = { status: "skipped", reason: shouldReembed ? undefined : "metadata-only" };
+      let embeddingStatus: { status: "written" | "skipped"; reason?: string } = {
+        status: "skipped",
+        reason: shouldReembed ? undefined : "metadata-only",
+      };
 
       if (shouldReembed) {
         const embedResult = await attempt("update:re-embed", async () => {
           const text = await embedTextForNote(vault.storage, updated);
           const vector = await embed(text);
-          await vault.storage.writeEmbedding({ id: noteId, ...embeddingMetadata(vector), embedding: vector, updatedAt: now });
+          await vault.storage.writeEmbedding({
+            id: noteId,
+            ...embeddingMetadata(vector),
+            embedding: vector,
+            updatedAt: now,
+          });
         });
         if (embedResult.ok) {
           embeddingStatus = { status: "written" };
@@ -393,9 +496,10 @@ export function registerUpdateTool(server: McpServer, ctx: ServerContext): void 
         toolName: "update",
         noteProjectId: note.project,
       });
-      const pushStatus = commitStatus.status === "committed"
-        ? await pushAfterMutation(ctx, vault)
-        : { status: "skipped" as const, reason: "commit-failed" as const };
+      const pushStatus =
+        commitStatus.status === "committed"
+          ? await pushAfterMutation(ctx, vault)
+          : { status: "skipped" as const, reason: "commit-failed" as const };
       const retry = buildMutationRetryContract({
         commit: commitStatus,
         commitMessage,
@@ -431,10 +535,19 @@ export function registerUpdateTool(server: McpServer, ctx: ServerContext): void 
 
       invalidateActiveProjectCache();
       const fieldText = changes.length > 0 ? `\nfields modified: ${changes.join(", ")}` : "";
-      const warningsText = lintWarnings && lintWarnings.length > 0
-        ? `\nmarkdown lint warnings (not auto-fixable):\n- ${lintWarnings.join("\n- ")}`
-        : "";
-      return { content: [{ type: "text", text: `Updated memory '${id}'${fieldText}${warningsText}\n${formatPersistenceSummary(persistence)}` }], structuredContent };
-    }
+      const warningsText =
+        lintWarnings && lintWarnings.length > 0
+          ? `\nmarkdown lint warnings (not auto-fixable):\n- ${lintWarnings.join("\n- ")}`
+          : "";
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Updated memory '${id}'${fieldText}${warningsText}\n${formatPersistenceSummary(persistence)}`,
+          },
+        ],
+        structuredContent,
+      };
+    },
   );
 }

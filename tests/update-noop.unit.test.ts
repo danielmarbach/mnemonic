@@ -24,37 +24,51 @@ describe("update no-op detection", () => {
 
     it("detects lifecycle change", async () => {
       const { hasActualChanges } = await import("../src/update-detect-changes.js");
-      expect(hasActualChanges({ lifecycle: "permanent", originalLifecycle: "temporary" })).toBe(true);
+      expect(hasActualChanges({ lifecycle: "permanent", originalLifecycle: "temporary" })).toBe(
+        true,
+      );
     });
 
     it("detects no lifecycle change when values are identical", async () => {
       const { hasActualChanges } = await import("../src/update-detect-changes.js");
-      expect(hasActualChanges({ lifecycle: "temporary", originalLifecycle: "temporary" })).toBe(false);
+      expect(hasActualChanges({ lifecycle: "temporary", originalLifecycle: "temporary" })).toBe(
+        false,
+      );
     });
 
     it("detects role change when explicitly set", async () => {
       const { hasActualChanges } = await import("../src/update-detect-changes.js");
-      expect(hasActualChanges({ role: "decision", originalRole: "research", roleExplicitlySet: true })).toBe(true);
+      expect(
+        hasActualChanges({ role: "decision", originalRole: "research", roleExplicitlySet: true }),
+      ).toBe(true);
     });
 
     it("ignores role change when not explicitly set", async () => {
       const { hasActualChanges } = await import("../src/update-detect-changes.js");
-      expect(hasActualChanges({ role: "decision", originalRole: "research", roleExplicitlySet: false })).toBe(false);
+      expect(
+        hasActualChanges({ role: "decision", originalRole: "research", roleExplicitlySet: false }),
+      ).toBe(false);
     });
 
     it("detects no role change when values are identical and explicitly set", async () => {
       const { hasActualChanges } = await import("../src/update-detect-changes.js");
-      expect(hasActualChanges({ role: "research", originalRole: "research", roleExplicitlySet: true })).toBe(false);
+      expect(
+        hasActualChanges({ role: "research", originalRole: "research", roleExplicitlySet: true }),
+      ).toBe(false);
     });
 
     it("detects role change from undefined to value when explicitly set", async () => {
       const { hasActualChanges } = await import("../src/update-detect-changes.js");
-      expect(hasActualChanges({ role: "decision", originalRole: undefined, roleExplicitlySet: true })).toBe(true);
+      expect(
+        hasActualChanges({ role: "decision", originalRole: undefined, roleExplicitlySet: true }),
+      ).toBe(true);
     });
 
     it("detects role change from value to undefined when explicitly set", async () => {
       const { hasActualChanges } = await import("../src/update-detect-changes.js");
-      expect(hasActualChanges({ role: undefined, originalRole: "research", roleExplicitlySet: true })).toBe(true);
+      expect(
+        hasActualChanges({ role: undefined, originalRole: "research", roleExplicitlySet: true }),
+      ).toBe(true);
     });
 
     it("detects tags change", async () => {
@@ -84,56 +98,64 @@ describe("update no-op detection", () => {
 
     it("detects no changes at all (true no-op)", async () => {
       const { hasActualChanges } = await import("../src/update-detect-changes.js");
-      expect(hasActualChanges({
-        content: undefined,
-        originalContent: "original",
-        title: "Same Title",
-        originalTitle: "Same Title",
-        lifecycle: "temporary",
-        originalLifecycle: "temporary",
-        tags: ["a"],
-        originalTags: ["a"],
-      })).toBe(false);
+      expect(
+        hasActualChanges({
+          content: undefined,
+          originalContent: "original",
+          title: "Same Title",
+          originalTitle: "Same Title",
+          lifecycle: "temporary",
+          originalLifecycle: "temporary",
+          tags: ["a"],
+          originalTags: ["a"],
+        }),
+      ).toBe(false);
     });
 
     it("detects changes when only content differs", async () => {
       const { hasActualChanges } = await import("../src/update-detect-changes.js");
-      expect(hasActualChanges({
-        content: "new content",
-        originalContent: "original",
-        title: "Same Title",
-        originalTitle: "Same Title",
-        lifecycle: "temporary",
-        originalLifecycle: "temporary",
-        tags: ["a"],
-        originalTags: ["a"],
-      })).toBe(true);
+      expect(
+        hasActualChanges({
+          content: "new content",
+          originalContent: "original",
+          title: "Same Title",
+          originalTitle: "Same Title",
+          lifecycle: "temporary",
+          originalLifecycle: "temporary",
+          tags: ["a"],
+          originalTags: ["a"],
+        }),
+      ).toBe(true);
     });
 
     it("treats semanticPatch presence as a content change", async () => {
       const { hasActualChanges } = await import("../src/update-detect-changes.js");
-      expect(hasActualChanges({
-        semanticPatchApplied: true,
-        content: undefined,
-        originalContent: "original",
-        title: "Same Title",
-        originalTitle: "Same Title",
-        lifecycle: "temporary",
-        originalLifecycle: "temporary",
-        tags: ["a"],
-        originalTags: ["a"],
-      })).toBe(true);
+      expect(
+        hasActualChanges({
+          semanticPatchApplied: true,
+          content: undefined,
+          originalContent: "original",
+          title: "Same Title",
+          originalTitle: "Same Title",
+          lifecycle: "temporary",
+          originalLifecycle: "temporary",
+          tags: ["a"],
+          originalTags: ["a"],
+        }),
+      ).toBe(true);
     });
 
     it("treats relatedTo auto-relationship addition as a change", async () => {
       const { hasActualChanges } = await import("../src/update-detect-changes.js");
-      expect(hasActualChanges({
-        content: undefined,
-        originalContent: "original",
-        title: "Same Title",
-        originalTitle: "Same Title",
-        relatedToChanged: true,
-      })).toBe(true);
+      expect(
+        hasActualChanges({
+          content: undefined,
+          originalContent: "original",
+          title: "Same Title",
+          originalTitle: "Same Title",
+          relatedToChanged: true,
+        }),
+      ).toBe(true);
     });
   });
 

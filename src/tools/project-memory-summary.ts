@@ -4,7 +4,11 @@ import type { ServerContext } from "../server-context.js";
 import { performance } from "perf_hooks";
 
 import { memoryId } from "../brands.js";
-import { checkEmbeddingCompatibility, currentEmbeddingIdentity, safeCosineSimilarity } from "../embeddings.js";
+import {
+  checkEmbeddingCompatibility,
+  currentEmbeddingIdentity,
+  safeCosineSimilarity,
+} from "../embeddings.js";
 import { getNoteProvenance, computeConfidence, computeDecayInfo } from "../provenance.js";
 import { getRelationshipPreview } from "../relationships.js";
 import { formatRelationshipPreview } from "../helpers/index.js";
@@ -46,14 +50,18 @@ function sampleWarningNotes(entries: NoteEntry[]): Array<{ id: string; title: st
 function buildMaintenanceWarnings(
   entries: NoteEntry[],
   anchors: AnchorNote[],
-  noteContext: Map<string, { metadata: EffectiveNoteMetadata; inbound: number; visibleOutbound: number }>,
+  noteContext: Map<
+    string,
+    { metadata: EffectiveNoteMetadata; inbound: number; visibleOutbound: number }
+  >,
 ): ProjectMaintenanceWarning[] | undefined {
   const staleTemporary: NoteEntry[] = [];
   const supersededCandidates: NoteEntry[] = [];
 
   for (const entry of entries) {
     const context = noteContext.get(entry.note.id);
-    const centrality = (context?.inbound ?? 0) + (context?.visibleOutbound ?? entry.note.relatedTo?.length ?? 0);
+    const centrality =
+      (context?.inbound ?? 0) + (context?.visibleOutbound ?? entry.note.relatedTo?.length ?? 0);
     const superseded = (entry.note.relatedTo ?? []).some((rel) => rel.type === "supersedes");
     const decayInfo = computeDecayInfo({
       lifecycle: entry.note.lifecycle,
@@ -78,7 +86,8 @@ function buildMaintenanceWarnings(
       message: `${staleTemporary.length} stale temporary note${staleTemporary.length === 1 ? "" : "s"} may need review or consolidation.`,
       count: staleTemporary.length,
       sampleNotes: sampleWarningNotes(staleTemporary),
-      suggestedAction: "Inspect temporary notes, then update, consolidate, or remove scaffolding explicitly.",
+      suggestedAction:
+        "Inspect temporary notes, then update, consolidate, or remove scaffolding explicitly.",
     });
   }
 
@@ -86,19 +95,25 @@ function buildMaintenanceWarnings(
     warnings.push({
       code: "superseded-prune-candidates",
       severity: "info",
-      message: supersededCandidates.length === 1
-        ? "1 superseded note may be a prune candidate."
-        : `${supersededCandidates.length} superseded notes may be prune candidates.`,
+      message:
+        supersededCandidates.length === 1
+          ? "1 superseded note may be a prune candidate."
+          : `${supersededCandidates.length} superseded notes may be prune candidates.`,
       count: supersededCandidates.length,
       sampleNotes: sampleWarningNotes(supersededCandidates),
-      suggestedAction: "Review sources, then use consolidate prune-superseded only when deletion is intentional.",
+      suggestedAction:
+        "Review sources, then use consolidate prune-superseded only when deletion is intentional.",
     });
   }
 
   const hasOrientationCandidate = entries.some((entry) => {
     const metadata = noteContext.get(entry.note.id)?.metadata;
-    return entry.note.lifecycle === "permanent" &&
-      (metadata?.alwaysLoad === true || metadata?.role === "summary" || metadata?.role === "decision");
+    return (
+      entry.note.lifecycle === "permanent" &&
+      (metadata?.alwaysLoad === true ||
+        metadata?.role === "summary" ||
+        metadata?.role === "decision")
+    );
   });
 
   if (anchors.length === 0 && entries.length >= 3 && !hasOrientationCandidate) {
@@ -107,7 +122,8 @@ function buildMaintenanceWarnings(
       severity: "info",
       message: "No strong anchor notes found; project orientation may depend on recent notes.",
       count: entries.length,
-      suggestedAction: "Consider consolidating durable decisions or summaries so future sessions have stable entry points.",
+      suggestedAction:
+        "Consider consolidating durable decisions or summaries so future sessions have stable entry points.",
     });
   }
 
@@ -136,7 +152,11 @@ export function registerProjectMemorySummaryTool(server: McpServer, ctx: ServerC
         openWorldHint: false,
       },
       inputSchema: z.object({
-        cwd: z.string().describe("Absolute path of the project working directory. Required for project-scoped routing, vault selection, and search boosting."),
+        cwd: z
+          .string()
+          .describe(
+            "Absolute path of the project working directory. Required for project-scoped routing, vault selection, and search boosting.",
+          ),
         maxPerTheme: z.number().int().min(1).max(5).optional().default(3),
         recentLimit: z.number().int().min(1).max(10).optional().default(5),
         anchorLimit: z.number().int().min(1).max(10).optional().default(5),
@@ -145,20 +165,34 @@ export function registerProjectMemorySummaryTool(server: McpServer, ctx: ServerC
       }),
       outputSchema: ProjectSummaryResultSchema,
     },
-    async ({ cwd, maxPerTheme, recentLimit, anchorLimit, includeRelatedGlobal, relatedGlobalLimit }) => {
+    async ({
+      cwd,
+      maxPerTheme,
+      recentLimit,
+      anchorLimit: _anchorLimit,
+      includeRelatedGlobal,
+      relatedGlobalLimit,
+    }) => {
       const t0Summary = performance.now();
       await ensureBranchSynced(ctx, cwd);
 
       // Pre-resolve project so we can pass its id to collectVisibleNotes for session caching
       const preProject = await resolveProject(ctx, cwd);
-      const { project, entries } = await collectVisibleNotes(ctx, cwd, "all", undefined, "any", preProject?.id);
+      const { project, entries } = await collectVisibleNotes(
+        ctx,
+        cwd,
+        "all",
+        undefined,
+        "any",
+        preProject?.id,
+      );
       if (!project) {
         return projectNotFoundResponse(cwd);
       }
 
       // Separate project-scoped notes (for themes/anchors) from global notes
-      const projectEntries = entries.filter(e =>
-        e.note.project === project.id || e.vault.provenance !== "main"
+      const projectEntries = entries.filter(
+        (e) => e.note.project === project.id || e.vault.provenance !== "main",
       );
 
       // Empty-project case: no project-scoped notes exist
@@ -175,15 +209,18 @@ export function registerProjectMemorySummaryTool(server: McpServer, ctx: ServerC
             suggestedNext: [],
           },
         };
-        return { content: [{ type: "text", text: `No memories found for project ${project.name}.` }], structuredContent };
+        return {
+          content: [{ type: "text", text: `No memories found for project ${project.name}.` }],
+          structuredContent,
+        };
       }
 
       const policyLine = await formatProjectPolicyLine(ctx, project.id);
 
-      const projectNoteIds = new Set(projectEntries.map(e => e.note.id));
+      const projectNoteIds = new Set(projectEntries.map((e) => e.note.id));
 
       // Compute promoted themes from keywords (graduation system)
-      const graduationResult = computeThemesWithGraduation(projectEntries.map(e => e.note));
+      const graduationResult = computeThemesWithGraduation(projectEntries.map((e) => e.note));
       const promotedThemes = new Set(graduationResult.promotedThemes);
       const themeCache = graduationResult.themeAssignments;
 
@@ -205,18 +242,24 @@ export function registerProjectMemorySummaryTool(server: McpServer, ctx: ServerC
       const effectiveMetadataById = new Map(
         projectEntries.map((entry) => {
           const inbound = inboundReferences.get(entry.note.id) ?? 0;
-          const visibleOutbound = (entry.note.relatedTo ?? []).filter((rel) => projectNoteIds.has(rel.id)).length;
+          const visibleOutbound = (entry.note.relatedTo ?? []).filter((rel) =>
+            projectNoteIds.has(rel.id),
+          ).length;
           const metadata = getEffectiveMetadata(entry.note, {
             inboundReferences: inbound,
             linkedByPermanentNotes: linkedByPermanentNotes.get(entry.note.id) ?? 0,
-            anchorCandidate: entry.note.lifecycle === "permanent" && (visibleOutbound > 0 || inbound > 0),
+            anchorCandidate:
+              entry.note.lifecycle === "permanent" && (visibleOutbound > 0 || inbound > 0),
           });
-          return [entry.note.id, {
-            metadata,
-            inbound,
-            visibleOutbound,
-          }] as const;
-        })
+          return [
+            entry.note.id,
+            {
+              metadata,
+              inbound,
+              visibleOutbound,
+            },
+          ] as const;
+        }),
       );
 
       // Categorize by theme with graduation (project-scoped only)
@@ -230,7 +273,7 @@ export function registerProjectMemorySummaryTool(server: McpServer, ctx: ServerC
 
       // Theme order: fixed themes first, then promoted themes alphabetically, then "other"
       const fixedThemes = ["overview", "decisions", "tooling", "bugs", "architecture", "quality"];
-      const dynamicThemes = graduationResult.promotedThemes.filter(t => !fixedThemes.includes(t));
+      const dynamicThemes = graduationResult.promotedThemes.filter((t) => !fixedThemes.includes(t));
       const themeOrder = [...fixedThemes, ...dynamicThemes.sort(), "other"];
 
       // Collapse thin dynamic-theme buckets (< 2 notes) into "other" to reduce noise.
@@ -246,9 +289,13 @@ export function registerProjectMemorySummaryTool(server: McpServer, ctx: ServerC
       }
 
       // Calculate notes distribution (project-scoped only)
-      const projectVaultCount = projectEntries.filter(e => e.vault.provenance === "project-local").length;
-      const attachedVaultCount = projectEntries.filter(e => e.vault.provenance === "project-attached").length;
-      const mainVaultProjectEntries = projectEntries.filter(e => e.vault.provenance === "main");
+      const projectVaultCount = projectEntries.filter(
+        (e) => e.vault.provenance === "project-local",
+      ).length;
+      const attachedVaultCount = projectEntries.filter(
+        (e) => e.vault.provenance === "project-attached",
+      ).length;
+      const mainVaultProjectEntries = projectEntries.filter((e) => e.vault.provenance === "main");
       const mainVaultCount = mainVaultProjectEntries.length;
       const totalProjectNotes = projectEntries.length;
 
@@ -257,7 +304,9 @@ export function registerProjectMemorySummaryTool(server: McpServer, ctx: ServerC
       sections.push(`Project summary: **${project.name}**`);
       sections.push(`- id: \`${project.id}\``);
       sections.push(`- ${policyLine.replace(/^Policy:\s*/, "policy: ")}`);
-      sections.push(`- memories: ${totalProjectNotes} (project-vault: ${projectVaultCount}, main-vault: ${mainVaultCount}${attachedVaultCount > 0 ? `, attached: ${attachedVaultCount}` : ""})`);
+      sections.push(
+        `- memories: ${totalProjectNotes} (project-vault: ${projectVaultCount}, main-vault: ${mainVaultCount}${attachedVaultCount > 0 ? `, attached: ${attachedVaultCount}` : ""})`,
+      );
       if (mainVaultProjectEntries.length > 0) {
         sections.push(`- private project memories: ${mainVaultProjectEntries.length}`);
       }
@@ -266,19 +315,21 @@ export function registerProjectMemorySummaryTool(server: McpServer, ctx: ServerC
       for (const theme of themeOrder) {
         const bucket = themed.get(theme);
         if (!bucket || bucket.length === 0) continue;
-        
+
         // Sort by within-theme score
-        const sorted = [...bucket].sort((a, b) => 
-          withinThemeScore(b.note, effectiveMetadataById.get(b.note.id)?.metadata) - withinThemeScore(a.note, effectiveMetadataById.get(a.note.id)?.metadata)
+        const sorted = [...bucket].sort(
+          (a, b) =>
+            withinThemeScore(b.note, effectiveMetadataById.get(b.note.id)?.metadata) -
+            withinThemeScore(a.note, effectiveMetadataById.get(a.note.id)?.metadata),
         );
         const top = sorted.slice(0, maxPerTheme);
-        
+
         sections.push(`\n${titleCaseTheme(theme)}:`);
-        sections.push(...top.map(e => `- ${e.note.title} (\`${e.note.id}\`)`));
-        
+        sections.push(...top.map((e) => `- ${e.note.title} (\`${e.note.id}\`)`));
+
         themes[theme] = {
           count: bucket.length,
-          examples: top.map(e => ({
+          examples: top.map((e) => ({
             id: e.note.id,
             title: e.note.title,
             updatedAt: e.note.updatedAt,
@@ -290,9 +341,9 @@ export function registerProjectMemorySummaryTool(server: McpServer, ctx: ServerC
       const recent = [...projectEntries]
         .sort((a, b) => b.note.updatedAt.localeCompare(a.note.updatedAt))
         .slice(0, recentLimit);
-      
+
       sections.push(`\nRecent activity (start here):`);
-      sections.push(...recent.map(e => `- ${e.note.updatedAt} — ${e.note.title}`));
+      sections.push(...recent.map((e) => `- ${e.note.updatedAt} — ${e.note.title}`));
 
       const temporaryEntries = projectEntries
         .filter((entry) => entry.note.lifecycle === "temporary")
@@ -303,9 +354,11 @@ export function registerProjectMemorySummaryTool(server: McpServer, ctx: ServerC
           const relatedCount = entry.note.relatedTo?.length ?? 0;
           const days = daysSinceUpdate(entry.note.updatedAt);
           const rationaleParts = [`updated ${days < 1 ? "today" : `${Math.round(days)}d ago`}`];
-          if (relatedCount > 0) rationaleParts.push(`${relatedCount} linked note${relatedCount === 1 ? "" : "s"}`);
+          if (relatedCount > 0)
+            rationaleParts.push(`${relatedCount} linked note${relatedCount === 1 ? "" : "s"}`);
           if (nextAction) rationaleParts.push("explicit next action");
-          if (metadata?.role === "plan" || metadata?.role === "context") rationaleParts.push(`${metadata.role} note`);
+          if (metadata?.role === "plan" || metadata?.role === "context")
+            rationaleParts.push(`${metadata.role} note`);
 
           return {
             entry,
@@ -316,30 +369,35 @@ export function registerProjectMemorySummaryTool(server: McpServer, ctx: ServerC
           };
         })
         .filter((candidate) => candidate.score > -Infinity)
-        .sort((a, b) => b.score - a.score || b.entry.note.updatedAt.localeCompare(a.entry.note.updatedAt))
+        .sort(
+          (a, b) =>
+            b.score - a.score || b.entry.note.updatedAt.localeCompare(a.entry.note.updatedAt),
+        )
         .slice(0, 3);
 
-      const workingState = temporaryEntries.length > 0
-        ? {
-            summary:
-              temporaryEntries.length === 1
-                ? `1 temporary note may help resume active work.`
-                : `${temporaryEntries.length} temporary notes may help resume active work.`,
-            recoveryHint: "Orient with project_memory_summary first, then inspect these temporary notes if you need to continue in-progress work.",
-            notes: temporaryEntries.map(({ entry, rationale, preview, nextAction }) => ({
-              id: entry.note.id,
-              title: entry.note.title,
-              updatedAt: entry.note.updatedAt,
-              rationale,
-              preview,
-              nextAction,
-            })),
-          }
-        : undefined;
+      const workingState =
+        temporaryEntries.length > 0
+          ? {
+              summary:
+                temporaryEntries.length === 1
+                  ? `1 temporary note may help resume active work.`
+                  : `${temporaryEntries.length} temporary notes may help resume active work.`,
+              recoveryHint:
+                "Orient with project_memory_summary first, then inspect these temporary notes if you need to continue in-progress work.",
+              notes: temporaryEntries.map(({ entry, rationale, preview, nextAction }) => ({
+                id: entry.note.id,
+                title: entry.note.title,
+                updatedAt: entry.note.updatedAt,
+                rationale,
+                preview,
+                nextAction,
+              })),
+            }
+          : undefined;
 
       // Anchor notes with diversity constraint (project-scoped only)
       const scoredAnchorCandidates = projectEntries
-        .map(e => {
+        .map((e) => {
           const baselineContext = effectiveMetadataById.get(e.note.id);
           const metadata = baselineContext?.metadata;
           return {
@@ -351,11 +409,17 @@ export function registerProjectMemorySummaryTool(server: McpServer, ctx: ServerC
             explicitOrientationRole:
               metadata?.roleSource === "explicit" &&
               (metadata.role === "summary" || metadata.role === "decision"),
-            hasVisibleGraphParticipation: (baselineContext?.visibleOutbound ?? 0) > 0 || (baselineContext?.inbound ?? 0) > 0,
+            hasVisibleGraphParticipation:
+              (baselineContext?.visibleOutbound ?? 0) > 0 || (baselineContext?.inbound ?? 0) > 0,
           };
         })
-        .filter(candidate => candidate.score > -Infinity)
-        .filter(candidate => candidate.alwaysLoad || candidate.explicitOrientationRole || candidate.hasVisibleGraphParticipation)
+        .filter((candidate) => candidate.score > -Infinity)
+        .filter(
+          (candidate) =>
+            candidate.alwaysLoad ||
+            candidate.explicitOrientationRole ||
+            candidate.hasVisibleGraphParticipation,
+        )
         .sort((a, b) => b.score - a.score || a.entry.note.title.localeCompare(b.entry.note.title));
 
       // Enforce max 2 per theme for scored anchors
@@ -384,47 +448,65 @@ export function registerProjectMemorySummaryTool(server: McpServer, ctx: ServerC
 
       if (anchors.length > 0) {
         sections.push(`\nAnchors:`);
-        sections.push(...anchors.slice(0, 5).map(a => 
-          `- ${a.title} (\`${a.id}\`) — centrality: ${a.centrality}, diversity: ${a.connectionDiversity}`
-        ));
+        sections.push(
+          ...anchors
+            .slice(0, 5)
+            .map(
+              (a) =>
+                `- ${a.title} (\`${a.id}\`) — centrality: ${a.centrality}, diversity: ${a.connectionDiversity}`,
+            ),
+        );
       }
 
-      const maintenanceWarnings = buildMaintenanceWarnings(projectEntries, anchors, effectiveMetadataById);
+      const maintenanceWarnings = buildMaintenanceWarnings(
+        projectEntries,
+        anchors,
+        effectiveMetadataById,
+      );
 
       // Compute orientation after anchors are computed (for text output)
       let relatedGlobal: ProjectSummaryResult["relatedGlobal"];
-      
+
       if (includeRelatedGlobal) {
         const anchorEmbeddings = await Promise.all(
-          anchors.slice(0, 5).map(async a => {
+          anchors.slice(0, 5).map(async (a) => {
             for (const vault of ctx.vaultManager.allKnownVaults(project.id)) {
               const emb = await vault.storage.readEmbedding(memoryId(a.id));
               if (emb) return { id: a.id, embedding: emb.embedding };
             }
             return null;
-          })
+          }),
         );
-        
+
         const validAnchors = anchorEmbeddings.filter((e): e is NonNullable<typeof e> => e !== null);
-        
+
         if (validAnchors.length > 0) {
           // Get global notes (not project-scoped)
-          const globalEntries = entries.filter(e => !e.note.project);
-          const globalCandidates: Array<{ id: string; title: string; similarity: number; preview: string }> = [];
-          
+          const globalEntries = entries.filter((e) => !e.note.project);
+          const globalCandidates: Array<{
+            id: string;
+            title: string;
+            similarity: number;
+            preview: string;
+          }> = [];
+
           for (const entry of globalEntries) {
             const emb = await entry.vault.storage.readEmbedding(entry.note.id);
             if (!emb) continue;
-            
+
             // Find max similarity to any anchor
             let maxSim = 0;
             for (const anchor of validAnchors) {
-              if (checkEmbeddingCompatibility(emb, currentEmbeddingIdentity, anchor.embedding.length).status !== "compatible") continue;
+              if (
+                checkEmbeddingCompatibility(emb, currentEmbeddingIdentity, anchor.embedding.length)
+                  .status !== "compatible"
+              )
+                continue;
               const sim = safeCosineSimilarity(anchor.embedding, emb.embedding);
               if (sim === undefined) continue;
               if (sim > maxSim) maxSim = sim;
             }
-            
+
             if (maxSim > 0.4) {
               const projection = await entry.vault.storage.readProjection(entry.note.id);
               const preview = projection?.summary
@@ -438,19 +520,21 @@ export function registerProjectMemorySummaryTool(server: McpServer, ctx: ServerC
               });
             }
           }
-          
+
           globalCandidates.sort((a, b) => b.similarity - a.similarity);
-          
+
           if (globalCandidates.length > 0) {
             relatedGlobal = {
               notes: globalCandidates.slice(0, relatedGlobalLimit),
               computedAt: new Date().toISOString(),
             };
-            
+
             sections.push(`\nRelated Global:`);
-            sections.push(...relatedGlobal.notes.map(n => 
-              `- ${n.title} (\`${n.id}\`) — similarity: ${n.similarity.toFixed(2)}`
-            ));
+            sections.push(
+              ...relatedGlobal.notes.map(
+                (n) => `- ${n.title} (\`${n.id}\`) — similarity: ${n.similarity.toFixed(2)}`,
+              ),
+            );
           }
         }
       }
@@ -483,13 +567,15 @@ export function registerProjectMemorySummaryTool(server: McpServer, ctx: ServerC
         const relationships = await getRelationshipPreview(
           note,
           ctx.vaultManager.allKnownVaults(project.id),
-          { activeProjectId: project.id, limit: 3 }
+          { activeProjectId: project.id, limit: 3 },
         );
         return { relationships };
       };
 
       const primaryEnriched = primaryAnchor ? await enrichOrientationNote(primaryAnchor) : {};
-      const primaryRelationships = primaryAnchor ? await enrichOrientationNoteWithRelationships(primaryAnchor) : {};
+      const primaryRelationships = primaryAnchor
+        ? await enrichOrientationNoteWithRelationships(primaryAnchor)
+        : {};
 
       // Select theme-diverse suggestedNext: avoid repeating the primary anchor's theme.
       // Backfills without constraint if not enough theme-distinct candidates exist.
@@ -512,14 +598,26 @@ export function registerProjectMemorySummaryTool(server: McpServer, ctx: ServerC
       }
 
       const suggestedEnriched = await Promise.all(suggestedCandidates.map(enrichOrientationNote));
-      const suggestedRelationships = await Promise.all(suggestedCandidates.map(enrichOrientationNoteWithRelationships));
+      const suggestedRelationships = await Promise.all(
+        suggestedCandidates.map(enrichOrientationNoteWithRelationships),
+      );
 
       const recentPermanent = recent.find((entry) => entry.note.lifecycle === "permanent");
       const fallbackEntry = recentPermanent ?? recent[0];
-      const permanentOverrideUsed = Boolean(recentPermanent && recent[0] && recentPermanent.note.id !== recent[0].note.id);
+      const permanentOverrideUsed = Boolean(
+        recentPermanent && recent[0] && recentPermanent.note.id !== recent[0].note.id,
+      );
 
       // Enrich fallback primaryEntry when no anchors exist
-      let fallbackEnriched: { provenance?: { lastUpdatedAt: string; lastCommitHash: string; lastCommitMessage: string; recentlyChanged: boolean }; confidence?: Confidence } = {};
+      let fallbackEnriched: {
+        provenance?: {
+          lastUpdatedAt: string;
+          lastCommitHash: string;
+          lastCommitMessage: string;
+          recentlyChanged: boolean;
+        };
+        confidence?: Confidence;
+      } = {};
       let fallbackRelationships: { relationships?: RelationshipPreview } = {};
       if (!primaryAnchor && fallbackEntry) {
         const fallbackNote = fallbackEntry.note;
@@ -532,10 +630,10 @@ export function registerProjectMemorySummaryTool(server: McpServer, ctx: ServerC
         }
         const preview = await getRelationshipPreview(
           fallbackNote,
-           ctx.vaultManager.allKnownVaults(project.id),
-           { activeProjectId: project.id, limit: 3 }
-         );
-         if (preview) fallbackRelationships = { relationships: preview };
+          ctx.vaultManager.allKnownVaults(project.id),
+          { activeProjectId: project.id, limit: 3 },
+        );
+        if (preview) fallbackRelationships = { relationships: preview };
       }
 
       const orientation: ProjectSummaryResult["orientation"] = {
@@ -553,8 +651,8 @@ export function registerProjectMemorySummaryTool(server: McpServer, ctx: ServerC
               rationale: permanentOverrideUsed
                 ? "Most recent permanent note — no high-centrality anchors found"
                 : fallbackEntry
-                ? "Most recent note — no high-centrality anchors found"
-                : "Only note available",
+                  ? "Most recent note — no high-centrality anchors found"
+                  : "Only note available",
               ...fallbackEnriched,
               ...fallbackRelationships,
             },
@@ -579,7 +677,9 @@ export function registerProjectMemorySummaryTool(server: McpServer, ctx: ServerC
 
       // Orientation text output
       sections.push(`\nOrientation:`);
-      sections.push(`Start with: ${orientation.primaryEntry.title} (\`${orientation.primaryEntry.id}\`)`);
+      sections.push(
+        `Start with: ${orientation.primaryEntry.title} (\`${orientation.primaryEntry.id}\`)`,
+      );
       sections.push(`  Rationale: ${orientation.primaryEntry.rationale}`);
       if (orientation.primaryEntry.confidence) {
         sections.push(`  Confidence: ${orientation.primaryEntry.confidence}`);
@@ -590,7 +690,9 @@ export function registerProjectMemorySummaryTool(server: McpServer, ctx: ServerC
       if (orientation.suggestedNext.length > 0) {
         sections.push(`Then check:`);
         for (const next of orientation.suggestedNext) {
-          sections.push(`  - ${next.title} (\`${next.id}\`) — ${next.rationale}${next.confidence ? ` [${next.confidence}]` : ""}`);
+          sections.push(
+            `  - ${next.title} (\`${next.id}\`) — ${next.rationale}${next.confidence ? ` [${next.confidence}]` : ""}`,
+          );
           if (next.relationships) {
             sections.push(`    ${formatRelationshipPreview(next.relationships)}`);
           }
@@ -636,7 +738,7 @@ export function registerProjectMemorySummaryTool(server: McpServer, ctx: ServerC
           privateProject: mainVaultProjectEntries.length,
         },
         themes,
-        recent: recent.map(e => ({
+        recent: recent.map((e) => ({
           id: e.note.id,
           title: e.note.title,
           updatedAt: e.note.updatedAt,
@@ -651,6 +753,6 @@ export function registerProjectMemorySummaryTool(server: McpServer, ctx: ServerC
 
       console.error(`[summary:timing] ${(performance.now() - t0Summary).toFixed(1)}ms`);
       return { content: [{ type: "text", text: sections.join("\n") }], structuredContent };
-    }
+    },
   );
 }

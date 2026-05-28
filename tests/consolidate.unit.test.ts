@@ -22,10 +22,20 @@ describe("consolidate helpers", () => {
   it("preserves distinct relationship types when merging source notes", () => {
     const relationships = mergeRelationshipsFromNotes(
       [
-        { relatedTo: [{ id: "target-1", type: "related-to" }, { id: "source-2", type: "related-to" }] },
-        { relatedTo: [{ id: "target-1", type: "explains" }, { id: "target-2", type: "example-of" }] },
+        {
+          relatedTo: [
+            { id: "target-1", type: "related-to" },
+            { id: "source-2", type: "related-to" },
+          ],
+        },
+        {
+          relatedTo: [
+            { id: "target-1", type: "explains" },
+            { id: "target-2", type: "example-of" },
+          ],
+        },
       ],
-      new Set(["source-1", "source-2"])
+      new Set(["source-1", "source-2"]),
     );
 
     expect(relationships).toEqual([
@@ -80,15 +90,21 @@ describe("consolidate helpers", () => {
 
   it("derives merge risk with critical vs non-critical calibration", () => {
     expect(deriveMergeRisk([])).toBe("low");
-    expect(deriveMergeRisk(["temporary research - consider whether it contains unique evidence"])).toBe("medium");
-    expect(deriveMergeRisk(["lifecycle (temporary) differs from group majority (permanent)"])).toBe("medium");
-    expect(deriveMergeRisk(["supersedes 1 other - merging may orphan the supersedes chain"])).toBe("high");
+    expect(
+      deriveMergeRisk(["temporary research - consider whether it contains unique evidence"]),
+    ).toBe("medium");
+    expect(deriveMergeRisk(["lifecycle (temporary) differs from group majority (permanent)"])).toBe(
+      "medium",
+    );
+    expect(deriveMergeRisk(["supersedes 1 other - merging may orphan the supersedes chain"])).toBe(
+      "high",
+    );
     expect(deriveMergeRisk(["target is older than 1 source - stale summary risk"])).toBe("high");
     expect(
       deriveMergeRisk([
         "temporary research - consider whether it contains unique evidence",
         "lifecycle (temporary) differs from group majority (permanent)",
-      ])
+      ]),
     ).toBe("high");
   });
 
@@ -129,7 +145,9 @@ describe("consolidate helpers", () => {
     const warningsA = buildNoteWarnings(noteA, allNotes, noteA);
     const warningsB = buildNoteWarnings(noteB, allNotes, noteA);
 
-    expect(warningsA).toContain("temporary research - consider whether it contains unique evidence");
+    expect(warningsA).toContain(
+      "temporary research - consider whether it contains unique evidence",
+    );
     expect(warningsA).toContain("supersedes 1 other - merging may orphan the supersedes chain");
     expect(warningsA).toContain("target is older than 2 sources - stale summary risk");
     expect(warningsA).toContain("lifecycle (temporary) differs from group majority (permanent)");

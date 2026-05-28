@@ -19,14 +19,17 @@ import { embedModel } from "../src/embeddings.js";
 import { RecallResultSchema } from "../src/structured-content.js";
 
 describe("recall-embeddings", () => {
-  async function writeSeedNote(vaultDir: string, note: {
-    id: string;
-    title: string;
-    content: string;
-    tags?: string[];
-    lifecycle?: "temporary" | "permanent";
-    updatedAt?: string;
-  }): Promise<void> {
+  async function writeSeedNote(
+    vaultDir: string,
+    note: {
+      id: string;
+      title: string;
+      content: string;
+      tags?: string[];
+      lifecycle?: "temporary" | "permanent";
+      updatedAt?: string;
+    },
+  ): Promise<void> {
     await mkdir(path.join(vaultDir, "notes"), { recursive: true });
     await writeFile(
       path.join(vaultDir, "notes", `${note.id}.md`),
@@ -44,16 +47,24 @@ ${note.content}`,
     );
   }
 
-  async function writeSeedEmbedding(vaultDir: string, id: string, embedding: number[]): Promise<void> {
+  async function writeSeedEmbedding(
+    vaultDir: string,
+    id: string,
+    embedding: number[],
+  ): Promise<void> {
     await mkdir(path.join(vaultDir, "embeddings"), { recursive: true });
-      await writeFile(
-        path.join(vaultDir, "embeddings", `${id}.json`),
-        JSON.stringify({
+    await writeFile(
+      path.join(vaultDir, "embeddings", `${id}.json`),
+      JSON.stringify(
+        {
           id,
           model: embedModel,
           embedding,
           updatedAt: "2026-01-01T00:00:00.000Z",
-        }, null, 2),
+        },
+        null,
+        2,
+      ),
       "utf-8",
     );
   }
@@ -81,12 +92,19 @@ This note has no embedding yet and should be found via recall.`,
     const embeddingServer = await startFakeEmbeddingServer();
 
     try {
-      const recallText = await callLocalMcp(vaultDir, "recall", {
-        query: "lazy backfill recall",
-      }, embeddingServer.url);
+      const recallText = await callLocalMcp(
+        vaultDir,
+        "recall",
+        {
+          query: "lazy backfill recall",
+        },
+        embeddingServer.url,
+      );
 
       expect(recallText).toContain("Lazy backfill recall note");
-      await expect(stat(path.join(vaultDir, "embeddings", "backfill-recall-note.json"))).resolves.toBeDefined();
+      await expect(
+        stat(path.join(vaultDir, "embeddings", "backfill-recall-note.json")),
+      ).resolves.toBeDefined();
     } finally {
       await embeddingServer.close();
     }
@@ -99,29 +117,39 @@ This note has no embedding yet and should be found via recall.`,
     const embeddingServer = await startFakeOpenAICompatibleEmbeddingServer();
 
     try {
-      await callLocalMcp(vaultDir, "remember", {
-        title: "OpenAI compatible recall note",
-        content: "This note uses the OpenAI compatible embedding transport.",
-        tags: ["integration"],
-        scope: "global",
-        summary: "Seed OpenAI compatible provider test",
-      }, {
-        env: {
-          EMBED_PROVIDER: "openai-compatible",
-          EMBED_BASE_URL: embeddingServer.url,
-          EMBED_MODEL: "fake-openai-compatible-model",
+      await callLocalMcp(
+        vaultDir,
+        "remember",
+        {
+          title: "OpenAI compatible recall note",
+          content: "This note uses the OpenAI compatible embedding transport.",
+          tags: ["integration"],
+          scope: "global",
+          summary: "Seed OpenAI compatible provider test",
         },
-      });
+        {
+          env: {
+            EMBED_PROVIDER: "openai-compatible",
+            EMBED_BASE_URL: embeddingServer.url,
+            EMBED_MODEL: "fake-openai-compatible-model",
+          },
+        },
+      );
 
-      const recallText = await callLocalMcp(vaultDir, "recall", {
-        query: "OpenAI compatible recall",
-      }, {
-        env: {
-          EMBED_PROVIDER: "openai-compatible",
-          EMBED_BASE_URL: embeddingServer.url,
-          EMBED_MODEL: "fake-openai-compatible-model",
+      const recallText = await callLocalMcp(
+        vaultDir,
+        "recall",
+        {
+          query: "OpenAI compatible recall",
         },
-      });
+        {
+          env: {
+            EMBED_PROVIDER: "openai-compatible",
+            EMBED_BASE_URL: embeddingServer.url,
+            EMBED_MODEL: "fake-openai-compatible-model",
+          },
+        },
+      );
 
       expect(recallText).toContain("OpenAI compatible recall note");
     } finally {
@@ -136,29 +164,39 @@ This note has no embedding yet and should be found via recall.`,
     const embeddingServer = await startFakeGeminiEmbeddingServer();
 
     try {
-      await callLocalMcp(vaultDir, "remember", {
-        title: "Gemini recall note",
-        content: "This note uses the Gemini embedding transport.",
-        tags: ["integration"],
-        scope: "global",
-        summary: "Seed Gemini provider test",
-      }, {
-        env: {
-          EMBED_PROVIDER: "gemini",
-          GEMINI_BASE_URL: embeddingServer.url,
-          GEMINI_API_KEY: "fake-gemini-key",
+      await callLocalMcp(
+        vaultDir,
+        "remember",
+        {
+          title: "Gemini recall note",
+          content: "This note uses the Gemini embedding transport.",
+          tags: ["integration"],
+          scope: "global",
+          summary: "Seed Gemini provider test",
         },
-      });
+        {
+          env: {
+            EMBED_PROVIDER: "gemini",
+            GEMINI_BASE_URL: embeddingServer.url,
+            GEMINI_API_KEY: "fake-gemini-key",
+          },
+        },
+      );
 
-      const recallText = await callLocalMcp(vaultDir, "recall", {
-        query: "Gemini recall",
-      }, {
-        env: {
-          EMBED_PROVIDER: "gemini",
-          GEMINI_BASE_URL: embeddingServer.url,
-          GEMINI_API_KEY: "fake-gemini-key",
+      const recallText = await callLocalMcp(
+        vaultDir,
+        "recall",
+        {
+          query: "Gemini recall",
         },
-      });
+        {
+          env: {
+            EMBED_PROVIDER: "gemini",
+            GEMINI_BASE_URL: embeddingServer.url,
+            GEMINI_API_KEY: "fake-gemini-key",
+          },
+        },
+      );
 
       expect(recallText).toContain("Gemini recall note");
     } finally {
@@ -172,13 +210,18 @@ This note has no embedding yet and should be found via recall.`,
     const embeddingServer = await startFakeEmbeddingServer();
 
     try {
-      const rememberText = await callLocalMcp(vaultDir, "remember", {
-        title: "Staleness detection note",
-        content: "Original content before direct edit.",
-        tags: ["integration"],
-        scope: "global",
-        summary: "Seed note for staleness detection test",
-      }, embeddingServer.url);
+      const rememberText = await callLocalMcp(
+        vaultDir,
+        "remember",
+        {
+          title: "Staleness detection note",
+          content: "Original content before direct edit.",
+          tags: ["integration"],
+          scope: "global",
+          summary: "Seed note for staleness detection test",
+        },
+        embeddingServer.url,
+      );
 
       const noteId = extractRememberedId(rememberText);
       const embeddingPath = path.join(vaultDir, "embeddings", `${noteId}.json`);
@@ -204,13 +247,18 @@ This note has no embedding yet and should be found via recall.`,
     const embeddingServer = await startFakeEmbeddingServer();
 
     try {
-      const rememberText = await callLocalMcp(vaultDir, "remember", {
-        title: "Offline recall note",
-        content: "This note has an embedding and should be found even when Ollama is down.",
-        tags: ["integration"],
-        scope: "global",
-        summary: "Seed note for offline recall test",
-      }, embeddingServer.url);
+      const rememberText = await callLocalMcp(
+        vaultDir,
+        "remember",
+        {
+          title: "Offline recall note",
+          content: "This note has an embedding and should be found even when Ollama is down.",
+          tags: ["integration"],
+          scope: "global",
+          summary: "Seed note for offline recall test",
+        },
+        embeddingServer.url,
+      );
 
       const noteId = extractRememberedId(rememberText);
 
@@ -230,13 +278,22 @@ This note has no embedding.`,
         "utf-8",
       );
 
-      const recallText = await callLocalMcp(vaultDir, "recall", {
-        query: "offline recall note",
-      }, embeddingServer.url);
+      const recallText = await callLocalMcp(
+        vaultDir,
+        "recall",
+        {
+          query: "offline recall note",
+        },
+        embeddingServer.url,
+      );
 
       expect(recallText).toContain("Offline recall note");
-      await expect(stat(path.join(vaultDir, "embeddings", "no-embedding-note.json"))).resolves.toBeDefined();
-      await expect(stat(path.join(vaultDir, "embeddings", `${noteId}.json`))).resolves.toBeDefined();
+      await expect(
+        stat(path.join(vaultDir, "embeddings", "no-embedding-note.json")),
+      ).resolves.toBeDefined();
+      await expect(
+        stat(path.join(vaultDir, "embeddings", `${noteId}.json`)),
+      ).resolves.toBeDefined();
     } finally {
       await embeddingServer.close();
     }
@@ -248,13 +305,18 @@ This note has no embedding.`,
     const embeddingServer = await startFakeEmbeddingServer();
 
     try {
-      const rememberText = await callLocalMcp(vaultDir, "remember", {
-        title: "Get by ID test note",
-        content: "Content for get operation.",
-        tags: ["integration"],
-        scope: "global",
-        summary: "Create note for get test",
-      }, embeddingServer.url);
+      const rememberText = await callLocalMcp(
+        vaultDir,
+        "remember",
+        {
+          title: "Get by ID test note",
+          content: "Content for get operation.",
+          tags: ["integration"],
+          scope: "global",
+          summary: "Create note for get test",
+        },
+        embeddingServer.url,
+      );
 
       const noteId = extractRememberedId(rememberText);
 
@@ -286,18 +348,28 @@ This note has no embedding.`,
     const embeddingServer = await startFakeEmbeddingServer();
 
     try {
-      const rememberText = await callLocalMcp(vaultDir, "remember", {
-        title: "Where is test note",
-        content: "Note for where_is_memory test.",
-        tags: ["integration"],
-        cwd: repoDir,
-        scope: "project",
-        summary: "Create note for where_is_memory test",
-      }, embeddingServer.url);
+      const rememberText = await callLocalMcp(
+        vaultDir,
+        "remember",
+        {
+          title: "Where is test note",
+          content: "Note for where_is_memory test.",
+          tags: ["integration"],
+          cwd: repoDir,
+          scope: "project",
+          summary: "Create note for where_is_memory test",
+        },
+        embeddingServer.url,
+      );
 
       const noteId = extractRememberedId(rememberText);
 
-      const whereText = await callLocalMcp(vaultDir, "where_is_memory", { id: noteId, cwd: repoDir }, embeddingServer.url);
+      const whereText = await callLocalMcp(
+        vaultDir,
+        "where_is_memory",
+        { id: noteId, cwd: repoDir },
+        embeddingServer.url,
+      );
 
       expect(whereText).toContain(noteId);
       expect(whereText).toContain("project-vault");
@@ -314,19 +386,29 @@ This note has no embedding.`,
     try {
       await initTestVaultRepo(vaultDir);
 
-      await callLocalMcp(vaultDir, "remember", {
-        title: "Temporal recall schema audit test",
-        content: "Testing temporal recall history output.",
-        tags: ["audit", "temporal"],
-        lifecycle: "permanent",
-        scope: "global",
-        summary: "Seed note for temporal recall schema audit",
-      }, { ollamaUrl: embeddingServer.url, disableGit: false });
+      await callLocalMcp(
+        vaultDir,
+        "remember",
+        {
+          title: "Temporal recall schema audit test",
+          content: "Testing temporal recall history output.",
+          tags: ["audit", "temporal"],
+          lifecycle: "permanent",
+          scope: "global",
+          summary: "Seed note for temporal recall schema audit",
+        },
+        { ollamaUrl: embeddingServer.url, disableGit: false },
+      );
 
-      const response = await callLocalMcpResponse(vaultDir, "recall", {
-        query: "temporal recall schema audit",
-        mode: "temporal",
-      }, embeddingServer.url);
+      const response = await callLocalMcpResponse(
+        vaultDir,
+        "recall",
+        {
+          query: "temporal recall schema audit",
+          mode: "temporal",
+        },
+        embeddingServer.url,
+      );
 
       const structured = response.structuredContent;
       const results = structured?.["results"] as Array<Record<string, unknown>>;
@@ -366,35 +448,55 @@ This note has no embedding.`,
     const embeddingServer = await startFakeEmbeddingServer();
 
     try {
-      const parent = await callLocalMcpResponse(vaultDir, "remember", {
-        title: "Workflow parent note",
-        content: "Root context for workflow chain.",
-        tags: ["workflow"],
-        lifecycle: "temporary",
-        scope: "global",
-        summary: "Create workflow parent",
-      }, embeddingServer.url);
+      const parent = await callLocalMcpResponse(
+        vaultDir,
+        "remember",
+        {
+          title: "Workflow parent note",
+          content: "Root context for workflow chain.",
+          tags: ["workflow"],
+          lifecycle: "temporary",
+          scope: "global",
+          summary: "Create workflow parent",
+        },
+        embeddingServer.url,
+      );
 
-      const child = await callLocalMcpResponse(vaultDir, "remember", {
-        title: "Workflow child note",
-        content: "Plan step connected by legacy related-to.",
-        tags: ["workflow"],
-        lifecycle: "temporary",
-        scope: "global",
-        summary: "Create workflow child",
-      }, embeddingServer.url);
+      const child = await callLocalMcpResponse(
+        vaultDir,
+        "remember",
+        {
+          title: "Workflow child note",
+          content: "Plan step connected by legacy related-to.",
+          tags: ["workflow"],
+          lifecycle: "temporary",
+          scope: "global",
+          summary: "Create workflow child",
+        },
+        embeddingServer.url,
+      );
 
-      await callLocalMcpResponse(vaultDir, "relate", {
-        fromId: child.structuredContent?.id,
-        toId: parent.structuredContent?.id,
-        type: "related-to",
-      }, embeddingServer.url);
+      await callLocalMcpResponse(
+        vaultDir,
+        "relate",
+        {
+          fromId: child.structuredContent?.id,
+          toId: parent.structuredContent?.id,
+          type: "related-to",
+        },
+        embeddingServer.url,
+      );
 
-      const response = await callLocalMcpResponse(vaultDir, "recall", {
-        query: "workflow child plan step",
-        mode: "workflow",
-        limit: 3,
-      }, embeddingServer.url);
+      const response = await callLocalMcpResponse(
+        vaultDir,
+        "recall",
+        {
+          query: "workflow child plan step",
+          mode: "workflow",
+          limit: 3,
+        },
+        embeddingServer.url,
+      );
 
       const parsed = RecallResultSchema.parse(response.structuredContent);
       expect(parsed.results.length).toBeGreaterThan(0);
@@ -412,20 +514,30 @@ This note has no embedding.`,
     try {
       await initTestVaultRepo(vaultDir);
 
-      await callLocalMcp(vaultDir, "remember", {
-        title: "Temporal cap test note",
-        content: "Testing temporal history cap.",
-        tags: ["audit", "temporal"],
-        lifecycle: "permanent",
-        scope: "global",
-        summary: "Seed note for temporal cap test",
-      }, { ollamaUrl: embeddingServer.url, disableGit: false });
+      await callLocalMcp(
+        vaultDir,
+        "remember",
+        {
+          title: "Temporal cap test note",
+          content: "Testing temporal history cap.",
+          tags: ["audit", "temporal"],
+          lifecycle: "permanent",
+          scope: "global",
+          summary: "Seed note for temporal cap test",
+        },
+        { ollamaUrl: embeddingServer.url, disableGit: false },
+      );
 
-      const response = await callLocalMcpResponse(vaultDir, "recall", {
-        query: "temporal cap test",
-        mode: "temporal",
-        limit: 1,
-      }, embeddingServer.url);
+      const response = await callLocalMcpResponse(
+        vaultDir,
+        "recall",
+        {
+          query: "temporal cap test",
+          mode: "temporal",
+          limit: 1,
+        },
+        embeddingServer.url,
+      );
 
       const results = response.structuredContent?.["results"] as Array<Record<string, unknown>>;
       expect(results).toBeDefined();
@@ -443,18 +555,28 @@ This note has no embedding.`,
     try {
       await initTestVaultRepo(vaultDir);
 
-      await callLocalMcp(vaultDir, "remember", {
-        title: "Plain recall temporal absent test",
-        content: "Testing plain recall mode.",
-        tags: ["audit", "temporal"],
-        lifecycle: "permanent",
-        scope: "global",
-        summary: "Seed note for plain recall test",
-      }, { ollamaUrl: embeddingServer.url, disableGit: false });
+      await callLocalMcp(
+        vaultDir,
+        "remember",
+        {
+          title: "Plain recall temporal absent test",
+          content: "Testing plain recall mode.",
+          tags: ["audit", "temporal"],
+          lifecycle: "permanent",
+          scope: "global",
+          summary: "Seed note for plain recall test",
+        },
+        { ollamaUrl: embeddingServer.url, disableGit: false },
+      );
 
-      const response = await callLocalMcpResponse(vaultDir, "recall", {
-        query: "plain recall temporal absent",
-      }, embeddingServer.url);
+      const response = await callLocalMcpResponse(
+        vaultDir,
+        "recall",
+        {
+          query: "plain recall temporal absent",
+        },
+        embeddingServer.url,
+      );
 
       const structured = response.structuredContent;
       expect(structured?.["mode"]).toBeUndefined();
@@ -496,11 +618,16 @@ This note has no embedding.`,
       await writeSeedEmbedding(vaultDir, "fresh-temporal-semantic", [0.1, 0.2, 0.3]);
       await writeSeedEmbedding(vaultDir, "stale-temporal-semantic", [0.1, 0.2, 0.3]);
 
-      const response = await callLocalMcpResponse(vaultDir, "recall", {
-        query: "show recall changes from the last 7 days",
-        limit: 10,
-        scope: "global",
-      }, embeddingServer.url);
+      const response = await callLocalMcpResponse(
+        vaultDir,
+        "recall",
+        {
+          query: "show recall changes from the last 7 days",
+          limit: 10,
+          scope: "global",
+        },
+        embeddingServer.url,
+      );
 
       const parsed = RecallResultSchema.parse(response.structuredContent);
       const ids = parsed.results.map((result) => result.id);
@@ -540,11 +667,16 @@ This note has no embedding.`,
       await writeSeedEmbedding(vaultDir, "fresh-temporal-boost", [0.1, 0.2, 0.3]);
       await writeSeedEmbedding(vaultDir, "stale-temporal-boost", [0.1, 0.2, 0.3]);
 
-      const response = await callLocalMcpResponse(vaultDir, "recall", {
-        query: "what changed this week in recall",
-        limit: 10,
-        scope: "global",
-      }, embeddingServer.url);
+      const response = await callLocalMcpResponse(
+        vaultDir,
+        "recall",
+        {
+          query: "what changed this week in recall",
+          limit: 10,
+          scope: "global",
+        },
+        embeddingServer.url,
+      );
 
       const parsed = RecallResultSchema.parse(response.structuredContent);
       const ids = parsed.results.map((result) => result.id);
@@ -585,11 +717,16 @@ This note has no embedding.`,
       await writeSeedEmbedding(vaultDir, "fresh-temporal-rescue", [-0.1, -0.2, -0.3]);
       await writeSeedEmbedding(vaultDir, "stale-temporal-rescue", [-0.1, -0.2, -0.3]);
 
-      const response = await callLocalMcpResponse(vaultDir, "recall", {
-        query: "projectiontext recovery in the last 7 days",
-        limit: 10,
-        scope: "global",
-      }, embeddingServer.url);
+      const response = await callLocalMcpResponse(
+        vaultDir,
+        "recall",
+        {
+          query: "projectiontext recovery in the last 7 days",
+          limit: 10,
+          scope: "global",
+        },
+        embeddingServer.url,
+      );
 
       const parsed = RecallResultSchema.parse(response.structuredContent);
       const ids = parsed.results.map((result) => result.id);
@@ -607,18 +744,28 @@ This note has no embedding.`,
     const embeddingServer = await startFakeEmbeddingServer();
 
     try {
-      await callLocalMcp(vaultDir, "remember", {
-        title: "Schema audit recall test",
-        content: "Testing provenance and confidence in recall.",
-        tags: ["audit", "recall"],
-        lifecycle: "permanent",
-        scope: "global",
-        summary: "Seed note for recall schema audit",
-      }, embeddingServer.url);
+      await callLocalMcp(
+        vaultDir,
+        "remember",
+        {
+          title: "Schema audit recall test",
+          content: "Testing provenance and confidence in recall.",
+          tags: ["audit", "recall"],
+          lifecycle: "permanent",
+          scope: "global",
+          summary: "Seed note for recall schema audit",
+        },
+        embeddingServer.url,
+      );
 
-      const response = await callLocalMcpResponse(vaultDir, "recall", {
-        query: "schema audit recall test",
-      }, embeddingServer.url);
+      const response = await callLocalMcpResponse(
+        vaultDir,
+        "recall",
+        {
+          query: "schema audit recall test",
+        },
+        embeddingServer.url,
+      );
 
       expect(() => RecallResultSchema.parse(response.structuredContent)).not.toThrow();
       const parsed = RecallResultSchema.parse(response.structuredContent);
@@ -640,7 +787,8 @@ This note has no embedding.`,
       await writeSeedNote(vaultDir, {
         id: "semantic-target",
         title: "CI learning promotion guidance",
-        content: "We promote CI failure learnings into durable notes after triage so useful lessons are preserved.",
+        content:
+          "We promote CI failure learnings into durable notes after triage so useful lessons are preserved.",
         tags: ["ci", "learning", "design"],
       });
       await writeSeedNote(vaultDir, {
@@ -653,11 +801,16 @@ This note has no embedding.`,
       await writeSeedEmbedding(vaultDir, "semantic-target", [0.1, 0.2, 0.3]);
       await writeSeedEmbedding(vaultDir, "lexical-decoy", [0.05, 0.1, 0.15]);
 
-      const response = await callLocalMcpResponse(vaultDir, "recall", {
-        query: "how we handle promotion of CI learnings",
-        limit: 2,
-        scope: "global",
-      }, embeddingServer.url);
+      const response = await callLocalMcpResponse(
+        vaultDir,
+        "recall",
+        {
+          query: "how we handle promotion of CI learnings",
+          limit: 2,
+          scope: "global",
+        },
+        embeddingServer.url,
+      );
 
       const parsed = RecallResultSchema.parse(response.structuredContent);
       expect(parsed.results).toHaveLength(2);
@@ -677,7 +830,8 @@ This note has no embedding.`,
       await writeSeedNote(vaultDir, {
         id: "projection-doc",
         title: "Projection layer notes",
-        content: "ProjectionText staleness handling for derived retrieval text and cache refresh behavior.",
+        content:
+          "ProjectionText staleness handling for derived retrieval text and cache refresh behavior.",
         tags: ["projection", "design"],
       });
       await writeSeedNote(vaultDir, {
@@ -697,11 +851,16 @@ This note has no embedding.`,
         await writeSeedEmbedding(vaultDir, id, [-0.1, -0.2, -0.3]);
       }
 
-      const response = await callLocalMcpResponse(vaultDir, "recall", {
-        query: "projectiontext staleness",
-        limit: 3,
-        scope: "global",
-      }, embeddingServer.url);
+      const response = await callLocalMcpResponse(
+        vaultDir,
+        "recall",
+        {
+          query: "projectiontext staleness",
+          limit: 3,
+          scope: "global",
+        },
+        embeddingServer.url,
+      );
 
       const parsed = RecallResultSchema.parse(response.structuredContent);
       expect(parsed.results.length).toBeGreaterThanOrEqual(1);
@@ -734,11 +893,16 @@ This note has no embedding.`,
       await writeSeedEmbedding(vaultDir, "english-decoy", [0.2, 0.05, -0.1]);
       await writeSeedEmbedding(vaultDir, "italian-target", [0.1, 0.2, 0.3]);
 
-      const response = await callLocalMcpResponse(vaultDir, "recall", {
-        query: "how we handle promotion of CI learnings",
-        limit: 2,
-        scope: "global",
-      }, embeddingServer.url);
+      const response = await callLocalMcpResponse(
+        vaultDir,
+        "recall",
+        {
+          query: "how we handle promotion of CI learnings",
+          limit: 2,
+          scope: "global",
+        },
+        embeddingServer.url,
+      );
 
       const parsed = RecallResultSchema.parse(response.structuredContent);
       expect(parsed.results).toHaveLength(1);
@@ -770,11 +934,16 @@ This note has no embedding.`,
       await writeSeedEmbedding(vaultDir, "a-unrelated", [0.1, 0.2, 0.3]);
       await writeSeedEmbedding(vaultDir, "b-target", [0.1, 0.2, 0.3]);
 
-      const response = await callLocalMcpResponse(vaultDir, "recall", {
-        query: "hybrid recall design",
-        limit: 2,
-        scope: "global",
-      }, embeddingServer.url);
+      const response = await callLocalMcpResponse(
+        vaultDir,
+        "recall",
+        {
+          query: "hybrid recall design",
+          limit: 2,
+          scope: "global",
+        },
+        embeddingServer.url,
+      );
 
       const parsed = RecallResultSchema.parse(response.structuredContent);
       expect(parsed.results).toHaveLength(2);
@@ -820,11 +989,16 @@ This note has no embedding.`,
         await writeSeedEmbedding(vaultDir, id, [-0.1, -0.2, -0.3]);
       }
 
-      const response = await callLocalMcpResponse(vaultDir, "recall", {
-        query: "hybrid recall design",
-        limit: 3,
-        scope: "global",
-      }, embeddingServer.url);
+      const response = await callLocalMcpResponse(
+        vaultDir,
+        "recall",
+        {
+          query: "hybrid recall design",
+          limit: 3,
+          scope: "global",
+        },
+        embeddingServer.url,
+      );
 
       const parsed = RecallResultSchema.parse(response.structuredContent);
       expect(parsed.results.length).toBeGreaterThanOrEqual(1);
@@ -855,16 +1029,22 @@ This note has no embedding.`,
       await writeSeedNote(vaultDir, {
         id: "z-strong-target",
         title: "ProjectionText staleness design",
-        content: "ProjectionText staleness handling for derived retrieval text and precise rescue behavior.",
+        content:
+          "ProjectionText staleness handling for derived retrieval text and precise rescue behavior.",
         tags: ["projection", "design"],
       });
       await writeSeedEmbedding(vaultDir, "z-strong-target", [-0.1, -0.2, -0.3]);
 
-      const response = await callLocalMcpResponse(vaultDir, "recall", {
-        query: "projectiontext staleness",
-        limit: 3,
-        scope: "global",
-      }, embeddingServer.url);
+      const response = await callLocalMcpResponse(
+        vaultDir,
+        "recall",
+        {
+          query: "projectiontext staleness",
+          limit: 3,
+          scope: "global",
+        },
+        embeddingServer.url,
+      );
 
       const parsed = RecallResultSchema.parse(response.structuredContent);
       expect(parsed.results.length).toBeGreaterThanOrEqual(1);
@@ -883,30 +1063,47 @@ This note has no embedding.`,
     const embeddingServer = await startFakeEmbeddingServer();
 
     try {
-      await callLocalMcp(vaultDir, "remember", {
-        title: "Key design decisions",
-        content: "Embeddings are gitignored because they are derived data and can be rebuilt.\n\n## Decision\nKeep derived artifacts out of git.\n\n## Rationale\nGit should track durable source-of-truth notes, not rebuildable machine output.",
-        tags: ["design"],
-        cwd: repoDir,
-        scope: "project",
-        summary: "Add canonical design explanation note",
-      }, embeddingServer.url);
+      await callLocalMcp(
+        vaultDir,
+        "remember",
+        {
+          title: "Key design decisions",
+          content:
+            "Embeddings are gitignored because they are derived data and can be rebuilt.\n\n## Decision\nKeep derived artifacts out of git.\n\n## Rationale\nGit should track durable source-of-truth notes, not rebuildable machine output.",
+          tags: ["design"],
+          cwd: repoDir,
+          scope: "project",
+          summary: "Add canonical design explanation note",
+        },
+        embeddingServer.url,
+      );
 
-      await callLocalMcp(vaultDir, "remember", {
-        title: "Sync redesign",
-        content: "Embeddings sync redesign and reindex behavior. This note discusses when embeddings are regenerated during sync.",
-        tags: ["sync"],
-        cwd: repoDir,
-        scope: "project",
-        summary: "Add incidental embeddings note",
-      }, embeddingServer.url);
+      await callLocalMcp(
+        vaultDir,
+        "remember",
+        {
+          title: "Sync redesign",
+          content:
+            "Embeddings sync redesign and reindex behavior. This note discusses when embeddings are regenerated during sync.",
+          tags: ["sync"],
+          cwd: repoDir,
+          scope: "project",
+          summary: "Add incidental embeddings note",
+        },
+        embeddingServer.url,
+      );
 
-      const response = await callLocalMcpResponse(vaultDir, "recall", {
-        query: "why are embeddings gitignored",
-        cwd: repoDir,
-        scope: "all",
-        limit: 3,
-      }, embeddingServer.url);
+      const response = await callLocalMcpResponse(
+        vaultDir,
+        "recall",
+        {
+          query: "why are embeddings gitignored",
+          cwd: repoDir,
+          scope: "all",
+          limit: 3,
+        },
+        embeddingServer.url,
+      );
 
       const parsed = RecallResultSchema.parse(response.structuredContent);
       expect(parsed.results[0]?.title).toBe("Key design decisions");
@@ -924,30 +1121,47 @@ This note has no embedding.`,
     const embeddingServer = await startFakeEmbeddingServer();
 
     try {
-      await callLocalMcp(vaultDir, "remember", {
-        title: "API endpoint port",
-        content: "The local API listens on port 4317 and the port can be changed via configuration.",
-        tags: ["fact"],
-        cwd: repoDir,
-        scope: "project",
-        summary: "Add direct answer note",
-      }, embeddingServer.url);
+      await callLocalMcp(
+        vaultDir,
+        "remember",
+        {
+          title: "API endpoint port",
+          content:
+            "The local API listens on port 4317 and the port can be changed via configuration.",
+          tags: ["fact"],
+          cwd: repoDir,
+          scope: "project",
+          summary: "Add direct answer note",
+        },
+        embeddingServer.url,
+      );
 
-      await callLocalMcp(vaultDir, "remember", {
-        title: "System overview",
-        content: "This note explains architecture, decisions, and system context in a broad durable form.",
-        tags: ["overview"],
-        cwd: repoDir,
-        scope: "project",
-        summary: "Add overview note",
-      }, embeddingServer.url);
+      await callLocalMcp(
+        vaultDir,
+        "remember",
+        {
+          title: "System overview",
+          content:
+            "This note explains architecture, decisions, and system context in a broad durable form.",
+          tags: ["overview"],
+          cwd: repoDir,
+          scope: "project",
+          summary: "Add overview note",
+        },
+        embeddingServer.url,
+      );
 
-      const response = await callLocalMcpResponse(vaultDir, "recall", {
-        query: "what port does the local api use",
-        cwd: repoDir,
-        scope: "all",
-        limit: 3,
-      }, embeddingServer.url);
+      const response = await callLocalMcpResponse(
+        vaultDir,
+        "recall",
+        {
+          query: "what port does the local api use",
+          cwd: repoDir,
+          scope: "all",
+          limit: 3,
+        },
+        embeddingServer.url,
+      );
 
       const parsed = RecallResultSchema.parse(response.structuredContent);
       expect(parsed.results[0]?.title).toBe("API endpoint port");
@@ -962,54 +1176,81 @@ This note has no embedding.`,
     const embeddingServer = await startFakeEmbeddingServer();
 
     try {
-      const sourceText = await callLocalMcp(vaultDir, "remember", {
-        title: "Recall evidence source",
-        content: "This note explains recall evidence ranking and supersession lineage.",
-        tags: ["evidence", "recall"],
-        lifecycle: "permanent",
-        scope: "global",
-        summary: "Create source note for recall evidence",
-      }, embeddingServer.url);
+      const sourceText = await callLocalMcp(
+        vaultDir,
+        "remember",
+        {
+          title: "Recall evidence source",
+          content: "This note explains recall evidence ranking and supersession lineage.",
+          tags: ["evidence", "recall"],
+          lifecycle: "permanent",
+          scope: "global",
+          summary: "Create source note for recall evidence",
+        },
+        embeddingServer.url,
+      );
       const sourceId = extractRememberedId(sourceText);
 
-      const childText = await callLocalMcp(vaultDir, "remember", {
-        title: "Recall evidence child",
-        content: "Older fragment superseded by the recall evidence source note.",
-        tags: ["evidence", "recall"],
-        lifecycle: "temporary",
-        scope: "global",
-        summary: "Create child note for recall evidence",
-      }, embeddingServer.url);
+      const childText = await callLocalMcp(
+        vaultDir,
+        "remember",
+        {
+          title: "Recall evidence child",
+          content: "Older fragment superseded by the recall evidence source note.",
+          tags: ["evidence", "recall"],
+          lifecycle: "temporary",
+          scope: "global",
+          summary: "Create child note for recall evidence",
+        },
+        embeddingServer.url,
+      );
       const childId = extractRememberedId(childText);
 
-      await callLocalMcp(vaultDir, "relate", {
-        fromId: sourceId,
-        toId: childId,
-        type: "supersedes",
-        bidirectional: false,
-      }, embeddingServer.url);
+      await callLocalMcp(
+        vaultDir,
+        "relate",
+        {
+          fromId: sourceId,
+          toId: childId,
+          type: "supersedes",
+          bidirectional: false,
+        },
+        embeddingServer.url,
+      );
 
-      const defaultResponse = await callLocalMcpResponse(vaultDir, "recall", {
-        query: "Recall evidence source",
-        scope: "global",
-      }, embeddingServer.url);
+      const defaultResponse = await callLocalMcpResponse(
+        vaultDir,
+        "recall",
+        {
+          query: "Recall evidence source",
+          scope: "global",
+        },
+        embeddingServer.url,
+      );
       const defaultParsed = RecallResultSchema.parse(defaultResponse.structuredContent);
       const defaultMatch = defaultParsed.results.find((result) => result.id === sourceId);
       expect(defaultMatch).toBeDefined();
       expect(defaultMatch?.retrievalEvidence).toBeUndefined();
       expect(defaultResponse.text).not.toContain("channels:");
 
-      const evidenceResponse = await callLocalMcpResponse(vaultDir, "recall", {
-        query: "Recall evidence source",
-        scope: "global",
-        evidence: "compact",
-      }, embeddingServer.url);
+      const evidenceResponse = await callLocalMcpResponse(
+        vaultDir,
+        "recall",
+        {
+          query: "Recall evidence source",
+          scope: "global",
+          evidence: "compact",
+        },
+        embeddingServer.url,
+      );
       const evidenceParsed = RecallResultSchema.parse(evidenceResponse.structuredContent);
       const evidenceMatch = evidenceParsed.results.find((result) => result.id === sourceId);
       expect(evidenceMatch?.retrievalEvidence).toBeDefined();
       expect(evidenceMatch?.retrievalEvidence?.channels.length).toBeGreaterThan(0);
       expect(["top3", "top10", "lower"]).toContain(evidenceMatch?.retrievalEvidence?.rankBand);
-      expect(["today", "thisWeek", "thisMonth", "older"]).toContain(evidenceMatch?.retrievalEvidence?.freshness);
+      expect(["today", "thisWeek", "thisMonth", "older"]).toContain(
+        evidenceMatch?.retrievalEvidence?.freshness,
+      );
       expect(evidenceMatch?.retrievalEvidence?.projectRelevant).toBe(false);
       expect(evidenceMatch?.retrievalEvidence?.superseded).toBe(true);
       expect(evidenceMatch?.retrievalEvidence?.supersededBy).toBe(childId);
@@ -1031,20 +1272,31 @@ This note has no embedding.`,
       tempDirs.push(repoDir);
       await initTestRepo(repoDir);
 
-      await callLocalMcp(vaultDir, "remember", {
-        title: "Confidence text output test",
-        content: "This note should show confidence in the text rendering of non-temporal recall results.",
-        tags: ["confidence", "text-rendering"],
-        lifecycle: "permanent",
-        scope: "project",
-        cwd: repoDir,
-        summary: "Seed note for confidence text rendering test",
-      }, embeddingServer.url);
+      await callLocalMcp(
+        vaultDir,
+        "remember",
+        {
+          title: "Confidence text output test",
+          content:
+            "This note should show confidence in the text rendering of non-temporal recall results.",
+          tags: ["confidence", "text-rendering"],
+          lifecycle: "permanent",
+          scope: "project",
+          cwd: repoDir,
+          summary: "Seed note for confidence text rendering test",
+        },
+        embeddingServer.url,
+      );
 
-      const response = await callLocalMcpResponse(vaultDir, "recall", {
-        query: "confidence text output",
-        cwd: repoDir,
-      }, embeddingServer.url);
+      const response = await callLocalMcpResponse(
+        vaultDir,
+        "recall",
+        {
+          query: "confidence text output",
+          cwd: repoDir,
+        },
+        embeddingServer.url,
+      );
 
       expect(response.text).toMatch(/\*\*confidence:\*\*\s*(high|medium|low)/i);
       expect(response.text).toContain("confidence:");
@@ -1063,34 +1315,49 @@ This note has no embedding.`,
       tempDirs.push(repoDir);
       await initTestRepo(repoDir);
 
-      await callLocalMcp(vaultDir, "remember", {
-        title: "Diagnostics Text Anchor",
-        content: "A summary note marked alwaysLoad to anchor coverage text output testing.",
-        tags: ["diagnostics", "text"],
-        lifecycle: "permanent",
-        role: "summary",
-        alwaysLoad: true,
-        scope: "project",
-        cwd: repoDir,
-        summary: "Anchor for diagnostics text test",
-      }, embeddingServer.url);
+      await callLocalMcp(
+        vaultDir,
+        "remember",
+        {
+          title: "Diagnostics Text Anchor",
+          content: "A summary note marked alwaysLoad to anchor coverage text output testing.",
+          tags: ["diagnostics", "text"],
+          lifecycle: "permanent",
+          role: "summary",
+          alwaysLoad: true,
+          scope: "project",
+          cwd: repoDir,
+          summary: "Anchor for diagnostics text test",
+        },
+        embeddingServer.url,
+      );
 
-      await callLocalMcp(vaultDir, "remember", {
-        title: "Diagnostics Text Context",
-        content: "A temporary context note for text output diagnostics.",
-        tags: ["diagnostics", "text"],
-        lifecycle: "temporary",
-        role: "context",
-        scope: "project",
-        cwd: repoDir,
-      }, embeddingServer.url);
+      await callLocalMcp(
+        vaultDir,
+        "remember",
+        {
+          title: "Diagnostics Text Context",
+          content: "A temporary context note for text output diagnostics.",
+          tags: ["diagnostics", "text"],
+          lifecycle: "temporary",
+          role: "context",
+          scope: "project",
+          cwd: repoDir,
+        },
+        embeddingServer.url,
+      );
 
-      const response = await callLocalMcpResponse(vaultDir, "recall", {
-        query: "diagnostics text output",
-        cwd: repoDir,
-        limit: 10,
-        scope: "all",
-      }, embeddingServer.url);
+      const response = await callLocalMcpResponse(
+        vaultDir,
+        "recall",
+        {
+          query: "diagnostics text output",
+          cwd: repoDir,
+          limit: 10,
+          scope: "all",
+        },
+        embeddingServer.url,
+      );
 
       expect(response.text).toMatch(/scope notes: \d+/);
       expect(response.text).toMatch(/themes: \d+/);

@@ -35,7 +35,8 @@ describe("extractProjectionSummary", () => {
 
   it("extracts the first non-heading paragraph", () => {
     const note = makeNote({
-      content: "## Background\n\nThis is the first paragraph. It contains the key decision.\n\nAnother paragraph here.",
+      content:
+        "## Background\n\nThis is the first paragraph. It contains the key decision.\n\nAnother paragraph here.",
     });
     const summary = extractProjectionSummary(note);
     expect(summary).toContain("This is the first paragraph");

@@ -10,7 +10,7 @@ async function getTsFiles(dir: string): Promise<string[]> {
   for (const entry of entries) {
     const fullPath = path.join(dir, entry.name);
     if (entry.isDirectory() && entry.name !== "node_modules" && entry.name !== "build") {
-      files.push(...await getTsFiles(fullPath));
+      files.push(...(await getTsFiles(fullPath)));
     } else if (entry.isFile() && entry.name.endsWith(".ts")) {
       files.push(fullPath);
     }

@@ -22,19 +22,57 @@ async function makeTempDir(prefix: string): Promise<string> {
 
 async function initRepoWithCommit(dir: string): Promise<void> {
   await execFileAsync("git", ["init"], { cwd: dir });
-  await execFileAsync("git", ["-c", "user.email=test@example.com", "-c", "user.name=Test", "commit", "--allow-empty", "-m", "init"], { cwd: dir });
+  await execFileAsync(
+    "git",
+    [
+      "-c",
+      "user.email=test@example.com",
+      "-c",
+      "user.name=Test",
+      "commit",
+      "--allow-empty",
+      "-m",
+      "init",
+    ],
+    { cwd: dir },
+  );
 }
 
-async function addSubmodule(parentDir: string, submoduleDir: string, submodulePath: string): Promise<void> {
-  await execFileAsync("git", ["-c", "protocol.file.allow=always", "-c", "user.email=test@example.com", "-c", "user.name=Test", "submodule", "add", submoduleDir, submodulePath], { cwd: parentDir });
-  await execFileAsync("git", ["-c", "user.email=test@example.com", "-c", "user.name=Test", "commit", "-m", "add submodule"], { cwd: parentDir });
+async function addSubmodule(
+  parentDir: string,
+  submoduleDir: string,
+  submodulePath: string,
+): Promise<void> {
+  await execFileAsync(
+    "git",
+    [
+      "-c",
+      "protocol.file.allow=always",
+      "-c",
+      "user.email=test@example.com",
+      "-c",
+      "user.name=Test",
+      "submodule",
+      "add",
+      submoduleDir,
+      submodulePath,
+    ],
+    { cwd: parentDir },
+  );
+  await execFileAsync(
+    "git",
+    ["-c", "user.email=test@example.com", "-c", "user.name=Test", "commit", "-m", "add submodule"],
+    { cwd: parentDir },
+  );
 }
 
 describe("detectProject", () => {
   it("uses the git remote URL when origin exists", async () => {
     const dir = await makeTempDir("mnemonic-project-remote-");
     await execFileAsync("git", ["init"], { cwd: dir });
-    await execFileAsync("git", ["remote", "add", "origin", "git@github.com:acme/myapp.git"], { cwd: dir });
+    await execFileAsync("git", ["remote", "add", "origin", "git@github.com:acme/myapp.git"], {
+      cwd: dir,
+    });
 
     await expect(detectProject(dir)).resolves.toEqual({
       id: "github-com-acme-myapp",
@@ -72,8 +110,12 @@ describe("detectProject", () => {
   it("can use a configured remote override for forked repos", async () => {
     const dir = await makeTempDir("mnemonic-project-fork-");
     await execFileAsync("git", ["init"], { cwd: dir });
-    await execFileAsync("git", ["remote", "add", "origin", "git@github.com:user/myapp-fork.git"], { cwd: dir });
-    await execFileAsync("git", ["remote", "add", "upstream", "git@github.com:acme/myapp.git"], { cwd: dir });
+    await execFileAsync("git", ["remote", "add", "origin", "git@github.com:user/myapp-fork.git"], {
+      cwd: dir,
+    });
+    await execFileAsync("git", ["remote", "add", "upstream", "git@github.com:acme/myapp.git"], {
+      cwd: dir,
+    });
 
     const resolved = await resolveProjectIdentity(dir, {
       getProjectIdentityOverride: async () => ({
@@ -102,12 +144,14 @@ describe("detectProject", () => {
       identityOverrideApplied: true,
     });
 
-    await expect(detectProject(dir, {
-      getProjectIdentityOverride: async () => ({
-        remoteName: "upstream",
-        updatedAt: "2026-03-08T12:00:00.000Z",
+    await expect(
+      detectProject(dir, {
+        getProjectIdentityOverride: async () => ({
+          remoteName: "upstream",
+          updatedAt: "2026-03-08T12:00:00.000Z",
+        }),
       }),
-    })).resolves.toEqual({
+    ).resolves.toEqual({
       id: "github-com-acme-myapp",
       name: "myapp",
       source: "git-remote-override",
@@ -122,7 +166,11 @@ describe("detectProject", () => {
     await initRepoWithCommit(submoduleDir);
 
     await execFileAsync("git", ["init"], { cwd: parentDir });
-    await execFileAsync("git", ["remote", "add", "origin", "git@github.com:acme/superproject.git"], { cwd: parentDir });
+    await execFileAsync(
+      "git",
+      ["remote", "add", "origin", "git@github.com:acme/superproject.git"],
+      { cwd: parentDir },
+    );
     await initRepoWithCommit(parentDir);
     await addSubmodule(parentDir, submoduleDir, "vendor/lib");
 
@@ -150,7 +198,12 @@ describe("detectProject", () => {
     const submoduleCwd = path.join(parent, "vendor/dep");
 
     await expect(detectProject(submoduleCwd)).resolves.toEqual({
-      id: expect.stringContaining(parentName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "")),
+      id: expect.stringContaining(
+        parentName
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, "-")
+          .replace(/^-+|-+$/g, ""),
+      ),
       name: parentName,
       source: "git-folder",
     });

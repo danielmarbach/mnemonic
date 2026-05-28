@@ -14,7 +14,8 @@ export function slugify(text: string): string {
 
 export function makeId(title: string): MemoryId {
   const slug = slugify(title);
-  const suffix = randomUUID().split("-")[0]!;
+  const suffix = randomUUID().split("-")[0];
+  if (!suffix) throw new Error("Failed to generate UUID");
   return memoryId(slug ? `${slug}-${suffix}` : suffix);
 }
 
@@ -26,9 +27,10 @@ export function formatNote(note: Note, score?: number, showRawRelated = true): s
   const scoreStr = score !== undefined ? ` | similarity: ${score.toFixed(3)}` : "";
   const projectStr = note.project ? ` | project: ${note.projectName ?? note.project}` : " | global";
   const roleStr = note.role ? ` | **role: ${note.role}**` : "";
-  const relStr = showRawRelated && note.relatedTo && note.relatedTo.length > 0
-    ? `\n**related:** ${note.relatedTo.map((r) => `\`${r.id}\` (${r.type})`).join(", ")}`
-    : "";
+  const relStr =
+    showRawRelated && note.relatedTo && note.relatedTo.length > 0
+      ? `\n**related:** ${note.relatedTo.map((r) => `\`${r.id}\` (${r.type})`).join(", ")}`
+      : "";
   return (
     `## ${note.title}\n` +
     `**id:** \`${note.id}\`${projectStr}${scoreStr}\n` +
@@ -44,7 +46,7 @@ export function formatTemporalHistory(
     message: string;
     summary?: string;
     changeDescription?: string;
-  }>
+  }>,
 ): string {
   if (history.length === 0) {
     return "**history:** no git history found";
@@ -54,14 +56,16 @@ export function formatTemporalHistory(
   for (const entry of history) {
     const summary = entry.summary ? ` — ${entry.summary}` : "";
     const changeDesc = entry.changeDescription ? ` (${entry.changeDescription})` : "";
-    lines.push(`- \`${entry.commitHash.slice(0, 7)}\` ${entry.timestamp} — ${entry.message}${summary}${changeDesc}`);
+    lines.push(
+      `- \`${entry.commitHash.slice(0, 7)}\` ${entry.timestamp} — ${entry.message}${summary}${changeDesc}`,
+    );
   }
   return lines.join("\n");
 }
 
 export function formatRelationshipPreview(preview: RelationshipPreview): string {
   const shown = preview.shown
-    .map(r => `${r.title} (\`${r.id}\`) [${r.relationType ?? "related-to"}]`)
+    .map((r) => `${r.title} (\`${r.id}\`) [${r.relationType ?? "related-to"}]`)
     .join(", ");
   const more = preview.truncated
     ? ` [+${preview.totalDirectRelations - preview.shown.length} more]`

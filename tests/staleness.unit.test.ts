@@ -25,7 +25,19 @@ async function initGitRepo(dir: string, readmeContent: string): Promise<void> {
 async function initGitRepoWithCommit(dir: string, readmeContent: string): Promise<void> {
   await initGitRepo(dir, readmeContent);
   await execFileAsync("git", ["add", "README.md"], { cwd: dir });
-  await execFileAsync("git", ["-c", "user.email=test@example.com", "-c", "user.name=Test", "commit", "-m", "chore: initial commit"], { cwd: dir });
+  await execFileAsync(
+    "git",
+    [
+      "-c",
+      "user.email=test@example.com",
+      "-c",
+      "user.name=Test",
+      "commit",
+      "-m",
+      "chore: initial commit",
+    ],
+    { cwd: dir },
+  );
 }
 
 function makeEmbeddingRecord(id: string): EmbeddingRecord {
@@ -65,13 +77,24 @@ describe("VaultManager staleness detection", () => {
     return stdout.trim();
   }
 
-  async function commitChange(repoDir: string, filePath: string, content: string, message: string): Promise<void> {
+  async function commitChange(
+    repoDir: string,
+    filePath: string,
+    content: string,
+    message: string,
+  ): Promise<void> {
     await fs.writeFile(path.join(repoDir, filePath), content);
     await execFileAsync("git", ["add", filePath], { cwd: repoDir });
-    await execFileAsync("git", ["-c", "user.email=test@example.com", "-c", "user.name=Test", "commit", "-m", message], { cwd: repoDir });
+    await execFileAsync(
+      "git",
+      ["-c", "user.email=test@example.com", "-c", "user.name=Test", "commit", "-m", message],
+      { cwd: repoDir },
+    );
   }
 
-  function makeAttachmentConfig(overrides: Partial<ProjectAttachmentConfig> & { projectSlug: string }): ProjectAttachmentConfig {
+  function makeAttachmentConfig(
+    overrides: Partial<ProjectAttachmentConfig> & { projectSlug: string },
+  ): ProjectAttachmentConfig {
     return {
       projectName: overrides.projectSlug,
       localPath: path.join(tempDir, `attached-${overrides.projectSlug}`),
@@ -220,7 +243,9 @@ describe("removeStaleEmbeddings", () => {
   const tempDirs: string[] = [];
 
   afterEach(async () => {
-    await Promise.all(tempDirs.splice(0).map((dir) => fs.rm(dir, { recursive: true, force: true })));
+    await Promise.all(
+      tempDirs.splice(0).map((dir) => fs.rm(dir, { recursive: true, force: true })),
+    );
   });
 
   async function createTempStorage(): Promise<Storage> {
@@ -352,7 +377,9 @@ describe("VaultManager clearAttachmentCaches and reload", () => {
     return stdout.trim();
   }
 
-  function makeAttachmentConfig(overrides: Partial<ProjectAttachmentConfig> & { projectSlug: string }): ProjectAttachmentConfig {
+  function makeAttachmentConfig(
+    overrides: Partial<ProjectAttachmentConfig> & { projectSlug: string },
+  ): ProjectAttachmentConfig {
     return {
       projectName: overrides.projectSlug,
       localPath: path.join(tempDir, `attached-${overrides.projectSlug}`),

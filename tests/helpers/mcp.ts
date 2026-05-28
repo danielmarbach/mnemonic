@@ -47,7 +47,9 @@ async function ensureBuiltEntryPointReadyInternal(options?: {
 }): Promise<void> {
   const entryPoint = options?.entryPoint ?? builtEntryPoint;
   const lockDir = options?.lockDir ?? buildLockDir;
-  const runBuild = options?.runBuild ?? (() => execFileAsync("npm", ["run", "build"], { cwd: repoRoot }).then(() => undefined));
+  const runBuild =
+    options?.runBuild ??
+    (() => execFileAsync("npm", ["run", "build"], { cwd: repoRoot }).then(() => undefined));
   const timeoutMs = options?.timeoutMs ?? 120_000;
   const pollIntervalMs = options?.pollIntervalMs ?? 100;
   const deadline = Date.now() + timeoutMs;
@@ -105,7 +107,10 @@ beforeAll(async () => {
   await ensureBuiltEntryPointReady();
 }, 120000);
 
-export async function startFakeEmbeddingServer(): Promise<{ url: string; close: () => Promise<void> }> {
+export async function startFakeEmbeddingServer(): Promise<{
+  url: string;
+  close: () => Promise<void>;
+}> {
   const server = http.createServer((req, res) => {
     if (req.method !== "POST" || req.url !== "/api/embed") {
       res.writeHead(404).end();
@@ -128,13 +133,17 @@ export async function startFakeEmbeddingServer(): Promise<{ url: string; close: 
 
   return {
     url: `http://127.0.0.1:${address.port}`,
-    close: () => new Promise<void>((resolve, reject) => {
-      server.close((err) => err ? reject(err) : resolve());
-    }),
+    close: () =>
+      new Promise<void>((resolve, reject) => {
+        server.close((err) => (err ? reject(err) : resolve()));
+      }),
   };
 }
 
-export async function startFakeOpenAICompatibleEmbeddingServer(): Promise<{ url: string; close: () => Promise<void> }> {
+export async function startFakeOpenAICompatibleEmbeddingServer(): Promise<{
+  url: string;
+  close: () => Promise<void>;
+}> {
   const server = http.createServer((req, res) => {
     if (req.method !== "POST" || req.url !== "/v1/embeddings") {
       res.writeHead(404).end();
@@ -143,7 +152,9 @@ export async function startFakeOpenAICompatibleEmbeddingServer(): Promise<{ url:
 
     let raw = "";
     req.setEncoding("utf-8");
-    req.on("data", (chunk) => { raw += chunk; });
+    req.on("data", (chunk) => {
+      raw += chunk;
+    });
     req.on("end", () => {
       const body = JSON.parse(raw) as Record<string, unknown>;
       if (body["encoding_format"] !== "float" || typeof body["model"] !== "string") {
@@ -168,15 +179,23 @@ export async function startFakeOpenAICompatibleEmbeddingServer(): Promise<{ url:
 
   return {
     url: `http://127.0.0.1:${address.port}`,
-    close: () => new Promise<void>((resolve, reject) => {
-      server.close((err) => err ? reject(err) : resolve());
-    }),
+    close: () =>
+      new Promise<void>((resolve, reject) => {
+        server.close((err) => (err ? reject(err) : resolve()));
+      }),
   };
 }
 
-export async function startFakeGeminiEmbeddingServer(): Promise<{ url: string; close: () => Promise<void> }> {
+export async function startFakeGeminiEmbeddingServer(): Promise<{
+  url: string;
+  close: () => Promise<void>;
+}> {
   const server = http.createServer((req, res) => {
-    if (req.method !== "POST" || !req.url?.startsWith("/v1beta/models/") || !req.url.endsWith(":embedContent")) {
+    if (
+      req.method !== "POST" ||
+      !req.url?.startsWith("/v1beta/models/") ||
+      !req.url.endsWith(":embedContent")
+    ) {
       res.writeHead(404).end();
       return;
     }
@@ -188,7 +207,9 @@ export async function startFakeGeminiEmbeddingServer(): Promise<{ url: string; c
 
     let raw = "";
     req.setEncoding("utf-8");
-    req.on("data", (chunk) => { raw += chunk; });
+    req.on("data", (chunk) => {
+      raw += chunk;
+    });
     req.on("end", () => {
       const body = JSON.parse(raw) as Record<string, unknown>;
       const content = body["content"] as { parts?: Array<{ text?: string }> } | undefined;
@@ -214,9 +235,10 @@ export async function startFakeGeminiEmbeddingServer(): Promise<{ url: string; c
 
   return {
     url: `http://127.0.0.1:${address.port}`,
-    close: () => new Promise<void>((resolve, reject) => {
-      server.close((err) => err ? reject(err) : resolve());
-    }),
+    close: () =>
+      new Promise<void>((resolve, reject) => {
+        server.close((err) => (err ? reject(err) : resolve()));
+      }),
   };
 }
 
@@ -297,10 +319,17 @@ export async function callLocalMcpMethod(
     throw new Error(`Empty stdout from MCP process`);
   }
 
-  const lines = stdout.trim().split("\n").filter(Boolean).map((line) => JSON.parse(line) as {
-    id?: number;
-    result?: Record<string, unknown>;
-  });
+  const lines = stdout
+    .trim()
+    .split("\n")
+    .filter(Boolean)
+    .map(
+      (line) =>
+        JSON.parse(line) as {
+          id?: number;
+          result?: Record<string, unknown>;
+        },
+    );
 
   return lines.find((line) => line.id === id) ?? {};
 }
@@ -322,16 +351,25 @@ export async function callLocalMcpResponse(
   options?: string | { ollamaUrl?: string; disableGit?: boolean; env?: Record<string, string> },
 ): Promise<{ text: string; structuredContent?: Record<string, unknown> }> {
   const resolvedOptions = typeof options === "string" ? { ollamaUrl: options } : options;
-  const response = await callLocalMcpMethod(vaultDir, 1, "tools/call", {
-    name: toolName,
-    arguments: arguments_,
-  }, resolvedOptions);
+  const response = await callLocalMcpMethod(
+    vaultDir,
+    1,
+    "tools/call",
+    {
+      name: toolName,
+      arguments: arguments_,
+    },
+    resolvedOptions,
+  );
   const text = response?.result?.content?.[0]?.text;
   if (!text) {
     throw new Error(`Missing tool response for ${toolName}`);
   }
 
-  return { text, structuredContent: response?.result?.structuredContent as Record<string, unknown> | undefined };
+  return {
+    text,
+    structuredContent: response?.result?.structuredContent as Record<string, unknown> | undefined,
+  };
 }
 
 export async function callLocalMcpPrompt(vaultDir: string, promptName: string): Promise<string> {
@@ -349,7 +387,10 @@ export async function createPersistentMcpSession(
   vaultDir: string,
   options?: { ollamaUrl?: string; disableGit?: boolean; env?: Record<string, string> },
 ): Promise<{
-  callTool: (toolName: string, arguments_: Record<string, unknown>) => Promise<{ text: string; structuredContent?: Record<string, unknown> }>;
+  callTool: (
+    toolName: string,
+    arguments_: Record<string, unknown>,
+  ) => Promise<{ text: string; structuredContent?: Record<string, unknown> }>;
   close: () => Promise<void>;
 }> {
   const child = spawn("node", [builtEntryPoint], {
@@ -367,7 +408,10 @@ export async function createPersistentMcpSession(
   let stdoutBuffer = "";
   let stderrBuffer = "";
   let nextId = 1;
-  const pending = new Map<number, { resolve: (value: any) => void; reject: (error: Error) => void }>();
+  const pending = new Map<
+    number,
+    { resolve: (value: any) => void; reject: (error: Error) => void }
+  >();
 
   child.stdout.on("data", (chunk) => {
     stdoutBuffer += chunk.toString();
@@ -397,16 +441,18 @@ export async function createPersistentMcpSession(
     pending.clear();
   });
 
-  child.stdin.write(JSON.stringify({
-    jsonrpc: "2.0",
-    id: 0,
-    method: "initialize",
-    params: {
-      protocolVersion: "2024-11-05",
-      capabilities: {},
-      clientInfo: { name: "vitest-persistent", version: "1.0" },
-    },
-  }) + "\n");
+  child.stdin.write(
+    JSON.stringify({
+      jsonrpc: "2.0",
+      id: 0,
+      method: "initialize",
+      params: {
+        protocolVersion: "2024-11-05",
+        capabilities: {},
+        clientInfo: { name: "vitest-persistent", version: "1.0" },
+      },
+    }) + "\n",
+  );
 
   return {
     callTool: async (toolName, arguments_) => {
@@ -414,18 +460,23 @@ export async function createPersistentMcpSession(
       const resultPromise = new Promise<Record<string, unknown> | undefined>((resolve, reject) => {
         pending.set(id, { resolve, reject });
       });
-      child.stdin.write(JSON.stringify({
-        jsonrpc: "2.0",
-        id,
-        method: "tools/call",
-        params: { name: toolName, arguments: arguments_ },
-      }) + "\n");
+      child.stdin.write(
+        JSON.stringify({
+          jsonrpc: "2.0",
+          id,
+          method: "tools/call",
+          params: { name: toolName, arguments: arguments_ },
+        }) + "\n",
+      );
       const result = await resultPromise;
       const text = result?.content?.[0]?.text as string | undefined;
       if (!text) {
         throw new Error(`Missing tool response for ${toolName}`);
       }
-      return { text, structuredContent: result?.structuredContent as Record<string, unknown> | undefined };
+      return {
+        text,
+        structuredContent: result?.structuredContent as Record<string, unknown> | undefined,
+      };
     },
     close: async () => {
       child.stdin.end();
@@ -434,9 +485,13 @@ export async function createPersistentMcpSession(
   };
 }
 
-export async function listLocalMcpTools(vaultDir: string): Promise<Array<{ name: string; description?: string }>> {
+export async function listLocalMcpTools(
+  vaultDir: string,
+): Promise<Array<{ name: string; description?: string }>> {
   const response = await callLocalMcpMethod(vaultDir, 1, "tools/list", {});
-  const tools = response?.result?.tools as Array<{ name: string; description?: string }> | undefined;
+  const tools = response?.result?.tools as
+    | Array<{ name: string; description?: string }>
+    | undefined;
   if (!tools) {
     throw new Error("Missing tools/list response");
   }

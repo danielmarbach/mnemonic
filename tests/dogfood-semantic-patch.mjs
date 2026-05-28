@@ -151,7 +151,8 @@ async function main() {
   console.log("heading B still present:", stillHasB);
 
   // Summary
-  const allOk = p1Ok && hasPatched && hasHeadingB && lintRejected && retryOk && retryContentOk && stillHasB;
+  const allOk =
+    p1Ok && hasPatched && hasHeadingB && lintRejected && retryOk && retryContentOk && stillHasB;
   console.log("\n" + (allOk ? "ALL PASSED" : "SOME FAILED"));
 
   child.stdin.end();

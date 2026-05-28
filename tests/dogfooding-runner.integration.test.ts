@@ -13,7 +13,7 @@ describe("dogfood isolation runner", () => {
     await writeFile(
       path.join(sourceVault, "notes", "sample.md"),
       "---\ntitle: Sample\nlifecycle: permanent\n---\n\nhello",
-      "utf-8"
+      "utf-8",
     );
 
     const result = await runDogfoodInIsolation({

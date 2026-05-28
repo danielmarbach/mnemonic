@@ -2,9 +2,17 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ServerContext } from "../server-context.js";
 import { readVaultSchemaVersion } from "../config.js";
-import { MigrationListResultSchema, type MigrationListResult, MigrationExecuteResultSchema, type MigrationExecuteResult } from "../structured-content.js";
+import {
+  MigrationListResultSchema,
+  type MigrationListResult,
+  MigrationExecuteResultSchema,
+  type MigrationExecuteResult,
+} from "../structured-content.js";
 import { getErrorMessage, attempt } from "../error-utils.js";
-import { ensureBranchSynced as ensureBranchSyncedFromModule, projectParam } from "../helpers/project.js";
+import {
+  ensureBranchSynced as ensureBranchSyncedFromModule,
+  projectParam,
+} from "../helpers/project.js";
 
 export function registerListMigrationsTool(server: McpServer, ctx: ServerContext): void {
   server.registerTool(
@@ -41,7 +49,9 @@ export function registerListMigrationsTool(server: McpServer, ctx: ServerContext
         const pending = await ctx.migrator.getPendingMigrations(version);
         totalPending += pending.length;
         const label = vault.provenance === "project-local" ? "project" : "main";
-        lines.push(`  ${label} (${vault.storage.vaultPath}): ${version} — ${pending.length} pending`);
+        lines.push(
+          `  ${label} (${vault.storage.vaultPath}): ${version} — ${pending.length} pending`,
+        );
         vaultsInfo.push({
           path: vault.storage.vaultPath,
           type: vault.provenance === "project-local" ? "project" : "main",
@@ -65,12 +75,12 @@ export function registerListMigrationsTool(server: McpServer, ctx: ServerContext
       const structuredContent: MigrationListResult = {
         action: "migration_list",
         vaults: vaultsInfo,
-        available: available.map(m => ({ name: m.name, description: m.description })),
+        available: available.map((m) => ({ name: m.name, description: m.description })),
         totalPending,
       };
 
       return { content: [{ type: "text", text: lines.join("\n") }], structuredContent };
-    }
+    },
   );
 }
 
@@ -96,10 +106,22 @@ export function registerExecuteMigrationTool(server: McpServer, ctx: ServerConte
         openWorldHint: false,
       },
       inputSchema: z.object({
-        migrationName: z.string().describe("Name of the migration to execute (get names from `list_migrations`)"),
-        dryRun: z.boolean().default(true).describe("If true, show what would change without actually modifying notes. Always try dry-run first."),
-        backup: z.boolean().default(true).describe("If true, warn about backing up before real migration"),
-        cwd: projectParam.optional().describe("Optional: limit migration to a specific project vault"),
+        migrationName: z
+          .string()
+          .describe("Name of the migration to execute (get names from `list_migrations`)"),
+        dryRun: z
+          .boolean()
+          .default(true)
+          .describe(
+            "If true, show what would change without actually modifying notes. Always try dry-run first.",
+          ),
+        backup: z
+          .boolean()
+          .default(true)
+          .describe("If true, warn about backing up before real migration"),
+        cwd: projectParam
+          .optional()
+          .describe("Optional: limit migration to a specific project vault"),
       }),
       outputSchema: MigrationExecuteResultSchema,
     },
@@ -112,34 +134,42 @@ export function registerExecuteMigrationTool(server: McpServer, ctx: ServerConte
           backup,
           cwd,
         });
-        
+
         const lines: string[] = [];
         lines.push(`Migration: ${migrationName}`);
         lines.push(`Mode: ${dryRun ? "DRY-RUN" : "EXECUTE"}`);
         lines.push(`Vaults processed: ${vaultsProcessed}`);
-        lines.push("")
-        
-        const vaultResults: Array<{ path: string; notesProcessed: number; notesModified: number; errors: Array<{ noteId: string; error: string }>; warnings: string[] }> = [];
+        lines.push("");
+
+        const vaultResults: Array<{
+          path: string;
+          notesProcessed: number;
+          notesModified: number;
+          errors: Array<{ noteId: string; error: string }>;
+          warnings: string[];
+        }> = [];
         for (const [vaultPath, result] of results) {
           lines.push(`Vault: ${vaultPath}`);
           lines.push(`  Notes processed: ${result.notesProcessed}`);
           lines.push(`  Notes modified: ${result.notesModified}`);
-          
+
           const vaultResultErrors: Array<{ noteId: string; error: string }> = [];
           const vaultResultWarnings: string[] = [];
-          
+
           if (result.errors.length > 0) {
             lines.push(`  Errors: ${result.errors.length}`);
-            result.errors.forEach(e => lines.push(`    - ${e.noteId}: ${e.error}`));
-            vaultResultErrors.push(...result.errors.map(e => ({ noteId: e.noteId, error: e.error })));
+            result.errors.forEach((e) => lines.push(`    - ${e.noteId}: ${e.error}`));
+            vaultResultErrors.push(
+              ...result.errors.map((e) => ({ noteId: e.noteId, error: e.error })),
+            );
           }
-          
+
           if (result.warnings.length > 0) {
             lines.push(`  Warnings: ${result.warnings.length}`);
-            result.warnings.forEach(w => lines.push(`    - ${w}`));
+            result.warnings.forEach((w) => lines.push(`    - ${w}`));
             vaultResultWarnings.push(...result.warnings);
           }
-          
+
           vaultResults.push({
             path: vaultPath,
             notesProcessed: result.notesProcessed,
@@ -149,13 +179,15 @@ export function registerExecuteMigrationTool(server: McpServer, ctx: ServerConte
           });
           lines.push("");
         }
-        
+
         if (!dryRun) {
-          lines.push("Migration executed. Modified vaults were auto-committed and pushed when git was available.");
+          lines.push(
+            "Migration executed. Modified vaults were auto-committed and pushed when git was available.",
+          );
         } else {
           lines.push("✓ Dry-run completed - no changes made");
         }
-        
+
         const structuredContent: MigrationExecuteResult = {
           action: "migration_executed",
           migration: migrationName,
@@ -163,19 +195,21 @@ export function registerExecuteMigrationTool(server: McpServer, ctx: ServerConte
           vaultsProcessed,
           vaultResults,
         };
-        
+
         return { content: [{ type: "text" as const, text: lines.join("\n") }], structuredContent };
       });
 
       if (!migrationResult.ok) {
         return {
-          content: [{
-            type: "text" as const,
-            text: `Migration failed: ${getErrorMessage(migrationResult.error)}`,
-          }],
+          content: [
+            {
+              type: "text" as const,
+              text: `Migration failed: ${getErrorMessage(migrationResult.error)}`,
+            },
+          ],
         };
       }
       return migrationResult.value;
-    }
+    },
   );
 }

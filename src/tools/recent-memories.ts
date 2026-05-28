@@ -8,11 +8,7 @@ import {
   noteProjectRef,
   ensureBranchSynced,
 } from "../helpers/project.js";
-import {
-  collectVisibleNotes,
-  formatListEntry,
-  storageLabel,
-} from "../helpers/vault.js";
+import { collectVisibleNotes, formatListEntry, storageLabel } from "../helpers/vault.js";
 
 export function registerRecentMemoriesTool(server: McpServer, ctx: ServerContext): void {
   server.registerTool(
@@ -38,11 +34,20 @@ export function registerRecentMemoriesTool(server: McpServer, ctx: ServerContext
       inputSchema: z.object({
         cwd: projectParam,
         scope: z.enum(["project", "global", "all"]).optional().default("all"),
-        storedIn: z.enum(["project-vault", "main-vault", "any", "attached"]).optional().default("any").describe("Filter by vault storage label like list tool."),
+        storedIn: z
+          .enum(["project-vault", "main-vault", "any", "attached"])
+          .optional()
+          .default("any")
+          .describe("Filter by vault storage label like list tool."),
         limit: z.number().int().min(1).max(20).optional().default(5),
         includePreview: z.boolean().optional().default(true),
         includeStorage: z.boolean().optional().default(true),
-        lifecycle: z.enum(["temporary", "permanent"]).optional().describe("Filter results by lifecycle. Useful for recovering working-state with `lifecycle: temporary` after `project_memory_summary` orientation."),
+        lifecycle: z
+          .enum(["temporary", "permanent"])
+          .optional()
+          .describe(
+            "Filter results by lifecycle. Useful for recovering working-state with `lifecycle: temporary` after `project_memory_summary` orientation.",
+          ),
       }),
       outputSchema: RecentResultSchema,
     },
@@ -59,18 +64,25 @@ export function registerRecentMemoriesTool(server: McpServer, ctx: ServerContext
         .slice(0, limit);
 
       if (recent.length === 0) {
-        const structuredContent: RecentResult = { action: "recent_shown", project: toProjectRef(project), count: 0, limit: limit || 5, notes: [] };
+        const structuredContent: RecentResult = {
+          action: "recent_shown",
+          project: toProjectRef(project),
+          count: 0,
+          limit: limit || 5,
+          notes: [],
+        };
         return { content: [{ type: "text", text: "No memories found." }], structuredContent };
       }
 
-      const header = project && scope !== "global"
-        ? `Recent memories for ${project.name}:`
-        : "Recent memories:";
-      const lines = recent.map((entry) => formatListEntry(entry, {
-        includePreview,
-        includeStorage,
-        includeUpdated: true,
-      }));
+      const header =
+        project && scope !== "global" ? `Recent memories for ${project.name}:` : "Recent memories:";
+      const lines = recent.map((entry) =>
+        formatListEntry(entry, {
+          includePreview,
+          includeStorage,
+          includeUpdated: true,
+        }),
+      );
 
       const textContent = `${header}\n\n${lines.join("\n")}`;
 
@@ -82,7 +94,10 @@ export function registerRecentMemoriesTool(server: McpServer, ctx: ServerContext
         lifecycle: note.lifecycle,
         vault: storageLabel(vault),
         updatedAt: note.updatedAt,
-        preview: includePreview && note.content ? note.content.substring(0, 100) + (note.content.length > 100 ? "..." : "") : undefined,
+        preview:
+          includePreview && note.content
+            ? note.content.substring(0, 100) + (note.content.length > 100 ? "..." : "")
+            : undefined,
       }));
 
       const structuredContent: RecentResult = {
@@ -94,6 +109,6 @@ export function registerRecentMemoriesTool(server: McpServer, ctx: ServerContext
       };
 
       return { content: [{ type: "text", text: textContent }], structuredContent };
-    }
+    },
   );
 }

@@ -35,20 +35,26 @@ async function startOpenAICompatibleServer(options: {
       return;
     }
 
-    if (options.expectedAuth !== undefined && req.headers.authorization !== `Bearer ${options.expectedAuth}`) {
+    if (
+      options.expectedAuth !== undefined &&
+      req.headers.authorization !== `Bearer ${options.expectedAuth}`
+    ) {
       res.writeHead(401).end(JSON.stringify({ error: "missing auth" }));
       return;
     }
 
     let raw = "";
     req.setEncoding("utf-8");
-    req.on("data", (chunk) => { raw += chunk; });
+    req.on("data", (chunk) => {
+      raw += chunk;
+    });
     req.on("end", () => {
       const body = JSON.parse(raw) as Record<string, unknown>;
       if (
-        body["model"] !== options.expectedModel
-        || body["encoding_format"] !== "float"
-        || (options.expectedDimensions !== undefined && body["dimensions"] !== options.expectedDimensions)
+        body["model"] !== options.expectedModel ||
+        body["encoding_format"] !== "float" ||
+        (options.expectedDimensions !== undefined &&
+          body["dimensions"] !== options.expectedDimensions)
       ) {
         res.writeHead(400).end(JSON.stringify({ error: "unexpected body" }));
         return;
@@ -68,9 +74,12 @@ async function startOpenAICompatibleServer(options: {
     throw new Error("Could not determine fake OpenAI-compatible server address");
   }
 
-  closeServers.push(() => new Promise<void>((resolve, reject) => {
-    server.close((err) => err ? reject(err) : resolve());
-  }));
+  closeServers.push(
+    () =>
+      new Promise<void>((resolve, reject) => {
+        server.close((err) => (err ? reject(err) : resolve()));
+      }),
+  );
 
   return { url: `http://127.0.0.1:${address.port}` };
 }
@@ -82,7 +91,10 @@ async function startGeminiServer(options: {
   embedding?: number[];
 }): Promise<{ url: string }> {
   const server = http.createServer((req, res) => {
-    if (req.method !== "POST" || req.url !== `/v1beta/models/${options.expectedModel}:embedContent`) {
+    if (
+      req.method !== "POST" ||
+      req.url !== `/v1beta/models/${options.expectedModel}:embedContent`
+    ) {
       res.writeHead(404).end();
       return;
     }
@@ -94,14 +106,17 @@ async function startGeminiServer(options: {
 
     let raw = "";
     req.setEncoding("utf-8");
-    req.on("data", (chunk) => { raw += chunk; });
+    req.on("data", (chunk) => {
+      raw += chunk;
+    });
     req.on("end", () => {
       const body = JSON.parse(raw) as Record<string, unknown>;
       const content = body["content"] as { parts?: Array<{ text?: string }> } | undefined;
       if (
-        body["model"] !== `models/${options.expectedModel}`
-        || typeof content?.parts?.[0]?.text !== "string"
-        || (options.expectedDimensions !== undefined && body["outputDimensionality"] !== options.expectedDimensions)
+        body["model"] !== `models/${options.expectedModel}` ||
+        typeof content?.parts?.[0]?.text !== "string" ||
+        (options.expectedDimensions !== undefined &&
+          body["outputDimensionality"] !== options.expectedDimensions)
       ) {
         res.writeHead(400).end(JSON.stringify({ error: "unexpected body" }));
         return;
@@ -121,9 +136,12 @@ async function startGeminiServer(options: {
     throw new Error("Could not determine fake Gemini server address");
   }
 
-  closeServers.push(() => new Promise<void>((resolve, reject) => {
-    server.close((err) => err ? reject(err) : resolve());
-  }));
+  closeServers.push(
+    () =>
+      new Promise<void>((resolve, reject) => {
+        server.close((err) => (err ? reject(err) : resolve()));
+      }),
+  );
 
   return { url: `http://127.0.0.1:${address.port}` };
 }
@@ -328,8 +346,14 @@ describe("embedding provider configuration", () => {
   });
 
   it("defaults the native OpenAI and Gemini models", () => {
-    const openai = resolveEmbeddingProviderConfig({ EMBED_PROVIDER: "openai", OPENAI_API_KEY: "secret" });
-    const gemini = resolveEmbeddingProviderConfig({ EMBED_PROVIDER: "gemini", GEMINI_API_KEY: "secret" });
+    const openai = resolveEmbeddingProviderConfig({
+      EMBED_PROVIDER: "openai",
+      OPENAI_API_KEY: "secret",
+    });
+    const gemini = resolveEmbeddingProviderConfig({
+      EMBED_PROVIDER: "gemini",
+      GEMINI_API_KEY: "secret",
+    });
 
     expect(openai.model).toBe("text-embedding-3-small");
     expect(gemini.model).toBe("gemini-embedding-2");
@@ -376,7 +400,10 @@ describe("OpenAI-compatible embedding provider", () => {
   });
 
   it("does not include API keys in provider error messages", async () => {
-    const server = await startOpenAICompatibleServer({ expectedAuth: "expected-key", expectedModel: "local-model" });
+    const server = await startOpenAICompatibleServer({
+      expectedAuth: "expected-key",
+      expectedModel: "local-model",
+    });
     const config = resolveEmbeddingProviderConfig({
       EMBED_PROVIDER: "openai-compatible",
       EMBED_BASE_URL: server.url,
@@ -384,7 +411,9 @@ describe("OpenAI-compatible embedding provider", () => {
       EMBED_MODEL: "local-model",
     });
 
-    await expect(createEmbeddingProvider(config).embed("hello")).rejects.not.toThrow(/wrong-secret-key/);
+    await expect(createEmbeddingProvider(config).embed("hello")).rejects.not.toThrow(
+      /wrong-secret-key/,
+    );
   });
 });
 
@@ -410,14 +439,19 @@ describe("Gemini embedding provider", () => {
   });
 
   it("does not include Gemini API keys in provider error messages", async () => {
-    const server = await startGeminiServer({ expectedApiKey: "expected-key", expectedModel: "gemini-embedding-2" });
+    const server = await startGeminiServer({
+      expectedApiKey: "expected-key",
+      expectedModel: "gemini-embedding-2",
+    });
     const config = resolveEmbeddingProviderConfig({
       EMBED_PROVIDER: "gemini",
       GEMINI_BASE_URL: server.url,
       GEMINI_API_KEY: "wrong-gemini-secret",
     });
 
-    await expect(createEmbeddingProvider(config).embed("hello")).rejects.not.toThrow(/wrong-gemini-secret/);
+    await expect(createEmbeddingProvider(config).embed("hello")).rejects.not.toThrow(
+      /wrong-gemini-secret/,
+    );
   });
 });
 
@@ -439,7 +473,8 @@ describe("embedding compatibility", () => {
       id: "other-note",
       ...embeddingMetadata(vector),
       provider: "openai",
-      compatibilityKey: "provider=openai|model=text-embedding-3-small|dimensions=3|metric=cosine|inputMode=default",
+      compatibilityKey:
+        "provider=openai|model=text-embedding-3-small|dimensions=3|metric=cosine|inputMode=default",
       embedding: vector,
       updatedAt: new Date().toISOString(),
     };
@@ -463,7 +498,9 @@ describe("embedding compatibility", () => {
       EMBED_MODEL: "local-model",
     });
 
-    await expect(createEmbeddingProvider(config).embed("hello")).rejects.toThrow(/unexpected shape/i);
+    await expect(createEmbeddingProvider(config).embed("hello")).rejects.toThrow(
+      /unexpected shape/i,
+    );
   });
 });
 

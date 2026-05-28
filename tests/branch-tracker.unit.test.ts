@@ -8,7 +8,12 @@ vi.mock("../src/project.js", () => ({
   getCurrentGitBranch: getCurrentGitBranchMock,
 }));
 
-import { checkBranchChange, getLastBranch, resetBranchHistory, updateBranchHistory } from "../src/branch-tracker.js";
+import {
+  checkBranchChange,
+  getLastBranch,
+  resetBranchHistory,
+  updateBranchHistory,
+} from "../src/branch-tracker.js";
 
 function testPath(name: string): string {
   return `/test/${name}-${crypto.randomUUID()}`;

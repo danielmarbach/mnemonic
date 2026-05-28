@@ -14,7 +14,12 @@ import {
   ProjectRef,
   type RecallRetrievalCoverage,
 } from "../structured-content.js";
-import { checkEmbeddingCompatibility, currentEmbeddingIdentity, embed, safeCosineSimilarity } from "../embeddings.js";
+import {
+  checkEmbeddingCompatibility,
+  currentEmbeddingIdentity,
+  embed,
+  safeCosineSimilarity,
+} from "../embeddings.js";
 import {
   detectTemporalQueryHint,
   shouldApplyTemporalFiltering,
@@ -66,7 +71,14 @@ import {
 } from "../provenance.js";
 import { enrichTemporalHistory } from "../temporal-interpretation.js";
 import { getRelationshipPreview } from "../relationships.js";
-import { collectLexicalRescueCandidates, buildRecallCandidateContext, identifyHighPriorityAnchors, computeRecallDiversity, computeRecallRetrievalCoverage, ATTACHMENT_BOOST } from "./recall-helpers.js";
+import {
+  collectLexicalRescueCandidates,
+  buildRecallCandidateContext,
+  identifyHighPriorityAnchors,
+  computeRecallDiversity,
+  computeRecallRetrievalCoverage,
+  ATTACHMENT_BOOST,
+} from "./recall-helpers.js";
 
 export function registerRecallTool(server: McpServer, ctx: ServerContext): void {
   server.registerTool(
@@ -74,7 +86,7 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
     {
       title: "Recall",
       description:
-        "Supports opt-in temporal mode (`mode: \"temporal\"`) for git-backed history and workflow mode (`mode: \"workflow\"`) for RPIR chain reconstruction.\n\n" +
+        'Supports opt-in temporal mode (`mode: "temporal"`) for git-backed history and workflow mode (`mode: "workflow"`) for RPIR chain reconstruction.\n\n' +
         "Use this when:\n" +
         "- You know the topic but not the exact memory id\n" +
         "- Starting a session and want relevant prior context\n" +
@@ -93,28 +105,68 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
         openWorldHint: true,
       },
       inputSchema: z.object({
-        query: z.string().describe("Natural-language search query describing the topic, decision, bug, preference, or context you want to find."),
+        query: z
+          .string()
+          .describe(
+            "Natural-language search query describing the topic, decision, bug, preference, or context you want to find.",
+          ),
         cwd: projectParam,
         limit: z.number().int().min(1).max(20).optional().default(ctx.defaultRecallLimit),
         minSimilarity: z.number().min(0).max(1).optional().default(ctx.defaultMinSimilarity),
-        mode: z.enum(["default", "temporal", "workflow"]).optional().default("default").describe("Use `temporal` for compact git-backed history, or `workflow` for RPIR-oriented chain reconstruction."),
-        verbose: z.boolean().optional().default(false).describe("Only meaningful with `mode: \"temporal\"`. Adds richer stats-based history context without returning raw diffs."),
-        evidence: z.enum(["compact"]).optional().describe("Optional retrieval rationale. Omit for default output; use `compact` for bounded rank and lineage signals."),
-        tags: z.array(z.string()).optional().describe("Filter results to notes with all of these tags."),
+        mode: z
+          .enum(["default", "temporal", "workflow"])
+          .optional()
+          .default("default")
+          .describe(
+            "Use `temporal` for compact git-backed history, or `workflow` for RPIR-oriented chain reconstruction.",
+          ),
+        verbose: z
+          .boolean()
+          .optional()
+          .default(false)
+          .describe(
+            'Only meaningful with `mode: "temporal"`. Adds richer stats-based history context without returning raw diffs.',
+          ),
+        evidence: z
+          .enum(["compact"])
+          .optional()
+          .describe(
+            "Optional retrieval rationale. Omit for default output; use `compact` for bounded rank and lineage signals.",
+          ),
+        tags: z
+          .array(z.string())
+          .optional()
+          .describe("Filter results to notes with all of these tags."),
         scope: z
           .enum(["project", "global", "all"])
           .optional()
           .default("all")
           .describe(
             "'project' = this project's memories and attached vault notes, " +
-            "'global' = only unscoped memories (main/global storage), " +
-            "'all' = both, with project notes boosted (default)"
+              "'global' = only unscoped memories (main/global storage), " +
+              "'all' = both, with project notes boosted (default)",
           ),
-        lifecycle: z.enum(["temporary", "permanent"]).optional().describe("Filter results by lifecycle. Useful for recovering working-state with `lifecycle: temporary` after `project_memory_summary` orientation."),
+        lifecycle: z
+          .enum(["temporary", "permanent"])
+          .optional()
+          .describe(
+            "Filter results by lifecycle. Useful for recovering working-state with `lifecycle: temporary` after `project_memory_summary` orientation.",
+          ),
       }),
       outputSchema: RecallResultSchema,
     },
-    async ({ query, cwd, limit, minSimilarity, mode, verbose, evidence, tags, scope, lifecycle }) => {
+    async ({
+      query,
+      cwd,
+      limit,
+      minSimilarity,
+      mode,
+      verbose,
+      evidence,
+      tags,
+      scope,
+      lifecycle,
+    }) => {
       const t0Recall = performance.now();
       await ensureBranchSynced(ctx, cwd);
 
@@ -144,7 +196,8 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
       }
       const noteCache = new Map<string, Note>();
 
-      const noteCacheKey = (vault: Vault, id: string): string => `${vault.storage.vaultPath}::${id}`;
+      const noteCacheKey = (vault: Vault, id: string): string =>
+        `${vault.storage.vaultPath}::${id}`;
       const readCachedNote = async (vault: Vault, id: string): Promise<Note | null> => {
         // Check session cache first (populated when getOrBuildVaultEmbeddings was called)
         if (project) {
@@ -167,22 +220,31 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
 
       await Promise.allSettled(
         vaults.map((vault) =>
-          embedMissingNotes(ctx, vault.storage).catch(() => { /* best-effort: don't block recall if Ollama is down */ }),
+          embedMissingNotes(ctx, vault.storage).catch(() => {
+            /* best-effort: don't block recall if Ollama is down */
+          }),
         ),
       );
 
       const scored: ScoredRecallCandidate[] = [];
       const temporalQueryHint = detectTemporalQueryHint(query);
       const applyTemporalFilter = shouldApplyTemporalFiltering(temporalQueryHint);
-      const temporalFilterWindowDays = applyTemporalFilter ? temporalQueryHint?.filterWindowDays : undefined;
+      const temporalFilterWindowDays = applyTemporalFilter
+        ? temporalQueryHint?.filterWindowDays
+        : undefined;
 
       for (const vault of vaults) {
         const embeddings = project
-          ? (await getOrBuildVaultEmbeddings(project.id, vault)) ?? await vault.storage.listEmbeddings()
+          ? ((await getOrBuildVaultEmbeddings(project.id, vault)) ??
+            (await vault.storage.listEmbeddings()))
           : await vault.storage.listEmbeddings();
 
         for (const rec of embeddings) {
-          if (checkEmbeddingCompatibility(rec, currentEmbeddingIdentity, queryVec.length).status !== "compatible") continue;
+          if (
+            checkEmbeddingCompatibility(rec, currentEmbeddingIdentity, queryVec.length).status !==
+            "compatible"
+          )
+            continue;
           const rawScore = safeCosineSimilarity(queryVec, rec.embedding);
           if (rawScore === undefined) continue;
           if (rawScore < minSimilarity) continue;
@@ -210,9 +272,9 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
           }
 
           if (
-            applyTemporalFilter
-            && temporalFilterWindowDays !== undefined
-            && !isWithinTemporalFilterWindow(note.updatedAt, temporalFilterWindowDays)
+            applyTemporalFilter &&
+            temporalFilterWindowDays !== undefined &&
+            !isWithinTemporalFilterWindow(note.updatedAt, temporalFilterWindowDays)
           ) {
             continue;
           }
@@ -221,7 +283,11 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
           const temporalBoost = temporalQueryHint
             ? computeTemporalRecencyBoost(note.updatedAt, temporalQueryHint)
             : 0;
-          const scopeBoost = isCurrentProject ? ctx.projectScopeBoost : isAttachedVault ? ATTACHMENT_BOOST : 0;
+          const scopeBoost = isCurrentProject
+            ? ctx.projectScopeBoost
+            : isAttachedVault
+              ? ATTACHMENT_BOOST
+              : 0;
           const boost = scopeBoost + context.metadataBoost + temporalBoost;
           scored.push({
             id: rec.id,
@@ -248,10 +314,15 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
         }
 
         if (note.relatedTo && note.relatedTo.length > 0) {
-          noteRelationships.set(candidate.id, note.relatedTo.map((r) => ({ id: r.id, type: r.type })));
+          noteRelationships.set(
+            candidate.id,
+            note.relatedTo.map((r) => ({ id: r.id, type: r.type })),
+          );
         }
 
-        const projection = await getOrBuildProjection(candidate.vault.storage, note).catch(() => undefined);
+        const projection = await getOrBuildProjection(candidate.vault.storage, note).catch(
+          () => undefined,
+        );
         if (!projection) {
           continue;
         }
@@ -275,14 +346,16 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
         return undefined;
       };
       const strongestSemanticScore = scored.reduce<number | undefined>(
-        (max, candidate) => max === undefined ? candidate.score : Math.max(max, candidate.score),
-        undefined
+        (max, candidate) => (max === undefined ? candidate.score : Math.max(max, candidate.score)),
+        undefined,
       );
       const reranked = applyLexicalReranking(scored, query, getProjectionText);
 
       // Apply graph spreading activation: traverse related notes and boost their scores
       const preSpreadIds = new Set(reranked.map((c) => c.id));
-      const getNoteRelationships = (id: string): Array<{ id: string; type: RelationshipType }> | undefined => {
+      const getNoteRelationships = (
+        id: string,
+      ): Array<{ id: string; type: RelationshipType }> | undefined => {
         return noteRelationships.get(id);
       };
       const withGraphSpread = applyGraphSpreadingActivation(reranked, getNoteRelationships);
@@ -316,7 +389,7 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
           scope,
           tags,
           lifecycle,
-          promoted
+          promoted,
         );
         promoted.push(...rescueCandidates);
         rescueCandidateIds = new Set(rescueCandidates.map((candidate) => candidate.id));
@@ -324,9 +397,10 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
         promoted = applyCanonicalExplanationPromotion(promoted);
       }
 
-      const top = mode === "workflow"
-        ? selectWorkflowResults(promoted, effectiveLimit, scope)
-        : selectRecallResults(promoted, effectiveLimit, scope);
+      const top =
+        mode === "workflow"
+          ? selectWorkflowResults(promoted, effectiveLimit, scope)
+          : selectRecallResults(promoted, effectiveLimit, scope);
 
       if (top.length === 0) {
         const structuredContent: RecallResult = {
@@ -336,7 +410,10 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
           recallScopeNoteCount,
           results: [],
         };
-        return { content: [{ type: "text", text: "No memories found matching that query." }], structuredContent };
+        return {
+          content: [{ type: "text", text: "No memories found matching that query." }],
+          structuredContent,
+        };
       }
 
       const header = project
@@ -384,7 +461,21 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
       // Top 1 by default, top 3 if result count is small
       const recallRelationshipLimit = top.length <= 3 ? 3 : 1;
 
-      for (const [index, { id, score, vault, boosted, semanticRank, lexicalRank, graphRank, canonicalExplanationScore, metadata, isCurrentProject }] of top.entries()) {
+      for (const [
+        index,
+        {
+          id,
+          score,
+          vault,
+          boosted,
+          semanticRank,
+          lexicalRank,
+          graphRank,
+          canonicalExplanationScore,
+          metadata,
+          isCurrentProject,
+        },
+      ] of top.entries()) {
         const note = await readCachedNote(vault, id);
         if (note) {
           const centrality = note.relatedTo?.length ?? 0;
@@ -400,35 +491,45 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
             return Number.isFinite(ss) ? ss : undefined;
           });
           const signalStrength = signalStrengthResult.ok ? signalStrengthResult.value : undefined;
-          const confidence = computeConfidence(note.lifecycle, note.updatedAt, centrality, signalStrength);
-          let history: Array<{
-            commitHash: string;
-            timestamp: string;
-            message: string;
-            summary?: string;
-            stats?: {
-              additions: number;
-              deletions: number;
-              filesChanged: number;
-              changeType: "metadata-only change" | "minor edit" | "substantial update";
-            };
-          }> | undefined;
+          const confidence = computeConfidence(
+            note.lifecycle,
+            note.updatedAt,
+            centrality,
+            signalStrength,
+          );
+          let history:
+            | Array<{
+                commitHash: string;
+                timestamp: string;
+                message: string;
+                summary?: string;
+                stats?: {
+                  additions: number;
+                  deletions: number;
+                  filesChanged: number;
+                  changeType: "metadata-only change" | "minor edit" | "substantial update";
+                };
+              }>
+            | undefined;
 
           let historySummary: string | undefined;
 
           if (mode === "temporal") {
             if (index < ctx.temporalHistoryNoteLimit) {
-              const commits = await vault.git.getFileHistory(filePath, ctx.temporalHistoryCommitLimit);
+              const commits = await vault.git.getFileHistory(
+                filePath,
+                ctx.temporalHistoryCommitLimit,
+              );
               const rawHistory = await Promise.all(
                 commits.map(async (commit) => {
                   const stats = await vault.git.getCommitStats(filePath, commit.hash);
                   return buildTemporalHistoryEntry(commit, stats, verbose);
-                })
+                }),
               );
               const enriched = enrichTemporalHistory(rawHistory);
               history = verbose
                 ? enriched.interpretedHistory
-                : enriched.interpretedHistory.map(entry => ({ ...entry, stats: undefined }));
+                : enriched.interpretedHistory.map((entry) => ({ ...entry, stats: undefined }));
               historySummary = enriched.historySummary;
             }
           }
@@ -439,45 +540,57 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
             relationships = await getRelationshipPreview(
               note,
               ctx.vaultManager.allKnownVaults(project?.id),
-              { activeProjectId: project?.id, limit: 3 }
+              { activeProjectId: project?.id, limit: 3 },
             );
           }
 
-          const formattedHistory = mode === "temporal" && history !== undefined
-            ? `\n\n${formatTemporalHistory(history)}`
-            : "";
-          const formattedRelationships = relationships !== undefined
-            ? `\n\n${formatRelationshipPreview(relationships)}`
-            : "";
-          const provenanceLine = provenance || confidence
-            ? `\n**confidence:** ${confidence ?? "medium"}${provenance?.recentlyChanged ? " | **recently changed**" : ""}${signalStrength !== undefined ? ` | signalStrength: ${signalStrength.toFixed(2)}` : ""}`
-            : signalStrength !== undefined
-              ? `\n**signalStrength:** ${signalStrength.toFixed(2)}`
+          const formattedHistory =
+            mode === "temporal" && history !== undefined
+              ? `\n\n${formatTemporalHistory(history)}`
               : "";
-          const supersededRelations = (note.relatedTo ?? []).filter((rel) => rel.type === "supersedes");
-          const retrievalEvidence: RetrievalEvidence | undefined = evidence === "compact"
-            ? {
-              channels: [
-                semanticRank !== undefined ? "semantic" : undefined,
-                lexicalRank !== undefined ? "lexical" : undefined,
-                graphRank !== undefined ? "graph-rank" : undefined,
-                rescueCandidateIds.has(id) ? "rescue" : undefined,
-                canonicalExplanationScore !== undefined && canonicalExplanationScore > 0 ? "canonical" : undefined,
-                temporalQueryHint ? "temporal-boost" : undefined,
-              ].filter((value): value is RetrievalEvidence["channels"][number] => value !== undefined),
-              rankBand: toRecallRankBand(semanticRank),
-              projectRelevant: isCurrentProject,
-              freshness: toRecallFreshness(note.updatedAt),
-              superseded: supersededRelations.length > 0,
-              supersededBy: supersededRelations.length > 0 ? supersededRelations[0]?.id : undefined,
-              supersededCount: supersededRelations.length > 0 ? supersededRelations.length : undefined,
-            }
-            : undefined;
+          const formattedRelationships =
+            relationships !== undefined ? `\n\n${formatRelationshipPreview(relationships)}` : "";
+          const provenanceLine =
+            provenance || confidence
+              ? `\n**confidence:** ${confidence ?? "medium"}${provenance?.recentlyChanged ? " | **recently changed**" : ""}${signalStrength !== undefined ? ` | signalStrength: ${signalStrength.toFixed(2)}` : ""}`
+              : signalStrength !== undefined
+                ? `\n**signalStrength:** ${signalStrength.toFixed(2)}`
+                : "";
+          const supersededRelations = (note.relatedTo ?? []).filter(
+            (rel) => rel.type === "supersedes",
+          );
+          const retrievalEvidence: RetrievalEvidence | undefined =
+            evidence === "compact"
+              ? {
+                  channels: [
+                    semanticRank !== undefined ? "semantic" : undefined,
+                    lexicalRank !== undefined ? "lexical" : undefined,
+                    graphRank !== undefined ? "graph-rank" : undefined,
+                    rescueCandidateIds.has(id) ? "rescue" : undefined,
+                    canonicalExplanationScore !== undefined && canonicalExplanationScore > 0
+                      ? "canonical"
+                      : undefined,
+                    temporalQueryHint ? "temporal-boost" : undefined,
+                  ].filter(
+                    (value): value is RetrievalEvidence["channels"][number] => value !== undefined,
+                  ),
+                  rankBand: toRecallRankBand(semanticRank),
+                  projectRelevant: isCurrentProject,
+                  freshness: toRecallFreshness(note.updatedAt),
+                  superseded: supersededRelations.length > 0,
+                  supersededBy:
+                    supersededRelations.length > 0 ? supersededRelations[0]?.id : undefined,
+                  supersededCount:
+                    supersededRelations.length > 0 ? supersededRelations.length : undefined,
+                }
+              : undefined;
           const evidenceLine = retrievalEvidence
             ? `\n${formatRetrievalEvidenceHint(retrievalEvidence, metadata?.role)}`
             : "";
           // Suppress raw related IDs when enriched preview is shown to avoid duplication
-          sections.push(`${formatNote(note, score, relationships === undefined)}${provenanceLine}${evidenceLine}${formattedHistory}${formattedRelationships}`);
+          sections.push(
+            `${formatNote(note, score, relationships === undefined)}${provenanceLine}${evidenceLine}${formattedHistory}${formattedRelationships}`,
+          );
 
           structuredResults.push({
             id,
@@ -501,13 +614,19 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
 
           if (project) {
             setSessionCachedNote(project.id, vault.storage.vaultPath, note);
-            recordSessionNoteAccess(project.id, vault.storage.vaultPath, id, "recall", computeHybridScore({
+            recordSessionNoteAccess(
+              project.id,
+              vault.storage.vaultPath,
               id,
-              score,
-              boosted,
-              vault,
-              isCurrentProject: note.project === project.id,
-            }));
+              "recall",
+              computeHybridScore({
+                id,
+                score,
+                boosted,
+                vault,
+                isCurrentProject: note.project === project.id,
+              }),
+            );
           }
         }
       }
@@ -518,7 +637,11 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
         diversity = await computeRecallDiversity(structuredResults);
         if (project) {
           const { anchorIds, anchorLookup } = await identifyHighPriorityAnchors(vaults, project.id);
-          const coverageResult = await computeRecallRetrievalCoverage(structuredResults.map((r) => r.id), anchorIds, anchorLookup);
+          const coverageResult = await computeRecallRetrievalCoverage(
+            structuredResults.map((r) => r.id),
+            anchorIds,
+            anchorLookup,
+          );
           if (coverageResult) {
             retrievalCoverage = coverageResult;
           }
@@ -533,9 +656,12 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
         diagnosticsParts.push(`themes: ${diversity.themeCount}`);
       }
       if (retrievalCoverage) {
-        diagnosticsParts.push(`anchor coverage: ${retrievalCoverage.fraction.toFixed(2)} (${retrievalCoverage.anchorsInResults}/${retrievalCoverage.highPriorityAnchorsTotal})`);
+        diagnosticsParts.push(
+          `anchor coverage: ${retrievalCoverage.fraction.toFixed(2)} (${retrievalCoverage.anchorsInResults}/${retrievalCoverage.highPriorityAnchorsTotal})`,
+        );
       }
-      const diagnosticsLine = diagnosticsParts.length > 0 ? `\n${diagnosticsParts.join(" | ")}` : "";
+      const diagnosticsLine =
+        diagnosticsParts.length > 0 ? `\n${diagnosticsParts.join(" | ")}` : "";
       const textContent = `${header}${diagnosticsLine}\n\n${sections.join("\n\n---\n\n")}`;
 
       const structuredContent: RecallResult = {
@@ -553,6 +679,6 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
         content: [{ type: "text", text: textContent }],
         structuredContent,
       };
-    }
+    },
   );
 }
