@@ -3,6 +3,17 @@ import tseslint from "typescript-eslint";
 import prettierPlugin from "eslint-plugin-prettier";
 import prettierConfig from "eslint-config-prettier";
 
+// Custom rules replacing ast-grep patterns
+import noAwaitInPromiseAll from "./eslint-rules/no-await-in-promise-all.js";
+import noBareTryCatch from "./eslint-rules/no-bare-try-catch.js";
+
+const localPlugin = {
+  rules: {
+    "no-await-in-promise-all": noAwaitInPromiseAll,
+    "no-bare-try-catch": noBareTryCatch,
+  },
+};
+
 export default tseslint.config(
   // Base JS + TypeScript
   js.configs.recommended,
@@ -11,6 +22,7 @@ export default tseslint.config(
   // TypeScript source files
   {
     files: ["src/**/*.ts"],
+    plugins: { local: localPlugin },
     languageOptions: {
       parserOptions: {
         projectService: true,
@@ -27,6 +39,11 @@ export default tseslint.config(
       "no-console": ["error", { allow: ["error"] }],
       "@typescript-eslint/no-non-null-assertion": "error",
       "@typescript-eslint/only-throw-error": "error",
+
+      // Custom rules (replacing ast-grep patterns with no ESLint equivalent)
+      "local/no-await-in-promise-all": "error",
+      "local/no-bare-try-catch": "error",
+
       "no-restricted-syntax": [
         "error",
         // no-enum-declaration: prefer const objects + as const
@@ -42,14 +59,6 @@ export default tseslint.config(
             "TSAsExpression[left.callee.object.name='JSON'][left.callee.property.name='parse']",
           message:
             "Type assertion on JSON.parse result bypasses validation — use Zod schema instead.",
-        },
-
-        // no-bare-try-catch: use attempt() for fail-soft operations
-        {
-          selector:
-            "TryStatement[handler.body.body.length=0]",
-          message:
-            "Empty catch block — every error path must be traceable via debugLog or attempt().",
         },
       ],
 
@@ -71,6 +80,22 @@ export default tseslint.config(
     },
   },
 
+  // no-bare-try-catch exemptions — files where raw try/catch is expected
+  {
+    files: [
+      "src/git.ts",
+      "src/cli/**/*.ts",
+      "src/index.ts",
+      "src/startup.ts",
+      "src/migration.ts",
+      "src/embeddings.ts",
+      "src/error-utils.ts",
+    ],
+    rules: {
+      "local/no-bare-try-catch": "off",
+    },
+  },
+
   // Test files — relaxed rules
   {
     files: ["tests/**/*.ts", "src/__tests__/**/*.ts"],
@@ -78,12 +103,14 @@ export default tseslint.config(
       "@typescript-eslint/no-explicit-any": "off",
       "@typescript-eslint/no-non-null-assertion": "off",
       "no-console": "off",
+      "local/no-await-in-promise-all": "off",
+      "local/no-bare-try-catch": "off",
       // Test imports are often used only for type side-effects or kept for future tests
       "@typescript-eslint/no-unused-vars": ["warn", { argsIgnorePattern: "^_", varsIgnorePattern: "^_" }],
     },
   },
 
-  // CLI entry points — allow console.error for diagnostics
+  // CLI entry points — allow console for diagnostics
   {
     files: ["src/cli/**/*.ts", "src/startup.ts"],
     rules: {
