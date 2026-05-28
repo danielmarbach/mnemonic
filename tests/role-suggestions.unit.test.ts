@@ -116,7 +116,8 @@ describe("role suggestions", () => {
   it("reports none provenance when no inference fires", () => {
     const note = makeNote({
       title: "Apunte",
-      content: "Texto libre sin forma marcada. Solo una observacion corta sobre algo que cambio ayer.",
+      content:
+        "Texto libre sin forma marcada. Solo una observacion corta sobre algo que cambio ayer.",
       lifecycle: "temporary",
     });
 
@@ -133,7 +134,8 @@ describe("role suggestions", () => {
   it("suggests summary from structure and graph shape without English keywords", () => {
     const note = makeNote({
       title: "Panorama rapido",
-      content: "# Vista\n- modulo A\n- modulo B\n\n# Riesgos\n- cola lenta\n- cache fria\n\n# Estado\n- listo\n- abierto",
+      content:
+        "# Vista\n- modulo A\n- modulo B\n\n# Riesgos\n- cola lenta\n- cache fria\n\n# Estado\n- listo\n- abierto",
     });
 
     expect(suggestRole(note, { inboundReferences: 5, linkedByPermanentNotes: 3 })).toBe("summary");
@@ -142,7 +144,8 @@ describe("role suggestions", () => {
   it("suggests decision from dependency shape and explanatory structure without English decision keywords", () => {
     const note = makeNote({
       title: "Cambio de flujo",
-      content: "## Situacion\nModulo A depende de B.\n\n## Restricciones\n- latencia\n- retries\n\n## Consecuencias\nSe simplifica el camino de lectura.",
+      content:
+        "## Situacion\nModulo A depende de B.\n\n## Restricciones\n- latencia\n- retries\n\n## Consecuencias\nSe simplifica el camino de lectura.",
       relatedTo: [rel("base", "explains"), rel("legacy", "supersedes")],
     });
 
@@ -152,7 +155,8 @@ describe("role suggestions", () => {
   it("suggests plan from ordered task structure without English plan keywords", () => {
     const note = makeNote({
       title: "Semana 14",
-      content: "1. Preparar datos\n2. Mover trafico\n3. Verificar rutas\n\n- [ ] cerrar huecos\n- [ ] medir tiempos",
+      content:
+        "1. Preparar datos\n2. Mover trafico\n3. Verificar rutas\n\n- [ ] cerrar huecos\n- [ ] medir tiempos",
     });
 
     expect(suggestRole(note)).toBe("plan");
@@ -161,7 +165,8 @@ describe("role suggestions", () => {
   it("suggests reference from lookup-oriented structure in non-engineering content", () => {
     const note = makeNote({
       title: "Guia del mercado",
-      content: "Tomates: puesto 4\nPan: puesto 7\nMiel: puesto 11\nQueso: puesto 14\n\n| sala | horario |\n| --- | --- |\n| patio | 08-12 |\n| norte | 09-18 |",
+      content:
+        "Tomates: puesto 4\nPan: puesto 7\nMiel: puesto 11\nQueso: puesto 14\n\n| sala | horario |\n| --- | --- |\n| patio | 08-12 |\n| norte | 09-18 |",
     });
 
     expect(suggestRole(note)).toBe("reference");
@@ -170,7 +175,8 @@ describe("role suggestions", () => {
   it("suggests context as a weak fallback when appropriate", () => {
     const note = makeNote({
       title: "Barrio central",
-      content: "# Entorno\nLa plaza conecta el mercado y la estacion.\n\n# Limites\nEl ruido sube por la tarde y baja al amanecer.",
+      content:
+        "# Entorno\nLa plaza conecta el mercado y la estacion.\n\n# Limites\nEl ruido sube por la tarde y baja al amanecer.",
       relatedTo: [rel("mapa", "related-to")],
     });
 
@@ -180,7 +186,8 @@ describe("role suggestions", () => {
   it("returns no role suggestion for an ambiguous note", () => {
     const note = makeNote({
       title: "Apunte",
-      content: "Texto libre sin forma marcada. Solo una observacion corta sobre algo que cambio ayer.",
+      content:
+        "Texto libre sin forma marcada. Solo una observacion corta sobre algo que cambio ayer.",
       lifecycle: "temporary",
     });
 
@@ -194,7 +201,13 @@ describe("role suggestions", () => {
       relatedTo: [rel("a", "related-to"), rel("b", "related-to"), rel("c", "related-to")],
     });
 
-    expect(suggestImportance(note, { inboundReferences: 6, linkedByPermanentNotes: 4, anchorCandidate: true })).toBe("high");
+    expect(
+      suggestImportance(note, {
+        inboundReferences: 6,
+        linkedByPermanentNotes: 4,
+        anchorCandidate: true,
+      }),
+    ).toBe("high");
   });
 
   it("never infers low importance", () => {
@@ -223,7 +236,8 @@ describe("role suggestions", () => {
   it("handles mixed-language samples from structure and graph evidence", () => {
     const note = makeNote({
       title: "Mapa del quartier",
-      content: "# Zona\n- calle A\n- calle B\n\n# Etat\n- stable\n- ouvert\n\n# Rutas\n- bus\n- metro",
+      content:
+        "# Zona\n- calle A\n- calle B\n\n# Etat\n- stable\n- ouvert\n\n# Rutas\n- bus\n- metro",
     });
 
     expect(suggestRole(note, { inboundReferences: 4, linkedByPermanentNotes: 2 })).toBe("summary");
@@ -233,7 +247,8 @@ describe("role suggestions", () => {
   it("cue-word variants do not change the role when structure is identical", () => {
     const base = makeNote({
       title: "nota breve",
-      content: "Texto libre sin forma marcada. Solo una observacion corta sobre algo que cambio ayer.",
+      content:
+        "Texto libre sin forma marcada. Solo una observacion corta sobre algo que cambio ayer.",
       lifecycle: "temporary",
     });
     const cueVariant = makeNote({
@@ -249,7 +264,8 @@ describe("role suggestions", () => {
   it("unsupported-language notes behave the same as cue-word variants when structure is identical", () => {
     const cueVariant = makeNote({
       title: "summary decision plan reference context",
-      content: "Texto libre sin forma marcada. Solo una observacion corta sobre algo que cambio ayer.",
+      content:
+        "Texto libre sin forma marcada. Solo una observacion corta sobre algo que cambio ayer.",
       lifecycle: "temporary",
     });
     const unsupportedLanguage = makeNote({
@@ -275,12 +291,14 @@ describe("role suggestions", () => {
   it("never returns research or review from inference", () => {
     const researchNote = makeNote({
       title: "Research findings on API design",
-      content: "## Findings\n\n- Investigated three approaches\n- Approach A had best latency\n- Approach B had best throughput\n\n## Conclusion\n\nApproach A is preferred for low-latency use cases.",
+      content:
+        "## Findings\n\n- Investigated three approaches\n- Approach A had best latency\n- Approach B had best throughput\n\n## Conclusion\n\nApproach A is preferred for low-latency use cases.",
       lifecycle: "temporary",
     });
     const reviewNote = makeNote({
       title: "Code review for PR 42",
-      content: "## Issues found\n\n1. Missing error handling in handler\n2. N+1 query in list endpoint\n[x] Check auth middleware\n\n## Verdict\n\nNeeds changes before merge.",
+      content:
+        "## Issues found\n\n1. Missing error handling in handler\n2. N+1 query in list endpoint\n[x] Check auth middleware\n\n## Verdict\n\nNeeds changes before merge.",
       lifecycle: "temporary",
     });
 

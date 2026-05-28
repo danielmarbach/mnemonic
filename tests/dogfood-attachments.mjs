@@ -26,7 +26,7 @@ function createRepo(name) {
   writeFileSync(path.join(vaultDir, ".gitignore"), "embeddings/\nprojections/\n");
   writeFileSync(
     path.join(vaultDir, "config.json"),
-    JSON.stringify({ schemaVersion: "1.3" }, null, 2) + "\n"
+    JSON.stringify({ schemaVersion: "1.3" }, null, 2) + "\n",
   );
 
   // Initial commit so git branch exists for attachment reads
@@ -44,7 +44,7 @@ mkdirSync(path.join(mainVaultDir, "notes"), { recursive: true });
 writeFileSync(path.join(mainVaultDir, ".gitignore"), "embeddings/\nprojections/\n");
 writeFileSync(
   path.join(mainVaultDir, "config.json"),
-  JSON.stringify({ schemaVersion: "1.3" }, null, 2) + "\n"
+  JSON.stringify({ schemaVersion: "1.3" }, null, 2) + "\n",
 );
 
 const consumingRepo = createRepo("consuming");
@@ -119,7 +119,8 @@ async function main() {
   // 1. Seed a note in the attached repo directly
   const attRemember = await callTool("remember", {
     title: "Attached repo architecture decision",
-    content: "# Attached repo architecture decision\n\nWe chose federated reads over a centralised service.",
+    content:
+      "# Attached repo architecture decision\n\nWe chose federated reads over a centralised service.",
     lifecycle: "permanent",
     tags: ["architecture", "attachments"],
     scope: "project",
@@ -246,7 +247,8 @@ async function main() {
 
   // 12. memory_graph resolves cross-vault edge
   const graphResult = await callTool("memory_graph", { cwd: consumingRepo });
-  const graphHasCrossVault = graphResult.text.includes(attachedNoteId) || graphResult.text.includes("attached:");
+  const graphHasCrossVault =
+    graphResult.text.includes(attachedNoteId) || graphResult.text.includes("attached:");
   check("15. memory_graph resolves cross-vault", graphHasCrossVault);
 
   // 13. Cross-vault unrelate
@@ -264,15 +266,14 @@ async function main() {
     cwd: consumingRepo,
   });
   const consumingNoteAfter = getAfterUnrelate.structured?.notes?.[0];
-  const relationshipRemoved = !consumingNoteAfter?.relatedTo?.some(
-    (r) => r.id === attachedNoteId
-  );
+  const relationshipRemoved = !consumingNoteAfter?.relatedTo?.some((r) => r.id === attachedNoteId);
   check("17. relationship removed from consuming note", relationshipRemoved);
 
   // 15. Write-through: update existing attached note
   const updateWr = await callTool("update", {
     id: attachedNoteId,
-    content: "# Attached repo architecture decision\n\nWe chose federated reads over a centralised service. Updated via write-through.",
+    content:
+      "# Attached repo architecture decision\n\nWe chose federated reads over a centralised service. Updated via write-through.",
     cwd: consumingRepo,
     allowProtectedBranch: true,
   });
@@ -291,11 +292,15 @@ async function main() {
     ids: [attachedNoteId],
     cwd: consumingRepo,
   });
-  check("20. attached note no longer found after forget", getAfterForget.text.includes("Not found"));
+  check(
+    "20. attached note no longer found after forget",
+    getAfterForget.text.includes("Not found"),
+  );
 
   // 18. Sync mentions attached vault
   const syncResult = await callTool("sync", { cwd: consumingRepo });
-  const syncMentions = syncResult.text.includes("attached") || syncResult.text.includes("Attachment");
+  const syncMentions =
+    syncResult.text.includes("attached") || syncResult.text.includes("Attachment");
   check("21. sync output mentions attached vault", syncMentions);
 
   // Summary

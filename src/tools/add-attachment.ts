@@ -6,11 +6,15 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ServerContext } from "../server-context.js";
 import type { ProjectAttachmentConfig } from "../vault.js";
 import { detectDefaultBranch } from "../attached-storage.js";
-import { projectId, attachmentSlug, type AttachmentSlug } from "../brands.js";
+import { attachmentSlug, type AttachmentSlug } from "../brands.js";
 import { resolveProject as resolveProjectFromModule } from "../helpers/project.js";
 import { projectNotFoundResponse } from "../helpers/vault.js";
 import { formatCommitBody } from "../helpers/git-commit.js";
-import { pushAfterMutation as pushAfterMutationFromModule, buildMutationRetryContract, formatRetrySummary } from "../helpers/persistence.js";
+import {
+  pushAfterMutation as pushAfterMutationFromModule,
+  buildMutationRetryContract,
+  formatRetrySummary,
+} from "../helpers/persistence.js";
 import { AddAttachmentResultSchema, type AddAttachmentResult } from "../structured-content.js";
 import { invalidateActiveProjectCache } from "../cache.js";
 import { attempt } from "../error-utils.js";
@@ -55,12 +59,33 @@ export function registerAddAttachmentTool(server: McpServer, ctx: ServerContext)
         openWorldHint: false,
       },
       inputSchema: z.object({
-        cwd: z.string().describe("Absolute path of the project working directory. Required for project-scoped routing, vault selection, and search boosting."),
+        cwd: z
+          .string()
+          .describe(
+            "Absolute path of the project working directory. Required for project-scoped routing, vault selection, and search boosting.",
+          ),
         localPath: z.string().describe("Absolute path to the external repository to attach."),
-        vaultFolder: z.string().optional().describe("Vault folder name within the attached repo (default: .mnemonic)"),
-        branch: z.string().optional().describe("Git branch to read notes from in the attached repo (default: auto-detected)"),
-        writable: z.boolean().optional().default(false).describe("Whether this attachment supports write operations (default: false). When true, remember/update/forget/relate/unrelate can modify notes in this attached vault."),
-        pushBranch: z.string().optional().describe("Git branch to push mutations to when writable. Defaults to the read branch. If empty, commits locally without push."),
+        vaultFolder: z
+          .string()
+          .optional()
+          .describe("Vault folder name within the attached repo (default: .mnemonic)"),
+        branch: z
+          .string()
+          .optional()
+          .describe("Git branch to read notes from in the attached repo (default: auto-detected)"),
+        writable: z
+          .boolean()
+          .optional()
+          .default(false)
+          .describe(
+            "Whether this attachment supports write operations (default: false). When true, remember/update/forget/relate/unrelate can modify notes in this attached vault.",
+          ),
+        pushBranch: z
+          .string()
+          .optional()
+          .describe(
+            "Git branch to push mutations to when writable. Defaults to the read branch. If empty, commits locally without push.",
+          ),
       }),
       outputSchema: AddAttachmentResultSchema,
     },
@@ -68,11 +93,24 @@ export function registerAddAttachmentTool(server: McpServer, ctx: ServerContext)
       const expandedPath = expandHomePath(localPath);
       const resolvedPath = path.resolve(expandedPath);
       if (!resolvedPath.startsWith("/")) {
-        return { content: [{ type: "text", text: `Invalid path: ${localPath}. Must resolve to an absolute path.` }], isError: true };
+        return {
+          content: [
+            { type: "text", text: `Invalid path: ${localPath}. Must resolve to an absolute path.` },
+          ],
+          isError: true,
+        };
       }
       const folder = vaultFolder?.trim() || ".mnemonic";
       if (folder.includes("..") || !folder.startsWith(".mnemonic")) {
-        return { content: [{ type: "text", text: `Invalid vault folder: ${folder}. Must start with .mnemonic and not contain ..` }], isError: true };
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Invalid vault folder: ${folder}. Must start with .mnemonic and not contain ..`,
+            },
+          ],
+          isError: true,
+        };
       }
       const pathCheck = await attempt("add-attachment:check-path", async () => {
         const stat = await fs.stat(resolvedPath);
@@ -82,14 +120,31 @@ export function registerAddAttachmentTool(server: McpServer, ctx: ServerContext)
         return { valid: true, reason: "" };
       });
       if (!pathCheck.ok || !pathCheck.value.valid) {
-        return { content: [{ type: "text", text: pathCheck.ok ? pathCheck.value.reason : `Invalid path: ${localPath}. Path does not exist.` }], isError: true };
+        return {
+          content: [
+            {
+              type: "text",
+              text: pathCheck.ok
+                ? pathCheck.value.reason
+                : `Invalid path: ${localPath}. Path does not exist.`,
+            },
+          ],
+          isError: true,
+        };
       }
 
       const notesDir = path.join(resolvedPath, folder, "notes");
-      const accessCheck = await attempt("add-attachment:check-notes-dir", () => fs.access(notesDir));
+      const accessCheck = await attempt("add-attachment:check-notes-dir", () =>
+        fs.access(notesDir),
+      );
       if (!accessCheck.ok) {
         return {
-          content: [{ type: "text", text: `Cannot attach: no notes directory found at ${notesDir}. Ensure the repository has a ${folder}/notes/ directory.` }],
+          content: [
+            {
+              type: "text",
+              text: `Cannot attach: no notes directory found at ${notesDir}. Ensure the repository has a ${folder}/notes/ directory.`,
+            },
+          ],
           isError: true,
         };
       }
@@ -103,7 +158,12 @@ export function registerAddAttachmentTool(server: McpServer, ctx: ServerContext)
       const remoteResult = await git.raw(["remote", "get-url", "origin"]).catch(() => null);
       if (!remoteResult?.trim()) {
         return {
-          content: [{ type: "text", text: `Cannot attach: no 'origin' remote found at ${resolvedPath}. The repository must have an 'origin' remote.` }],
+          content: [
+            {
+              type: "text",
+              text: `Cannot attach: no 'origin' remote found at ${resolvedPath}. The repository must have an 'origin' remote.`,
+            },
+          ],
           isError: true,
         };
       }
@@ -114,10 +174,15 @@ export function registerAddAttachmentTool(server: McpServer, ctx: ServerContext)
 
       const maxAttachments = await ctx.configStore.getMaxAttachmentsPerProject();
       const currentAttachments = await ctx.configStore.getProjectAttachments(project.id);
-      const existingIndex = currentAttachments.findIndex(a => a.projectSlug === slug);
+      const existingIndex = currentAttachments.findIndex((a) => a.projectSlug === slug);
       if (existingIndex === -1 && currentAttachments.length >= maxAttachments) {
         return {
-          content: [{ type: "text", text: `Cannot attach: project already has ${currentAttachments.length} attachment(s), maximum is ${maxAttachments}. Remove an existing attachment first.` }],
+          content: [
+            {
+              type: "text",
+              text: `Cannot attach: project already has ${currentAttachments.length} attachment(s), maximum is ${maxAttachments}. Remove an existing attachment first.`,
+            },
+          ],
           isError: true,
         };
       }
@@ -143,7 +208,7 @@ export function registerAddAttachmentTool(server: McpServer, ctx: ServerContext)
         vaultFolder: folder,
         enabled: true,
         branch: effectiveBranch,
-        addedAt: existingIndex !== -1 ? currentAttachments[existingIndex]!.addedAt : now,
+        addedAt: existingIndex !== -1 ? (currentAttachments[existingIndex]?.addedAt ?? now) : now,
         updatedAt: now,
         branchTipHash,
         writable: writable ?? false,
@@ -170,10 +235,15 @@ export function registerAddAttachmentTool(server: McpServer, ctx: ServerContext)
       });
       const commitMessage = `attachment: add ${name} to ${project.name}`;
       const commitFiles = ["config.json"];
-      const commitStatus = await ctx.vaultManager.main.git.commitWithStatus(commitMessage, commitFiles, commitBody);
-      const pushStatus = commitStatus.status === "committed"
-        ? await pushAfterMutationFromModule(ctx, ctx.vaultManager.main)
-        : { status: "skipped" as const, reason: "commit-failed" as const };
+      const commitStatus = await ctx.vaultManager.main.git.commitWithStatus(
+        commitMessage,
+        commitFiles,
+        commitBody,
+      );
+      const pushStatus =
+        commitStatus.status === "committed"
+          ? await pushAfterMutationFromModule(ctx, ctx.vaultManager.main)
+          : { status: "skipped" as const, reason: "commit-failed" as const };
       const retry = buildMutationRetryContract({
         commit: commitStatus,
         commitMessage,
@@ -184,9 +254,11 @@ export function registerAddAttachmentTool(server: McpServer, ctx: ServerContext)
         mutationApplied: true,
       });
 
-      let warnings: string[] = [];
+      const warnings: string[] = [];
       if (!effectiveBranch) {
-        warnings.push("Branch is empty — attached vault will read from working tree (not recommended for production).");
+        warnings.push(
+          "Branch is empty — attached vault will read from working tree (not recommended for production).",
+        );
       }
 
       const structuredContent: AddAttachmentResult = {
@@ -211,17 +283,19 @@ export function registerAddAttachmentTool(server: McpServer, ctx: ServerContext)
       const writableStr = writable ? "writable" : "read-only";
       const pushStr = pushBranch ? `pushBranch=${pushBranch}` : "";
       return {
-        content: [{
-          type: "text",
-          text:
-            `Attachment added to ${project.name}: ${name} (${slug}) at ${resolvedPath}, branch=${branchDisplay}, ${writableStr}${pushStr ? `, ${pushStr}` : ""}` +
-            (warnings.length > 0 ? `\nWarnings: ${warnings.join("; ")}` : "") +
-            (commitStatus.status === "failed"
-              ? `\n${formatRetrySummary(retry) ?? `Commit failed. Push status: ${pushStatus.status}.`}`
-              : ""),
-        }],
+        content: [
+          {
+            type: "text",
+            text:
+              `Attachment added to ${project.name}: ${name} (${slug}) at ${resolvedPath}, branch=${branchDisplay}, ${writableStr}${pushStr ? `, ${pushStr}` : ""}` +
+              (warnings.length > 0 ? `\nWarnings: ${warnings.join("; ")}` : "") +
+              (commitStatus.status === "failed"
+                ? `\n${formatRetrySummary(retry) ?? `Commit failed. Push status: ${pushStatus.status}.`}`
+                : ""),
+          },
+        ],
         structuredContent,
       };
-    }
+    },
   );
 }

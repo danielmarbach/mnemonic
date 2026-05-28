@@ -2,7 +2,10 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ServerContext } from "../server-context.js";
 import { resolveProjectIdentityForCwd as resolveProjectIdentityForCwdFromModule } from "../helpers/project.js";
-import { projectNotFoundResponse, formatProjectPolicyLine as formatProjectPolicyLineFromModule } from "../helpers/vault.js";
+import {
+  projectNotFoundResponse,
+  formatProjectPolicyLine as formatProjectPolicyLineFromModule,
+} from "../helpers/vault.js";
 import type { ProjectIdentityResolution } from "../project.js";
 import { ProjectIdentityResultSchema, type ProjectIdentityResult } from "../structured-content.js";
 
@@ -21,7 +24,9 @@ export function formatProjectIdentityText(identity: ProjectIdentityResolution): 
   if (identity.identityOverride) {
     const defaultRemote = identity.defaultProject.remoteName ?? "none";
     const status = identity.identityOverrideApplied ? "applied" : "configured, remote unavailable";
-    lines.push(`- **identity override:** ${identity.identityOverride.remoteName} (${status}; default remote: ${defaultRemote})`);
+    lines.push(
+      `- **identity override:** ${identity.identityOverride.remoteName} (${status}; default remote: ${defaultRemote})`,
+    );
     lines.push(`- **default id:** \`${identity.defaultProject.id}\``);
   }
 
@@ -50,7 +55,11 @@ export function registerDetectProjectTool(server: McpServer, ctx: ServerContext)
       },
       outputSchema: ProjectIdentityResultSchema,
       inputSchema: z.object({
-        cwd: z.string().describe("Absolute path of the project working directory. Required for project-scoped routing, vault selection, and search boosting."),
+        cwd: z
+          .string()
+          .describe(
+            "Absolute path of the project working directory. Required for project-scoped routing, vault selection, and search boosting.",
+          ),
       }),
     },
     async ({ cwd }) => {
@@ -60,7 +69,7 @@ export function registerDetectProjectTool(server: McpServer, ctx: ServerContext)
         return projectNotFoundResponse(cwd);
       }
       const policyLine = await formatProjectPolicyLineFromModule(ctx, project.id);
-      
+
       const structuredContent: ProjectIdentityResult = {
         action: "project_identity_detected",
         project: {
@@ -69,23 +78,25 @@ export function registerDetectProjectTool(server: McpServer, ctx: ServerContext)
           source: project.source,
           remoteName: project.remoteName,
         },
-        defaultProject: identity.defaultProject ? {
-          id: identity.defaultProject.id,
-          name: identity.defaultProject.name,
-          remoteName: identity.defaultProject.remoteName,
-        } : undefined,
+        defaultProject: identity.defaultProject
+          ? {
+              id: identity.defaultProject.id,
+              name: identity.defaultProject.name,
+              remoteName: identity.defaultProject.remoteName,
+            }
+          : undefined,
         identityOverride: identity.identityOverride,
       };
-      
+
       return {
-        content: [{
-          type: "text",
-          text:
-            `${formatProjectIdentityText(identity)}\n` +
-            `- **${policyLine}**`,
-        }],
+        content: [
+          {
+            type: "text",
+            text: `${formatProjectIdentityText(identity)}\n` + `- **${policyLine}**`,
+          },
+        ],
         structuredContent,
       };
-    }
+    },
   );
 }

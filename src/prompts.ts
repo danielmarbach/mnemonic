@@ -23,7 +23,7 @@ export function registerPrompts(server: McpServer): void {
               "- When unsure, prefer `recall` over `remember`.\n" +
               "- For repo-related tasks, pass `cwd` so mnemonic can route project memories correctly.\n\n" +
               "Workflow: `recall`/`list` -> `get` -> `update` or `remember` -> `relate`/`consolidate`/`move_memory`. Use `discover_tags` only when tag choice is ambiguous.\n\n" +
-              "When a merge/prune decision is uncertain, use optional evidence enrichment: `recall` with `evidence: \"compact\"` and `consolidate` analysis strategies with `evidence: true`. Evidence improves confidence but is not required.\n\n" +
+              'When a merge/prune decision is uncertain, use optional evidence enrichment: `recall` with `evidence: "compact"` and `consolidate` analysis strategies with `evidence: true`. Evidence improves confidence but is not required.\n\n' +
               "Roles are optional prioritization hints, not schema. Lifecycle still governs durability. When `lifecycle` is omitted, `remember` applies soft defaults based on role: `research`, `plan`, and `review` default to `temporary`; `decision`, `summary`, and `reference` default to `permanent`. Explicit `lifecycle` always overrides the role-based default. Inferred roles are internal hints only. Prioritization is language-independent by default.\n\n" +
               "### Working-state continuity\n\n" +
               "Preserve in-progress work as temporary notes when continuation value is high. Recovery happens after project orientation.\n\n" +
@@ -64,7 +64,7 @@ export function registerPrompts(server: McpServer): void {
               "- Existing bug note found by `recall` -> inspect with `get` -> refine with `update`.\n" +
               "- No matching note found by `recall` -> optional `discover_tags` with note context -> create with `remember`.\n" +
               "- Two notes overlap heavily -> inspect -> clean up with `consolidate`.\n" +
-              "- Unsure why a recall hit ranked high -> rerun `recall` with `evidence: \"compact\"`.\n" +
+              '- Unsure why a recall hit ranked high -> rerun `recall` with `evidence: "compact"`.\n' +
               "- Unsure whether to merge/prune -> run `consolidate` analysis with `evidence: true` before `execute-merge` or `prune-superseded`.\n" +
               "- Forgetting is explicit: lifecycle, `supersedes`, `delete`, and `prune-superseded`; mnemonic does not auto-expire notes.\n" +
               "- Resume work: `project_memory_summary` -> `recall` (lifecycle: temporary) -> continue from temporary notes.\n\n" +
@@ -75,12 +75,12 @@ export function registerPrompts(server: McpServer): void {
               "- `operation` has an `op` key plus `value` (except `remove` which has no value).\n" +
               "- The parameter must be a JSON array, NOT a string.\n" +
               "- Use `get` first to read exact heading text, then use those headings (without `##` prefix) as selector values.\n" +
-              "- Common mistake: writing `{ \"op\": \"appendChild\", \"value\": \"...\" }` at the top level instead of nesting inside `operation`. Correct shape: `{ \"selector\": { \"heading\": \"Findings\" }, \"operation\": { \"op\": \"insertAfter\", \"value\": \"text\" } }`\n" +
-              "- `appendChild`, `prependChild`, and `replaceChildren` do NOT work with `heading` selectors. To add content under a heading, use `insertAfter`. To replace a full section including its body, use `{ \"selector\": { \"section\": \"Findings\" }, \"operation\": { \"op\": \"replaceSection\", \"value\": \"## Findings\\n\\nNew body.\" } }`.",
+              '- Common mistake: writing `{ "op": "appendChild", "value": "..." }` at the top level instead of nesting inside `operation`. Correct shape: `{ "selector": { "heading": "Findings" }, "operation": { "op": "insertAfter", "value": "text" } }`\n' +
+              '- `appendChild`, `prependChild`, and `replaceChildren` do NOT work with `heading` selectors. To add content under a heading, use `insertAfter`. To replace a full section including its body, use `{ "selector": { "section": "Findings" }, "operation": { "op": "replaceSection", "value": "## Findings\\n\\nNew body." } }`.',
           },
         },
       ],
-    })
+    }),
   );
 
   // ── mnemonic-rpi-workflow prompt ───────────────────────────────────────────────
@@ -94,7 +94,7 @@ export function registerPrompts(server: McpServer): void {
             "## RPIR workflow: research → plan → implement → review\n\n" +
             "mnemonic is the artifact store, not the runtime. Store workflow artifacts with correct roles and lifecycle; do not build orchestration in core. Note creation is the attention filter: capture durable decisions, outcomes, corrections, constraints, and validated learnings; skip routine chatter.\n\n" +
             "### Request root note\n\n" +
-            "For each RPIR workflow, create one request root note: `role: context`, `lifecycle: temporary`, `tags: [\"workflow\", \"request\"]`. All artifacts relate to it.\n\n" +
+            'For each RPIR workflow, create one request root note: `role: context`, `lifecycle: temporary`, `tags: ["workflow", "request"]`. All artifacts relate to it.\n\n' +
             "### Stage 1 — Research\n\n" +
             "- Create or update request root note.\n" +
             "- Create research notes: `role: research`, `lifecycle: temporary`.\n" +
@@ -146,8 +146,9 @@ export function registerPrompts(server: McpServer): void {
     "mnemonic-rpi-workflow",
     {
       title: "RPI Workflow: Research → Plan → Implement → Review",
-      description: "Stage protocol and conventions for structured task workflows using mnemonic as artifact store.",
+      description:
+        "Stage protocol and conventions for structured task workflows using mnemonic as artifact store.",
     },
-    rpiWorkflowPrompt
+    rpiWorkflowPrompt,
   );
 }

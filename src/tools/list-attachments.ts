@@ -30,7 +30,11 @@ export function registerListAttachmentsTool(server: McpServer, ctx: ServerContex
         openWorldHint: false,
       },
       inputSchema: z.object({
-        cwd: z.string().describe("Absolute path of the project working directory. Required for project-scoped routing, vault selection, and search boosting."),
+        cwd: z
+          .string()
+          .describe(
+            "Absolute path of the project working directory. Required for project-scoped routing, vault selection, and search boosting.",
+          ),
       }),
       outputSchema: ListAttachmentsResultSchema,
     },
@@ -47,21 +51,27 @@ export function registerListAttachmentsTool(server: McpServer, ctx: ServerContex
       const lines: string[] = [];
 
       if (attachments.length === 0) {
-        lines.push(`No attachments for project ${project.name} (${maxAttachments} attachment slots available).`);
+        lines.push(
+          `No attachments for project ${project.name} (${maxAttachments} attachment slots available).`,
+        );
       } else {
         lines.push(`Attachments for ${project.name} (${attachments.length}/${maxAttachments}):`);
       }
 
       for (const att of attachments) {
         const resolvedLocalPath = path.resolve(expandHomePath(att.localPath));
-        const pathCheck = await attempt("list-attachments:check-path", () => fs.access(resolvedLocalPath));
+        const pathCheck = await attempt("list-attachments:check-path", () =>
+          fs.access(resolvedLocalPath),
+        );
         const pathExists = pathCheck.ok;
 
         let noteCount = 0;
         if (pathExists && att.enabled) {
           const noteCountResult = await attempt("list-attachments:count-notes", async () => {
             const attachedVaults = ctx.vaultManager.getAttachmentsForProject(project.id);
-            const matchingVault = attachedVaults.find(v => v.attachmentRef?.projectSlug === att.projectSlug);
+            const matchingVault = attachedVaults.find(
+              (v) => v.attachmentRef?.projectSlug === att.projectSlug,
+            );
             if (matchingVault) {
               const notes = await matchingVault.storage.listNoteIds();
               return notes.length;
@@ -93,7 +103,7 @@ export function registerListAttachmentsTool(server: McpServer, ctx: ServerContex
         const writableStr = att.writable ? "writable" : "read-only";
         const pushStr = att.pushBranch ? `pushBranch=${att.pushBranch}` : "push=default";
         lines.push(
-          `  - ${att.projectName} (${att.projectSlug}): ${status}, ${writableStr}, ${pushStr}, branch=${branchDisplay}, notes=${noteCount}, path=${resolvedLocalPath}`
+          `  - ${att.projectName} (${att.projectSlug}): ${status}, ${writableStr}, ${pushStr}, branch=${branchDisplay}, notes=${noteCount}, path=${resolvedLocalPath}`,
         );
       }
 
@@ -108,6 +118,6 @@ export function registerListAttachmentsTool(server: McpServer, ctx: ServerContex
         content: [{ type: "text", text: lines.join("\n") }],
         structuredContent,
       };
-    }
+    },
   );
 }

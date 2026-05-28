@@ -43,7 +43,9 @@ export async function startServer(server: McpServer, ctx: ServerContext): Promis
   }
   process.on("SIGINT", shutdown);
   process.on("SIGTERM", shutdown);
-  transport.onclose = async () => { await server.close(); };
+  transport.onclose = async () => {
+    await server.close();
+  };
 
   await server.connect(transport);
   console.error(`[mnemonic] Started. Main vault: ${ctx.vaultPath}`);

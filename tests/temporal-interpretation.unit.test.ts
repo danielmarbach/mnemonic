@@ -20,7 +20,9 @@ function makeHistoryEntry(overrides: Partial<TemporalHistoryEntry> = {}): Tempor
   };
 }
 
-function makeInterpretedEntry(overrides: Partial<InterpretedHistoryEntry> = {}): InterpretedHistoryEntry {
+function makeInterpretedEntry(
+  overrides: Partial<InterpretedHistoryEntry> = {},
+): InterpretedHistoryEntry {
   return {
     commitHash: "abc123",
     timestamp: "2026-01-01T00:00:00.000Z",
@@ -293,12 +295,15 @@ describe("interpretHistoryEntry", () => {
 
     for (const category of categories) {
       const entry = makeHistoryEntry({
-        stats: category === "unknown" ? undefined : {
-          additions: category === "create" ? 100 : 10,
-          deletions: 0,
-          filesChanged: 1,
-          changeType: category === "create" ? "substantial update" : "minor edit",
-        },
+        stats:
+          category === "unknown"
+            ? undefined
+            : {
+                additions: category === "create" ? 100 : 10,
+                deletions: 0,
+                filesChanged: 1,
+                changeType: category === "create" ? "substantial update" : "minor edit",
+              },
       });
       const result = interpretHistoryEntry(entry, { isFirstCommit: category === "create" });
 
@@ -372,7 +377,9 @@ describe("summarizeHistory", () => {
     ];
     const result = summarizeHistory(entries);
     // Clarify is dominant (2 non-create), but with connect present, we get the connect message
-    expect(result).toBe("The core content remained stable; later edits expanded rationale and linked related notes.");
+    expect(result).toBe(
+      "The core content remained stable; later edits expanded rationale and linked related notes.",
+    );
   });
 
   it("summarizes stable core with expansion pattern", () => {
@@ -394,7 +401,9 @@ describe("summarizeHistory", () => {
       makeInterpretedEntry({ changeCategory: "create" }),
     ];
     const result = summarizeHistory(entries);
-    expect(result).toBe("The core content remained stable; later edits expanded rationale and linked related notes.");
+    expect(result).toBe(
+      "The core content remained stable; later edits expanded rationale and linked related notes.",
+    );
   });
 
   it("summarizes substantial restructure pattern", () => {
@@ -405,7 +414,9 @@ describe("summarizeHistory", () => {
       makeInterpretedEntry({ changeCategory: "create" }),
     ];
     const result = summarizeHistory(entries);
-    expect(result).toBe("The note evolved through several substantial revisions before settling into its current form.");
+    expect(result).toBe(
+      "The note evolved through several substantial revisions before settling into its current form.",
+    );
   });
 
   it("summarizes predominantly refinement pattern", () => {
@@ -443,7 +454,12 @@ describe("summarizeHistory", () => {
   });
 
   it("summarizes unknown-dominant pattern with multiple substantial updates", () => {
-    const substantialStats = { additions: 200, deletions: 50, filesChanged: 5, changeType: "substantial update" as const };
+    const substantialStats = {
+      additions: 200,
+      deletions: 50,
+      filesChanged: 5,
+      changeType: "substantial update" as const,
+    };
     const entries = [
       makeInterpretedEntry({ changeCategory: "unknown", stats: substantialStats }),
       makeInterpretedEntry({ changeCategory: "unknown", stats: substantialStats }),
@@ -455,8 +471,14 @@ describe("summarizeHistory", () => {
 
   it("summarizes unknown-dominant pattern with high total additions", () => {
     const entries = [
-      makeInterpretedEntry({ changeCategory: "unknown", stats: { additions: 80, deletions: 10, filesChanged: 2, changeType: "minor edit" as const } }),
-      makeInterpretedEntry({ changeCategory: "unknown", stats: { additions: 60, deletions: 5, filesChanged: 2, changeType: "minor edit" as const } }),
+      makeInterpretedEntry({
+        changeCategory: "unknown",
+        stats: { additions: 80, deletions: 10, filesChanged: 2, changeType: "minor edit" as const },
+      }),
+      makeInterpretedEntry({
+        changeCategory: "unknown",
+        stats: { additions: 60, deletions: 5, filesChanged: 2, changeType: "minor edit" as const },
+      }),
       makeInterpretedEntry({ changeCategory: "create" }),
     ];
     const result = summarizeHistory(entries);
@@ -519,8 +541,16 @@ describe("enrichTemporalHistory", () => {
 
   it("interprets entries without stats as unknown (when not first commit)", () => {
     const entries: TemporalHistoryEntry[] = [
-      makeHistoryEntry({ commitHash: "newer", timestamp: "2026-01-02T00:00:00.000Z", stats: undefined }),
-      makeHistoryEntry({ commitHash: "older", timestamp: "2026-01-01T00:00:00.000Z", stats: undefined }),
+      makeHistoryEntry({
+        commitHash: "newer",
+        timestamp: "2026-01-02T00:00:00.000Z",
+        stats: undefined,
+      }),
+      makeHistoryEntry({
+        commitHash: "older",
+        timestamp: "2026-01-01T00:00:00.000Z",
+        stats: undefined,
+      }),
     ];
     const result = enrichTemporalHistory(entries);
 

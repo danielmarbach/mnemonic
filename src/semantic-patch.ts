@@ -36,7 +36,10 @@ function isHeadingNode(node: Content): node is Heading {
   return node.type === "heading";
 }
 
-function findHeadingIndex(tree: Root, predicate: (heading: Heading) => boolean): number | undefined {
+function findHeadingIndex(
+  tree: Root,
+  predicate: (heading: Heading) => boolean,
+): number | undefined {
   for (let i = 0; i < tree.children.length; i++) {
     const child = tree.children[i];
     if (child && isHeadingNode(child) && predicate(child)) {
@@ -61,7 +64,10 @@ function sectionEndIndex(tree: Root, headingIndex: number): number {
   return tree.children.length;
 }
 
-function resolveSelector(tree: Root, selector: SemanticSelector): { parent: Root; index: number; target: Content } | undefined {
+function resolveSelector(
+  tree: Root,
+  selector: SemanticSelector,
+): { parent: Root; index: number; target: Content } | undefined {
   if ("heading" in selector) {
     const index = findHeadingIndex(tree, (heading) => getHeadingText(heading) === selector.heading);
     if (index !== undefined) {
@@ -72,7 +78,9 @@ function resolveSelector(tree: Root, selector: SemanticSelector): { parent: Root
   }
 
   if ("headingStartsWith" in selector) {
-    const index = findHeadingIndex(tree, (heading) => getHeadingText(heading).startsWith(selector.headingStartsWith));
+    const index = findHeadingIndex(tree, (heading) =>
+      getHeadingText(heading).startsWith(selector.headingStartsWith),
+    );
     if (index !== undefined) {
       const target = tree.children[index];
       if (target) return { parent: tree, index, target };
@@ -126,19 +134,29 @@ function parseValueNodes(value: string): Content[] {
   return fragment.children;
 }
 
-function throwIfHeadingReplaceLooksLikeSectionReplace(target: Content, selector: SemanticSelector, op: SemanticOperation): void {
-  if (op.op !== "replace" || !("heading" in selector || "headingStartsWith" in selector) || !isHeadingNode(target)) {
+function throwIfHeadingReplaceLooksLikeSectionReplace(
+  target: Content,
+  selector: SemanticSelector,
+  op: SemanticOperation,
+): void {
+  if (
+    op.op !== "replace" ||
+    !("heading" in selector || "headingStartsWith" in selector) ||
+    !isHeadingNode(target)
+  ) {
     return;
   }
 
   const newNodes = parseValueNodes(op.value);
-  if (!newNodes.some((node) => isHeadingNode(node) && getHeadingText(node) === getHeadingText(target))) {
+  if (
+    !newNodes.some((node) => isHeadingNode(node) && getHeadingText(node) === getHeadingText(target))
+  ) {
     return;
   }
 
   throw new SemanticPatchError(
     "Heading `replace` only replaces the heading node and leaves the existing section body intact. " +
-    "Use `{ selector: { section: \"...\" }, operation: { op: \"replaceSection\", value: \"...\" } }` to replace a whole section."
+      'Use `{ selector: { section: "..." }, operation: { op: "replaceSection", value: "..." } }` to replace a whole section.',
   );
 }
 
@@ -152,7 +170,10 @@ function collectAvailableHeadings(tree: Root): string[] {
   return headings;
 }
 
-export async function applySemanticPatches(body: string, patches: SemanticPatch[]): Promise<{ content: string; lintWarnings: string[] }> {
+export async function applySemanticPatches(
+  body: string,
+  patches: SemanticPatch[],
+): Promise<{ content: string; lintWarnings: string[] }> {
   const tree = parseBody(body);
 
   for (const patch of patches) {

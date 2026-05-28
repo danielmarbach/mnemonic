@@ -21,22 +21,32 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".."
 const execFileAsync = promisify(execFile);
 
 afterEach(async () => {
-  await Promise.all(tempDirs.splice(0).map((dir) => import("fs/promises").then((fs) => fs.rm(dir, { recursive: true, force: true }))));
+  await Promise.all(
+    tempDirs
+      .splice(0)
+      .map((dir) =>
+        import("fs/promises").then((fs) => fs.rm(dir, { recursive: true, force: true })),
+      ),
+  );
 });
 
 beforeAll(async () => {
   await execFileAsync("npm", ["run", "build"], { cwd: repoRoot });
 }, 120000);
 
-async function writeSeedNote(vaultDir: string, note: {
-  id: string;
-  title: string;
-  content: string;
-  tags?: string[];
-  lifecycle?: "temporary" | "permanent";
-  updatedAt?: string;
-  relatedTo?: Array<{ id: string; type: string }>;
-}, projectDir?: string): Promise<void> {
+async function writeSeedNote(
+  vaultDir: string,
+  note: {
+    id: string;
+    title: string;
+    content: string;
+    tags?: string[];
+    lifecycle?: "temporary" | "permanent";
+    updatedAt?: string;
+    relatedTo?: Array<{ id: string; type: string }>;
+  },
+  projectDir?: string,
+): Promise<void> {
   const baseDir = projectDir ? path.join(projectDir, ".mnemonic") : vaultDir;
   await mkdir(path.join(baseDir, "notes"), { recursive: true });
   const relatedToYaml = note.relatedTo?.length
@@ -58,17 +68,26 @@ ${note.content}`,
   );
 }
 
-async function writeSeedEmbedding(vaultDir: string, id: string, embedding: number[], projectDir?: string): Promise<void> {
+async function writeSeedEmbedding(
+  vaultDir: string,
+  id: string,
+  embedding: number[],
+  projectDir?: string,
+): Promise<void> {
   const baseDir = projectDir ? path.join(projectDir, ".mnemonic") : vaultDir;
   await mkdir(path.join(baseDir, "embeddings"), { recursive: true });
   await writeFile(
     path.join(baseDir, "embeddings", `${id}.json`),
-    JSON.stringify({
-      id,
-      model: embedModel,
-      embedding,
-      updatedAt: "2026-01-01T00:00:00.000Z",
-    }, null, 2),
+    JSON.stringify(
+      {
+        id,
+        model: embedModel,
+        embedding,
+        updatedAt: "2026-01-01T00:00:00.000Z",
+      },
+      null,
+      2,
+    ),
     "utf-8",
   );
 }
@@ -84,57 +103,88 @@ describe("recall pipeline integration", () => {
     const embeddingServer = await startFakeEmbeddingServer();
 
     try {
-      const globalNote = await callLocalMcp(mainVaultDir, "remember", {
-        title: "Global Architecture Decision",
-        content: "A global note describing architecture decisions, design patterns, and system structure.",
-        tags: ["integration", "architecture"],
-        scope: "global",
-        lifecycle: "permanent",
-        summary: "Global architecture decision note",
-        cwd: repoDir,
-      }, embeddingServer.url);
+      const globalNote = await callLocalMcp(
+        mainVaultDir,
+        "remember",
+        {
+          title: "Global Architecture Decision",
+          content:
+            "A global note describing architecture decisions, design patterns, and system structure.",
+          tags: ["integration", "architecture"],
+          scope: "global",
+          lifecycle: "permanent",
+          summary: "Global architecture decision note",
+          cwd: repoDir,
+        },
+        embeddingServer.url,
+      );
 
       const globalId = extractRememberedId(globalNote);
 
-      const projectNote = await callLocalMcp(mainVaultDir, "remember", {
-        title: "Project Entry Point",
-        content: "A project note serving as an entry point for graph spreading to discover the global architecture note.",
-        tags: ["integration", "pipeline"],
-        cwd: repoDir,
-        scope: "project",
-        lifecycle: "permanent",
-        summary: "Project entry point for cross-vault graph spreading test",
-      }, embeddingServer.url);
+      const projectNote = await callLocalMcp(
+        mainVaultDir,
+        "remember",
+        {
+          title: "Project Entry Point",
+          content:
+            "A project note serving as an entry point for graph spreading to discover the global architecture note.",
+          tags: ["integration", "pipeline"],
+          cwd: repoDir,
+          scope: "project",
+          lifecycle: "permanent",
+          summary: "Project entry point for cross-vault graph spreading test",
+        },
+        embeddingServer.url,
+      );
 
       const projectId = extractRememberedId(projectNote);
 
-      await callLocalMcp(mainVaultDir, "relate", {
-        fromId: projectId,
-        toId: globalId,
-        type: "explains",
-        cwd: repoDir,
-      }, embeddingServer.url);
+      await callLocalMcp(
+        mainVaultDir,
+        "relate",
+        {
+          fromId: projectId,
+          toId: globalId,
+          type: "explains",
+          cwd: repoDir,
+        },
+        embeddingServer.url,
+      );
 
-      const projectEmbeddingPath = path.join(repoDir, ".mnemonic", "embeddings", `${projectId}.json`);
-      const highScoreEmbedding = Array(384).fill(0).map((_, i) => i === 0 ? 0.9 : 0.01);
+      const projectEmbeddingPath = path.join(
+        repoDir,
+        ".mnemonic",
+        "embeddings",
+        `${projectId}.json`,
+      );
+      const highScoreEmbedding = Array(384)
+        .fill(0)
+        .map((_, i) => (i === 0 ? 0.9 : 0.01));
       const projectEmbeddingRaw = await readFile(projectEmbeddingPath, "utf-8");
       const projectEmbeddingJson = JSON.parse(projectEmbeddingRaw) as Record<string, unknown>;
       projectEmbeddingJson["embedding"] = highScoreEmbedding;
       await writeFile(projectEmbeddingPath, JSON.stringify(projectEmbeddingJson), "utf-8");
 
       const globalEmbeddingPath = path.join(mainVaultDir, "embeddings", `${globalId}.json`);
-      const lowEmbedding = Array(384).fill(0).map((_, i) => i === 0 ? 0.01 : 0.01);
+      const lowEmbedding = Array(384)
+        .fill(0)
+        .map((_, i) => (i === 0 ? 0.01 : 0.01));
       const globalEmbeddingRaw = await readFile(globalEmbeddingPath, "utf-8");
       const globalEmbeddingJson = JSON.parse(globalEmbeddingRaw) as Record<string, unknown>;
       globalEmbeddingJson["embedding"] = lowEmbedding;
       await writeFile(globalEmbeddingPath, JSON.stringify(globalEmbeddingJson), "utf-8");
 
-      const response = await callLocalMcpResponse(mainVaultDir, "recall", {
-        query: "Project Entry Point architecture",
-        cwd: repoDir,
-        limit: 10,
-        scope: "all",
-      }, embeddingServer.url);
+      const response = await callLocalMcpResponse(
+        mainVaultDir,
+        "recall",
+        {
+          query: "Project Entry Point architecture",
+          cwd: repoDir,
+          limit: 10,
+          scope: "all",
+        },
+        embeddingServer.url,
+      );
 
       const parsed = RecallResultSchema.parse(response.structuredContent);
       const ids = parsed.results.map((r) => r.id);
@@ -157,16 +207,22 @@ describe("recall pipeline integration", () => {
       await writeSeedNote(vaultDir, {
         id: "rescue-lexical-match",
         title: "Rescue Candidate Coverage Scoring",
-        content: "Rescue candidate scoring should include coverage and phrase scores to avoid double penalty against semantic candidates. When a rescue candidate has strong lexical overlap, it should not be systematically depressed by zero coverage and phrase scores.",
+        content:
+          "Rescue candidate scoring should include coverage and phrase scores to avoid double penalty against semantic candidates. When a rescue candidate has strong lexical overlap, it should not be systematically depressed by zero coverage and phrase scores.",
         tags: ["integration", "pipeline"],
       });
 
-      const response = await callLocalMcpResponse(vaultDir, "recall", {
-        query: "rescue candidate scoring coverage phrase scores lexical rank",
-        limit: 10,
-        scope: "global",
-        minSimilarity: 0.01,
-      }, embeddingServer.url);
+      const response = await callLocalMcpResponse(
+        vaultDir,
+        "recall",
+        {
+          query: "rescue candidate scoring coverage phrase scores lexical rank",
+          limit: 10,
+          scope: "global",
+          minSimilarity: 0.01,
+        },
+        embeddingServer.url,
+      );
 
       const parsed = RecallResultSchema.parse(response.structuredContent);
       const ids = parsed.results.map((r) => r.id);
@@ -186,43 +242,64 @@ describe("recall pipeline integration", () => {
     const embeddingServer = await startFakeEmbeddingServer();
 
     try {
-      await callLocalMcp(mainVaultDir, "remember", {
-        title: "Project Anchor Note",
-        content: "A project-scoped summary note marked as alwaysLoad for coverage testing.",
-        tags: ["integration", "diagnostics"],
-        cwd: repoDir,
-        scope: "project",
-        lifecycle: "permanent",
-        role: "summary",
-        alwaysLoad: true,
-        summary: "Project anchor for diagnostics test",
-      }, embeddingServer.url);
+      await callLocalMcp(
+        mainVaultDir,
+        "remember",
+        {
+          title: "Project Anchor Note",
+          content: "A project-scoped summary note marked as alwaysLoad for coverage testing.",
+          tags: ["integration", "diagnostics"],
+          cwd: repoDir,
+          scope: "project",
+          lifecycle: "permanent",
+          role: "summary",
+          alwaysLoad: true,
+          summary: "Project anchor for diagnostics test",
+        },
+        embeddingServer.url,
+      );
 
-      await callLocalMcp(mainVaultDir, "remember", {
-        title: "Global Diagnostics Note",
-        content: "A global note used to test recallScopeNoteCount and diversity metrics across vaults.",
-        tags: ["integration", "global-diagnostics"],
-        scope: "global",
-        lifecycle: "permanent",
-        cwd: repoDir,
-      }, embeddingServer.url);
+      await callLocalMcp(
+        mainVaultDir,
+        "remember",
+        {
+          title: "Global Diagnostics Note",
+          content:
+            "A global note used to test recallScopeNoteCount and diversity metrics across vaults.",
+          tags: ["integration", "global-diagnostics"],
+          scope: "global",
+          lifecycle: "permanent",
+          cwd: repoDir,
+        },
+        embeddingServer.url,
+      );
 
-      await callLocalMcp(mainVaultDir, "remember", {
-        title: "Project Context Note",
-        content: "Another project note with a different role to test roleMix diversity.",
-        tags: ["integration", "diagnostics"],
-        cwd: repoDir,
-        scope: "project",
-        lifecycle: "temporary",
-        role: "context",
-      }, embeddingServer.url);
+      await callLocalMcp(
+        mainVaultDir,
+        "remember",
+        {
+          title: "Project Context Note",
+          content: "Another project note with a different role to test roleMix diversity.",
+          tags: ["integration", "diagnostics"],
+          cwd: repoDir,
+          scope: "project",
+          lifecycle: "temporary",
+          role: "context",
+        },
+        embeddingServer.url,
+      );
 
-      const projectResponse = await callLocalMcpResponse(mainVaultDir, "recall", {
-        query: "diagnostics testing",
-        cwd: repoDir,
-        limit: 10,
-        scope: "all",
-      }, embeddingServer.url);
+      const projectResponse = await callLocalMcpResponse(
+        mainVaultDir,
+        "recall",
+        {
+          query: "diagnostics testing",
+          cwd: repoDir,
+          limit: 10,
+          scope: "all",
+        },
+        embeddingServer.url,
+      );
 
       const projectResult = RecallResultSchema.parse(projectResponse.structuredContent);
 
@@ -239,19 +316,26 @@ describe("recall pipeline integration", () => {
       expect(projectResult.retrievalCoverage!.fraction).toBeGreaterThanOrEqual(0);
       expect(projectResult.retrievalCoverage!.fraction).toBeLessThanOrEqual(1);
 
-      const globalScopeResponse = await callLocalMcpResponse(mainVaultDir, "recall", {
-        query: "global diagnostics note",
-        cwd: repoDir,
-        limit: 10,
-        scope: "global",
-      }, embeddingServer.url);
+      const globalScopeResponse = await callLocalMcpResponse(
+        mainVaultDir,
+        "recall",
+        {
+          query: "global diagnostics note",
+          cwd: repoDir,
+          limit: 10,
+          scope: "global",
+        },
+        embeddingServer.url,
+      );
 
       const globalScopeResult = RecallResultSchema.parse(globalScopeResponse.structuredContent);
       expect(globalScopeResult.recallScopeNoteCount).toBeDefined();
       expect(typeof globalScopeResult.recallScopeNoteCount).toBe("number");
 
       if (globalScopeResult.results.length > 0 && globalScopeResult.retrievalCoverage) {
-        expect(globalScopeResult.retrievalCoverage.highPriorityAnchorsTotal).toBeGreaterThanOrEqual(0);
+        expect(globalScopeResult.retrievalCoverage.highPriorityAnchorsTotal).toBeGreaterThanOrEqual(
+          0,
+        );
         expect(globalScopeResult.retrievalCoverage.fraction).toBeGreaterThanOrEqual(0);
       }
 
@@ -262,12 +346,17 @@ describe("recall pipeline integration", () => {
       const emptyVaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-diagnostics-empty-"));
       tempDirs.push(emptyVaultDir);
 
-      const emptyResponse = await callLocalMcpResponse(emptyVaultDir, "recall", {
-        query: "nonexistent query",
-        limit: 10,
-        scope: "global",
-        cwd: emptyVaultDir,
-      }, embeddingServer.url);
+      const emptyResponse = await callLocalMcpResponse(
+        emptyVaultDir,
+        "recall",
+        {
+          query: "nonexistent query",
+          limit: 10,
+          scope: "global",
+          cwd: emptyVaultDir,
+        },
+        embeddingServer.url,
+      );
 
       const emptyResult = RecallResultSchema.parse(emptyResponse.structuredContent);
       expect(emptyResult.results).toHaveLength(0);
@@ -286,21 +375,31 @@ describe("recall pipeline integration", () => {
     const embeddingServer = await startFakeEmbeddingServer();
 
     try {
-      await callLocalMcp(mainVaultDir, "remember", {
-        title: "Note for limit test",
-        content: "A note to verify recallScopeNoteCount appears even with explicit limit=1.",
-        tags: ["integration", "limit-test"],
-        cwd: repoDir,
-        scope: "project",
-        lifecycle: "permanent",
-      }, embeddingServer.url);
+      await callLocalMcp(
+        mainVaultDir,
+        "remember",
+        {
+          title: "Note for limit test",
+          content: "A note to verify recallScopeNoteCount appears even with explicit limit=1.",
+          tags: ["integration", "limit-test"],
+          cwd: repoDir,
+          scope: "project",
+          lifecycle: "permanent",
+        },
+        embeddingServer.url,
+      );
 
-      const response = await callLocalMcpResponse(mainVaultDir, "recall", {
-        query: "limit test",
-        cwd: repoDir,
-        limit: 1,
-        scope: "all",
-      }, embeddingServer.url);
+      const response = await callLocalMcpResponse(
+        mainVaultDir,
+        "recall",
+        {
+          query: "limit test",
+          cwd: repoDir,
+          limit: 1,
+          scope: "all",
+        },
+        embeddingServer.url,
+      );
 
       const result = RecallResultSchema.parse(response.structuredContent);
       expect(result.recallScopeNoteCount).toBeDefined();
@@ -323,17 +422,23 @@ describe("recall pipeline integration", () => {
       await writeSeedNote(vaultDir, {
         id: "recent-temporal-note",
         title: "Recent Pipeline Temporal Note",
-        content: "A note with a recent timestamp that should survive explicit temporal filtering in the pipeline.",
+        content:
+          "A note with a recent timestamp that should survive explicit temporal filtering in the pipeline.",
         tags: ["integration", "pipeline"],
         updatedAt: twoDaysAgo,
       });
       await writeSeedEmbedding(vaultDir, "recent-temporal-note", [0.1, 0.2, 0.3]);
 
-      const response = await callLocalMcpResponse(vaultDir, "recall", {
-        query: "show recent pipeline changes from the last 7 days",
-        limit: 10,
-        scope: "global",
-      }, embeddingServer.url);
+      const response = await callLocalMcpResponse(
+        vaultDir,
+        "recall",
+        {
+          query: "show recent pipeline changes from the last 7 days",
+          limit: 10,
+          scope: "global",
+        },
+        embeddingServer.url,
+      );
 
       const parsed = RecallResultSchema.parse(response.structuredContent);
       const ids = parsed.results.map((r) => r.id);
@@ -353,33 +458,49 @@ describe("recall pipeline integration", () => {
     const embeddingServer = await startFakeEmbeddingServer();
 
     try {
-      await callLocalMcp(mainVaultDir, "remember", {
-        title: "Permanent Summary Note",
-        content: "A permanent summary note with high structural support for signalStrength testing.",
-        tags: ["integration", "signal"],
-        cwd: repoDir,
-        scope: "project",
-        lifecycle: "permanent",
-        role: "summary",
-        alwaysLoad: true,
-      }, embeddingServer.url);
+      await callLocalMcp(
+        mainVaultDir,
+        "remember",
+        {
+          title: "Permanent Summary Note",
+          content:
+            "A permanent summary note with high structural support for signalStrength testing.",
+          tags: ["integration", "signal"],
+          cwd: repoDir,
+          scope: "project",
+          lifecycle: "permanent",
+          role: "summary",
+          alwaysLoad: true,
+        },
+        embeddingServer.url,
+      );
 
-      await callLocalMcp(mainVaultDir, "remember", {
-        title: "Temporary Context Note",
-        content: "A temporary context note with no relations — should have low signalStrength.",
-        tags: ["integration", "signal"],
-        cwd: repoDir,
-        scope: "project",
-        lifecycle: "temporary",
-        role: "context",
-      }, embeddingServer.url);
+      await callLocalMcp(
+        mainVaultDir,
+        "remember",
+        {
+          title: "Temporary Context Note",
+          content: "A temporary context note with no relations — should have low signalStrength.",
+          tags: ["integration", "signal"],
+          cwd: repoDir,
+          scope: "project",
+          lifecycle: "temporary",
+          role: "context",
+        },
+        embeddingServer.url,
+      );
 
-      const response = await callLocalMcpResponse(mainVaultDir, "recall", {
-        query: "signal testing",
-        cwd: repoDir,
-        limit: 10,
-        scope: "all",
-      }, embeddingServer.url);
+      const response = await callLocalMcpResponse(
+        mainVaultDir,
+        "recall",
+        {
+          query: "signal testing",
+          cwd: repoDir,
+          limit: 10,
+          scope: "all",
+        },
+        embeddingServer.url,
+      );
 
       const result = RecallResultSchema.parse(response.structuredContent);
 

@@ -68,7 +68,10 @@ export function assertMemoryId(value: string, label = "id"): asserts value is Me
 }
 
 /** Assert that a string is a valid ISO 8601 date string. Throws on invalid input. */
-export function assertIsoDateString(value: string, label = "date"): asserts value is ISO8601DateString {
+export function assertIsoDateString(
+  value: string,
+  label = "date",
+): asserts value is ISO8601DateString {
   if (isNaN(Date.parse(value))) {
     throw new Error(`Invalid ${label}: ${value} (not a valid ISO 8601 date string)`);
   }

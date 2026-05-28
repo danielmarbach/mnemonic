@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { computeThemesWithGraduation, extractKeywords, normalizeKeyword } from "../src/project-introspection.js";
+import {
+  computeThemesWithGraduation,
+  extractKeywords,
+  normalizeKeyword,
+} from "../src/project-introspection.js";
 import type { Note } from "../src/storage.js";
 
 describe("extractKeywords", () => {

@@ -1,7 +1,12 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ServerContext } from "../server-context.js";
-import { ensureBranchSynced, resolveProject, noteProjectRef, projectParam } from "../helpers/project.js";
+import {
+  ensureBranchSynced,
+  resolveProject,
+  noteProjectRef,
+  projectParam,
+} from "../helpers/project.js";
 import { storageLabel } from "../helpers/vault.js";
 import { WhereIsResultSchema, type WhereIsResult, NoteIdSchema } from "../structured-content.js";
 
@@ -27,7 +32,9 @@ export function registerWhereIsMemoryTool(server: McpServer, ctx: ServerContext)
         openWorldHint: false,
       },
       inputSchema: z.object({
-        id: NoteIdSchema.describe("Exact memory id. Use an id returned by `recall`, `list`, `recent_memories`, or `where_is`."),
+        id: NoteIdSchema.describe(
+          "Exact memory id. Use an id returned by `recall`, `list`, `recent_memories`, or `where_is`.",
+        ),
         cwd: projectParam,
       }),
       outputSchema: WhereIsResultSchema,
@@ -38,14 +45,18 @@ export function registerWhereIsMemoryTool(server: McpServer, ctx: ServerContext)
       const project = await resolveProject(ctx, cwd);
       const found = await ctx.vaultManager.findNote(id, cwd, { projectId: project?.id });
       if (!found) {
-        return { content: [{ type: "text", text: `No memory found with id '${id}'` }], isError: true };
+        return {
+          content: [{ type: "text", text: `No memory found with id '${id}'` }],
+          isError: true,
+        };
       }
 
       const { note, vault } = found;
       const vaultLabel = storageLabel(vault);
-      const projectDisplay = note.projectName && note.project
-        ? `${note.projectName} (${note.project})`
-        : note.projectName ?? note.project ?? "global";
+      const projectDisplay =
+        note.projectName && note.project
+          ? `${note.projectName} (${note.project})`
+          : (note.projectName ?? note.project ?? "global");
       const relatedCount = note.relatedTo?.length ?? 0;
 
       const structuredContent: WhereIsResult = {
@@ -59,12 +70,14 @@ export function registerWhereIsMemoryTool(server: McpServer, ctx: ServerContext)
       };
 
       return {
-        content: [{
-          type: "text",
-          text: `'${note.title}' (${id})\nproject: ${projectDisplay} | stored: ${vaultLabel} | updated: ${note.updatedAt} | related: ${relatedCount}`,
-        }],
+        content: [
+          {
+            type: "text",
+            text: `'${note.title}' (${id})\nproject: ${projectDisplay} | stored: ${vaultLabel} | updated: ${note.updatedAt} | related: ${relatedCount}`,
+          },
+        ],
         structuredContent,
       };
-    }
+    },
   );
 }

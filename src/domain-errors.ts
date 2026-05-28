@@ -1,5 +1,5 @@
 // Domain error classes — replaces bare `new Error(...)` in domain logic.
-// Enforced by ast-grep rule: no-bare-new-error
+// Enforced by ESLint rule: no-bare-new-error (no-restricted-syntax + domain error classes)
 
 export class AtomicWriteInProgressError extends Error {
   constructor() {

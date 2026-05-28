@@ -36,7 +36,10 @@ function createFailingAtomicityMigration() {
       };
 
       if (first) {
-        await vault.storage.writeNote({ ...first, content: `${first.content}\n\nUpdated by migration.` });
+        await vault.storage.writeNote({
+          ...first,
+          content: `${first.content}\n\nUpdated by migration.`,
+        });
         result.notesModified = 1;
         result.modifiedNoteIds.push(first.id);
       }
@@ -56,10 +59,10 @@ describe("Migrator", () => {
 
   beforeEach(async () => {
     tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "mnemonic-test-"));
-    
+
     storage = new Storage(tempDir);
     await storage.init();
-    
+
     vault = {
       storage,
       git: new GitOps(tempDir, "notes"),
@@ -80,7 +83,7 @@ describe("Migrator", () => {
     it("should include built-in migrations", () => {
       const migrations = migrator.listAvailableMigrations();
       expect(migrations.length).toBeGreaterThan(0);
-      expect(migrations.some(m => m.name === "v0.1.0-backfill-memory-versions")).toBe(true);
+      expect(migrations.some((m) => m.name === "v0.1.0-backfill-memory-versions")).toBe(true);
     });
 
     it("warns when registering an unbounded migration", () => {
@@ -90,7 +93,13 @@ describe("Migrator", () => {
         name: "always-run-fixup",
         description: "No version constraints",
         async run() {
-          return { notesProcessed: 0, notesModified: 0, modifiedNoteIds: [], errors: [], warnings: [] };
+          return {
+            notesProcessed: 0,
+            notesModified: 0,
+            modifiedNoteIds: [],
+            errors: [],
+            warnings: [],
+          };
         },
       });
 
@@ -103,7 +112,7 @@ describe("Migrator", () => {
   describe("getPendingMigrations", () => {
     it("should return migrations for older schema version", async () => {
       const pending = await migrator.getPendingMigrations("0.0");
-      expect(pending.some(m => m.name === "v0.1.0-backfill-memory-versions")).toBe(true);
+      expect(pending.some((m) => m.name === "v0.1.0-backfill-memory-versions")).toBe(true);
     });
 
     it("should return no migrations when already at latest version", async () => {
@@ -158,12 +167,13 @@ Content of ${title}`;
     it("should detect notes without memoryVersion", async () => {
       await writeOldNote("old-note-1", "Old Note 1");
       await writeNewNote("new-note-1", "New Note 1");
-      
-      const migration = migrator.listAvailableMigrations()
-        .find(m => m.name === "v0.1.0-backfill-memory-versions")!;
-      
+
+      const migration = migrator
+        .listAvailableMigrations()
+        .find((m) => m.name === "v0.1.0-backfill-memory-versions")!;
+
       const result = await migration.run(vault, true);
-      
+
       expect(result.notesProcessed).toBe(2);
       expect(result.notesModified).toBe(1);
       expect(result.errors).toEqual([]);
@@ -171,40 +181,43 @@ Content of ${title}`;
 
     it("should add memoryVersion to old notes in dry-run mode", async () => {
       await writeOldNote("old-note", "Old Note");
-      
-      const migration = migrator.listAvailableMigrations()
-        .find(m => m.name === "v0.1.0-backfill-memory-versions")!;
-      
+
+      const migration = migrator
+        .listAvailableMigrations()
+        .find((m) => m.name === "v0.1.0-backfill-memory-versions")!;
+
       const result = await migration.run(vault, true);
-      
+
       expect(result.notesModified).toBe(1);
-      
+
       const note = await storage.readNote("old-note");
       expect(note?.memoryVersion).toBe(0);
     });
 
     it("should add memoryVersion to old notes when dryRun=false", async () => {
       await writeOldNote("old-note", "Old Note");
-      
-      const migration = migrator.listAvailableMigrations()
-        .find(m => m.name === "v0.1.0-backfill-memory-versions")!;
-      
+
+      const migration = migrator
+        .listAvailableMigrations()
+        .find((m) => m.name === "v0.1.0-backfill-memory-versions")!;
+
       const result = await migration.run(vault, false);
-      
+
       expect(result.notesModified).toBe(1);
-      
+
       const note = await storage.readNote("old-note");
       expect(note?.memoryVersion).toBe(1);
     });
 
     it("should not modify notes that already have memoryVersion", async () => {
       await writeNewNote("new-note", "New Note");
-      
-      const migration = migrator.listAvailableMigrations()
-        .find(m => m.name === "v0.1.0-backfill-memory-versions")!;
-      
+
+      const migration = migrator
+        .listAvailableMigrations()
+        .find((m) => m.name === "v0.1.0-backfill-memory-versions")!;
+
       const result = await migration.run(vault, false);
-      
+
       expect(result.notesProcessed).toBe(1);
       expect(result.notesModified).toBe(0);
     });
@@ -212,8 +225,9 @@ Content of ${title}`;
     it("should repair invalid memoryVersion values", async () => {
       await writeInvalidVersionNote("bad-note", "Bad Note");
 
-      const migration = migrator.listAvailableMigrations()
-        .find(m => m.name === "v0.1.0-backfill-memory-versions")!;
+      const migration = migrator
+        .listAvailableMigrations()
+        .find((m) => m.name === "v0.1.0-backfill-memory-versions")!;
 
       const result = await migration.run(vault, false);
 
@@ -229,12 +243,13 @@ Content of ${title}`;
       await writeOldNote("note-2", "Note 2");
       await writeNewNote("note-3", "Note 3");
       await writeOldNote("note-4", "Note 4");
-      
-      const migration = migrator.listAvailableMigrations()
-        .find(m => m.name === "v0.1.0-backfill-memory-versions")!;
-      
+
+      const migration = migrator
+        .listAvailableMigrations()
+        .find((m) => m.name === "v0.1.0-backfill-memory-versions")!;
+
       const result = await migration.run(vault, false);
-      
+
       expect(result.notesProcessed).toBe(4);
       expect(result.notesModified).toBe(3);
       expect(result.errors).toEqual([]);
@@ -244,11 +259,12 @@ Content of ${title}`;
       await fs.writeFile(
         path.join(tempDir, "notes", "not-a-note.txt"),
         "This is not a markdown file",
-        "utf-8"
+        "utf-8",
       );
 
-      const migration = migrator.listAvailableMigrations()
-        .find(m => m.name === "v0.1.0-backfill-memory-versions")!;
+      const migration = migrator
+        .listAvailableMigrations()
+        .find((m) => m.name === "v0.1.0-backfill-memory-versions")!;
 
       const result = await migration.run(vault, false);
 
@@ -261,8 +277,9 @@ Content of ${title}`;
       await writeOldNote("note-2", "Note 2");
       await writeNewNote("note-3", "Note 3");
 
-      const migration = migrator.listAvailableMigrations()
-        .find(m => m.name === "v0.1.0-backfill-memory-versions")!;
+      const migration = migrator
+        .listAvailableMigrations()
+        .find((m) => m.name === "v0.1.0-backfill-memory-versions")!;
 
       await migration.run(vault, false);
       await assertMigrationIdempotent(migration, vault);
@@ -272,8 +289,9 @@ Content of ${title}`;
       await writeInvalidVersionNote("bad-note", "Bad Note");
       await writeOldNote("old-note", "Old Note");
 
-      const migration = migrator.listAvailableMigrations()
-        .find(m => m.name === "v0.1.0-backfill-memory-versions")!;
+      const migration = migrator
+        .listAvailableMigrations()
+        .find((m) => m.name === "v0.1.0-backfill-memory-versions")!;
 
       await migration.run(vault, false);
       await assertMigrationIdempotent(migration, vault);
@@ -294,7 +312,11 @@ Content of ${title}`;
       await fs.writeFile(path.join(tempDir, "notes", `${id}.md`), content, "utf-8");
     };
 
-    const writeNoteWithLifecycle = async (id: string, title: string, lifecycle: "temporary" | "permanent") => {
+    const writeNoteWithLifecycle = async (
+      id: string,
+      title: string,
+      lifecycle: "temporary" | "permanent",
+    ) => {
       const content = `---
 title: ${title}
 tags: []
@@ -315,7 +337,8 @@ Content of ${title}`;
     it("adds lifecycle to notes that lack it", async () => {
       await writeNoteWithoutLifecycle("old-note", "Old Note");
 
-      const migration = migrator.listAvailableMigrations()
+      const migration = migrator
+        .listAvailableMigrations()
         .find((m) => m.name === "v0.1.1-backfill-note-lifecycle")!;
 
       const result = await migration.run(vault, false);
@@ -331,7 +354,8 @@ Content of ${title}`;
       await writeNoteWithLifecycle("temporary-note", "Temporary Note", "temporary");
       await writeNoteWithLifecycle("permanent-note", "Permanent Note", "permanent");
 
-      const migration = migrator.listAvailableMigrations()
+      const migration = migrator
+        .listAvailableMigrations()
         .find((m) => m.name === "v0.1.1-backfill-note-lifecycle")!;
 
       const first = await migration.run(vault, false);
@@ -344,7 +368,7 @@ Content of ${title}`;
   describe("runMigration", () => {
     beforeEach(async () => {
       await fs.mkdir(path.join(tempDir, "notes"), { recursive: true });
-      
+
       const content = `---
 title: Test Note
 tags: []
@@ -359,9 +383,9 @@ Test content`;
     it("should run migration on all vaults by default", async () => {
       const { results, vaultsProcessed } = await migrator.runMigration(
         "v0.1.0-backfill-memory-versions",
-        { dryRun: true }
+        { dryRun: true },
       );
-      
+
       expect(vaultsProcessed).toBe(1);
       expect(results.get(tempDir)?.notesModified).toBe(1);
     });
@@ -381,21 +405,21 @@ Test content`;
       vaultManager.getProjectVaultIfExists = vi.fn().mockImplementation(async (cwd: string) => {
         return cwd === tempDir ? vault : otherVault;
       });
-      
+
       const { results, vaultsProcessed } = await migrator.runMigration(
         "v0.1.0-backfill-memory-versions",
-        { dryRun: true, cwd: tempDir }
+        { dryRun: true, cwd: tempDir },
       );
-      
+
       expect(vaultsProcessed).toBe(1);
       expect(results.has(tempDir)).toBe(true);
       expect(results.has(otherDir)).toBe(false);
     });
 
     it("should throw error for unknown migration", async () => {
-      await expect(
-        migrator.runMigration("unknown-migration", { dryRun: true })
-      ).rejects.toThrow("Unknown migration: unknown-migration");
+      await expect(migrator.runMigration("unknown-migration", { dryRun: true })).rejects.toThrow(
+        "Unknown migration: unknown-migration",
+      );
     });
 
     it("rolls back note writes when a migration reports errors", async () => {
@@ -410,7 +434,7 @@ memoryVersion: 1
 ---
 
 Original content`,
-        "utf-8"
+        "utf-8",
       );
       await fs.writeFile(
         path.join(tempDir, "notes", "note-2.md"),
@@ -423,7 +447,7 @@ memoryVersion: 1
 ---
 
 Second note`,
-        "utf-8"
+        "utf-8",
       );
 
       migrator.registerMigration(createFailingAtomicityMigration());
@@ -433,7 +457,9 @@ Second note`,
       const { results } = await migrator.runMigration("failing-atomicity-check", { dryRun: false });
 
       expect(results.get(tempDir)?.errors).toHaveLength(1);
-      expect(results.get(tempDir)?.warnings).toContain("Atomic migration rollback applied; note changes were not flushed to disk.");
+      expect(results.get(tempDir)?.warnings).toContain(
+        "Atomic migration rollback applied; note changes were not flushed to disk.",
+      );
       expect(commitSpy).not.toHaveBeenCalled();
       expect(pushSpy).not.toHaveBeenCalled();
 
@@ -447,8 +473,12 @@ Second note`,
       await fs.mkdir(path.join(tempDir, "notes"), { recursive: true });
       await fs.writeFile(
         path.join(tempDir, "config.json"),
-        JSON.stringify({ schemaVersion: "0.0", reindexEmbedConcurrency: 4, projectMemoryPolicies: {} }, null, 2),
-        "utf-8"
+        JSON.stringify(
+          { schemaVersion: "0.0", reindexEmbedConcurrency: 4, projectMemoryPolicies: {} },
+          null,
+          2,
+        ),
+        "utf-8",
       );
 
       const content = `---
@@ -511,7 +541,7 @@ Test content`;
       await fs.writeFile(
         path.join(otherDir, "config.json"),
         JSON.stringify({ schemaVersion: "1.1" }),
-        "utf-8"
+        "utf-8",
       );
       const otherVault: Vault = {
         storage: otherStorage,
@@ -544,7 +574,7 @@ memoryVersion: 1
 ---
 
 Original content`,
-        "utf-8"
+        "utf-8",
       );
       await fs.writeFile(
         path.join(tempDir, "notes", "note-2.md"),
@@ -557,7 +587,7 @@ memoryVersion: 1
 ---
 
 Second note`,
-        "utf-8"
+        "utf-8",
       );
 
       migrator.registerMigration(createFailingAtomicityMigration());
@@ -566,9 +596,9 @@ Second note`,
 
       const { migrationResults } = await migrator.runAllPending({ dryRun: false });
 
-      const failingResult = migrationResults.get(tempDir)?.find(
-        ({ migration }) => migration === "failing-atomicity-check"
-      )?.result;
+      const failingResult = migrationResults
+        .get(tempDir)
+        ?.find(({ migration }) => migration === "failing-atomicity-check")?.result;
       expect(failingResult?.errors).toHaveLength(1);
       expect(failingResult?.warnings).toContain(
         "Schema version not advanced because one or more migrations reported errors; staged note updates were rolled back.",
@@ -632,7 +662,10 @@ Broken content`,
           const second = notes.find((note) => note.id === "note-2");
 
           if (first && !first.content.includes("Updated by retryable migration.")) {
-            await vault.storage.writeNote({ ...first, content: `${first.content}\n\nUpdated by retryable migration.` });
+            await vault.storage.writeNote({
+              ...first,
+              content: `${first.content}\n\nUpdated by retryable migration.`,
+            });
             result.notesModified++;
             result.modifiedNoteIds.push(first.id);
           }
@@ -834,7 +867,7 @@ Main content 2`,
       for (let i = 0; i < 2; i++) {
         const newTempDir = await fs.mkdtemp(path.join(os.tmpdir(), `mnemonic-test-vault${i}-`));
         tempDirs.push(newTempDir);
-        
+
         const newStorage = new Storage(newTempDir);
         await newStorage.init();
         const newVault: Vault = {
@@ -863,7 +896,7 @@ Main content 2`,
         } as any;
 
         const multiVaultMigrator = new Migrator(mockVaultManager);
-        
+
         let callCount = 0;
         multiVaultMigrator.registerMigration({
           name: "idempotency-test",
@@ -951,8 +984,12 @@ Main content 2`,
       await projectStorage.init();
       await fs.writeFile(
         path.join(projectDir, "config.json"),
-        JSON.stringify({ schemaVersion: "0.0", reindexEmbedConcurrency: 4, projectMemoryPolicies: {} }, null, 2),
-        "utf-8"
+        JSON.stringify(
+          { schemaVersion: "0.0", reindexEmbedConcurrency: 4, projectMemoryPolicies: {} },
+          null,
+          2,
+        ),
+        "utf-8",
       );
       await fs.writeFile(
         path.join(projectDir, "notes", "project-note.md"),
@@ -964,7 +1001,7 @@ updatedAt: 2026-01-01T00:00:00.000Z
 ---
 
 Project content`,
-        "utf-8"
+        "utf-8",
       );
 
       const projectVault: Vault = {
@@ -991,7 +1028,9 @@ Project content`,
       expect(projectCommitSpy).toHaveBeenCalledTimes(1);
       expect(projectPushSpy).toHaveBeenCalledTimes(1);
 
-      let projectConfig = JSON.parse(await fs.readFile(path.join(projectDir, "config.json"), "utf-8")) as {
+      let projectConfig = JSON.parse(
+        await fs.readFile(path.join(projectDir, "config.json"), "utf-8"),
+      ) as {
         schemaVersion: string;
       };
       expect(projectConfig.schemaVersion).toBe("1.1");
@@ -1016,7 +1055,9 @@ Project content`,
       expect(mainCommitSpy).toHaveBeenCalledTimes(1);
       expect(mainPushSpy).toHaveBeenCalledTimes(1);
 
-      projectConfig = JSON.parse(await fs.readFile(path.join(projectDir, "config.json"), "utf-8")) as {
+      projectConfig = JSON.parse(
+        await fs.readFile(path.join(projectDir, "config.json"), "utf-8"),
+      ) as {
         schemaVersion: string;
       };
       expect(projectConfig.schemaVersion).toBe("1.1");
@@ -1034,7 +1075,9 @@ Project content`,
 
     it("rejects invalid schema versions", async () => {
       const migratorAny = new Migrator(vaultManager);
-      await expect(migratorAny.getPendingMigrations("v1")).rejects.toThrow("Invalid schema version: v1");
+      await expect(migratorAny.getPendingMigrations("v1")).rejects.toThrow(
+        "Invalid schema version: v1",
+      );
     });
   });
 
@@ -1047,7 +1090,13 @@ Project content`,
         minSchemaVersion: "2.0",
         maxSchemaVersion: "3.0",
         async run(_vault, _dryRun) {
-          return { notesProcessed: 0, notesModified: 0, modifiedNoteIds: [], errors: [], warnings: [] };
+          return {
+            notesProcessed: 0,
+            notesModified: 0,
+            modifiedNoteIds: [],
+            errors: [],
+            warnings: [],
+          };
         },
       });
       migrator.registerMigration({
@@ -1056,18 +1105,24 @@ Project content`,
         minSchemaVersion: "1.0",
         maxSchemaVersion: "2.0",
         async run(_vault, _dryRun) {
-          return { notesProcessed: 0, notesModified: 0, modifiedNoteIds: [], errors: [], warnings: [] };
+          return {
+            notesProcessed: 0,
+            notesModified: 0,
+            modifiedNoteIds: [],
+            errors: [],
+            warnings: [],
+          };
         },
       });
 
       const pending = await migrator.getPendingMigrations("0.0");
-      const names = pending.map(m => m.name);
+      const names = pending.map((m) => m.name);
 
       expect(names).toEqual([
         "v0.1.0-backfill-memory-versions", // maxSchemaVersion 1.0
-        "v0.1.1-backfill-note-lifecycle",  // maxSchemaVersion 1.1
-        "upgrade-to-2.0",                  // maxSchemaVersion 2.0
-        "upgrade-to-3.0",                  // maxSchemaVersion 3.0
+        "v0.1.1-backfill-note-lifecycle", // maxSchemaVersion 1.1
+        "upgrade-to-2.0", // maxSchemaVersion 2.0
+        "upgrade-to-3.0", // maxSchemaVersion 3.0
       ]);
     });
 
@@ -1076,7 +1131,13 @@ Project content`,
         name: "always-run-fixup",
         description: "No version constraints",
         async run(_vault, _dryRun) {
-          return { notesProcessed: 0, notesModified: 0, modifiedNoteIds: [], errors: [], warnings: [] };
+          return {
+            notesProcessed: 0,
+            notesModified: 0,
+            modifiedNoteIds: [],
+            errors: [],
+            warnings: [],
+          };
         },
       });
       migrator.registerMigration({
@@ -1085,18 +1146,24 @@ Project content`,
         minSchemaVersion: "1.0",
         maxSchemaVersion: "2.0",
         async run(_vault, _dryRun) {
-          return { notesProcessed: 0, notesModified: 0, modifiedNoteIds: [], errors: [], warnings: [] };
+          return {
+            notesProcessed: 0,
+            notesModified: 0,
+            modifiedNoteIds: [],
+            errors: [],
+            warnings: [],
+          };
         },
       });
 
       const pending = await migrator.getPendingMigrations("0.0");
-      const names = pending.map(m => m.name);
+      const names = pending.map((m) => m.name);
 
       expect(names).toEqual([
         "v0.1.0-backfill-memory-versions", // maxSchemaVersion 1.0
-        "v0.1.1-backfill-note-lifecycle",  // maxSchemaVersion 1.1
-        "upgrade-to-2.0",                  // maxSchemaVersion 2.0
-        "always-run-fixup",                // unbounded — last
+        "v0.1.1-backfill-note-lifecycle", // maxSchemaVersion 1.1
+        "upgrade-to-2.0", // maxSchemaVersion 2.0
+        "always-run-fixup", // unbounded — last
       ]);
     });
 
@@ -1106,7 +1173,13 @@ Project content`,
         description: "Has only minSchemaVersion",
         minSchemaVersion: "3.0",
         async run(_vault, _dryRun) {
-          return { notesProcessed: 0, notesModified: 0, modifiedNoteIds: [], errors: [], warnings: [] };
+          return {
+            notesProcessed: 0,
+            notesModified: 0,
+            modifiedNoteIds: [],
+            errors: [],
+            warnings: [],
+          };
         },
       });
       migrator.registerMigration({
@@ -1115,18 +1188,24 @@ Project content`,
         minSchemaVersion: "1.0",
         maxSchemaVersion: "2.0",
         async run(_vault, _dryRun) {
-          return { notesProcessed: 0, notesModified: 0, modifiedNoteIds: [], errors: [], warnings: [] };
+          return {
+            notesProcessed: 0,
+            notesModified: 0,
+            modifiedNoteIds: [],
+            errors: [],
+            warnings: [],
+          };
         },
       });
 
       const pending = await migrator.getPendingMigrations("0.0");
-      const names = pending.map(m => m.name);
+      const names = pending.map((m) => m.name);
 
       expect(names).toEqual([
         "v0.1.0-backfill-memory-versions", // maxSchemaVersion 1.0
-        "v0.1.1-backfill-note-lifecycle",  // maxSchemaVersion 1.1
-        "upgrade-to-2.0",                  // maxSchemaVersion 2.0
-        "min-only-at-3.0",                 // minSchemaVersion 3.0
+        "v0.1.1-backfill-note-lifecycle", // maxSchemaVersion 1.1
+        "upgrade-to-2.0", // maxSchemaVersion 2.0
+        "min-only-at-3.0", // minSchemaVersion 3.0
       ]);
     });
   });

@@ -2,7 +2,13 @@ import os from "os";
 import path from "path";
 import { describe, expect, it } from "vitest";
 
-import { collapseHomePath, defaultClaudeHome, defaultVaultPath, expandHomePath, resolveUserPath } from "../src/paths.js";
+import {
+  collapseHomePath,
+  defaultClaudeHome,
+  defaultVaultPath,
+  expandHomePath,
+  resolveUserPath,
+} from "../src/paths.js";
 
 describe("path resolution", () => {
   it("expands a tilde home prefix", () => {
@@ -37,7 +43,9 @@ describe("path resolution", () => {
 
 describe("collapseHomePath", () => {
   it("collapses paths under home directory to tilde notation", () => {
-    expect(collapseHomePath("/tmp/home/projects/repo", { HOME: "/tmp/home" })).toBe("~/projects/repo");
+    expect(collapseHomePath("/tmp/home/projects/repo", { HOME: "/tmp/home" })).toBe(
+      "~/projects/repo",
+    );
   });
 
   it("returns home directory as tilde alone", () => {

@@ -33,7 +33,7 @@ Error: spawn ./scripts/mcp-local.sh ENOENT
       "tests/mcp.integration.test.ts > local MCP script > supports global remember and forget with git disabled",
     ]);
     expect(summary.failure_signature).toBe(
-      "vitest|tests/mcp.integration.test.ts|error-spawn-scripts-mcp-local-sh-enoent"
+      "vitest|tests/mcp.integration.test.ts|error-spawn-scripts-mcp-local-sh-enoent",
     );
     expect(summary.lesson).toContain("machine-specific script paths");
   });
@@ -58,7 +58,7 @@ Error: Test timed out in 5000ms.
     });
 
     expect(summary.failure_signature).toBe(
-      "vitest|tests/mcp.integration.test.ts|error-test-timed-out-in-5000ms"
+      "vitest|tests/mcp.integration.test.ts|error-test-timed-out-in-5000ms",
     );
     expect(summary.lesson).toContain("symptom, not the diagnosis");
     expect(summary.lesson).toContain("repeated build/process startup");
@@ -86,13 +86,15 @@ Error: Test timed out in 5000ms.
     });
 
     expect(markdown).toContain("# CI Failure Learning");
-    expect(markdown).toContain("Failure signature: `vitest|tests/example.test.ts|error-example-failure`");
+    expect(markdown).toContain(
+      "Failure signature: `vitest|tests/example.test.ts|error-example-failure`",
+    );
     expect(markdown).toContain("## Proposed Lesson");
   });
 
   it("sanitizes repo and user-specific paths", () => {
     const sanitized = sanitizeOutput(
-      "Error at /home/runner/work/mnemonic/mnemonic/tests/example.test.ts and /Users/alice/dev/mnemonic/file.ts"
+      "Error at /home/runner/work/mnemonic/mnemonic/tests/example.test.ts and /Users/alice/dev/mnemonic/file.ts",
     );
 
     expect(sanitized).toContain("<repo>");

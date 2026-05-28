@@ -38,5 +38,5 @@ export function parseMemorySections(content: string): Array<{ title: string; con
 
   flush();
 
-  return sections.filter(s => s.content.length > 0);
+  return sections.filter((s) => s.content.length > 0);
 }

@@ -1,13 +1,24 @@
 export type WriteScope = "project" | "global";
 export const WRITE_SCOPES = ["project", "global"] as const satisfies readonly WriteScope[];
 export type ProjectPolicyScope = WriteScope | "ask";
-export const PROJECT_POLICY_SCOPES = ["project", "global", "ask"] as const satisfies readonly ProjectPolicyScope[];
+export const PROJECT_POLICY_SCOPES = [
+  "project",
+  "global",
+  "ask",
+] as const satisfies readonly ProjectPolicyScope[];
 
 export type ConsolidationMode = "supersedes" | "delete";
-export const CONSOLIDATION_MODES = ["supersedes", "delete"] as const satisfies readonly ConsolidationMode[];
+export const CONSOLIDATION_MODES = [
+  "supersedes",
+  "delete",
+] as const satisfies readonly ConsolidationMode[];
 
 export type ProtectedBranchBehavior = "ask" | "block" | "allow";
-export const PROTECTED_BRANCH_BEHAVIORS = ["ask", "block", "allow"] as const satisfies readonly ProtectedBranchBehavior[];
+export const PROTECTED_BRANCH_BEHAVIORS = [
+  "ask",
+  "block",
+  "allow",
+] as const satisfies readonly ProtectedBranchBehavior[];
 export const DEFAULT_PROTECTED_BRANCH_PATTERNS = ["main", "master", "release*"] as const;
 
 export interface ProjectMemoryPolicy {
@@ -23,11 +34,15 @@ export interface ProjectMemoryPolicy {
   updatedAt: string;
 }
 
-export function resolveConsolidationMode(policy: ProjectMemoryPolicy | undefined): ConsolidationMode {
+export function resolveConsolidationMode(
+  policy: ProjectMemoryPolicy | undefined,
+): ConsolidationMode {
   return policy?.consolidationMode ?? "supersedes";
 }
 
-export function resolveProtectedBranchBehavior(policy: ProjectMemoryPolicy | undefined): ProtectedBranchBehavior {
+export function resolveProtectedBranchBehavior(
+  policy: ProjectMemoryPolicy | undefined,
+): ProtectedBranchBehavior {
   if (!policy) {
     return "ask";
   }

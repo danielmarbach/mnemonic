@@ -39,9 +39,7 @@ describe("analyzeThemeQuality", () => {
     ];
 
     const result = analyzeThemeQuality(notes);
-    expect(result.warnings).toContainEqual(
-      expect.stringContaining("High 'other' ratio")
-    );
+    expect(result.warnings).toContainEqual(expect.stringContaining("High 'other' ratio"));
   });
 
   it("flags too many single-note themes", () => {
@@ -53,21 +51,19 @@ describe("analyzeThemeQuality", () => {
     ];
 
     const result = analyzeThemeQuality(notes);
-    expect(result.warnings).toContainEqual(
-      expect.stringContaining("single-note themes")
-    );
+    expect(result.warnings).toContainEqual(expect.stringContaining("single-note themes"));
   });
 
   it("flags skewed distribution", () => {
     const notes = [
-      ...Array(8).fill(null).map((_, i) => makeNote({ id: `bug-${i}`, title: `Bug ${i}`, tags: ["bugs"] })),
+      ...Array(8)
+        .fill(null)
+        .map((_, i) => makeNote({ id: `bug-${i}`, title: `Bug ${i}`, tags: ["bugs"] })),
       makeNote({ id: "random", title: "Random" }),
     ];
 
     const result = analyzeThemeQuality(notes);
-    expect(result.warnings).toContainEqual(
-      expect.stringContaining("skewed")
-    );
+    expect(result.warnings).toContainEqual(expect.stringContaining("skewed"));
   });
 
   it("returns clean report for good distribution", () => {

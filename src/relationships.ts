@@ -2,7 +2,11 @@ import type { Note, Relationship } from "./storage.js";
 import type { Vault } from "./vault.js";
 import type { Confidence, RelatedNotePreview, RelationshipPreview } from "./structured-content.js";
 import { classifyTheme } from "./project-introspection.js";
-import { getEffectiveMetadata, type EffectiveNoteMetadata, type RoleSuggestionContext } from "./role-suggestions.js";
+import {
+  getEffectiveMetadata,
+  type EffectiveNoteMetadata,
+  type RoleSuggestionContext,
+} from "./role-suggestions.js";
 import { daysSince } from "./date-utils.js";
 import { attempt } from "./error-utils.js";
 import { memoryId } from "./brands.js";
@@ -44,7 +48,9 @@ function buildRoleSuggestionContext(note: Note, allNotes: Note[]): RoleSuggestio
   let linkedByPermanentNotes = 0;
 
   for (const candidate of allNotes) {
-    const hasRelationship = (candidate.relatedTo ?? []).some((relationship) => relationship.id === note.id);
+    const hasRelationship = (candidate.relatedTo ?? []).some(
+      (relationship) => relationship.id === note.id,
+    );
     if (!hasRelationship) {
       continue;
     }
@@ -58,7 +64,9 @@ function buildRoleSuggestionContext(note: Note, allNotes: Note[]): RoleSuggestio
   return {
     inboundReferences,
     linkedByPermanentNotes,
-    anchorCandidate: note.lifecycle === "permanent" && ((note.relatedTo?.length ?? 0) > 0 || inboundReferences > 0),
+    anchorCandidate:
+      note.lifecycle === "permanent" &&
+      ((note.relatedTo?.length ?? 0) > 0 || inboundReferences > 0),
   };
 }
 
@@ -69,7 +77,11 @@ function computeRelatedNoteConfidence(note: Note, now?: Date): Confidence {
   const daysSinceUpdate = Math.floor(daysSince(note.updatedAt, now ?? new Date()));
   const centrality = note.relatedTo?.length ?? 0;
 
-  if (note.lifecycle === "permanent" && centrality >= HIGH_CONFIDENCE_CENTRALITY && daysSinceUpdate < HIGH_CONFIDENCE_DAYS) {
+  if (
+    note.lifecycle === "permanent" &&
+    centrality >= HIGH_CONFIDENCE_CENTRALITY &&
+    daysSinceUpdate < HIGH_CONFIDENCE_DAYS
+  ) {
     return "high";
   }
 
@@ -102,7 +114,7 @@ export function scoreRelatedNote(
   note: Note,
   activeProjectId?: string,
   metadata: EffectiveNoteMetadata = getEffectiveMetadata(note),
-  now?: Date
+  now?: Date,
 ): number {
   let score = 0;
 
@@ -151,9 +163,9 @@ export function scoreRelatedNote(
 export async function getDirectRelatedNotes(
   note: Note,
   allVaults: Vault[],
-  activeProjectId?: string
+  activeProjectId?: string,
 ): Promise<ScoredRelatedNote[]> {
-  const relatedIds = note.relatedTo?.map(r => r.id) ?? [];
+  const relatedIds = note.relatedTo?.map((r) => r.id) ?? [];
   if (relatedIds.length === 0) {
     return [];
   }
@@ -170,16 +182,16 @@ export async function getDirectRelatedNotes(
     }
   }
 
-  const visibleNotes = [...noteById.values()].map(v => v.note);
+  const visibleNotes = [...noteById.values()].map((v) => v.note);
 
   for (const relatedId of relatedIds) {
-    const relationship = note.relatedTo?.find(r => r.id === relatedId);
+    const relationship = note.relatedTo?.find((r) => r.id === relatedId);
     if (!relationship) continue;
 
     let entry: { note: Note; vault: Vault } | undefined;
 
     if (relationship.vaultPath) {
-      const targetVault = allVaults.find(v => v.storage.vaultPath === relationship.vaultPath);
+      const targetVault = allVaults.find((v) => v.storage.vaultPath === relationship.vaultPath);
       if (targetVault) {
         const foundNote = await targetVault.storage.readNote(memoryId(relationship.id));
         if (foundNote) {
@@ -196,7 +208,10 @@ export async function getDirectRelatedNotes(
 
     const { note: relatedNote, vault } = entry;
 
-    const metadata = getEffectiveMetadata(relatedNote, buildRoleSuggestionContext(relatedNote, visibleNotes));
+    const metadata = getEffectiveMetadata(
+      relatedNote,
+      buildRoleSuggestionContext(relatedNote, visibleNotes),
+    );
     const score = scoreRelatedNote(relatedNote, activeProjectId, metadata);
     scored.push({
       note: relatedNote,
@@ -223,7 +238,7 @@ export async function getDirectRelatedNotes(
 function buildRelatedNotePreview(
   scored: ScoredRelatedNote,
   activeProjectId?: string,
-  now?: Date
+  now?: Date,
 ): RelatedNotePreview {
   const { note, relationType } = scored;
   const theme = classifyTheme(note);
@@ -245,14 +260,16 @@ function buildRelatedNotePreview(
  */
 export function buildRelationshipPreview(
   scoredRelated: ScoredRelatedNote[],
-  options: RelationshipExpansionOptions
+  options: RelationshipExpansionOptions,
 ): RelationshipPreview | undefined {
   if (scoredRelated.length === 0) {
     return undefined;
   }
 
   const limit = Math.min(options.limit ?? DEFAULT_RELATIONSHIP_LIMIT, HARD_MAX_RELATIONSHIP_LIMIT);
-  const shown = scoredRelated.slice(0, limit).map(s => buildRelatedNotePreview(s, options.activeProjectId));
+  const shown = scoredRelated
+    .slice(0, limit)
+    .map((s) => buildRelatedNotePreview(s, options.activeProjectId));
   const truncated = scoredRelated.length > limit;
 
   return {
@@ -271,7 +288,7 @@ export function buildRelationshipPreview(
 export async function getRelationshipPreview(
   note: Note,
   allVaults: Vault[],
-  options: RelationshipExpansionOptions
+  options: RelationshipExpansionOptions,
 ): Promise<RelationshipPreview | undefined> {
   const result = await attempt("relationships:preview", async () => {
     const scored = await getDirectRelatedNotes(note, allVaults, options.activeProjectId);

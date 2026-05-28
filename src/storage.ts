@@ -3,7 +3,11 @@ import path from "path";
 import { randomUUID } from "crypto";
 import matter from "gray-matter";
 import type { NoteProjection } from "./structured-content.js";
-import { validateEmbeddingRecord, validateNoteProjection, validateRelatedTo } from "./validation.js";
+import {
+  validateEmbeddingRecord,
+  validateNoteProjection,
+  validateRelatedTo,
+} from "./validation.js";
 import type {
   EmbeddingCompatibilityKey,
   EmbeddingDimensions,
@@ -15,16 +19,49 @@ import type {
 } from "./brands.js";
 import { memoryId, isoDateString, isValidMemoryId } from "./brands.js";
 import { attempt } from "./error-utils.js";
-import { AtomicWriteInProgressError, MalformedNoteError, InvalidNoteIdError } from "./domain-errors.js";
+import {
+  AtomicWriteInProgressError,
+  MalformedNoteError,
+  InvalidNoteIdError,
+} from "./domain-errors.js";
 
-export const RELATIONSHIP_TYPES = ["related-to", "explains", "example-of", "supersedes", "derives-from", "follows"] as const;
-export type RelationshipType = typeof RELATIONSHIP_TYPES[number];
+export const RELATIONSHIP_TYPES = [
+  "related-to",
+  "explains",
+  "example-of",
+  "supersedes",
+  "derives-from",
+  "follows",
+] as const;
+export type RelationshipType = (typeof RELATIONSHIP_TYPES)[number];
 export type NoteLifecycle = "temporary" | "permanent";
-export type NoteRole = "summary" | "decision" | "plan" | "context" | "reference" | "research" | "review";
+export type NoteRole =
+  | "summary"
+  | "decision"
+  | "plan"
+  | "context"
+  | "reference"
+  | "research"
+  | "review";
 export type NoteImportance = "high" | "normal" | "low";
-export const NOTE_LIFECYCLES = ["temporary", "permanent"] as const satisfies readonly NoteLifecycle[];
-export const NOTE_ROLES = ["summary", "decision", "plan", "context", "reference", "research", "review"] as const satisfies readonly NoteRole[];
-export const NOTE_IMPORTANCE_LEVELS = ["high", "normal", "low"] as const satisfies readonly NoteImportance[];
+export const NOTE_LIFECYCLES = [
+  "temporary",
+  "permanent",
+] as const satisfies readonly NoteLifecycle[];
+export const NOTE_ROLES = [
+  "summary",
+  "decision",
+  "plan",
+  "context",
+  "reference",
+  "research",
+  "review",
+] as const satisfies readonly NoteRole[];
+export const NOTE_IMPORTANCE_LEVELS = [
+  "high",
+  "normal",
+  "low",
+] as const satisfies readonly NoteImportance[];
 
 export interface Relationship {
   id: MemoryId;
@@ -211,7 +248,9 @@ export class Storage implements NoteStorage {
 
   async listNotes(filter?: { project?: string | null }): Promise<Note[]> {
     const ids = await this.listNoteIds();
-    const readNotes = await Promise.all(ids.map(async (id) => ({ id, note: await this.readNote(id) })));
+    const readNotes = await Promise.all(
+      ids.map(async (id) => ({ id, note: await this.readNote(id) })),
+    );
     const notes: Note[] = [];
 
     for (const { note } of readNotes) {
@@ -263,15 +302,13 @@ export class Storage implements NoteStorage {
   // ── Embeddings ─────────────────────────────────────────────────────────────
 
   async writeEmbedding(record: EmbeddingRecord): Promise<void> {
-    await fs.writeFile(
-      this.embeddingPath(record.id),
-      JSON.stringify(record, null, 2),
-      "utf-8"
-    );
+    await fs.writeFile(this.embeddingPath(record.id), JSON.stringify(record, null, 2), "utf-8");
   }
 
   async readEmbedding(id: MemoryId): Promise<EmbeddingRecord | null> {
-    const raw = await attempt("storage:readEmbedding", () => fs.readFile(this.embeddingPath(id), "utf-8"));
+    const raw = await attempt("storage:readEmbedding", () =>
+      fs.readFile(this.embeddingPath(id), "utf-8"),
+    );
     if (!raw.ok) return null;
     const parsed = await attempt("storage:readEmbedding", () => JSON.parse(raw.value));
     if (!parsed.ok) return null;
@@ -279,7 +316,11 @@ export class Storage implements NoteStorage {
   }
 
   async listEmbeddings(): Promise<EmbeddingRecord[]> {
-    const filesResult = await attempt("storage:listEmbeddings", () => fs.readdir(this.embeddingsDir), [] as string[]);
+    const filesResult = await attempt(
+      "storage:listEmbeddings",
+      () => fs.readdir(this.embeddingsDir),
+      [] as string[],
+    );
     const files = filesResult.ok ? filesResult.value : [];
     const ids = files
       .filter((file) => file.endsWith(".json"))
@@ -295,12 +336,14 @@ export class Storage implements NoteStorage {
     await fs.writeFile(
       this.projectionPath(memoryId(projection.noteId)),
       JSON.stringify(projection, null, 2),
-      "utf-8"
+      "utf-8",
     );
   }
 
   async readProjection(id: MemoryId): Promise<NoteProjection | null> {
-    const raw = await attempt("storage:readProjection", () => fs.readFile(this.projectionPath(id), "utf-8"));
+    const raw = await attempt("storage:readProjection", () =>
+      fs.readFile(this.projectionPath(id), "utf-8"),
+    );
     if (!raw.ok) return null;
     const parsed = await attempt("storage:readProjection", () => JSON.parse(raw.value));
     if (!parsed.ok) return null;
@@ -326,15 +369,17 @@ export class Storage implements NoteStorage {
 
   private stagedNotePath(id: MemoryId): string | undefined {
     validateNoteId(id);
-    return this.stagedNotesDir
-      ? path.join(this.stagedNotesDir, `${id}.md`)
-      : undefined;
+    return this.stagedNotesDir ? path.join(this.stagedNotesDir, `${id}.md`) : undefined;
   }
 
   async listNoteIds(): Promise<MemoryId[]> {
     const ids = new Set<string>();
 
-    const filesResult = await attempt("storage:listNoteIds", () => fs.readdir(this.notesDir), [] as string[]);
+    const filesResult = await attempt(
+      "storage:listNoteIds",
+      () => fs.readdir(this.notesDir),
+      [] as string[],
+    );
     const files = filesResult.ok ? filesResult.value : [];
     for (const file of files) {
       if (file.endsWith(".md")) {
@@ -344,7 +389,11 @@ export class Storage implements NoteStorage {
 
     if (this.stagedNotesDir) {
       const stagedDir = this.stagedNotesDir;
-      const stagedResult = await attempt("storage:listStagedNoteIds", () => fs.readdir(stagedDir), [] as string[]);
+      const stagedResult = await attempt(
+        "storage:listStagedNoteIds",
+        () => fs.readdir(stagedDir),
+        [] as string[],
+      );
       const stagedFiles = stagedResult.ok ? stagedResult.value : [];
       for (const file of stagedFiles) {
         if (file.endsWith(".md")) {
@@ -386,7 +435,8 @@ export class Storage implements NoteStorage {
       importance: normalizeImportance(parsed.data["importance"]),
       alwaysLoad: normalizeAlwaysLoad(parsed.data["alwaysLoad"]),
       project: typeof parsed.data["project"] === "string" ? parsed.data["project"] : undefined,
-      projectName: typeof parsed.data["projectName"] === "string" ? parsed.data["projectName"] : undefined,
+      projectName:
+        typeof parsed.data["projectName"] === "string" ? parsed.data["projectName"] : undefined,
       relatedTo: validateRelatedTo(parsed.data["relatedTo"]),
       createdAt: toIsoString(parsed.data["createdAt"]),
       updatedAt: toIsoString(parsed.data["updatedAt"]),

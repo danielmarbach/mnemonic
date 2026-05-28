@@ -62,7 +62,10 @@ describe("semantic-patch", () => {
   it("inserts content between heading and its existing body using insertAfter", async () => {
     const note = "# Title\n\n## Section\n\nExisting body.\n";
     const patches: SemanticPatch[] = [
-      { selector: { heading: "Section" }, operation: { op: "insertAfter", value: "Inserted mid." } },
+      {
+        selector: { heading: "Section" },
+        operation: { op: "insertAfter", value: "Inserted mid." },
+      },
     ];
     const result = await applySemanticPatches(note, patches);
     const expected = "# Title\n\n## Section\n\nInserted mid.\n\nExisting body.";
@@ -72,9 +75,7 @@ describe("semantic-patch", () => {
 
   it("removes a heading and preserves remaining structure", async () => {
     const note = "# A\n\nBody A.\n\n## B\n\nBody B.\n\n## C\n\nBody C.\n";
-    const patches: SemanticPatch[] = [
-      { selector: { heading: "B" }, operation: { op: "remove" } },
-    ];
+    const patches: SemanticPatch[] = [{ selector: { heading: "B" }, operation: { op: "remove" } }];
     const result = await applySemanticPatches(note, patches);
     const expected = "# A\n\nBody A.\n\nBody B.\n\n## C\n\nBody C.";
     expect(result.content).toBe(expected);
@@ -88,7 +89,8 @@ describe("semantic-patch", () => {
       { selector: { heading: "B" }, operation: { op: "insertAfter", value: "Added under B." } },
     ];
     const result = await applySemanticPatches(note, patches);
-    const expected = "# Note\n\n## A\n\nAdded under A.\n\nA body.\n\n## B\n\nAdded under B.\n\nB body.";
+    const expected =
+      "# Note\n\n## A\n\nAdded under A.\n\nA body.\n\n## B\n\nAdded under B.\n\nB body.";
     expect(result.content).toBe(expected);
     expect(result.lintWarnings).toEqual([]);
   });
@@ -113,9 +115,7 @@ describe("semantic-patch", () => {
         operation: { op: "appendChild", value: "This won't work." },
       },
     ];
-    await expect(applySemanticPatches(sampleNote, patches)).rejects.toThrow(
-      "Available headings"
-    );
+    await expect(applySemanticPatches(sampleNote, patches)).rejects.toThrow("Available headings");
   });
 
   it("lists available headings in diagnostic when heading not found", async () => {
@@ -135,37 +135,50 @@ describe("semantic-patch", () => {
       { selector: { heading: "Related" }, operation: { op: "remove" } },
     ];
     const result = await applySemanticPatches(sampleNote, patches);
-    const expected = "# My Note\n\nThis is the introduction.\n\n## Details\n\nSome detailed content here.\n\n- Item one\n- Item two";
+    const expected =
+      "# My Note\n\nThis is the introduction.\n\n## Details\n\nSome detailed content here.\n\n- Item one\n- Item two";
     expect(result.content).toBe(expected);
     expect(result.lintWarnings).toEqual([]);
   });
 
   it("inserts content after a heading", async () => {
     const patches: SemanticPatch[] = [
-      { selector: { heading: "My Note" }, operation: { op: "insertAfter", value: "Paragraph inserted after the title." } },
+      {
+        selector: { heading: "My Note" },
+        operation: { op: "insertAfter", value: "Paragraph inserted after the title." },
+      },
     ];
     const result = await applySemanticPatches(sampleNote, patches);
-    const expected = "# My Note\n\nParagraph inserted after the title.\n\nThis is the introduction.\n\n## Details\n\nSome detailed content here.\n\n## Related\n\n- Item one\n- Item two";
+    const expected =
+      "# My Note\n\nParagraph inserted after the title.\n\nThis is the introduction.\n\n## Details\n\nSome detailed content here.\n\n## Related\n\n- Item one\n- Item two";
     expect(result.content).toBe(expected);
     expect(result.lintWarnings).toEqual([]);
   });
 
   it("matches heading by prefix with headingStartsWith and inserts after", async () => {
     const patches: SemanticPatch[] = [
-      { selector: { headingStartsWith: "Det" }, operation: { op: "insertAfter", value: "Appended via prefix match." } },
+      {
+        selector: { headingStartsWith: "Det" },
+        operation: { op: "insertAfter", value: "Appended via prefix match." },
+      },
     ];
     const result = await applySemanticPatches(sampleNote, patches);
-    const expected = "# My Note\n\nThis is the introduction.\n\n## Details\n\nAppended via prefix match.\n\nSome detailed content here.\n\n## Related\n\n- Item one\n- Item two";
+    const expected =
+      "# My Note\n\nThis is the introduction.\n\n## Details\n\nAppended via prefix match.\n\nSome detailed content here.\n\n## Related\n\n- Item one\n- Item two";
     expect(result.content).toBe(expected);
     expect(result.lintWarnings).toEqual([]);
   });
 
   it("inserts content before a heading", async () => {
     const patches: SemanticPatch[] = [
-      { selector: { heading: "Details" }, operation: { op: "insertBefore", value: "Inserted before Details." } },
+      {
+        selector: { heading: "Details" },
+        operation: { op: "insertBefore", value: "Inserted before Details." },
+      },
     ];
     const result = await applySemanticPatches(sampleNote, patches);
-    const expected = "# My Note\n\nThis is the introduction.\n\nInserted before Details.\n\n## Details\n\nSome detailed content here.\n\n## Related\n\n- Item one\n- Item two";
+    const expected =
+      "# My Note\n\nThis is the introduction.\n\nInserted before Details.\n\n## Details\n\nSome detailed content here.\n\n## Related\n\n- Item one\n- Item two";
     expect(result.content).toBe(expected);
     expect(result.lintWarnings).toEqual([]);
   });
@@ -185,7 +198,9 @@ describe("semantic-patch", () => {
       { selector: { lastChild: true }, operation: { op: "replace", value: "replaced" } },
     ];
     const result = await applySemanticPatches(sampleNote, patches);
-    expect(result.content).toBe("# My Note\n\nThis is the introduction.\n\n## Details\n\nSome detailed content here.\n\n## Related\n\nreplaced");
+    expect(result.content).toBe(
+      "# My Note\n\nThis is the introduction.\n\n## Details\n\nSome detailed content here.\n\n## Related\n\nreplaced",
+    );
     expect(result.lintWarnings).toEqual([]);
   });
 
@@ -196,7 +211,9 @@ describe("semantic-patch", () => {
         operation: { op: "appendChild", value: "Won't work." },
       },
     ];
-    await expect(applySemanticPatches(sampleNote, appendPatch)).rejects.toThrow("Cannot appendChild to node of type 'heading'");
+    await expect(applySemanticPatches(sampleNote, appendPatch)).rejects.toThrow(
+      "Cannot appendChild to node of type 'heading'",
+    );
 
     const prependPatch: SemanticPatch[] = [
       {
@@ -204,7 +221,9 @@ describe("semantic-patch", () => {
         operation: { op: "prependChild", value: "Won't work." },
       },
     ];
-    await expect(applySemanticPatches(sampleNote, prependPatch)).rejects.toThrow("Cannot prependChild to node of type 'heading'");
+    await expect(applySemanticPatches(sampleNote, prependPatch)).rejects.toThrow(
+      "Cannot prependChild to node of type 'heading'",
+    );
 
     const replacePatch: SemanticPatch[] = [
       {
@@ -212,15 +231,21 @@ describe("semantic-patch", () => {
         operation: { op: "replaceChildren", value: "Won't work." },
       },
     ];
-    await expect(applySemanticPatches(sampleNote, replacePatch)).rejects.toThrow("Cannot replaceChildren of node of type 'heading'");
+    await expect(applySemanticPatches(sampleNote, replacePatch)).rejects.toThrow(
+      "Cannot replaceChildren of node of type 'heading'",
+    );
   });
 
   it("inserts content before a heading", async () => {
     const patches: SemanticPatch[] = [
-      { selector: { heading: "Details" }, operation: { op: "insertBefore", value: "Inserted before Details." } },
+      {
+        selector: { heading: "Details" },
+        operation: { op: "insertBefore", value: "Inserted before Details." },
+      },
     ];
     const result = await applySemanticPatches(sampleNote, patches);
-    const expected = "# My Note\n\nThis is the introduction.\n\nInserted before Details.\n\n## Details\n\nSome detailed content here.\n\n## Related\n\n- Item one\n- Item two";
+    const expected =
+      "# My Note\n\nThis is the introduction.\n\nInserted before Details.\n\n## Details\n\nSome detailed content here.\n\n## Related\n\n- Item one\n- Item two";
     expect(result.content).toBe(expected);
     expect(result.lintWarnings).toEqual([]);
   });
@@ -230,10 +255,14 @@ describe("semantic-patch", () => {
   it("applies multiple patches in a single call", async () => {
     const patches: SemanticPatch[] = [
       { selector: { heading: "My Note" }, operation: { op: "insertAfter", value: "After title." } },
-      { selector: { heading: "Details" }, operation: { op: "insertAfter", value: "After Details." } },
+      {
+        selector: { heading: "Details" },
+        operation: { op: "insertAfter", value: "After Details." },
+      },
     ];
     const result = await applySemanticPatches(sampleNote, patches);
-    const expected = "# My Note\n\nAfter title.\n\nThis is the introduction.\n\n## Details\n\nAfter Details.\n\nSome detailed content here.\n\n## Related\n\n- Item one\n- Item two";
+    const expected =
+      "# My Note\n\nAfter title.\n\nThis is the introduction.\n\n## Details\n\nAfter Details.\n\nSome detailed content here.\n\n## Related\n\n- Item one\n- Item two";
     expect(result.content).toBe(expected);
     expect(result.lintWarnings).toEqual([]);
   });
@@ -241,7 +270,10 @@ describe("semantic-patch", () => {
   it("appends new list items under a list container via replaceChildren", async () => {
     const note = "# Groceries\n\n- Milk\n- Eggs\n";
     const patches: SemanticPatch[] = [
-      { selector: { nthChild: 1 }, operation: { op: "replaceChildren", value: "- Milk\n- Eggs\n- Bread" } },
+      {
+        selector: { nthChild: 1 },
+        operation: { op: "replaceChildren", value: "- Milk\n- Eggs\n- Bread" },
+      },
     ];
     const result = await applySemanticPatches(note, patches);
     const expected = "# Groceries\n\n- Milk\n- Eggs\n- Bread";
@@ -251,10 +283,14 @@ describe("semantic-patch", () => {
 
   it("inserts multi-paragraph value after a heading", async () => {
     const patches: SemanticPatch[] = [
-      { selector: { heading: "Details" }, operation: { op: "insertAfter", value: "First paragraph.\n\nSecond paragraph." } },
+      {
+        selector: { heading: "Details" },
+        operation: { op: "insertAfter", value: "First paragraph.\n\nSecond paragraph." },
+      },
     ];
     const result = await applySemanticPatches(sampleNote, patches);
-    const expected = "# My Note\n\nThis is the introduction.\n\n## Details\n\nFirst paragraph.\n\nSecond paragraph.\n\nSome detailed content here.\n\n## Related\n\n- Item one\n- Item two";
+    const expected =
+      "# My Note\n\nThis is the introduction.\n\n## Details\n\nFirst paragraph.\n\nSecond paragraph.\n\nSome detailed content here.\n\n## Related\n\n- Item one\n- Item two";
     expect(result.content).toBe(expected);
     expect(result.lintWarnings).toEqual([]);
   });
@@ -266,7 +302,8 @@ describe("semantic-patch", () => {
     const result = await applySemanticPatches(sampleNote, patches);
     expect(result.lintWarnings.length).toBeGreaterThanOrEqual(1);
     expect(result.lintWarnings[0]).toContain("MD042");
-    const expected = "# My Note\n\nThis is the introduction.\n\n## Details\n\n[broken]()\n\nSome detailed content here.\n\n## Related\n\n- Item one\n- Item two";
+    const expected =
+      "# My Note\n\nThis is the introduction.\n\n## Details\n\n[broken]()\n\nSome detailed content here.\n\n## Related\n\n- Item one\n- Item two";
     expect(result.content).toBe(expected);
   });
 
@@ -282,9 +319,7 @@ describe("semantic-patch", () => {
 
   it("removes a paragraph and verifies the surrounding structure is intact", async () => {
     const note = "# Title\n\nFirst para.\n\n## Mid\n\nContent.\n\nLast para.\n";
-    const patches: SemanticPatch[] = [
-      { selector: { nthChild: 1 }, operation: { op: "remove" } },
-    ];
+    const patches: SemanticPatch[] = [{ selector: { nthChild: 1 }, operation: { op: "remove" } }];
     const result = await applySemanticPatches(note, patches);
     const expected = "# Title\n\n## Mid\n\nContent.\n\nLast para.";
     expect(result.content).toBe(expected);
@@ -311,7 +346,10 @@ describe("semantic-patch", () => {
 
   it("replaces a heading via replace operation", async () => {
     const patches: SemanticPatch[] = [
-      { selector: { heading: "Details" }, operation: { op: "replace", value: "Replaced heading content." } },
+      {
+        selector: { heading: "Details" },
+        operation: { op: "replace", value: "Replaced heading content." },
+      },
     ];
     const result = await applySemanticPatches(sampleNote, patches);
     expect(result.content).toBe(
@@ -332,16 +370,26 @@ describe("semantic-patch", () => {
 
   it("rejects replaceSection without a section selector", async () => {
     const patches: SemanticPatch[] = [
-      { selector: { heading: "Details" }, operation: { op: "replaceSection", value: "## Details\n\nNew." } },
+      {
+        selector: { heading: "Details" },
+        operation: { op: "replaceSection", value: "## Details\n\nNew." },
+      },
     ];
-    await expect(applySemanticPatches(sampleNote, patches)).rejects.toThrow("replaceSection requires a section selector");
+    await expect(applySemanticPatches(sampleNote, patches)).rejects.toThrow(
+      "replaceSection requires a section selector",
+    );
   });
 
   it("rejects heading replace that looks like a section replacement", async () => {
     const patches: SemanticPatch[] = [
-      { selector: { heading: "Details" }, operation: { op: "replace", value: "## Details\n\nNew details." } },
+      {
+        selector: { heading: "Details" },
+        operation: { op: "replace", value: "## Details\n\nNew details." },
+      },
     ];
-    await expect(applySemanticPatches(sampleNote, patches)).rejects.toThrow("Heading `replace` only replaces the heading node");
+    await expect(applySemanticPatches(sampleNote, patches)).rejects.toThrow(
+      "Heading `replace` only replaces the heading node",
+    );
   });
 
   it("fails on ambiguous headingStartsWith match (returns first match)", async () => {
@@ -357,20 +405,29 @@ describe("semantic-patch", () => {
   it("preserves code blocks through round-trip after patch", async () => {
     const note = "# Code\n\nSome text.\n\n```ts\nconst x = 1;\n```\n\nMore text.\n";
     const patches: SemanticPatch[] = [
-      { selector: { nthChild: 0 }, operation: { op: "insertAfter", value: "Inserted after heading." } },
+      {
+        selector: { nthChild: 0 },
+        operation: { op: "insertAfter", value: "Inserted after heading." },
+      },
     ];
     const result = await applySemanticPatches(note, patches);
-    expect(result.content).toBe("# Code\n\nInserted after heading.\n\nSome text.\n\n```ts\nconst x = 1;\n```\n\nMore text.");
+    expect(result.content).toBe(
+      "# Code\n\nInserted after heading.\n\nSome text.\n\n```ts\nconst x = 1;\n```\n\nMore text.",
+    );
     expect(result.lintWarnings).toEqual([]);
   });
 
   it("inserts a table after a heading", async () => {
     const note = "# Report\n\n## Data\n\nExisting.\n";
     const patches: SemanticPatch[] = [
-      { selector: { heading: "Data" }, operation: { op: "insertAfter", value: "| Col A | Col B |\n| --- | --- |\n| 1 | 2 |" } },
+      {
+        selector: { heading: "Data" },
+        operation: { op: "insertAfter", value: "| Col A | Col B |\n| --- | --- |\n| 1 | 2 |" },
+      },
     ];
     const result = await applySemanticPatches(note, patches);
-    const expected = "# Report\n\n## Data\n\n| Col A | Col B |\n| ----- | ----- |\n| 1     | 2     |\n\nExisting.";
+    const expected =
+      "# Report\n\n## Data\n\n| Col A | Col B |\n| ----- | ----- |\n| 1     | 2     |\n\nExisting.";
     expect(result.content).toBe(expected);
     expect(result.lintWarnings).toEqual([]);
   });
@@ -378,10 +435,13 @@ describe("semantic-patch", () => {
   it("inserts a fenced code block after a heading", async () => {
     const note = "# Code\n\n## Example\n\nExisting.\n";
     const patches: SemanticPatch[] = [
-      { selector: { heading: "Example" }, operation: { op: "insertAfter", value: "```ts\nconsole.log(\"hello\");\n```" } },
+      {
+        selector: { heading: "Example" },
+        operation: { op: "insertAfter", value: '```ts\nconsole.log("hello");\n```' },
+      },
     ];
     const result = await applySemanticPatches(note, patches);
-    const expected = "# Code\n\n## Example\n\n```ts\nconsole.log(\"hello\");\n```\n\nExisting.";
+    const expected = '# Code\n\n## Example\n\n```ts\nconsole.log("hello");\n```\n\nExisting.';
     expect(result.content).toBe(expected);
     expect(result.lintWarnings).toEqual([]);
   });

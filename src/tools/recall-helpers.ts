@@ -1,11 +1,29 @@
 import type { Note, NoteLifecycle } from "../storage.js";
 import type { Vault } from "../vault.js";
 import { getEffectiveMetadata } from "../role-suggestions.js";
-import { computeRecallMetadataBoost, type ScoredRecallCandidate, type TemporalQueryHint, shouldApplyTemporalFiltering, computeTemporalRecencyBoost, isWithinTemporalFilterWindow } from "../recall.js";
+import {
+  computeRecallMetadataBoost,
+  type ScoredRecallCandidate,
+  type TemporalQueryHint,
+  shouldApplyTemporalFiltering,
+  computeTemporalRecencyBoost,
+  isWithinTemporalFilterWindow,
+} from "../recall.js";
 import { getOrBuildProjection } from "../projections.js";
 import { attempt } from "../error-utils.js";
-import { getSessionCachedProjectionTokens, setSessionCachedProjectionTokens, getOrBuildVaultNoteList } from "../cache.js";
-import { tokenize, prepareTfIdfCorpusFromTokenizedDocuments, rankDocumentsByTfIdf, LEXICAL_RESCUE_CANDIDATE_LIMIT, LEXICAL_RESCUE_THRESHOLD, LEXICAL_RESCUE_RESULT_LIMIT } from "../lexical.js";
+import {
+  getSessionCachedProjectionTokens,
+  setSessionCachedProjectionTokens,
+  getOrBuildVaultNoteList,
+} from "../cache.js";
+import {
+  tokenize,
+  prepareTfIdfCorpusFromTokenizedDocuments,
+  rankDocumentsByTfIdf,
+  LEXICAL_RESCUE_CANDIDATE_LIMIT,
+  LEXICAL_RESCUE_THRESHOLD,
+  LEXICAL_RESCUE_RESULT_LIMIT,
+} from "../lexical.js";
 import type { RecallDiversity, RecallRetrievalCoverage } from "../structured-content.js";
 
 // ── Recall candidate context ──────────────────────────────────────────────────
@@ -25,7 +43,7 @@ export function buildRecallCandidateContext(note: Note) {
         note.content.includes("## ") ? 0.02 : 0,
         note.content.includes("- ") || note.content.includes("1. ") ? 0.01 : 0,
         note.content.length >= 400 ? 0.01 : 0,
-      ].reduce((sum, value) => sum + value, 0)
+      ].reduce((sum, value) => sum + value, 0),
     ),
   };
 }
@@ -43,11 +61,13 @@ export async function collectLexicalRescueCandidates(
   scope: "project" | "global" | "all",
   tags: string[] | undefined,
   lifecycle: NoteLifecycle | undefined,
-  existingIds: ScoredRecallCandidate[]
+  existingIds: ScoredRecallCandidate[],
 ): Promise<ScoredRecallCandidate[]> {
   const projectId = project?.id;
   const applyTemporalFilter = shouldApplyTemporalFiltering(temporalQueryHint);
-  const temporalFilterWindowDays = applyTemporalFilter ? temporalQueryHint?.filterWindowDays : undefined;
+  const temporalFilterWindowDays = applyTemporalFilter
+    ? temporalQueryHint?.filterWindowDays
+    : undefined;
   const existingIdSet = new Set(existingIds.map((c) => c.id));
   const rescuePool: Array<{
     id: string;
@@ -79,9 +99,9 @@ export async function collectLexicalRescueCandidates(
       if (scope === "project" && !isCurrentProject && !isAttachedVault) continue;
       if (scope === "global" && isProjectNote && !isAttachedVault) continue;
       if (
-        applyTemporalFilter
-        && temporalFilterWindowDays !== undefined
-        && !isWithinTemporalFilterWindow(note.updatedAt, temporalFilterWindowDays)
+        applyTemporalFilter &&
+        temporalFilterWindowDays !== undefined &&
+        !isWithinTemporalFilterWindow(note.updatedAt, temporalFilterWindowDays)
       ) {
         continue;
       }
@@ -97,12 +117,12 @@ export async function collectLexicalRescueCandidates(
         updatedAt: note.updatedAt,
         projectionText: projection.projectionText,
         projectionTokens: projectId
-          ? getSessionCachedProjectionTokens(
-            projectId,
-            vault.storage.vaultPath,
-            note.id,
-            projection.projectionText
-          ) ?? tokenize(projection.projectionText)
+          ? (getSessionCachedProjectionTokens(
+              projectId,
+              vault.storage.vaultPath,
+              note.id,
+              projection.projectionText,
+            ) ?? tokenize(projection.projectionText))
           : tokenize(projection.projectionText),
         context: buildRecallCandidateContext(note),
       });
@@ -113,7 +133,7 @@ export async function collectLexicalRescueCandidates(
           vault.storage.vaultPath,
           note.id,
           projection.projectionText,
-          rescuePool[rescuePool.length - 1]!.projectionTokens
+          rescuePool[rescuePool.length - 1]?.projectionTokens ?? [],
         );
       }
     }
@@ -129,7 +149,7 @@ export async function collectLexicalRescueCandidates(
       id: candidate.id,
       text: candidate.projectionText,
       tokens: candidate.projectionTokens,
-    }))
+    })),
   );
 
   const rankedRescueIds = new Map(
@@ -137,8 +157,8 @@ export async function collectLexicalRescueCandidates(
       query,
       rescueDocuments,
       LEXICAL_RESCUE_CANDIDATE_LIMIT,
-      preparedRescueCorpus
-    ).map((candidate) => [candidate.id, candidate.score])
+      preparedRescueCorpus,
+    ).map((candidate) => [candidate.id, candidate.score]),
   );
 
   const candidates: ScoredRecallCandidate[] = [];
@@ -152,7 +172,11 @@ export async function collectLexicalRescueCandidates(
     const temporalBoost = temporalQueryHint
       ? computeTemporalRecencyBoost(candidate.updatedAt, temporalQueryHint)
       : 0;
-    const scopeBoost = candidate.isCurrentProject ? PROJECT_SCOPE_BOOST : candidate.isAttachedVault ? ATTACHMENT_BOOST : 0;
+    const scopeBoost = candidate.isCurrentProject
+      ? PROJECT_SCOPE_BOOST
+      : candidate.isAttachedVault
+        ? ATTACHMENT_BOOST
+        : 0;
     const boost = scopeBoost + candidate.context.metadataBoost + temporalBoost;
     candidates.push({
       id: candidate.id,
@@ -209,7 +233,7 @@ export function escapeRegex(value: string): string {
 export function hasExactTagContextMatch(tag: string, values: Array<string | undefined>): boolean {
   const normalizedTag = tag.toLowerCase();
   const pattern = new RegExp(`(^|[^a-z0-9_-])${escapeRegex(normalizedTag)}([^a-z0-9_-]|$)`);
-  return values.some(value => value ? pattern.test(value.toLowerCase()) : false);
+  return values.some((value) => (value ? pattern.test(value.toLowerCase()) : false));
 }
 
 export async function identifyHighPriorityAnchors(
@@ -235,8 +259,8 @@ export async function identifyHighPriorityAnchors(
       for (const note of notes) {
         if (note.project !== projectId) continue;
         if (
-          (note.alwaysLoad === true || note.role === "summary")
-          && !supersededTargets.has(note.id)
+          (note.alwaysLoad === true || note.role === "summary") &&
+          !supersededTargets.has(note.id)
         ) {
           anchorIds.add(note.id);
           anchorLookup.set(note.id, note.title);

@@ -197,8 +197,26 @@ describe("classifyTheme", () => {
 describe("buildThemeCache", () => {
   it("maps note ids to themes", () => {
     const notes: Note[] = [
-      { id: "a", title: "Overview", content: "", tags: ["overview"], lifecycle: "permanent", createdAt: "", updatedAt: "", memoryVersion: 1 },
-      { id: "b", title: "Bug Fix", content: "", tags: ["bugs"], lifecycle: "permanent", createdAt: "", updatedAt: "", memoryVersion: 1 },
+      {
+        id: "a",
+        title: "Overview",
+        content: "",
+        tags: ["overview"],
+        lifecycle: "permanent",
+        createdAt: "",
+        updatedAt: "",
+        memoryVersion: 1,
+      },
+      {
+        id: "b",
+        title: "Bug Fix",
+        content: "",
+        tags: ["bugs"],
+        lifecycle: "permanent",
+        createdAt: "",
+        updatedAt: "",
+        memoryVersion: 1,
+      },
     ];
 
     const cache = buildThemeCache(notes);

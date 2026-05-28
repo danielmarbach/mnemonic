@@ -24,7 +24,14 @@ export class AttachedStorage implements NoteStorage {
   private notesRelDir: string;
   private writable: boolean;
 
-  constructor(baseStorage: Storage, repoStorage: Storage, repoPath: string, branch: string, notesRelDir: string, writable: boolean = false) {
+  constructor(
+    baseStorage: Storage,
+    repoStorage: Storage,
+    repoPath: string,
+    branch: string,
+    notesRelDir: string,
+    writable: boolean = false,
+  ) {
     this.baseStorage = baseStorage;
     this.repoStorage = repoStorage;
     this.repoPath = repoPath;
@@ -33,10 +40,18 @@ export class AttachedStorage implements NoteStorage {
     this.writable = writable;
   }
 
-  get vaultPath(): string { return this.baseStorage.vaultPath; }
-  get notesDir(): string { return this.baseStorage.notesDir; }
-  get embeddingsDir(): string { return this.baseStorage.embeddingsDir; }
-  get projectionsDir(): string { return this.baseStorage.projectionsDir; }
+  get vaultPath(): string {
+    return this.baseStorage.vaultPath;
+  }
+  get notesDir(): string {
+    return this.baseStorage.notesDir;
+  }
+  get embeddingsDir(): string {
+    return this.baseStorage.embeddingsDir;
+  }
+  get projectionsDir(): string {
+    return this.baseStorage.projectionsDir;
+  }
 
   async init(): Promise<void> {
     await this.baseStorage.init();
@@ -58,13 +73,13 @@ export class AttachedStorage implements NoteStorage {
       return output
         .trim()
         .split("\n")
-        .filter(line => line.endsWith(".md"))
-        .map(line => {
+        .filter((line) => line.endsWith(".md"))
+        .map((line) => {
           const filename = line.trim();
           const basename = path.basename(filename, ".md");
           return memoryId(basename);
         })
-        .filter(id => id.length > 0);
+        .filter((id) => id.length > 0);
     });
 
     if (!result.ok) {
@@ -94,7 +109,10 @@ export class AttachedStorage implements NoteStorage {
     });
 
     if (!result.ok || !result.value) {
-      debugLog("attached-storage:read-note", `failed for ${id}: ${result.ok ? "empty" : getErrorMessage(result.error)}`);
+      debugLog(
+        "attached-storage:read-note",
+        `failed for ${id}: ${result.ok ? "empty" : getErrorMessage(result.error)}`,
+      );
       return null;
     }
 

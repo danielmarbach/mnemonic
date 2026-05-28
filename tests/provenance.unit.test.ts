@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { buildTemporalHistoryEntry, computeSignalStrength, computeConfidence, computeDecayInfo } from "../src/provenance.js";
+import {
+  buildTemporalHistoryEntry,
+  computeSignalStrength,
+  computeConfidence,
+  computeDecayInfo,
+} from "../src/provenance.js";
 import { enrichTemporalHistory } from "../src/temporal-interpretation.js";
 import type { CommitStats, LastCommit } from "../src/git.js";
 
@@ -49,7 +54,7 @@ describe("buildTemporalHistoryEntry", () => {
     const entry = buildTemporalHistoryEntry(
       makeCommit(),
       makeStats({ additions: 50, deletions: 10, filesChanged: 3 }),
-      false
+      false,
     );
     expect(entry.summary).toMatch(/\+50\/-10 lines/);
     expect(entry.summary).not.toMatch(/files? changed/);
@@ -59,7 +64,7 @@ describe("buildTemporalHistoryEntry", () => {
     const entry = buildTemporalHistoryEntry(
       makeCommit(),
       makeStats({ additions: 50, deletions: 10, filesChanged: 3 }),
-      true
+      true,
     );
     expect(entry.summary).toMatch(/\+50\/-10 lines/);
     expect(entry.summary).toMatch(/3 files changed/);
@@ -69,7 +74,7 @@ describe("buildTemporalHistoryEntry", () => {
     const entry = buildTemporalHistoryEntry(
       makeCommit({ message: "relate: link to other note" }),
       makeStats({ additions: 0, deletions: 0, filesChanged: 1 }),
-      false
+      false,
     );
     expect(entry.stats?.changeType).toBe("metadata-only change");
     expect(entry.summary).toBe("metadata-only change");
@@ -81,14 +86,22 @@ describe("buildTemporalHistoryEntry", () => {
     // After the fix, stats are always present so classifyChange can resolve them as 'expand'.
     const entries = [
       buildTemporalHistoryEntry(
-        makeCommit({ hash: "b", timestamp: "2026-01-02T00:00:00.000Z", message: "update: add phase 5 content" }),
+        makeCommit({
+          hash: "b",
+          timestamp: "2026-01-02T00:00:00.000Z",
+          message: "update: add phase 5 content",
+        }),
         makeStats({ additions: 809, deletions: 23, filesChanged: 14 }),
-        false  // non-verbose
+        false, // non-verbose
       ),
       buildTemporalHistoryEntry(
-        makeCommit({ hash: "a", timestamp: "2026-01-01T00:00:00.000Z", message: "consolidate(supersedes): initial note" }),
+        makeCommit({
+          hash: "a",
+          timestamp: "2026-01-01T00:00:00.000Z",
+          message: "consolidate(supersedes): initial note",
+        }),
         makeStats({ additions: 115, deletions: 4, filesChanged: 5 }),
-        false  // non-verbose
+        false, // non-verbose
       ),
     ];
 
@@ -98,10 +111,14 @@ describe("buildTemporalHistoryEntry", () => {
     expect(result.interpretedHistory[1].changeCategory).toBe("create");
     // The update entry — with stats it classifies as 'expand', not 'unknown'
     expect(result.interpretedHistory[0].changeCategory).toBe("expand");
-    expect(result.interpretedHistory[0].changeDescription).toBe("Added substantial explanatory content.");
+    expect(result.interpretedHistory[0].changeDescription).toBe(
+      "Added substantial explanatory content.",
+    );
     // historySummary reflects the expansion pattern, not generic fallback
     // 2-entry history uses the specific "created and then expanded" path
-    expect(result.historySummary).toBe("This note was created and then expanded with additional detail.");
+    expect(result.historySummary).toBe(
+      "This note was created and then expanded with additional detail.",
+    );
   });
 });
 
@@ -119,7 +136,7 @@ describe("computeSignalStrength", () => {
       updatedAt: recentIso(),
       centrality: 0,
     });
-    expect(result).toBeCloseTo(0.10, 2); // only recency: 0.10 * (1 - 0/90)
+    expect(result).toBeCloseTo(0.1, 2); // only recency: 0.10 * (1 - 0/90)
   });
 
   it("returns higher scores for permanent summary with many relations", () => {
@@ -178,7 +195,7 @@ describe("computeSignalStrength", () => {
       updatedAt: recentIso(),
       centrality: 0,
     });
-    expect(perm - temp).toBeCloseTo(0.10, 2);
+    expect(perm - temp).toBeCloseTo(0.1, 2);
   });
 
   it("missing role contributes 0", () => {
@@ -200,17 +217,17 @@ describe("computeSignalStrength", () => {
 describe("computeConfidence with signalStrength", () => {
   it("returns high at 0.35 threshold", () => {
     expect(computeConfidence("permanent", new Date().toISOString(), 5, 0.35)).toBe("high");
-    expect(computeConfidence("permanent", new Date().toISOString(), 5, 0.40)).toBe("high");
+    expect(computeConfidence("permanent", new Date().toISOString(), 5, 0.4)).toBe("high");
   });
 
   it("returns medium between 0.15 and 0.35", () => {
     expect(computeConfidence("permanent", new Date().toISOString(), 5, 0.15)).toBe("medium");
-    expect(computeConfidence("temporary", new Date().toISOString(), 0, 0.20)).toBe("medium");
+    expect(computeConfidence("temporary", new Date().toISOString(), 0, 0.2)).toBe("medium");
   });
 
   it("returns low below 0.15", () => {
     expect(computeConfidence("temporary", new Date().toISOString(), 0, 0.0)).toBe("low");
-    expect(computeConfidence("temporary", new Date().toISOString(), 0, 0.10)).toBe("low");
+    expect(computeConfidence("temporary", new Date().toISOString(), 0, 0.1)).toBe("low");
   });
 
   it("falls back to legacy logic when signalStrength is undefined", () => {
@@ -238,7 +255,7 @@ describe("computeSignalStrength fail-soft guards", () => {
       updatedAt: new Date().toISOString(),
       centrality: -5,
     });
-    expect(result).toBeCloseTo(0.10, 2);
+    expect(result).toBeCloseTo(0.1, 2);
   });
 });
 

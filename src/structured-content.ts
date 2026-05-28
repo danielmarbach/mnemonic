@@ -5,12 +5,24 @@ import type { NoteLifecycle, NoteRole, RelationshipType } from "./storage.js";
 import { MERGE_RISKS } from "./consolidate.js";
 import type { MergeRisk } from "./consolidate.js";
 
-export const CONSOLIDATE_CLASSIFICATIONS = ["lineage", "duplicate-pressure", "unique-evidence-risk", "supersession-pressure"] as const;
-export type ConsolidateClassification = typeof CONSOLIDATE_CLASSIFICATIONS[number];
+export const CONSOLIDATE_CLASSIFICATIONS = [
+  "lineage",
+  "duplicate-pressure",
+  "unique-evidence-risk",
+  "supersession-pressure",
+] as const;
+export type ConsolidateClassification = (typeof CONSOLIDATE_CLASSIFICATIONS)[number];
 
-export const CONSOLIDATE_MAINTENANCE_WARNING_CODES = ["stale-temporary-notes", "superseded-prune-candidates"] as const;
+export const CONSOLIDATE_MAINTENANCE_WARNING_CODES = [
+  "stale-temporary-notes",
+  "superseded-prune-candidates",
+] as const;
 
-export const PROJECT_MAINTENANCE_WARNING_CODES = ["stale-temporary-notes", "superseded-prune-candidates", "weak-orientation-anchors"] as const;
+export const PROJECT_MAINTENANCE_WARNING_CODES = [
+  "stale-temporary-notes",
+  "superseded-prune-candidates",
+  "weak-orientation-anchors",
+] as const;
 export const PROJECT_MAINTENANCE_WARNING_SEVERITIES = ["info", "warning"] as const;
 
 export interface PersistenceStatus {
@@ -140,9 +152,17 @@ export interface RecallResult extends Record<string, unknown> {
         filesChanged: number;
         changeType: "metadata-only change" | "minor edit" | "substantial update";
       };
-      changeCategory?: "create" | "refine" | "expand" | "clarify" | "connect" | "restructure" | "reverse" | "unknown";
+      changeCategory?:
+        | "create"
+        | "refine"
+        | "expand"
+        | "clarify"
+        | "connect"
+        | "restructure"
+        | "reverse"
+        | "unknown";
       changeDescription?: string;
-    }>; 
+    }>;
     historySummary?: string;
     relationships?: RelationshipPreview;
     retrievalEvidence?: RetrievalEvidence;
@@ -162,7 +182,13 @@ export interface RecallRetrievalCoverage {
   missingAnchors: Array<{ id: string; title: string }>;
 }
 
-export type RetrievalEvidenceChannel = "semantic" | "lexical" | "graph-rank" | "temporal-boost" | "canonical" | "rescue";
+export type RetrievalEvidenceChannel =
+  | "semantic"
+  | "lexical"
+  | "graph-rank"
+  | "temporal-boost"
+  | "canonical"
+  | "rescue";
 export type RetrievalEvidenceRankBand = "top3" | "top10" | "lower";
 export type RetrievalEvidenceFreshness = "today" | "thisWeek" | "thisMonth" | "older";
 
@@ -384,15 +410,16 @@ export interface ConsolidateResult extends Record<string, unknown> {
   warnings?: string[];
   maintenanceWarnings?: ConsolidateMaintenanceWarning[];
   themeGroups?: Array<{ name: string; count: number; examples: string[] }>;
-  relationshipClusters?: Array<{ hub: { id: string; title: string }; notes: { id: string; title: string }[] }>;
+  relationshipClusters?: Array<{
+    hub: { id: string; title: string };
+    notes: { id: string; title: string }[];
+  }>;
   duplicatePairs?: ConsolidateDuplicatePairEvidence[];
   mergeSuggestions?: ConsolidateMergeSuggestionEvidence[];
   executeMergeEvidence?: ConsolidateExecuteMergeEvidence;
   persistence?: PersistenceStatus;
   retry?: MutationRetryContract;
 }
-
-
 
 export interface ConsolidateNoteMergeEvidence {
   id: string;
@@ -574,7 +601,7 @@ export interface Provenance {
 }
 
 export const CONFIDENCE_LEVELS = ["high", "medium", "low"] as const;
-export type Confidence = typeof CONFIDENCE_LEVELS[number];
+export type Confidence = (typeof CONFIDENCE_LEVELS)[number];
 
 export interface Orientation {
   primaryEntry: OrientationNote;
@@ -597,8 +624,9 @@ export interface WorkingState {
   notes: WorkingStateNote[];
 }
 
-export type ProjectMaintenanceWarningCode = typeof PROJECT_MAINTENANCE_WARNING_CODES[number];
-export type ProjectMaintenanceWarningSeverity = typeof PROJECT_MAINTENANCE_WARNING_SEVERITIES[number];
+export type ProjectMaintenanceWarningCode = (typeof PROJECT_MAINTENANCE_WARNING_CODES)[number];
+export type ProjectMaintenanceWarningSeverity =
+  (typeof PROJECT_MAINTENANCE_WARNING_SEVERITIES)[number];
 
 export interface ProjectMaintenanceWarning {
   code: ProjectMaintenanceWarningCode;
@@ -661,7 +689,11 @@ const _ChangeCategory = z.enum(CHANGE_CATEGORIES);
  * - "project-vault" for the primary project vault (.mnemonic/).
  * - "sub-vault:.mnemonic-<name>" for submodule-specific project vaults.
  */
-const _VaultLabel = z.string().regex(/^main-vault$|^project-vault$|^sub-vault:\.mnemonic-.+$|^attached:[a-z0-9][-a-z0-9]*\/\.mnemonic(-.+)?$/);
+const _VaultLabel = z
+  .string()
+  .regex(
+    /^main-vault$|^project-vault$|^sub-vault:\.mnemonic-.+$|^attached:[a-z0-9][-a-z0-9]*\/\.mnemonic(-.+)?$/,
+  );
 const ProjectRefSchema = z.object({ id: z.string(), name: z.string() });
 
 export const RelatedNotePreviewSchema = z.object({
@@ -699,36 +731,38 @@ export const PersistenceStatusSchema = z.object({
     pushReason: z.string().optional(),
     pushError: z.string().optional(),
   }),
-  retry: z.object({
-    recovery: z.object({
-      kind: z.enum(["manual-exact-git-recovery", "rerun-tool-call-serial", "no-manual-recovery"]),
-      allowed: z.boolean(),
-      reason: z.string(),
-    }),
-    attemptedCommit: z.object({
-      subject: z.string(),
-      body: z.string().optional(),
-      files: z.array(z.string()),
-      cwd: z.string().optional(),
-      vault: _VaultLabel,
-      error: z.string(),
-      operation: z.enum(["add", "commit"]).optional(),
-    }),
-    mutationApplied: z.boolean(),
-    retrySafe: z.boolean(),
-    rationale: z.string(),
-    instructions: z.object({
-      sourceOfTruth: z.enum(["attemptedCommit", "tool-response"]),
-      useExactSubject: z.boolean(),
-      useExactBody: z.boolean(),
-      useExactFiles: z.boolean(),
-      forbidInferenceFromHistory: z.boolean(),
-      forbidInferenceFromTitleOrSummary: z.boolean(),
-      forbidParallelSameVaultRetries: z.boolean(),
-      preferToolReconciliation: z.boolean(),
-      rerunSameToolCallSerially: z.boolean(),
-    }),
-  }).optional(),
+  retry: z
+    .object({
+      recovery: z.object({
+        kind: z.enum(["manual-exact-git-recovery", "rerun-tool-call-serial", "no-manual-recovery"]),
+        allowed: z.boolean(),
+        reason: z.string(),
+      }),
+      attemptedCommit: z.object({
+        subject: z.string(),
+        body: z.string().optional(),
+        files: z.array(z.string()),
+        cwd: z.string().optional(),
+        vault: _VaultLabel,
+        error: z.string(),
+        operation: z.enum(["add", "commit"]).optional(),
+      }),
+      mutationApplied: z.boolean(),
+      retrySafe: z.boolean(),
+      rationale: z.string(),
+      instructions: z.object({
+        sourceOfTruth: z.enum(["attemptedCommit", "tool-response"]),
+        useExactSubject: z.boolean(),
+        useExactBody: z.boolean(),
+        useExactFiles: z.boolean(),
+        forbidInferenceFromHistory: z.boolean(),
+        forbidInferenceFromTitleOrSummary: z.boolean(),
+        forbidParallelSameVaultRetries: z.boolean(),
+        preferToolReconciliation: z.boolean(),
+        rerunSameToolCallSerially: z.boolean(),
+      }),
+    })
+    .optional(),
   durability: z.enum(["local-only", "committed", "pushed"]),
 });
 
@@ -745,100 +779,228 @@ export const RememberResultSchema = z.object({
   persistence: PersistenceStatusSchema,
 });
 
-export const RememberToolResultSchema = z.object({
-  action: z.enum(["remembered", "lint_error"]).describe("Result variant: 'remembered' for success, 'lint_error' when unfixable markdown lint errors prevented storage."),
-  tool: z.literal("remember").optional().describe("Present and set to 'remember' when action is lint_error."),
-  id: z.string().optional().describe("Note id, present when action is remembered."),
-  title: z.string().optional().describe("Note title, present when action is remembered."),
-  project: ProjectRefSchema.optional().describe("Project reference, present when action is remembered."),
-  scope: z.enum(["project", "global"]).optional().describe("Storage scope, present when action is remembered."),
-  vault: _VaultLabel.optional().describe("Vault label, present when action is remembered."),
-  tags: z.array(z.string()).optional().describe("Note tags, present when action is remembered."),
-  lifecycle: _NoteLifecycle.optional().describe("Note lifecycle, present when action is remembered."),
-  timestamp: z.string().optional().describe("ISO timestamp, present when action is remembered."),
-  persistence: PersistenceStatusSchema.optional().describe("Git and embedding persistence status, present when action is remembered."),
-  issues: z.array(z.string()).optional().describe("Unfixable markdown lint issues that prevented storage. Present when action is lint_error."),
-}).superRefine((value, ctx) => {
-  if (value.action === "remembered") {
-    if (!value.id) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["id"], message: "id is required when action=remembered" });
-    if (!value.title) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["title"], message: "title is required when action=remembered" });
-    if (!value.scope) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["scope"], message: "scope is required when action=remembered" });
-    if (!value.vault) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["vault"], message: "vault is required when action=remembered" });
-    if (!value.tags) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["tags"], message: "tags is required when action=remembered" });
-    if (!value.lifecycle) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["lifecycle"], message: "lifecycle is required when action=remembered" });
-    if (!value.timestamp) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["timestamp"], message: "timestamp is required when action=remembered" });
-    if (!value.persistence) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["persistence"], message: "persistence is required when action=remembered" });
-  }
-  if (value.action === "lint_error") {
-    if (value.tool !== "remember") ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["tool"], message: "tool must be remember when action=lint_error" });
-    if (!value.issues) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["issues"], message: "issues is required when action=lint_error" });
-  }
-});
+export const RememberToolResultSchema = z
+  .object({
+    action: z
+      .enum(["remembered", "lint_error"])
+      .describe(
+        "Result variant: 'remembered' for success, 'lint_error' when unfixable markdown lint errors prevented storage.",
+      ),
+    tool: z
+      .literal("remember")
+      .optional()
+      .describe("Present and set to 'remember' when action is lint_error."),
+    id: z.string().optional().describe("Note id, present when action is remembered."),
+    title: z.string().optional().describe("Note title, present when action is remembered."),
+    project: ProjectRefSchema.optional().describe(
+      "Project reference, present when action is remembered.",
+    ),
+    scope: z
+      .enum(["project", "global"])
+      .optional()
+      .describe("Storage scope, present when action is remembered."),
+    vault: _VaultLabel.optional().describe("Vault label, present when action is remembered."),
+    tags: z.array(z.string()).optional().describe("Note tags, present when action is remembered."),
+    lifecycle: _NoteLifecycle
+      .optional()
+      .describe("Note lifecycle, present when action is remembered."),
+    timestamp: z.string().optional().describe("ISO timestamp, present when action is remembered."),
+    persistence: PersistenceStatusSchema.optional().describe(
+      "Git and embedding persistence status, present when action is remembered.",
+    ),
+    issues: z
+      .array(z.string())
+      .optional()
+      .describe(
+        "Unfixable markdown lint issues that prevented storage. Present when action is lint_error.",
+      ),
+  })
+  .superRefine((value, ctx) => {
+    if (value.action === "remembered") {
+      if (!value.id)
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["id"],
+          message: "id is required when action=remembered",
+        });
+      if (!value.title)
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["title"],
+          message: "title is required when action=remembered",
+        });
+      if (!value.scope)
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["scope"],
+          message: "scope is required when action=remembered",
+        });
+      if (!value.vault)
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["vault"],
+          message: "vault is required when action=remembered",
+        });
+      if (!value.tags)
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["tags"],
+          message: "tags is required when action=remembered",
+        });
+      if (!value.lifecycle)
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["lifecycle"],
+          message: "lifecycle is required when action=remembered",
+        });
+      if (!value.timestamp)
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["timestamp"],
+          message: "timestamp is required when action=remembered",
+        });
+      if (!value.persistence)
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["persistence"],
+          message: "persistence is required when action=remembered",
+        });
+    }
+    if (value.action === "lint_error") {
+      if (value.tool !== "remember")
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["tool"],
+          message: "tool must be remember when action=lint_error",
+        });
+      if (!value.issues)
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["issues"],
+          message: "issues is required when action=lint_error",
+        });
+    }
+  });
 
 export const RecallResultSchema = z.object({
   action: z.literal("recalled"),
   query: z.string(),
   scope: z.enum(["project", "global", "all"]),
-  recallScopeNoteCount: z.number().int().min(0).optional().describe("Total notes visible across all vaults for this recall scope. Use to decide whether to increase limit for small vaults."),
-  diversity: z.object({
-    themeCount: z.number().int().min(0).describe("Unique tag count across selected results"),
-    roleMix: z.record(z.string(), z.number()).describe("Count of each NoteRole present in selected results"),
-    lifecycleMix: z.record(z.string(), z.number()).describe("Count of each NoteLifecycle present in selected results"),
-  }).optional().describe("Diversity metrics: gauge whether results span enough perspectives"),
-  retrievalCoverage: z.object({
-    anchorsInResults: z.number().int().min(0).describe("Number of high-priority anchors found in results"),
-    highPriorityAnchorsTotal: z.number().int().min(0).describe("Total high-priority anchors in the project vault"),
-    fraction: z.number().min(0).max(1).describe("Fraction of high-priority anchors present in results (0 when no anchors exist)"),
-    missingAnchors: z.array(z.object({
+  recallScopeNoteCount: z
+    .number()
+    .int()
+    .min(0)
+    .optional()
+    .describe(
+      "Total notes visible across all vaults for this recall scope. Use to decide whether to increase limit for small vaults.",
+    ),
+  diversity: z
+    .object({
+      themeCount: z.number().int().min(0).describe("Unique tag count across selected results"),
+      roleMix: z
+        .record(z.string(), z.number())
+        .describe("Count of each NoteRole present in selected results"),
+      lifecycleMix: z
+        .record(z.string(), z.number())
+        .describe("Count of each NoteLifecycle present in selected results"),
+    })
+    .optional()
+    .describe("Diversity metrics: gauge whether results span enough perspectives"),
+  retrievalCoverage: z
+    .object({
+      anchorsInResults: z
+        .number()
+        .int()
+        .min(0)
+        .describe("Number of high-priority anchors found in results"),
+      highPriorityAnchorsTotal: z
+        .number()
+        .int()
+        .min(0)
+        .describe("Total high-priority anchors in the project vault"),
+      fraction: z
+        .number()
+        .min(0)
+        .max(1)
+        .describe("Fraction of high-priority anchors present in results (0 when no anchors exist)"),
+      missingAnchors: z
+        .array(
+          z.object({
+            id: z.string(),
+            title: z.string(),
+          }),
+        )
+        .describe("Up to 5 high-priority anchors not in results, for follow-up recall"),
+    })
+    .optional()
+    .describe(
+      "How well results cover the project's most important notes. Only present when project context is available.",
+    ),
+  results: z.array(
+    z.object({
       id: z.string(),
       title: z.string(),
-    })).describe("Up to 5 high-priority anchors not in results, for follow-up recall"),
-  }).optional().describe("How well results cover the project's most important notes. Only present when project context is available."),
-  results: z.array(z.object({
-    id: z.string(),
-    title: z.string(),
-    score: z.number(),
-    boosted: z.number(),
-    project: ProjectRefSchema.optional(),
-    vault: _VaultLabel,
-    tags: z.array(z.string()),
-    lifecycle: _NoteLifecycle,
-    role: _NoteRole.optional(),
-    updatedAt: z.string(),
-    provenance: z.object({
-      lastUpdatedAt: z.string(),
-      lastCommitHash: z.string(),
-      lastCommitMessage: z.string(),
-      recentlyChanged: z.boolean(),
-    }).optional(),
-    confidence: _Confidence.optional(),
-    signalStrength: z.number().min(0).optional().describe("Composite quality signal (0-0.50). Higher = more structural support from role, centrality, lifecycle, and recency. Use alongside confidence."),
-    history: z.array(z.object({
-      commitHash: z.string(),
-      timestamp: z.string(),
-      message: z.string(),
-      summary: z.string().optional(),
-      stats: z.object({
-        additions: z.number(),
-        deletions: z.number(),
-        filesChanged: z.number(),
-        changeType: z.enum(["metadata-only change", "minor edit", "substantial update"]),
-      }).optional(),
-      changeCategory: _ChangeCategory.optional(),
-      changeDescription: z.string().optional(),
-    })).optional(),
-    historySummary: z.string().optional(),
-    relationships: RelationshipPreviewSchema.optional(),
-    retrievalEvidence: z.object({
-      channels: z.array(z.enum(["semantic", "lexical", "graph-rank", "temporal-boost", "canonical", "rescue"])),
-      rankBand: z.enum(["top3", "top10", "lower"]),
-      projectRelevant: z.boolean(),
-      freshness: z.enum(["today", "thisWeek", "thisMonth", "older"]),
-      superseded: z.boolean(),
-      supersededBy: z.string().optional(),
-      supersededCount: z.number().int().optional(),
-    }).optional(),
-  })),
+      score: z.number(),
+      boosted: z.number(),
+      project: ProjectRefSchema.optional(),
+      vault: _VaultLabel,
+      tags: z.array(z.string()),
+      lifecycle: _NoteLifecycle,
+      role: _NoteRole.optional(),
+      updatedAt: z.string(),
+      provenance: z
+        .object({
+          lastUpdatedAt: z.string(),
+          lastCommitHash: z.string(),
+          lastCommitMessage: z.string(),
+          recentlyChanged: z.boolean(),
+        })
+        .optional(),
+      confidence: _Confidence.optional(),
+      signalStrength: z
+        .number()
+        .min(0)
+        .optional()
+        .describe(
+          "Composite quality signal (0-0.50). Higher = more structural support from role, centrality, lifecycle, and recency. Use alongside confidence.",
+        ),
+      history: z
+        .array(
+          z.object({
+            commitHash: z.string(),
+            timestamp: z.string(),
+            message: z.string(),
+            summary: z.string().optional(),
+            stats: z
+              .object({
+                additions: z.number(),
+                deletions: z.number(),
+                filesChanged: z.number(),
+                changeType: z.enum(["metadata-only change", "minor edit", "substantial update"]),
+              })
+              .optional(),
+            changeCategory: _ChangeCategory.optional(),
+            changeDescription: z.string().optional(),
+          }),
+        )
+        .optional(),
+      historySummary: z.string().optional(),
+      relationships: RelationshipPreviewSchema.optional(),
+      retrievalEvidence: z
+        .object({
+          channels: z.array(
+            z.enum(["semantic", "lexical", "graph-rank", "temporal-boost", "canonical", "rescue"]),
+          ),
+          rankBand: z.enum(["top3", "top10", "lower"]),
+          projectRelevant: z.boolean(),
+          freshness: z.enum(["today", "thisWeek", "thisMonth", "older"]),
+          superseded: z.boolean(),
+          supersededBy: z.string().optional(),
+          supersededCount: z.number().int().optional(),
+        })
+        .optional(),
+    }),
+  ),
 });
 
 export const ListResultSchema = z.object({
@@ -847,23 +1009,27 @@ export const ListResultSchema = z.object({
   scope: z.enum(["project", "global", "all"]),
   storedIn: z.enum(["project-vault", "main-vault", "any", "attached"]),
   project: ProjectRefSchema.optional(),
-  notes: z.array(z.object({
-    id: z.string(),
-    title: z.string(),
-    project: ProjectRefSchema.optional(),
-    tags: z.array(z.string()),
-    lifecycle: _NoteLifecycle,
-    role: _NoteRole.optional(),
-    vault: _VaultLabel,
-    updatedAt: z.string(),
-    hasRelated: z.boolean().optional(),
-  })),
-  options: z.object({
-    includeRelations: z.boolean().optional(),
-    includePreview: z.boolean().optional(),
-    includeStorage: z.boolean().optional(),
-    includeUpdated: z.boolean().optional(),
-  }).optional(),
+  notes: z.array(
+    z.object({
+      id: z.string(),
+      title: z.string(),
+      project: ProjectRefSchema.optional(),
+      tags: z.array(z.string()),
+      lifecycle: _NoteLifecycle,
+      role: _NoteRole.optional(),
+      vault: _VaultLabel,
+      updatedAt: z.string(),
+      hasRelated: z.boolean().optional(),
+    }),
+  ),
+  options: z
+    .object({
+      includeRelations: z.boolean().optional(),
+      includePreview: z.boolean().optional(),
+      includeStorage: z.boolean().optional(),
+      includeUpdated: z.boolean().optional(),
+    })
+    .optional(),
 });
 
 export const UpdateResultSchema = z.object({
@@ -879,33 +1045,99 @@ export const UpdateResultSchema = z.object({
   persistence: PersistenceStatusSchema,
 });
 
-export const UpdateToolResultSchema = z.object({
-  action: z.enum(["updated", "lint_error"]).describe("Result variant: 'updated' for success, 'lint_error' when unfixable markdown lint errors prevented the update."),
-  tool: z.literal("update").optional().describe("Present and set to 'update' when action is lint_error."),
-  id: z.string().optional().describe("Note id, present when action is updated."),
-  title: z.string().optional().describe("Note title, present when action is updated."),
-  fieldsModified: z.array(z.string()).optional().describe("List of fields that changed, present when action is updated."),
-  timestamp: z.string().optional().describe("ISO timestamp, present when action is updated."),
-  project: ProjectRefSchema.optional().describe("Project reference, present when action is updated."),
-  lifecycle: _NoteLifecycle.optional().describe("Note lifecycle, present when action is updated."),
-  role: _NoteRole.optional().describe("Note role, present when action is updated."),
-  lintWarnings: z.array(z.string()).optional().describe("Auto-fixed lint warnings from semantic patch, present when action is updated."),
-  persistence: PersistenceStatusSchema.optional().describe("Git and embedding persistence status, present when action is updated."),
-  issues: z.array(z.string()).optional().describe("Unfixable markdown lint issues that prevented the update. Present when action is lint_error."),
-}).superRefine((value, ctx) => {
-  if (value.action === "updated") {
-    if (!value.id) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["id"], message: "id is required when action=updated" });
-    if (!value.title) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["title"], message: "title is required when action=updated" });
-    if (!value.fieldsModified) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["fieldsModified"], message: "fieldsModified is required when action=updated" });
-    if (!value.timestamp) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["timestamp"], message: "timestamp is required when action=updated" });
-    if (!value.lifecycle) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["lifecycle"], message: "lifecycle is required when action=updated" });
-    if (!value.persistence) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["persistence"], message: "persistence is required when action=updated" });
-  }
-  if (value.action === "lint_error") {
-    if (value.tool !== "update") ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["tool"], message: "tool must be update when action=lint_error" });
-    if (!value.issues) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["issues"], message: "issues is required when action=lint_error" });
-  }
-});
+export const UpdateToolResultSchema = z
+  .object({
+    action: z
+      .enum(["updated", "lint_error"])
+      .describe(
+        "Result variant: 'updated' for success, 'lint_error' when unfixable markdown lint errors prevented the update.",
+      ),
+    tool: z
+      .literal("update")
+      .optional()
+      .describe("Present and set to 'update' when action is lint_error."),
+    id: z.string().optional().describe("Note id, present when action is updated."),
+    title: z.string().optional().describe("Note title, present when action is updated."),
+    fieldsModified: z
+      .array(z.string())
+      .optional()
+      .describe("List of fields that changed, present when action is updated."),
+    timestamp: z.string().optional().describe("ISO timestamp, present when action is updated."),
+    project: ProjectRefSchema.optional().describe(
+      "Project reference, present when action is updated.",
+    ),
+    lifecycle: _NoteLifecycle
+      .optional()
+      .describe("Note lifecycle, present when action is updated."),
+    role: _NoteRole.optional().describe("Note role, present when action is updated."),
+    lintWarnings: z
+      .array(z.string())
+      .optional()
+      .describe("Auto-fixed lint warnings from semantic patch, present when action is updated."),
+    persistence: PersistenceStatusSchema.optional().describe(
+      "Git and embedding persistence status, present when action is updated.",
+    ),
+    issues: z
+      .array(z.string())
+      .optional()
+      .describe(
+        "Unfixable markdown lint issues that prevented the update. Present when action is lint_error.",
+      ),
+  })
+  .superRefine((value, ctx) => {
+    if (value.action === "updated") {
+      if (!value.id)
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["id"],
+          message: "id is required when action=updated",
+        });
+      if (!value.title)
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["title"],
+          message: "title is required when action=updated",
+        });
+      if (!value.fieldsModified)
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["fieldsModified"],
+          message: "fieldsModified is required when action=updated",
+        });
+      if (!value.timestamp)
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["timestamp"],
+          message: "timestamp is required when action=updated",
+        });
+      if (!value.lifecycle)
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["lifecycle"],
+          message: "lifecycle is required when action=updated",
+        });
+      if (!value.persistence)
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["persistence"],
+          message: "persistence is required when action=updated",
+        });
+    }
+    if (value.action === "lint_error") {
+      if (value.tool !== "update")
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["tool"],
+          message: "tool must be update when action=lint_error",
+        });
+      if (!value.issues)
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["issues"],
+          message: "issues is required when action=lint_error",
+        });
+    }
+  });
 
 export const ForgetResultSchema = z.object({
   action: z.literal("forgotten"),
@@ -943,37 +1175,43 @@ export const RecentResultSchema = z.object({
   project: ProjectRefSchema.optional(),
   count: z.number(),
   limit: z.number(),
-  notes: z.array(z.object({
-    id: z.string(),
-    title: z.string(),
-    project: ProjectRefSchema.optional(),
-    tags: z.array(z.string()),
-    lifecycle: _NoteLifecycle,
-    vault: _VaultLabel,
-    updatedAt: z.string(),
-    preview: z.string().optional(),
-  })),
+  notes: z.array(
+    z.object({
+      id: z.string(),
+      title: z.string(),
+      project: ProjectRefSchema.optional(),
+      tags: z.array(z.string()),
+      lifecycle: _NoteLifecycle,
+      vault: _VaultLabel,
+      updatedAt: z.string(),
+      preview: z.string().optional(),
+    }),
+  ),
 });
 
 export const MemoryGraphResultSchema = z.object({
   action: z.literal("graph_shown"),
   project: ProjectRefSchema.optional(),
-  nodes: z.array(z.object({
-    id: z.string(),
-    title: z.string(),
-    edges: z.array(z.object({ toId: z.string(), type: _RelationshipType })),
-  })),
+  nodes: z.array(
+    z.object({
+      id: z.string(),
+      title: z.string(),
+      edges: z.array(z.object({ toId: z.string(), type: _RelationshipType })),
+    }),
+  ),
   limit: z.number(),
   truncated: z.boolean(),
 });
 
 export const ThemeSectionSchema = z.object({
   count: z.number(),
-  examples: z.array(z.object({
-    id: z.string(),
-    title: z.string(),
-    updatedAt: z.string(),
-  })),
+  examples: z.array(
+    z.object({
+      id: z.string(),
+      title: z.string(),
+      updatedAt: z.string(),
+    }),
+  ),
 });
 
 export const AnchorNoteSchema = z.object({
@@ -1010,12 +1248,14 @@ export const OrientationNoteSchema = z.object({
   id: z.string(),
   title: z.string(),
   rationale: z.string(),
-  provenance: z.object({
-    lastUpdatedAt: z.string(),
-    lastCommitHash: z.string(),
-    lastCommitMessage: z.string(),
-    recentlyChanged: z.boolean(),
-  }).optional(),
+  provenance: z
+    .object({
+      lastUpdatedAt: z.string(),
+      lastCommitHash: z.string(),
+      lastCommitMessage: z.string(),
+      recentlyChanged: z.boolean(),
+    })
+    .optional(),
   confidence: _Confidence.optional(),
   relationships: RelationshipPreviewSchema.optional(),
 });
@@ -1042,20 +1282,32 @@ export const WorkingStateSchema = z.object({
 });
 
 export const ProjectMaintenanceWarningSchema = z.object({
-  code: z.enum(PROJECT_MAINTENANCE_WARNING_CODES)
+  code: z
+    .enum(PROJECT_MAINTENANCE_WARNING_CODES)
     .describe("Stable warning code for a project memory maintenance condition."),
-  severity: z.enum(PROJECT_MAINTENANCE_WARNING_SEVERITIES)
-    .describe("Advisory severity for the maintenance condition; warnings still require explicit user action."),
-  message: z.string()
+  severity: z
+    .enum(PROJECT_MAINTENANCE_WARNING_SEVERITIES)
+    .describe(
+      "Advisory severity for the maintenance condition; warnings still require explicit user action.",
+    ),
+  message: z
+    .string()
     .describe("Compact human-readable maintenance warning matching the text output."),
-  count: z.number().optional()
+  count: z
+    .number()
+    .optional()
     .describe("Number of notes or conditions represented by this warning when applicable."),
-  sampleNotes: z.array(z.object({
-    id: z.string().describe("Memory id for a bounded sample note that triggered this warning."),
-    title: z.string().describe("Title for a bounded sample note that triggered this warning."),
-  })).optional()
+  sampleNotes: z
+    .array(
+      z.object({
+        id: z.string().describe("Memory id for a bounded sample note that triggered this warning."),
+        title: z.string().describe("Title for a bounded sample note that triggered this warning."),
+      }),
+    )
+    .optional()
     .describe("Bounded sample of notes that triggered this warning."),
-  suggestedAction: z.string()
+  suggestedAction: z
+    .string()
     .describe("Explicit next action the agent can take; never an automatic cleanup action."),
 });
 
@@ -1067,68 +1319,87 @@ export const ProjectSummaryResultSchema = z.object({
   recent: z.array(RecentNoteSchema),
   anchors: z.array(AnchorNoteSchema),
   orientation: OrientationSchema,
-  maintenanceWarnings: z.array(ProjectMaintenanceWarningSchema).optional()
+  maintenanceWarnings: z
+    .array(ProjectMaintenanceWarningSchema)
+    .optional()
     .describe("Advisory project memory health warnings derived from loaded metadata only."),
   workingState: WorkingStateSchema.optional(),
-  relatedGlobal: z.object({
-    notes: z.array(RelatedGlobalNoteSchema),
-    computedAt: z.string(),
-  }).optional(),
+  relatedGlobal: z
+    .object({
+      notes: z.array(RelatedGlobalNoteSchema),
+      computedAt: z.string(),
+    })
+    .optional(),
 });
 
 export const SyncResultSchema = z.object({
   action: z.literal("synced"),
-  vaults: z.array(z.object({
-    vault: z.enum(["main", "project", "attached"]),
-    hasRemote: z.boolean(),
-    pulled: z.number(),
-    deleted: z.number(),
-    pushed: z.number(),
-    embedded: z.number(),
-    failed: z.array(z.object({
-      id: z.string().describe("Note id that failed to embed"),
-      error: z.string().describe("Error message from the embedding provider"),
-    })),
-    gitError: z.object({
-      phase: z.enum(["fetch", "pull", "push"]),
-      message: z.string(),
-      isConflict: z.boolean(),
-      conflictFiles: z.array(z.string()).optional(),
-    }).optional(),
-    attachedSlug: z.string().optional().describe("For attached vaults: the project slug identifying the attachment."),
-  })),
+  vaults: z.array(
+    z.object({
+      vault: z.enum(["main", "project", "attached"]),
+      hasRemote: z.boolean(),
+      pulled: z.number(),
+      deleted: z.number(),
+      pushed: z.number(),
+      embedded: z.number(),
+      failed: z.array(
+        z.object({
+          id: z.string().describe("Note id that failed to embed"),
+          error: z.string().describe("Error message from the embedding provider"),
+        }),
+      ),
+      gitError: z
+        .object({
+          phase: z.enum(["fetch", "pull", "push"]),
+          message: z.string(),
+          isConflict: z.boolean(),
+          conflictFiles: z.array(z.string()).optional(),
+        })
+        .optional(),
+      attachedSlug: z
+        .string()
+        .optional()
+        .describe("For attached vaults: the project slug identifying the attachment."),
+    }),
+  ),
 });
 
 export const ReindexResultSchema = z.object({
   action: z.literal("reindexed"),
-  vaults: z.array(z.object({
-    vault: z.enum(["main", "project"]),
-    rebuilt: z.number(),
-    failed: z.array(z.object({
-      id: z.string().describe("Note id that failed to embed"),
-      error: z.string().describe("Error message from the embedding provider"),
-    })),
-  })),
+  vaults: z.array(
+    z.object({
+      vault: z.enum(["main", "project"]),
+      rebuilt: z.number(),
+      failed: z.array(
+        z.object({
+          id: z.string().describe("Note id that failed to embed"),
+          error: z.string().describe("Error message from the embedding provider"),
+        }),
+      ),
+    }),
+  ),
 });
 
 export const GetResultSchema = z.object({
   action: z.literal("got"),
   count: z.number(),
-  notes: z.array(z.object({
-    id: z.string(),
-    title: z.string(),
-    content: z.string(),
-    project: ProjectRefSchema.optional(),
-    tags: z.array(z.string()),
-    lifecycle: _NoteLifecycle,
-    role: _NoteRole.optional(),
-    alwaysLoad: z.boolean().optional(),
-    relatedTo: z.array(z.object({ id: z.string(), type: _RelationshipType })).optional(),
-    createdAt: z.string(),
-    updatedAt: z.string(),
-    vault: _VaultLabel,
-    relationships: RelationshipPreviewSchema.optional(),
-  })),
+  notes: z.array(
+    z.object({
+      id: z.string(),
+      title: z.string(),
+      content: z.string(),
+      project: ProjectRefSchema.optional(),
+      tags: z.array(z.string()),
+      lifecycle: _NoteLifecycle,
+      role: _NoteRole.optional(),
+      alwaysLoad: z.boolean().optional(),
+      relatedTo: z.array(z.object({ id: z.string(), type: _RelationshipType })).optional(),
+      createdAt: z.string(),
+      updatedAt: z.string(),
+      vault: _VaultLabel,
+      relationships: RelationshipPreviewSchema.optional(),
+    }),
+  ),
   notFound: z.array(z.string()),
 });
 
@@ -1142,8 +1413,11 @@ export const WhereIsResultSchema = z.object({
   relatedCount: z.number(),
 });
 
-export const ConsolidateClassificationSchema = z.enum(CONSOLIDATE_CLASSIFICATIONS)
-  .describe("Advisory classification for consolidation evidence: lineage (expected workflow overlap), duplicate-pressure (same role/lifecycle, no lineage), unique-evidence-risk (research with unique source), supersession-pressure (superseded and stale).");
+export const ConsolidateClassificationSchema = z
+  .enum(CONSOLIDATE_CLASSIFICATIONS)
+  .describe(
+    "Advisory classification for consolidation evidence: lineage (expected workflow overlap), duplicate-pressure (same role/lifecycle, no lineage), unique-evidence-risk (research with unique source), supersession-pressure (superseded and stale).",
+  );
 
 const ConsolidateNoteMergeEvidenceBaseSchema = z.object({
   id: z.string(),
@@ -1155,27 +1429,36 @@ const ConsolidateNoteMergeEvidenceBaseSchema = z.object({
   supersededBy: z.string().optional(),
   supersededCount: z.number().int().optional(),
   relatedCount: z.number(),
-  classification: ConsolidateClassificationSchema.optional()
-    .describe("Advisory classification for this note in the consolidation context."),
+  classification: ConsolidateClassificationSchema.optional().describe(
+    "Advisory classification for this note in the consolidation context.",
+  ),
   warnings: z.array(z.string()).optional(),
   mergeRisk: _MergeRisk,
 });
 
 export const ConsolidateMaintenanceWarningSchema = z.object({
-  code: z.enum(CONSOLIDATE_MAINTENANCE_WARNING_CODES)
+  code: z
+    .enum(CONSOLIDATE_MAINTENANCE_WARNING_CODES)
     .describe("Stable warning code for a consolidation maintenance condition."),
-  severity: z.enum(PROJECT_MAINTENANCE_WARNING_SEVERITIES)
+  severity: z
+    .enum(PROJECT_MAINTENANCE_WARNING_SEVERITIES)
     .describe("Advisory severity for the maintenance condition."),
-  message: z.string()
-    .describe("Compact human-readable maintenance warning."),
-  count: z.number().optional()
+  message: z.string().describe("Compact human-readable maintenance warning."),
+  count: z
+    .number()
+    .optional()
     .describe("Number of notes or conditions represented by this warning."),
-  sampleNotes: z.array(z.object({
-    id: z.string().describe("Memory id for a bounded sample note."),
-    title: z.string().describe("Title for a bounded sample note."),
-  })).optional()
+  sampleNotes: z
+    .array(
+      z.object({
+        id: z.string().describe("Memory id for a bounded sample note."),
+        title: z.string().describe("Title for a bounded sample note."),
+      }),
+    )
+    .optional()
     .describe("Bounded sample of notes that triggered this warning."),
-  suggestedAction: z.string()
+  suggestedAction: z
+    .string()
     .describe("Explicit next action for the agent; never an automatic cleanup action."),
 });
 
@@ -1186,75 +1469,105 @@ export const ConsolidateResultSchema = z.object({
   notesProcessed: z.number(),
   notesModified: z.number(),
   warnings: z.array(z.string()).optional(),
-  maintenanceWarnings: z.array(ConsolidateMaintenanceWarningSchema).optional()
+  maintenanceWarnings: z
+    .array(ConsolidateMaintenanceWarningSchema)
+    .optional()
     .describe("Advisory maintenance warnings derived from consolidate analysis."),
-  themeGroups: z.array(z.object({
-    name: z.string(),
-    count: z.number(),
-    examples: z.array(z.string()),
-  })).optional(),
-  relationshipClusters: z.array(z.object({
-    hub: z.object({
-      id: z.string(),
-      title: z.string(),
-    }),
-    notes: z.array(z.object({
-      id: z.string(),
-      title: z.string(),
-    })),
-  })).optional(),
-  duplicatePairs: z.array(z.object({
-    similarity: z.number(),
-    noteA: ConsolidateNoteMergeEvidenceBaseSchema,
-    noteB: ConsolidateNoteMergeEvidenceBaseSchema,
-    warnings: z.array(z.string()).optional(),
-    mergeRisk: _MergeRisk,
-  })).optional(),
-  mergeSuggestions: z.array(z.object({
-    targetTitle: z.string(),
-    sourceIds: z.array(z.string()),
-    mode: z.enum(["supersedes", "delete"]),
-    notes: z.array(ConsolidateNoteMergeEvidenceBaseSchema),
-    warnings: z.array(z.string()).optional(),
-    mergeRisk: _MergeRisk,
-  })).optional(),
-  executeMergeEvidence: z.object({
-    notes: z.array(ConsolidateNoteMergeEvidenceBaseSchema),
-    warnings: z.array(z.string()).optional(),
-    mergeRisk: _MergeRisk,
-  }).optional(),
+  themeGroups: z
+    .array(
+      z.object({
+        name: z.string(),
+        count: z.number(),
+        examples: z.array(z.string()),
+      }),
+    )
+    .optional(),
+  relationshipClusters: z
+    .array(
+      z.object({
+        hub: z.object({
+          id: z.string(),
+          title: z.string(),
+        }),
+        notes: z.array(
+          z.object({
+            id: z.string(),
+            title: z.string(),
+          }),
+        ),
+      }),
+    )
+    .optional(),
+  duplicatePairs: z
+    .array(
+      z.object({
+        similarity: z.number(),
+        noteA: ConsolidateNoteMergeEvidenceBaseSchema,
+        noteB: ConsolidateNoteMergeEvidenceBaseSchema,
+        warnings: z.array(z.string()).optional(),
+        mergeRisk: _MergeRisk,
+      }),
+    )
+    .optional(),
+  mergeSuggestions: z
+    .array(
+      z.object({
+        targetTitle: z.string(),
+        sourceIds: z.array(z.string()),
+        mode: z.enum(["supersedes", "delete"]),
+        notes: z.array(ConsolidateNoteMergeEvidenceBaseSchema),
+        warnings: z.array(z.string()).optional(),
+        mergeRisk: _MergeRisk,
+      }),
+    )
+    .optional(),
+  executeMergeEvidence: z
+    .object({
+      notes: z.array(ConsolidateNoteMergeEvidenceBaseSchema),
+      warnings: z.array(z.string()).optional(),
+      mergeRisk: _MergeRisk,
+    })
+    .optional(),
   persistence: PersistenceStatusSchema.optional(),
   retry: PersistenceStatusSchema.shape.retry,
 });
 
 export const ProjectIdentityResultSchema = z.object({
   action: z.enum(["project_identity_set", "project_identity_shown", "project_identity_detected"]),
-  project: z.object({
-    id: z.string(),
-    name: z.string(),
-    source: z.string(),
-    remoteName: RemoteNameSchema.optional(),
-  }).optional(),
-  identityOverride: z.object({
-    remoteName: RemoteNameSchema,
-    updatedAt: z.string(),
-  }).optional(),
-  defaultProject: z.object({
-    id: z.string(),
-    name: z.string(),
-    remoteName: RemoteNameSchema.optional(),
-  }).optional(),
+  project: z
+    .object({
+      id: z.string(),
+      name: z.string(),
+      source: z.string(),
+      remoteName: RemoteNameSchema.optional(),
+    })
+    .optional(),
+  identityOverride: z
+    .object({
+      remoteName: RemoteNameSchema,
+      updatedAt: z.string(),
+    })
+    .optional(),
+  defaultProject: z
+    .object({
+      id: z.string(),
+      name: z.string(),
+      remoteName: RemoteNameSchema.optional(),
+    })
+    .optional(),
   retry: PersistenceStatusSchema.shape.retry,
 });
 
 export const MigrationListResultSchema = z.object({
   action: z.literal("migration_list"),
-  vaults: z.array(z.object({
-    path: z.string(),
-    type: z.enum(["main", "project"]),
-    version: z.string(),
-    pending: z.number(),
-  })),
+  vaults: z.array(
+    z.object({
+      path: z.string(),
+      type: z.enum(["main", "project"]),
+      version: z.string(),
+      pending: z.number(),
+    }),
+  ),
   available: z.array(z.object({ name: z.string(), description: z.string() })),
   totalPending: z.number(),
 });
@@ -1264,13 +1577,15 @@ export const MigrationExecuteResultSchema = z.object({
   migration: z.string(),
   dryRun: z.boolean(),
   vaultsProcessed: z.number(),
-  vaultResults: z.array(z.object({
-    path: z.string(),
-    notesProcessed: z.number(),
-    notesModified: z.number(),
-    errors: z.array(z.object({ noteId: z.string(), error: z.string() })),
-    warnings: z.array(z.string()),
-  })),
+  vaultResults: z.array(
+    z.object({
+      path: z.string(),
+      notesProcessed: z.number(),
+      notesModified: z.number(),
+      errors: z.array(z.object({ noteId: z.string(), error: z.string() })),
+      warnings: z.array(z.string()),
+    }),
+  ),
 });
 
 export const PolicyResultSchema = z.object({
@@ -1319,19 +1634,21 @@ export const RemoveAttachmentResultSchema = z.object({
 export const ListAttachmentsResultSchema = z.object({
   action: z.literal("attachments_listed"),
   project: z.object({ id: z.string(), name: z.string() }),
-  attachments: z.array(z.object({
-    projectSlug: z.string(),
-    projectName: z.string(),
-    localPath: z.string(),
-    vaultFolder: z.string(),
-    enabled: z.boolean(),
-    branch: z.string(),
-    branchTipHash: z.string(),
-    pathExists: z.boolean(),
-    noteCount: z.number(),
-    writable: z.boolean().optional(),
-    pushBranch: z.string().optional(),
-  })),
+  attachments: z.array(
+    z.object({
+      projectSlug: z.string(),
+      projectName: z.string(),
+      localPath: z.string(),
+      vaultFolder: z.string(),
+      enabled: z.boolean(),
+      branch: z.string(),
+      branchTipHash: z.string(),
+      pathExists: z.boolean(),
+      noteCount: z.number(),
+      writable: z.boolean().optional(),
+      pushBranch: z.string().optional(),
+    }),
+  ),
   maxAttachmentsPerProject: z.number(),
 });
 
@@ -1410,21 +1727,29 @@ export const DiscoverTagsResultSchema = z.object({
   project: z.object({ id: z.string(), name: z.string() }).optional(),
   mode: z.enum(["suggest", "browse"]),
   scope: z.enum(["project", "global", "all"]),
-  recommendedTags: z.array(z.object({
-    tag: z.string(),
-    usageCount: z.number(),
-    example: z.string().optional(),
-    reason: z.string().optional(),
-    lifecycleTypes: z.array(_NoteLifecycle),
-    isTemporaryOnly: z.boolean(),
-  })).optional(),
-  tags: z.array(z.object({
-    tag: z.string(),
-    usageCount: z.number(),
-    examples: z.array(z.string()),
-    lifecycleTypes: z.array(_NoteLifecycle),
-    isTemporaryOnly: z.boolean(),
-  })).optional(),
+  recommendedTags: z
+    .array(
+      z.object({
+        tag: z.string(),
+        usageCount: z.number(),
+        example: z.string().optional(),
+        reason: z.string().optional(),
+        lifecycleTypes: z.array(_NoteLifecycle),
+        isTemporaryOnly: z.boolean(),
+      }),
+    )
+    .optional(),
+  tags: z
+    .array(
+      z.object({
+        tag: z.string(),
+        usageCount: z.number(),
+        examples: z.array(z.string()),
+        lifecycleTypes: z.array(_NoteLifecycle),
+        isTemporaryOnly: z.boolean(),
+      }),
+    )
+    .optional(),
   totalTags: z.number(),
   totalNotes: z.number(),
   vaultsSearched: z.number(),

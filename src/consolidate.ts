@@ -4,7 +4,7 @@ import type { ConsolidateClassification } from "./structured-content.js";
 import { daysSince } from "./date-utils.js";
 
 export const MERGE_RISKS = ["low", "medium", "high"] as const;
-export type MergeRisk = typeof MERGE_RISKS[number];
+export type MergeRisk = (typeof MERGE_RISKS)[number];
 
 export interface ConsolidateNoteEvidence {
   id: string;
@@ -26,8 +26,6 @@ function noteAgeDays(updatedAt: string, now: Date = new Date()): number {
 }
 
 const LINEAGE_RELATIONSHIP_TYPES = new Set(["derives-from", "follows"]);
-
-const WORKFLOW_ROLES = new Set(["plan", "research", "review"]);
 
 function hasLineageRelationship(note: NoteForWarnings, otherIds: Set<string>): boolean {
   return (note.relatedTo ?? []).some(
@@ -66,19 +64,16 @@ export function classifyConsolidationPair(
 ): ConsolidateClassification {
   const contextIds = new Set([noteA.id, noteB.id]);
 
-  if (
-    hasLineageRelationship(noteA, contextIds)
-    || hasLineageRelationship(noteB, contextIds)
-  ) {
+  if (hasLineageRelationship(noteA, contextIds) || hasLineageRelationship(noteB, contextIds)) {
     return "lineage";
   }
 
   const supersededByMap = buildSupersededByMap([noteA, noteB]);
   if (
-    (noteA.relatedTo ?? []).some((rel) => rel.type === "supersedes")
-    || (noteB.relatedTo ?? []).some((rel) => rel.type === "supersedes")
-    || supersededByMap.has(noteA.id)
-    || supersededByMap.has(noteB.id)
+    (noteA.relatedTo ?? []).some((rel) => rel.type === "supersedes") ||
+    (noteB.relatedTo ?? []).some((rel) => rel.type === "supersedes") ||
+    supersededByMap.has(noteA.id) ||
+    supersededByMap.has(noteB.id)
   ) {
     return "supersession-pressure";
   }
@@ -107,7 +102,9 @@ function isTemporaryResearchNote(note: Pick<Note, "lifecycle" | "role">): boolea
   return note.lifecycle === "temporary" && note.role === "research";
 }
 
-function majorityLifecycle(notes: Array<Pick<Note, "lifecycle">>): "temporary" | "permanent" | undefined {
+function majorityLifecycle(
+  notes: Array<Pick<Note, "lifecycle">>,
+): "temporary" | "permanent" | undefined {
   const counts = new Map<"temporary" | "permanent", number>();
   for (const note of notes) {
     counts.set(note.lifecycle, (counts.get(note.lifecycle) ?? 0) + 1);
@@ -127,7 +124,10 @@ function majorityLifecycle(notes: Array<Pick<Note, "lifecycle">>): "temporary" |
   return best;
 }
 
-type NoteForWarnings = Pick<Note, "id" | "title" | "lifecycle" | "role" | "updatedAt" | "relatedTo">;
+type NoteForWarnings = Pick<
+  Note,
+  "id" | "title" | "lifecycle" | "role" | "updatedAt" | "relatedTo"
+>;
 
 export function buildNoteWarnings(
   note: NoteForWarnings,
@@ -142,7 +142,9 @@ export function buildNoteWarnings(
 
   const supersedesCount = (note.relatedTo ?? []).filter((rel) => rel.type === "supersedes").length;
   if (supersedesCount > 0) {
-    warnings.push(`supersedes ${supersedesCount} other${supersedesCount > 1 ? "s" : ""} - merging may orphan the supersedes chain`);
+    warnings.push(
+      `supersedes ${supersedesCount} other${supersedesCount > 1 ? "s" : ""} - merging may orphan the supersedes chain`,
+    );
   }
 
   if (targetNote && targetNote.id === note.id) {
@@ -157,7 +159,9 @@ export function buildNoteWarnings(
             : count;
         }, 0);
       if (newerCount > 0) {
-        warnings.push(`target is older than ${newerCount} source${newerCount > 1 ? "s" : ""} - stale summary risk`);
+        warnings.push(
+          `target is older than ${newerCount} source${newerCount > 1 ? "s" : ""} - stale summary risk`,
+        );
       }
     }
   }
@@ -191,9 +195,8 @@ export function deriveMergeRisk(warnings: string[]): MergeRisk {
     return "low";
   }
 
-  const hasCritical = warnings.some((warning) =>
-    warning.includes("supersedes chain")
-    || warning.includes("stale summary risk")
+  const hasCritical = warnings.some(
+    (warning) => warning.includes("supersedes chain") || warning.includes("stale summary risk"),
   );
 
   if (hasCritical) {
@@ -210,7 +213,10 @@ export function deriveMergeRisk(warnings: string[]): MergeRisk {
 export function aggregateMergeRisk(noteRisks: MergeRisk[]): MergeRisk {
   const riskOrder: Record<MergeRisk, number> = { low: 0, medium: 1, high: 2 };
   if (noteRisks.length === 0) return "low";
-  return noteRisks.reduce((max, r) => riskOrder[r] > riskOrder[max] ? r : max, "low" as MergeRisk);
+  return noteRisks.reduce(
+    (max, r) => (riskOrder[r] > riskOrder[max] ? r : max),
+    "low" as MergeRisk,
+  );
 }
 
 export function buildConsolidateNoteEvidence(
@@ -248,7 +254,7 @@ export function normalizeMergePlanSourceIds(sourceIds: string[]): string[] {
 
 export function mergeRelationshipsFromNotes(
   notes: Array<Pick<Note, "relatedTo">>,
-  sourceIds: Set<string>
+  sourceIds: Set<string>,
 ): Relationship[] {
   const seen = new Set<string>();
   const merged: Relationship[] = [];
@@ -274,7 +280,7 @@ export function mergeRelationshipsFromNotes(
 
 export function filterRelationships(
   relationships: Relationship[] | undefined,
-  noteIds: Iterable<string>
+  noteIds: Iterable<string>,
 ): Relationship[] | undefined {
   if (!relationships || relationships.length === 0) {
     return undefined;

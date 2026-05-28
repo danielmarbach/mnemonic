@@ -105,7 +105,9 @@ describe("buildSummaryIntro", () => {
   });
 
   it("returns design-decision intro when neither bugs nor enhancements are present", () => {
-    expect(buildSummaryIntro(false, false)).toBe("This PR captures the following design decisions:");
+    expect(buildSummaryIntro(false, false)).toBe(
+      "This PR captures the following design decisions:",
+    );
   });
 });
 
@@ -401,11 +403,7 @@ describe("generateDescription — Open Questions section", () => {
   });
 
   it("extracts Risks section under Open Questions", () => {
-    const note = makeNote(
-      "Design Note",
-      ["design"],
-      "Summary.\n\n## Risks\n\n- Risk A\n",
-    );
+    const note = makeNote("Design Note", ["design"], "Summary.\n\n## Risks\n\n- Risk A\n");
     const desc = generateDescription([note]);
     expect(desc).toContain("## Open Questions");
     expect(desc).toContain("Risk A");
@@ -503,20 +501,13 @@ describe("scoreSemanticPaths", () => {
   });
 
   it("rates workflow file changes as high complexity", () => {
-    const r = scoreSemanticPaths([
-      ".github/workflows/ci.yml",
-      "src/index.ts",
-    ]);
+    const r = scoreSemanticPaths([".github/workflows/ci.yml", "src/index.ts"]);
     expect(r.isTrivial).toBe(false);
     expect(r.complexity).toBe("high");
   });
 
   it("rates cross-folder src+tests change as medium complexity", () => {
-    const r = scoreSemanticPaths([
-      "src/index.ts",
-      "src/markdown.ts",
-      "tests/unit.test.ts",
-    ]);
+    const r = scoreSemanticPaths(["src/index.ts", "src/markdown.ts", "tests/unit.test.ts"]);
     expect(r.isTrivial).toBe(false);
     expect(["medium", "high"]).toContain(r.complexity);
   });
@@ -607,11 +598,7 @@ describe("routeTier", () => {
   it("semantic high + size C results in Tier D", () => {
     // PR above p75 + high semantic = C+1 = D
     const stats = { changedFiles: 10, additions: 500, deletions: 100, commits: 10 };
-    const paths = [
-      "scripts/ci/something.mjs",
-      "src/index.ts",
-      "tests/unit.test.ts",
-    ];
+    const paths = ["scripts/ci/something.mjs", "src/index.ts", "tests/unit.test.ts"];
     expect(routeTier(stats, paths, thresholds)).toBe("D");
   });
 });

@@ -26,8 +26,8 @@ export function registerDiscoverTagsTool(server: McpServer, ctx: ServerContext):
         "Do not use this when:\n" +
         "- You need to browse notes by tag; use `list` with `tags` filter instead\n" +
         "- You already know the exact tags you want to use\n" +
-        "- You want broad inventory output but are not explicitly requesting `mode: \"browse\"`\n\n" +
-        "Returns: recommendedTags ranked by relevance and usage, with canonicality/lifecycle signals and one example per tag. Optional `mode: \"browse\"` for broader inventory.\n\n" +
+        '- You want broad inventory output but are not explicitly requesting `mode: "browse"`\n\n' +
+        'Returns: recommendedTags ranked by relevance and usage, with canonicality/lifecycle signals and one example per tag. Optional `mode: "browse"` for broader inventory.\n\n' +
         "Typical next step:\n" +
         "- Reuse suggested canonical tags when they fit, or create a new tag only when genuinely novel.",
       annotations: {
@@ -50,34 +50,52 @@ export function registerDiscoverTagsTool(server: McpServer, ctx: ServerContext):
           .default("all")
           .describe(
             "'project' = this project's memories and attached vault notes; " +
-            "'global' = only unscoped memories; " +
-            "'all' = everything visible (default)"
+              "'global' = only unscoped memories; " +
+              "'all' = everything visible (default)",
           ),
         storedIn: z
           .enum(["project-vault", "main-vault", "any", "attached"])
           .optional()
           .default("any")
-          .describe("Storage-label filter. Use `main-vault` for main/global storage. Use `project-vault` for any project vault. Use `attached` for notes from attached external repositories only."),
+          .describe(
+            "Storage-label filter. Use `main-vault` for main/global storage. Use `project-vault` for any project vault. Use `attached` for notes from attached external repositories only.",
+          ),
         limit: z.number().int().min(1).max(50).optional(),
       }),
       outputSchema: DiscoverTagsResultSchema,
     },
-    async ({ cwd, mode, title, content, query, candidateTags, lifecycle, scope, storedIn, limit }) => {
+    async ({
+      cwd,
+      mode,
+      title,
+      content,
+      query,
+      candidateTags,
+      lifecycle,
+      scope,
+      storedIn,
+      limit,
+    }) => {
       await ensureBranchSynced(ctx, cwd);
       const startTime = Date.now();
 
       const { project, entries } = await collectVisibleNotes(ctx, cwd, scope, undefined, storedIn);
 
       const tagStats = new Map<string, DiscoverTagStat>();
-      const candidateTagSet = new Set((candidateTags || []).map(tag => tag.toLowerCase()));
+      const candidateTagSet = new Set((candidateTags || []).map((tag) => tag.toLowerCase()));
       const contextValues = [title, content, query, ...(candidateTags || [])];
-      const contextTokens = new Set(tokenizeTagDiscoveryText(contextValues.filter(Boolean).join(" ")));
+      const contextTokens = new Set(
+        tokenizeTagDiscoveryText(contextValues.filter(Boolean).join(" ")),
+      );
       const isTemporaryTarget = lifecycle === "temporary";
       const effectiveLimit = limit ?? (mode === "browse" ? 20 : 10);
 
       for (const { note } of entries) {
-        const noteTokens = new Set(tokenizeTagDiscoveryText(`${note.title} ${note.content} ${note.tags.join(" ")}`));
-        const contextMatches = contextTokens.size > 0 ? countTokenOverlap(contextTokens, noteTokens) : 0;
+        const noteTokens = new Set(
+          tokenizeTagDiscoveryText(`${note.title} ${note.content} ${note.tags.join(" ")}`),
+        );
+        const contextMatches =
+          contextTokens.size > 0 ? countTokenOverlap(contextTokens, noteTokens) : 0;
 
         for (const tag of note.tags) {
           const stats = tagStats.get(tag) || {
@@ -100,61 +118,64 @@ export function registerDiscoverTagsTool(server: McpServer, ctx: ServerContext):
         }
       }
 
-      const rawTags = Array.from(tagStats.entries())
-        .map(([tag, stats]) => {
-          const lifecycleTypes = Array.from(stats.lifecycles) as NoteLifecycle[];
-          const isTemporaryOnly = stats.lifecycles.size === 1 && stats.lifecycles.has("temporary");
-          const tagTokens = tokenizeTagDiscoveryText(tag);
-          const exactContextMatch = stats.exactCandidateMatch || hasExactTagContextMatch(tag, contextValues);
-          const tagTokenOverlap = contextTokens.size > 0
-            ? countTokenOverlap(contextTokens, tagTokens)
-            : 0;
-          const averageContextMatch = stats.count > 0 ? stats.contextMatches / stats.count : 0;
-          const reason = exactContextMatch
-            ? "matches a candidate tag already present in the note context"
-            : tagTokenOverlap > 0 || stats.contextMatches > 0
-              ? "matches the note context and existing project usage"
-              : "high-usage canonical tag from existing project notes";
+      const rawTags = Array.from(tagStats.entries()).map(([tag, stats]) => {
+        const lifecycleTypes = Array.from(stats.lifecycles) as NoteLifecycle[];
+        const isTemporaryOnly = stats.lifecycles.size === 1 && stats.lifecycles.has("temporary");
+        const tagTokens = tokenizeTagDiscoveryText(tag);
+        const exactContextMatch =
+          stats.exactCandidateMatch || hasExactTagContextMatch(tag, contextValues);
+        const tagTokenOverlap =
+          contextTokens.size > 0 ? countTokenOverlap(contextTokens, tagTokens) : 0;
+        const averageContextMatch = stats.count > 0 ? stats.contextMatches / stats.count : 0;
+        const reason = exactContextMatch
+          ? "matches a candidate tag already present in the note context"
+          : tagTokenOverlap > 0 || stats.contextMatches > 0
+            ? "matches the note context and existing project usage"
+            : "high-usage canonical tag from existing project notes";
 
-          return {
-            tag,
-            usageCount: stats.count,
-            examples: stats.examples,
-            example: stats.examples[0],
-            reason,
-            lifecycleTypes,
-            isTemporaryOnly,
-            exactContextMatch,
-            tagTokenOverlap,
-            averageContextMatch,
-            isBroadSingleToken: tagTokens.length === 1,
-            isHighFrequency: stats.count >= 4,
-            specificityBoost: tagTokens.length > 1 ? 4 : 0,
-          };
-        });
+        return {
+          tag,
+          usageCount: stats.count,
+          examples: stats.examples,
+          example: stats.examples[0],
+          reason,
+          lifecycleTypes,
+          isTemporaryOnly,
+          exactContextMatch,
+          tagTokenOverlap,
+          averageContextMatch,
+          isBroadSingleToken: tagTokens.length === 1,
+          isHighFrequency: stats.count >= 4,
+          specificityBoost: tagTokens.length > 1 ? 4 : 0,
+        };
+      });
 
-      const hasStrongSpecificCandidate = rawTags.some(tag =>
-        tag.exactContextMatch && (!tag.isBroadSingleToken || tag.usageCount > 1)
+      const hasStrongSpecificCandidate = rawTags.some(
+        (tag) => tag.exactContextMatch && (!tag.isBroadSingleToken || tag.usageCount > 1),
       );
 
       const tags = rawTags
         .map((tag) => {
           const hasWeakDirectMatch = tag.tagTokenOverlap <= 1 && tag.averageContextMatch <= 2;
-          const genericPenalty = hasStrongSpecificCandidate && tag.isBroadSingleToken && tag.isHighFrequency && hasWeakDirectMatch
-            ? 10
-            : 0;
+          const genericPenalty =
+            hasStrongSpecificCandidate &&
+            tag.isBroadSingleToken &&
+            tag.isHighFrequency &&
+            hasWeakDirectMatch
+              ? 10
+              : 0;
           const score = hasStrongSpecificCandidate
             ? (tag.exactContextMatch ? 12 : 0) +
-              (tag.tagTokenOverlap * 5) +
+              tag.tagTokenOverlap * 5 +
               tag.specificityBoost +
-              (tag.averageContextMatch * 3) +
-              (tag.usageCount * 0.1) -
+              tag.averageContextMatch * 3 +
+              tag.usageCount * 0.1 -
               genericPenalty -
               (!isTemporaryTarget && tag.isTemporaryOnly ? 2 : 0)
             : (tag.exactContextMatch ? 6 : 0) +
-              (tag.tagTokenOverlap * 3) +
-              (tag.averageContextMatch * 2) +
-              (tag.usageCount * 1.5) +
+              tag.tagTokenOverlap * 3 +
+              tag.averageContextMatch * 2 +
+              tag.usageCount * 1.5 +
               (tag.isTemporaryOnly ? -3 : 1) -
               (!isTemporaryTarget && tag.isTemporaryOnly ? 2 : 0);
 
@@ -163,10 +184,12 @@ export function registerDiscoverTagsTool(server: McpServer, ctx: ServerContext):
             score,
           };
         })
-        .sort((a, b) => b.score - a.score || b.usageCount - a.usageCount || a.tag.localeCompare(b.tag));
+        .sort(
+          (a, b) => b.score - a.score || b.usageCount - a.usageCount || a.tag.localeCompare(b.tag),
+        );
 
       const durationMs = Date.now() - startTime;
-      const vaultsSearched = new Set(entries.map(e => storageLabel(e.vault))).size;
+      const vaultsSearched = new Set(entries.map((e) => storageLabel(e.vault))).size;
 
       const lines: string[] = [];
       if (mode === "browse") {
@@ -176,7 +199,9 @@ export function registerDiscoverTagsTool(server: McpServer, ctx: ServerContext):
           lines.push(`Tags (scope: ${scope}):`);
         }
         lines.push("");
-        lines.push(`Total: ${tags.length} unique tags across ${entries.length} notes (${durationMs}ms)`);
+        lines.push(
+          `Total: ${tags.length} unique tags across ${entries.length} notes (${durationMs}ms)`,
+        );
         lines.push("");
         lines.push("Tags sorted by usage:");
         for (const t of tags.slice(0, effectiveLimit)) {
@@ -197,7 +222,9 @@ export function registerDiscoverTagsTool(server: McpServer, ctx: ServerContext):
           lines.push(`Suggested tags (scope: ${scope}):`);
         }
         lines.push("");
-        lines.push(`Considered ${tags.length} unique tags across ${entries.length} notes (${durationMs}ms)`);
+        lines.push(
+          `Considered ${tags.length} unique tags across ${entries.length} notes (${durationMs}ms)`,
+        );
         lines.push("");
         if (contextTokens.size === 0) {
           lines.push("No note context provided; showing the most canonical existing tags.");
@@ -214,44 +241,45 @@ export function registerDiscoverTagsTool(server: McpServer, ctx: ServerContext):
         }
       }
 
-      const structuredContent: DiscoverTagsResult = mode === "browse"
-        ? {
-            action: "tags_discovered",
-            project: project ? { id: project.id, name: project.name } : undefined,
-            mode,
-            scope: scope || "all",
-            tags: tags.slice(0, effectiveLimit).map(tag => ({
-              tag: tag.tag,
-              usageCount: tag.usageCount,
-              examples: tag.examples,
-              lifecycleTypes: tag.lifecycleTypes,
-              isTemporaryOnly: tag.isTemporaryOnly,
-            })),
-            totalTags: tags.length,
-            totalNotes: entries.length,
-            vaultsSearched,
-            durationMs,
-          }
-        : {
-            action: "tags_discovered",
-            project: project ? { id: project.id, name: project.name } : undefined,
-            mode,
-            scope: scope || "all",
-            recommendedTags: tags.slice(0, effectiveLimit).map(tag => ({
-              tag: tag.tag,
-              usageCount: tag.usageCount,
-              example: tag.example,
-              reason: tag.reason,
-              lifecycleTypes: tag.lifecycleTypes,
-              isTemporaryOnly: tag.isTemporaryOnly,
-            })),
-            totalTags: tags.length,
-            totalNotes: entries.length,
-            vaultsSearched,
-            durationMs,
-          };
+      const structuredContent: DiscoverTagsResult =
+        mode === "browse"
+          ? {
+              action: "tags_discovered",
+              project: project ? { id: project.id, name: project.name } : undefined,
+              mode,
+              scope: scope || "all",
+              tags: tags.slice(0, effectiveLimit).map((tag) => ({
+                tag: tag.tag,
+                usageCount: tag.usageCount,
+                examples: tag.examples,
+                lifecycleTypes: tag.lifecycleTypes,
+                isTemporaryOnly: tag.isTemporaryOnly,
+              })),
+              totalTags: tags.length,
+              totalNotes: entries.length,
+              vaultsSearched,
+              durationMs,
+            }
+          : {
+              action: "tags_discovered",
+              project: project ? { id: project.id, name: project.name } : undefined,
+              mode,
+              scope: scope || "all",
+              recommendedTags: tags.slice(0, effectiveLimit).map((tag) => ({
+                tag: tag.tag,
+                usageCount: tag.usageCount,
+                example: tag.example,
+                reason: tag.reason,
+                lifecycleTypes: tag.lifecycleTypes,
+                isTemporaryOnly: tag.isTemporaryOnly,
+              })),
+              totalTags: tags.length,
+              totalNotes: entries.length,
+              vaultsSearched,
+              durationMs,
+            };
 
       return { content: [{ type: "text", text: lines.join("\n") }], structuredContent };
-    }
+    },
   );
 }

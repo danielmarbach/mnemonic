@@ -9,8 +9,18 @@ import type { NoteLifecycle } from "../src/storage.js";
 describe("computeRecallDiversity", () => {
   it("returns diversity metrics from recall results", async () => {
     const results = [
-      { id: "a", tags: ["workflow", "plan"], lifecycle: "temporary" as NoteLifecycle, role: "plan" },
-      { id: "b", tags: ["workflow", "decision"], lifecycle: "permanent" as NoteLifecycle, role: "decision" },
+      {
+        id: "a",
+        tags: ["workflow", "plan"],
+        lifecycle: "temporary" as NoteLifecycle,
+        role: "plan",
+      },
+      {
+        id: "b",
+        tags: ["workflow", "decision"],
+        lifecycle: "permanent" as NoteLifecycle,
+        role: "decision",
+      },
       { id: "c", tags: ["bug"], lifecycle: "temporary" as NoteLifecycle, role: "context" },
     ];
     const diversity = await computeRecallDiversity(results);
@@ -30,16 +40,19 @@ describe("computeRecallDiversity", () => {
   });
 
   it("omits role when undefined", async () => {
-    const results = [
-      { id: "a", tags: ["test"], lifecycle: "temporary" as NoteLifecycle },
-    ];
+    const results = [{ id: "a", tags: ["test"], lifecycle: "temporary" as NoteLifecycle }];
     const diversity = await computeRecallDiversity(results);
     expect(diversity!.roleMix).toEqual({});
     expect(diversity!.lifecycleMix).toEqual({ temporary: 1 });
   });
 
   it("returns undefined on computation failure", async () => {
-    const results = null as unknown as Array<{ id: string; tags: string[]; lifecycle: NoteLifecycle; role?: string }>;
+    const results = null as unknown as Array<{
+      id: string;
+      tags: string[];
+      lifecycle: NoteLifecycle;
+      role?: string;
+    }>;
     const diversity = await computeRecallDiversity(results);
     expect(diversity).toBeUndefined();
   });
@@ -99,8 +112,13 @@ describe("computeRecallRetrievalCoverage", () => {
   it("caps missing anchors at maxMissing", async () => {
     const anchorIds = new Set(["a1", "a2", "a3", "a4", "a5", "a6", "a7"]);
     const anchorLookup = new Map([
-      ["a1", "A1"], ["a2", "A2"], ["a3", "A3"],
-      ["a4", "A4"], ["a5", "A5"], ["a6", "A6"], ["a7", "A7"],
+      ["a1", "A1"],
+      ["a2", "A2"],
+      ["a3", "A3"],
+      ["a4", "A4"],
+      ["a5", "A5"],
+      ["a6", "A6"],
+      ["a7", "A7"],
     ]);
     const resultIds = ["other"];
 

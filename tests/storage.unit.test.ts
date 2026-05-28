@@ -1,6 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Storage, type Note, type EmbeddingRecord } from "../src/storage.js";
-import { validateRelatedTo, validateEmbeddingRecord, validateNoteProjection } from "../src/validation.js";
+import {
+  validateRelatedTo,
+  validateEmbeddingRecord,
+  validateNoteProjection,
+} from "../src/validation.js";
 import * as fs from "fs/promises";
 import * as path from "path";
 import os from "os";
@@ -191,7 +195,7 @@ Body`;
 
       const rawWithoutMetadata = await fs.readFile(
         path.join(tempDir, "notes", `${noteWithoutMetadata.id}.md`),
-        "utf-8"
+        "utf-8",
       );
       expect(rawWithoutMetadata).not.toContain("role:");
       expect(rawWithoutMetadata).not.toContain("importance:");
@@ -255,7 +259,11 @@ Body`;
 
       expect(read).toBeTruthy();
       expect(read!.relatedTo).toHaveLength(2);
-      expect(read!.relatedTo![0]).toEqual({ id: "other-note", type: "related-to", vaultPath: "/other/vault/path" });
+      expect(read!.relatedTo![0]).toEqual({
+        id: "other-note",
+        type: "related-to",
+        vaultPath: "/other/vault/path",
+      });
       expect(read!.relatedTo![1]).toEqual({ id: "same-vault-note", type: "explains" });
       expect(read!.relatedTo![1]).not.toHaveProperty("vaultPath");
     });
@@ -278,8 +286,12 @@ Body`;
 
       await storage.writeNote(note);
 
-      const filtered = (note.relatedTo ?? []).filter(r => r.id !== "target-a");
-      await storage.writeNote({ ...note, relatedTo: filtered, updatedAt: new Date().toISOString() });
+      const filtered = (note.relatedTo ?? []).filter((r) => r.id !== "target-a");
+      await storage.writeNote({
+        ...note,
+        relatedTo: filtered,
+        updatedAt: new Date().toISOString(),
+      });
 
       const read = await storage.readNote(note.id);
       expect(read!.relatedTo).toHaveLength(1);
@@ -390,7 +402,7 @@ Body`;
       // Invalid YAML in frontmatter
       await fs.writeFile(
         path.join(notesDir, "invalid-yaml.md"),
-        `---\ninvalid: yaml: here:::\n---\n\nContent`
+        `---\ninvalid: yaml: here:::\n---\n\nContent`,
       );
 
       const read = await storage.readNote("invalid-yaml");
@@ -635,7 +647,7 @@ Body`;
       await fs.writeFile(
         path.join(embeddingsDir, "corrupt-emb.json"),
         JSON.stringify({ id: 123, model: null, embedding: "not-an-array" }),
-        "utf-8"
+        "utf-8",
       );
 
       const read = await storage.readEmbedding("corrupt-emb");
@@ -649,7 +661,7 @@ Body`;
       await fs.writeFile(
         path.join(projectionsDir, "corrupt-proj.json"),
         JSON.stringify({ noteId: 42, title: true }),
-        "utf-8"
+        "utf-8",
       );
 
       const read = await storage.readProjection("corrupt-proj");
@@ -763,10 +775,7 @@ describe("Validation functions", () => {
     });
 
     it("should return undefined when all entries are invalid", () => {
-      const result = validateRelatedTo([
-        { id: "x", type: "bad" },
-        { not: "an object" },
-      ]);
+      const result = validateRelatedTo([{ id: "x", type: "bad" }, { not: "an object" }]);
       expect(result).toBeUndefined();
     });
 
@@ -774,18 +783,12 @@ describe("Validation functions", () => {
       const result = validateRelatedTo([
         { id: "rel-1", type: "related-to", vaultPath: "/path/to/vault" },
       ]);
-      expect(result).toEqual([
-        { id: "rel-1", type: "related-to", vaultPath: "/path/to/vault" },
-      ]);
+      expect(result).toEqual([{ id: "rel-1", type: "related-to", vaultPath: "/path/to/vault" }]);
     });
 
     it("should omit vaultPath when absent (no undefined in object)", () => {
-      const result = validateRelatedTo([
-        { id: "rel-1", type: "related-to" },
-      ]);
-      expect(result).toEqual([
-        { id: "rel-1", type: "related-to" },
-      ]);
+      const result = validateRelatedTo([{ id: "rel-1", type: "related-to" }]);
+      expect(result).toEqual([{ id: "rel-1", type: "related-to" }]);
       expect(result![0]).not.toHaveProperty("vaultPath");
     });
   });
@@ -809,7 +812,9 @@ describe("Validation functions", () => {
     it("should return null for invalid embedding record", () => {
       expect(validateEmbeddingRecord({ id: 42 })).toBeNull();
       expect(validateEmbeddingRecord(null)).toBeNull();
-      expect(validateEmbeddingRecord({ id: "x", model: "x", embedding: "bad", updatedAt: "x" })).toBeNull();
+      expect(
+        validateEmbeddingRecord({ id: "x", model: "x", embedding: "bad", updatedAt: "x" }),
+      ).toBeNull();
     });
   });
 

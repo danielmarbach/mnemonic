@@ -32,7 +32,9 @@ export class MarkdownLintError extends Error {
   }
 }
 
-export async function attemptCleanMarkdown(markdown: string): Promise<{ cleaned: string; warnings: string[] }> {
+export async function attemptCleanMarkdown(
+  markdown: string,
+): Promise<{ cleaned: string; warnings: string[] }> {
   let current = markdown.replace(/\r\n/g, "\n");
 
   for (let attempt = 0; attempt < 3; attempt++) {

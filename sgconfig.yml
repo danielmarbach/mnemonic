@@ -1,5 +1,0 @@
-ruleDirs:
-  - rules
-languageGlobs:
-  TypeScript:
-    - "src/**/*.ts"

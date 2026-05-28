@@ -1,5 +1,10 @@
 import { promises as fs } from "fs";
-import { checkEmbeddingCompatibility, currentEmbeddingIdentity, embed, embeddingMetadata } from "../embeddings.js";
+import {
+  checkEmbeddingCompatibility,
+  currentEmbeddingIdentity,
+  embed,
+  embeddingMetadata,
+} from "../embeddings.js";
 import { memoryId, isoDateString } from "../brands.js";
 import { getOrBuildProjection } from "../projections.js";
 import { attempt, getErrorMessage } from "../error-utils.js";
@@ -24,7 +29,9 @@ export async function embedMissingNotes(
   force = false,
 ): Promise<{ rebuilt: number; failed: FailedEmbedding[] }> {
   const notes = noteIds
-    ? (await Promise.all(noteIds.map((id) => storage.readNote(memoryId(id))))).filter((n): n is Note => n !== null)
+    ? (await Promise.all(noteIds.map((id) => storage.readNote(memoryId(id))))).filter(
+        (n): n is Note => n !== null,
+      )
     : await storage.listNotes();
 
   let rebuilt = 0;
@@ -42,9 +49,9 @@ export async function embedMissingNotes(
       if (!force) {
         const existing = await storage.readEmbedding(note.id);
         if (
-          existing
-          && checkEmbeddingCompatibility(existing, currentEmbeddingIdentity).status === "compatible"
-          && existing.updatedAt >= note.updatedAt
+          existing &&
+          checkEmbeddingCompatibility(existing, currentEmbeddingIdentity).status === "compatible" &&
+          existing.updatedAt >= note.updatedAt
         ) {
           continue;
         }
@@ -86,6 +93,7 @@ export async function backfillEmbeddingsAfterSync(
   if (rebuilt > 0 || failed.length > 0) {
     let failSummary = "";
     if (failed.length > 0) {
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- guarded by length > 0
       const first = failed[0]!;
       const sample = failed.length > 1 ? ` (e.g. "${first.id}")` : ` (${first.id})`;
       failSummary = ` Failed: ${failed.length} note(s)${sample} — ${first.error}`;
@@ -98,9 +106,16 @@ export async function backfillEmbeddingsAfterSync(
   return { embedded: rebuilt, failed };
 }
 
-export async function removeStaleEmbeddings(storage: NoteStorage, noteIds: string[]): Promise<void> {
+export async function removeStaleEmbeddings(
+  storage: NoteStorage,
+  noteIds: string[],
+): Promise<void> {
   for (const id of noteIds) {
-    const result = await attempt("embed:unlink", () => fs.unlink(storage.embeddingPath(memoryId(id))));
-    if (!result.ok) { /* already gone */ }
+    const result = await attempt("embed:unlink", () =>
+      fs.unlink(storage.embeddingPath(memoryId(id))),
+    );
+    if (!result.ok) {
+      /* already gone */
+    }
   }
 }

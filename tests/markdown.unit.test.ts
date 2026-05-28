@@ -5,7 +5,7 @@ import { attemptCleanMarkdown, MarkdownLintError, cleanMarkdown } from "../src/m
 describe("cleanMarkdown", () => {
   it("auto-fixes common markdown issues", async () => {
     await expect(cleanMarkdown("#bad\n\n-  item\n\n\ntext\n")).resolves.toBe(
-      "# bad\n\n- item\n\ntext"
+      "# bad\n\n- item\n\ntext",
     );
   });
 

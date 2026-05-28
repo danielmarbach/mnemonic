@@ -66,7 +66,9 @@ function normalizeMutationPushMode(value: unknown): MutationPushMode {
   }
 }
 
-function normalizeProjectIdentityOverrides(value: unknown): Record<string, ProjectIdentityOverride> {
+function normalizeProjectIdentityOverrides(
+  value: unknown,
+): Record<string, ProjectIdentityOverride> {
   if (!value || typeof value !== "object") {
     return {};
   }
@@ -118,32 +120,35 @@ function normalizeProjectMemoryPolicies(value: unknown): Record<string, ProjectM
         ? policyRecord.projectId.trim()
         : projectId;
 
-    const defaultScope = PROJECT_POLICY_SCOPES.includes(policyRecord.defaultScope as (typeof PROJECT_POLICY_SCOPES)[number])
+    const defaultScope = PROJECT_POLICY_SCOPES.includes(
+      policyRecord.defaultScope as (typeof PROJECT_POLICY_SCOPES)[number],
+    )
       ? (policyRecord.defaultScope as (typeof PROJECT_POLICY_SCOPES)[number])
       : "project";
 
     const consolidationMode = CONSOLIDATION_MODES.includes(
-      policyRecord.consolidationMode as (typeof CONSOLIDATION_MODES)[number]
+      policyRecord.consolidationMode as (typeof CONSOLIDATION_MODES)[number],
     )
       ? (policyRecord.consolidationMode as (typeof CONSOLIDATION_MODES)[number])
       : undefined;
 
     const protectedBranchBehavior = PROTECTED_BRANCH_BEHAVIORS.includes(
-      policyRecord.protectedBranchBehavior as (typeof PROTECTED_BRANCH_BEHAVIORS)[number]
+      policyRecord.protectedBranchBehavior as (typeof PROTECTED_BRANCH_BEHAVIORS)[number],
     )
       ? (policyRecord.protectedBranchBehavior as (typeof PROTECTED_BRANCH_BEHAVIORS)[number])
       : undefined;
 
     const protectedBranchPatterns = Array.isArray(policyRecord.protectedBranchPatterns)
       ? policyRecord.protectedBranchPatterns
-        .filter((pattern): pattern is string => typeof pattern === "string")
-        .map((pattern) => pattern.trim())
-        .filter((pattern) => pattern.length > 0)
+          .filter((pattern): pattern is string => typeof pattern === "string")
+          .map((pattern) => pattern.trim())
+          .filter((pattern) => pattern.length > 0)
       : undefined;
 
     normalized[projectId] = {
       projectId: normalizedProjectId,
-      projectName: typeof policyRecord.projectName === "string" ? policyRecord.projectName : undefined,
+      projectName:
+        typeof policyRecord.projectName === "string" ? policyRecord.projectName : undefined,
       defaultScope,
       consolidationMode,
       protectedBranchPatterns,
@@ -169,9 +174,13 @@ function normalizeProjectAttachments(value: unknown): Record<string, ProjectAtta
       if (typeof a.localPath !== "string" || !a.localPath.trim()) continue;
       validAttachments.push({
         projectSlug: attachmentSlug(a.projectSlug.trim()),
-        projectName: typeof a.projectName === "string" ? a.projectName.trim() : a.projectSlug.trim(),
+        projectName:
+          typeof a.projectName === "string" ? a.projectName.trim() : a.projectSlug.trim(),
         localPath: a.localPath.trim(),
-        vaultFolder: typeof a.vaultFolder === "string" && a.vaultFolder.trim() ? a.vaultFolder.trim() : ".mnemonic",
+        vaultFolder:
+          typeof a.vaultFolder === "string" && a.vaultFolder.trim()
+            ? a.vaultFolder.trim()
+            : ".mnemonic",
         enabled: typeof a.enabled === "boolean" ? a.enabled : true,
         branch: typeof a.branch === "string" ? a.branch : "main",
         addedAt: typeof a.addedAt === "string" ? a.addedAt : "",
@@ -212,16 +221,26 @@ export async function readVaultSchemaVersion(vaultPath: string): Promise<string>
  * Write the schema version to a vault's config.json.
  * Preserves any existing fields in the file.
  */
-export async function writeVaultSchemaVersion(vaultPath: string, schemaVersion: string): Promise<void> {
+export async function writeVaultSchemaVersion(
+  vaultPath: string,
+  schemaVersion: string,
+): Promise<void> {
   const filePath = path.join(path.resolve(vaultPath), "config.json");
   let existing: Record<string, unknown> = {};
-  const existingResult = await attempt("config:read-existing", () => fs.readFile(filePath, "utf-8"));
+  const existingResult = await attempt("config:read-existing", () =>
+    fs.readFile(filePath, "utf-8"),
+  );
   if (existingResult.ok) {
     const jsonResult = attemptSync("config:parse", () => JSON.parse(existingResult.value));
-    const parsed = jsonResult.ok ? ConfigJsonObjectSchema.safeParse(jsonResult.value) : { success: false as const, data: undefined };
+    const parsed = jsonResult.ok
+      ? ConfigJsonObjectSchema.safeParse(jsonResult.value)
+      : { success: false as const, data: undefined };
     existing = parsed.success ? parsed.data : {};
   } else {
-    debugLog("config:write-schema-version", `no existing config, starting fresh: ${getErrorMessage(existingResult.error)}`);
+    debugLog(
+      "config:write-schema-version",
+      `no existing config, starting fresh: ${getErrorMessage(existingResult.error)}`,
+    );
   }
   existing.schemaVersion = normalizeSchemaVersion(schemaVersion);
   await fs.writeFile(filePath, JSON.stringify(existing, null, 2) + "\n", "utf-8");
@@ -244,7 +263,9 @@ export class MnemonicConfigStore {
     return config.projectMemoryPolicies[projectId];
   }
 
-  async getProjectIdentityOverride(projectId: string): Promise<ProjectIdentityOverride | undefined> {
+  async getProjectIdentityOverride(
+    projectId: string,
+  ): Promise<ProjectIdentityOverride | undefined> {
     const config = await this.readAll();
     return config.projectIdentityOverrides[projectId];
   }
@@ -255,7 +276,10 @@ export class MnemonicConfigStore {
     await this.writeAll(config);
   }
 
-  async setProjectIdentityOverride(projectId: string, override: ProjectIdentityOverride): Promise<void> {
+  async setProjectIdentityOverride(
+    projectId: string,
+    override: ProjectIdentityOverride,
+  ): Promise<void> {
     const config = await this.readAll();
     config.projectIdentityOverrides[projectId] = override;
     await this.writeAll(config);
@@ -272,7 +296,10 @@ export class MnemonicConfigStore {
     return config.projectAttachments[projectId] ?? [];
   }
 
-  async setProjectAttachments(projectId: string, attachments: ProjectAttachmentConfig[]): Promise<void> {
+  async setProjectAttachments(
+    projectId: string,
+    attachments: ProjectAttachmentConfig[],
+  ): Promise<void> {
     const config = await this.readAll();
     config.projectAttachments[projectId] = attachments;
     await this.writeAll(config);
@@ -302,7 +329,9 @@ export class MnemonicConfigStore {
     const readResult = await attempt("config:read", () => fs.readFile(this.filePath, "utf-8"));
     if (readResult.ok) {
       const jsonResult = attemptSync("config:parse", () => JSON.parse(readResult.value));
-      const parsed = jsonResult.ok ? MnemonicConfigRawSchema.safeParse(jsonResult.value) : { success: false as const, data: undefined };
+      const parsed = jsonResult.ok
+        ? MnemonicConfigRawSchema.safeParse(jsonResult.value)
+        : { success: false as const, data: undefined };
       const data = parsed.success ? parsed.data : {};
       config = {
         schemaVersion: normalizeSchemaVersion(data.schemaVersion),
@@ -334,12 +363,14 @@ const VaultSchemaVersionFragmentSchema = z.object({
 
 const ConfigJsonObjectSchema = z.record(z.string(), z.unknown());
 
-const MnemonicConfigRawSchema = z.object({
-  schemaVersion: z.unknown().optional(),
-  reindexEmbedConcurrency: z.unknown().optional(),
-  mutationPushMode: z.unknown().optional(),
-  projectMemoryPolicies: z.unknown().optional(),
-  projectIdentityOverrides: z.unknown().optional(),
-  projectAttachments: z.unknown().optional(),
-  maxAttachmentsPerProject: z.unknown().optional(),
-}).passthrough();
+const MnemonicConfigRawSchema = z
+  .object({
+    schemaVersion: z.unknown().optional(),
+    reindexEmbedConcurrency: z.unknown().optional(),
+    mutationPushMode: z.unknown().optional(),
+    projectMemoryPolicies: z.unknown().optional(),
+    projectIdentityOverrides: z.unknown().optional(),
+    projectAttachments: z.unknown().optional(),
+    maxAttachmentsPerProject: z.unknown().optional(),
+  })
+  .passthrough();

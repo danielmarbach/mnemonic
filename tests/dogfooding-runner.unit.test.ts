@@ -22,9 +22,7 @@ describe("dogfooding runner helpers", () => {
 
   it("reads recent memories from notes rather than results", () => {
     const recent = {
-      notes: [
-        { id: "temp-1", title: "Checkpoint", lifecycle: "temporary" },
-      ],
+      notes: [{ id: "temp-1", title: "Checkpoint", lifecycle: "temporary" }],
     };
 
     expect(getRecentMemoryNotes(recent)).toEqual([
@@ -43,5 +41,4 @@ describe("dogfooding runner helpers", () => {
 
     expect(getWorkingStateNotes(summary)).toEqual([{ id: "wip-1", title: "WIP" }]);
   });
-
 });

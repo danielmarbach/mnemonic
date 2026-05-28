@@ -24,7 +24,7 @@ describe("normalizeProjectAttachments", () => {
     await fs.writeFile(
       path.join(tempDir, "config.json"),
       JSON.stringify(data, null, 2) + "\n",
-      "utf-8"
+      "utf-8",
     );
     configStore.invalidateCache();
   }
@@ -91,9 +91,7 @@ describe("normalizeProjectAttachments", () => {
     await writeConfig({
       schemaVersion: "1.2",
       projectAttachments: {
-        "proj-1": [
-          { localPath: "/path/to/repo" },
-        ],
+        "proj-1": [{ localPath: "/path/to/repo" }],
       },
     });
     const result = await readConfigAttachments();
@@ -104,9 +102,7 @@ describe("normalizeProjectAttachments", () => {
     await writeConfig({
       schemaVersion: "1.2",
       projectAttachments: {
-        "proj-1": [
-          { projectSlug: "   ", localPath: "/path" },
-        ],
+        "proj-1": [{ projectSlug: "   ", localPath: "/path" }],
       },
     });
     const result = await readConfigAttachments();
@@ -117,9 +113,7 @@ describe("normalizeProjectAttachments", () => {
     await writeConfig({
       schemaVersion: "1.2",
       projectAttachments: {
-        "proj-1": [
-          { projectSlug: 123, localPath: "/path" },
-        ],
+        "proj-1": [{ projectSlug: 123, localPath: "/path" }],
       },
     });
     const result = await readConfigAttachments();
@@ -130,9 +124,7 @@ describe("normalizeProjectAttachments", () => {
     await writeConfig({
       schemaVersion: "1.2",
       projectAttachments: {
-        "proj-1": [
-          { projectSlug: "org/repo" },
-        ],
+        "proj-1": [{ projectSlug: "org/repo" }],
       },
     });
     const result = await readConfigAttachments();
@@ -143,9 +135,7 @@ describe("normalizeProjectAttachments", () => {
     await writeConfig({
       schemaVersion: "1.2",
       projectAttachments: {
-        "proj-1": [
-          { projectSlug: "org/repo", localPath: "  " },
-        ],
+        "proj-1": [{ projectSlug: "org/repo", localPath: "  " }],
       },
     });
     const result = await readConfigAttachments();
@@ -156,9 +146,7 @@ describe("normalizeProjectAttachments", () => {
     await writeConfig({
       schemaVersion: "1.2",
       projectAttachments: {
-        "proj-1": [
-          { projectSlug: "org/repo", localPath: 42 },
-        ],
+        "proj-1": [{ projectSlug: "org/repo", localPath: 42 }],
       },
     });
     const result = await readConfigAttachments();
@@ -439,7 +427,7 @@ describe("maxAttachmentsPerProject", () => {
     await fs.writeFile(
       path.join(tempDir, "config.json"),
       JSON.stringify(data, null, 2) + "\n",
-      "utf-8"
+      "utf-8",
     );
     configStore.invalidateCache();
   }
@@ -551,7 +539,7 @@ describe("Schema migration for projectAttachments", () => {
     await fs.writeFile(
       path.join(tempDir, "config.json"),
       JSON.stringify(data, null, 2) + "\n",
-      "utf-8"
+      "utf-8",
     );
     configStore.invalidateCache();
   }

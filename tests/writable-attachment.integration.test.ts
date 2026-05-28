@@ -45,7 +45,19 @@ Content from writable attached vault.`;
   await writeFile(path.join(notesDir, "attached-note.md"), noteContent, "utf-8");
 
   await execFileAsync("git", ["add", ".mnemonic/"], { cwd: attachedDir });
-  await execFileAsync("git", ["-c", "user.email=test@example.com", "-c", "user.name=Test User", "commit", "-m", "chore: add mnemonic notes"], { cwd: attachedDir });
+  await execFileAsync(
+    "git",
+    [
+      "-c",
+      "user.email=test@example.com",
+      "-c",
+      "user.name=Test User",
+      "commit",
+      "-m",
+      "chore: add mnemonic notes",
+    ],
+    { cwd: attachedDir },
+  );
   await execFileAsync("git", ["remote", "add", "origin", bareDir], { cwd: attachedDir });
   await execFileAsync("git", ["push", "-u", "origin", "main"], { cwd: attachedDir });
   await execFileAsync("git", ["remote", "set-head", "origin", "--auto"], { cwd: attachedDir });
@@ -61,7 +73,10 @@ describe("writable attached vault mutations", () => {
   it("relate across writable attached vault succeeds", async () => {
     const { vaultDir, repoDir, attachedDir } = await setupWritableAttachedVaultFixture();
     const embeddingServer = await startFakeEmbeddingServer();
-    const session = await createPersistentMcpSession(vaultDir, { ollamaUrl: embeddingServer.url, disableGit: false });
+    const session = await createPersistentMcpSession(vaultDir, {
+      ollamaUrl: embeddingServer.url,
+      disableGit: false,
+    });
 
     try {
       await session.callTool("add_attachment", {
@@ -108,7 +123,10 @@ describe("writable attached vault mutations", () => {
   it("unrelate across writable attached vault succeeds", async () => {
     const { vaultDir, repoDir, attachedDir } = await setupWritableAttachedVaultFixture();
     const embeddingServer = await startFakeEmbeddingServer();
-    const session = await createPersistentMcpSession(vaultDir, { ollamaUrl: embeddingServer.url, disableGit: false });
+    const session = await createPersistentMcpSession(vaultDir, {
+      ollamaUrl: embeddingServer.url,
+      disableGit: false,
+    });
 
     try {
       await session.callTool("add_attachment", {
@@ -162,7 +180,10 @@ describe("writable attached vault mutations", () => {
   it("forget on writable attached vault deletes the note", async () => {
     const { vaultDir, repoDir, attachedDir } = await setupWritableAttachedVaultFixture();
     const embeddingServer = await startFakeEmbeddingServer();
-    const session = await createPersistentMcpSession(vaultDir, { ollamaUrl: embeddingServer.url, disableGit: false });
+    const session = await createPersistentMcpSession(vaultDir, {
+      ollamaUrl: embeddingServer.url,
+      disableGit: false,
+    });
 
     try {
       await session.callTool("add_attachment", {
@@ -196,7 +217,10 @@ describe("writable attached vault mutations", () => {
   it("update on writable attached vault modifies the note", async () => {
     const { vaultDir, repoDir, attachedDir } = await setupWritableAttachedVaultFixture();
     const embeddingServer = await startFakeEmbeddingServer();
-    const session = await createPersistentMcpSession(vaultDir, { ollamaUrl: embeddingServer.url, disableGit: false });
+    const session = await createPersistentMcpSession(vaultDir, {
+      ollamaUrl: embeddingServer.url,
+      disableGit: false,
+    });
 
     try {
       await session.callTool("add_attachment", {
@@ -208,7 +232,8 @@ describe("writable attached vault mutations", () => {
 
       const updateResult = await session.callTool("update", {
         id: "attached-note",
-        content: "# Updated attached note\n\nThis content was written through a writable attached vault.",
+        content:
+          "# Updated attached note\n\nThis content was written through a writable attached vault.",
         cwd: repoDir,
       });
 

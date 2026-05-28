@@ -8,11 +8,7 @@ import {
   type RelateResult,
   type MutationRetryContract,
 } from "../structured-content.js";
-import {
-  projectParam,
-  ensureBranchSynced,
-  resolveProject,
-} from "../helpers/project.js";
+import { projectParam, ensureBranchSynced, resolveProject } from "../helpers/project.js";
 import { memoryId, isoDateString } from "../brands.js";
 import { attachedVaultErrorMessage, ensureAttachmentsLoaded } from "../helpers/vault.js";
 import type { Vault } from "../vault.js";
@@ -55,10 +51,17 @@ export function registerRelateTool(server: McpServer, ctx: ServerContext): void 
       inputSchema: z.object({
         fromId: z.string().describe("Source memory id"),
         toId: z.string().describe("Target memory id"),
-        type: z.enum(RELATIONSHIP_TYPES).default("related-to").describe(
-          "Relationship type: 'related-to' (same topic), 'explains' (clarifies why), 'example-of' (instance of pattern), 'supersedes' (replaces), 'derives-from' (derived artifact), 'follows' (sequence order)"
-        ),
-        bidirectional: z.boolean().optional().default(true).describe("Add relationship in both directions (default: true)"),
+        type: z
+          .enum(RELATIONSHIP_TYPES)
+          .default("related-to")
+          .describe(
+            "Relationship type: 'related-to' (same topic), 'explains' (clarifies why), 'example-of' (instance of pattern), 'supersedes' (replaces), 'derives-from' (derived artifact), 'follows' (sequence order)",
+          ),
+        bidirectional: z
+          .boolean()
+          .optional()
+          .default(true)
+          .describe("Add relationship in both directions (default: true)"),
         cwd: projectParam,
       }),
       outputSchema: RelateResultSchema,
@@ -74,18 +77,38 @@ export function registerRelateTool(server: McpServer, ctx: ServerContext): void 
         ctx.vaultManager.findNote(toId, cwd, { mutable: true, projectId }),
       ]);
       if (!foundFrom) {
-        const foundFromAny = await ctx.vaultManager.findNote(fromId, cwd, { mutable: false, projectId });
+        const foundFromAny = await ctx.vaultManager.findNote(fromId, cwd, {
+          mutable: false,
+          projectId,
+        });
         if (foundFromAny) {
-          return { content: [{ type: "text", text: attachedVaultErrorMessage(fromId, foundFromAny.vault) }], isError: true };
+          return {
+            content: [
+              { type: "text", text: attachedVaultErrorMessage(fromId, foundFromAny.vault) },
+            ],
+            isError: true,
+          };
         }
-        return { content: [{ type: "text", text: `No memory found with id '${fromId}'` }], isError: true };
+        return {
+          content: [{ type: "text", text: `No memory found with id '${fromId}'` }],
+          isError: true,
+        };
       }
       if (!foundTo) {
-        const foundToAny = await ctx.vaultManager.findNote(toId, cwd, { mutable: false, projectId });
+        const foundToAny = await ctx.vaultManager.findNote(toId, cwd, {
+          mutable: false,
+          projectId,
+        });
         if (foundToAny) {
-          return { content: [{ type: "text", text: attachedVaultErrorMessage(toId, foundToAny.vault) }], isError: true };
+          return {
+            content: [{ type: "text", text: attachedVaultErrorMessage(toId, foundToAny.vault) }],
+            isError: true,
+          };
         }
-        return { content: [{ type: "text", text: `No memory found with id '${toId}'` }], isError: true };
+        return {
+          content: [{ type: "text", text: `No memory found with id '${toId}'` }],
+          isError: true,
+        };
       }
 
       const { note: fromNote, vault: fromVault } = foundFrom;
@@ -93,15 +116,33 @@ export function registerRelateTool(server: McpServer, ctx: ServerContext): void 
       const now = isoDateString(new Date().toISOString());
 
       // Pre-check branch protection before mutating any notes
-      const mutableVaults = new Set([fromVault, ...(bidirectional && toVault !== fromVault ? [toVault] : [])]);
+      const mutableVaults = new Set([
+        fromVault,
+        ...(bidirectional && toVault !== fromVault ? [toVault] : []),
+      ]);
       const preChecks = await Promise.all(
-        Array.from(mutableVaults).map(vault =>
-          checkVaultProtectedBranch({ ctx, vault, allowProtectedBranch: false, toolName: "relate", noteProjectId: vault === fromVault ? fromNote.project ?? undefined : toNote.project ?? undefined })
-        )
+        Array.from(mutableVaults).map((vault) =>
+          checkVaultProtectedBranch({
+            ctx,
+            vault,
+            allowProtectedBranch: false,
+            toolName: "relate",
+            noteProjectId:
+              vault === fromVault ? (fromNote.project ?? undefined) : (toNote.project ?? undefined),
+          }),
+        ),
       );
       for (const check of preChecks) {
         if (check.blocked) {
-          return { content: [{ type: "text", text: check.message ?? "Protected branch policy blocked this commit." }], isError: true };
+          return {
+            content: [
+              {
+                type: "text",
+                text: check.message ?? "Protected branch policy blocked this commit.",
+              },
+            ],
+            isError: true,
+          };
         }
       }
 
@@ -117,7 +158,11 @@ export function registerRelateTool(server: McpServer, ctx: ServerContext): void 
         if (crossVault) {
           fromRelationship.vaultPath = toVault.storage.vaultPath;
         }
-        await fromVault.storage.writeNote({ ...fromNote, relatedTo: [...fromRels, fromRelationship], updatedAt: now });
+        await fromVault.storage.writeNote({
+          ...fromNote,
+          relatedTo: [...fromRels, fromRelationship],
+          updatedAt: now,
+        });
         const files = vaultChanges.get(fromVault) ?? [];
         files.push(ctx.vaultManager.noteRelPath(fromVault, fromId));
         vaultChanges.set(fromVault, files);
@@ -130,7 +175,11 @@ export function registerRelateTool(server: McpServer, ctx: ServerContext): void 
         if (crossVault) {
           toRelationship.vaultPath = fromVault.storage.vaultPath;
         }
-        await toVault.storage.writeNote({ ...toNote, relatedTo: [...toRels, toRelationship], updatedAt: now });
+        await toVault.storage.writeNote({
+          ...toNote,
+          relatedTo: [...toRels, toRelationship],
+          updatedAt: now,
+        });
         const files = vaultChanges.get(toVault) ?? [];
         files.push(ctx.vaultManager.noteRelPath(toVault, toId));
         vaultChanges.set(toVault, files);
@@ -139,14 +188,20 @@ export function registerRelateTool(server: McpServer, ctx: ServerContext): void 
       // Check for uncommitted changes from a previous failed attempt
       if (vaultChanges.size === 0) {
         // If relationships exist in note content, check git status for pending changes
-        const allVaults = new Set([fromVault, ...(bidirectional && toVault !== fromVault ? [toVault] : [])]);
-        
+        const allVaults = new Set([
+          fromVault,
+          ...(bidirectional && toVault !== fromVault ? [toVault] : []),
+        ]);
+
         for (const vault of allVaults) {
-          const noteIds = vault === fromVault
-            ? (bidirectional && vault === toVault ? [fromId, toId] : [fromId])
-            : [toId];
+          const noteIds =
+            vault === fromVault
+              ? bidirectional && vault === toVault
+                ? [fromId, toId]
+                : [fromId]
+              : [toId];
           const pendingFiles = await ctx.vaultManager.getPendingNoteFiles(vault, noteIds);
-          
+
           if (pendingFiles.length > 0) {
             // Commit the pending changes from previous failed attempt
             const commitBody = formatCommitBody({
@@ -165,11 +220,11 @@ export function registerRelateTool(server: McpServer, ctx: ServerContext): void 
               allowProtectedBranch: false,
               toolName: "relate",
             });
-            
+
             if (commitStatus.status === "committed") {
               await pushAfterMutation(ctx, vault);
             }
-            
+
             const retry = buildMutationRetryContract({
               commit: commitStatus,
               commitMessage,
@@ -180,29 +235,36 @@ export function registerRelateTool(server: McpServer, ctx: ServerContext): void 
               mutationApplied: true,
               preferredRecovery: "rerun-tool-call-serial",
             });
-            
+
             const structuredContent: RelateResult = {
               action: "related",
               fromId,
               toId,
               type,
               bidirectional,
-              notesModified: pendingFiles.map((f: string) => path.basename(f, '.md')),
+              notesModified: pendingFiles.map((f: string) => path.basename(f, ".md")),
               retry,
             };
-            
+
             const retrySummary = formatRetrySummary(retry);
             return {
-              content: [{
-                type: "text",
-                text: `Reconciled pending commit for relationship \`${fromId}\` ${bidirectional ? "↔" : "→"} \`${toId}\` (${type})${retrySummary ? `\n${retrySummary}` : ""}`,
-              }],
+              content: [
+                {
+                  type: "text",
+                  text: `Reconciled pending commit for relationship \`${fromId}\` ${bidirectional ? "↔" : "→"} \`${toId}\` (${type})${retrySummary ? `\n${retrySummary}` : ""}`,
+                },
+              ],
               structuredContent,
             };
           }
         }
-        
-        return { content: [{ type: "text", text: `Relationship already exists between '${fromId}' and '${toId}'` }], isError: true };
+
+        return {
+          content: [
+            { type: "text", text: `Relationship already exists between '${fromId}' and '${toId}'` },
+          ],
+          isError: true,
+        };
       }
 
       const modifiedNoteIds: string[] = [];
@@ -246,7 +308,7 @@ export function registerRelateTool(server: McpServer, ctx: ServerContext): void 
         if (commitStatus.status === "committed") {
           await pushAfterMutation(ctx, vault);
         }
-        modifiedNoteIds.push(...files.map(f => path.basename(f, '.md')));
+        modifiedNoteIds.push(...files.map((f) => path.basename(f, ".md")));
       }
 
       const dirStr = bidirectional ? "↔" : "→";
@@ -259,16 +321,18 @@ export function registerRelateTool(server: McpServer, ctx: ServerContext): void 
         notesModified: modifiedNoteIds,
         retry,
       };
-      
+
       const retrySummary = formatRetrySummary(retry);
       invalidateActiveProjectCache();
       return {
-        content: [{
-          type: "text",
-          text: `Linked \`${fromId}\` ${dirStr} \`${toId}\` (${type})${retrySummary ? `\n${retrySummary}` : ""}`,
-        }],
+        content: [
+          {
+            type: "text",
+            text: `Linked \`${fromId}\` ${dirStr} \`${toId}\` (${type})${retrySummary ? `\n${retrySummary}` : ""}`,
+          },
+        ],
         structuredContent,
       };
-    }
+    },
   );
 }

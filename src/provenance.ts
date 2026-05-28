@@ -9,7 +9,7 @@ const RECENTLY_CHANGED_DAYS = 5;
 
 const SIGNAL_ROLE_WEIGHTS: Record<NoteRole, number> = {
   summary: 0.15,
-  decision: 0.10,
+  decision: 0.1,
   plan: 0.08,
   research: 0.05,
   review: 0.05,
@@ -19,8 +19,8 @@ const SIGNAL_ROLE_WEIGHTS: Record<NoteRole, number> = {
 
 const SIGNAL_CENTRALITY_LOG_FACTOR = 0.05;
 const SIGNAL_CENTRALITY_MAX = 0.15;
-const SIGNAL_LIFECYCLE_PERMANENT = 0.10;
-const SIGNAL_RECENCY_MAX = 0.10;
+const SIGNAL_LIFECYCLE_PERMANENT = 0.1;
+const SIGNAL_RECENCY_MAX = 0.1;
 const SIGNAL_RECENCY_WINDOW_DAYS = 90;
 
 const CONFIDENCE_HIGH_THRESHOLD = 0.35;
@@ -35,12 +35,22 @@ const DECAY_HALF_LIFE_TEMPORARY_CONTEXT_DAYS = 45;
 const DECAY_HALF_LIFE_PERMANENT_CORE_DAYS = 365;
 const DECAY_HALF_LIFE_PERMANENT_DEFAULT_DAYS = 180;
 const DECAY_HALF_LIFE_SUPERSEDED_DAYS = 30;
-const DECAY_CENTRALITY_EXTENSION_FACTOR = 0.10;
+const DECAY_CENTRALITY_EXTENSION_FACTOR = 0.1;
 const DECAY_CENTRALITY_EXTENSION_MAX = 2;
 const DECAY_STALENESS_REVIEW_THRESHOLD = 0.5;
 
 export type DecayMaintenanceHint = "review" | "consolidate" | "prune-superseded";
-export type DecayBasis = "temporary" | "permanent" | "superseded" | "plan" | "research" | "review" | "decision" | "summary" | "reference" | "centrality-extension";
+export type DecayBasis =
+  | "temporary"
+  | "permanent"
+  | "superseded"
+  | "plan"
+  | "research"
+  | "review"
+  | "decision"
+  | "summary"
+  | "reference"
+  | "centrality-extension";
 
 export interface DecayInfo {
   ageDays: number;
@@ -53,7 +63,7 @@ export interface DecayInfo {
 
 function classifyTemporalChange(
   commit: LastCommit,
-  stats: CommitStats
+  stats: CommitStats,
 ): "metadata-only change" | "minor edit" | "substantial update" {
   if (stats.additions === 0 && stats.deletions === 0) {
     return "metadata-only change";
@@ -74,9 +84,7 @@ function classifyTemporalChange(
 function formatTemporalSummary(stats: CommitStats, changeType: string, verbose: boolean): string {
   const lineSummary = `+${stats.additions}/-${stats.deletions} lines`;
   if (!verbose) {
-    return changeType === "metadata-only change"
-      ? changeType
-      : `${changeType} (${lineSummary})`;
+    return changeType === "metadata-only change" ? changeType : `${changeType} (${lineSummary})`;
   }
 
   const fileSummary = `${stats.filesChanged} ${stats.filesChanged === 1 ? "file" : "files"} changed`;
@@ -88,7 +96,7 @@ function formatTemporalSummary(stats: CommitStats, changeType: string, verbose: 
 export function buildTemporalHistoryEntry(
   commit: LastCommit,
   stats: CommitStats | null,
-  verbose: boolean
+  verbose: boolean,
 ): {
   commitHash: string;
   timestamp: string;
@@ -127,7 +135,7 @@ export function buildTemporalHistoryEntry(
 export async function getNoteProvenance(
   git: GitOps,
   filePath: string,
-  now: Date = new Date()
+  _now: Date = new Date(),
 ): Promise<Provenance | undefined> {
   const commit = await git.getLastCommit(filePath);
   if (!commit) return undefined;
@@ -150,11 +158,11 @@ export function computeSignalStrength(params: {
 }): number {
   const daysSinceUpdateNum = Math.floor(daysSince(params.updatedAt));
 
-  const roleWeight = params.role ? SIGNAL_ROLE_WEIGHTS[params.role] ?? 0 : 0;
+  const roleWeight = params.role ? (SIGNAL_ROLE_WEIGHTS[params.role] ?? 0) : 0;
   const centrality = Number.isFinite(params.centrality) ? Math.max(0, params.centrality) : 0;
   const centralityWeight = Math.min(
     SIGNAL_CENTRALITY_MAX,
-    Math.log(centrality + 1) * SIGNAL_CENTRALITY_LOG_FACTOR
+    Math.log(centrality + 1) * SIGNAL_CENTRALITY_LOG_FACTOR,
   );
   const lifecycleWeight = params.lifecycle === "permanent" ? SIGNAL_LIFECYCLE_PERMANENT : 0;
   const recencyWeight =
@@ -175,7 +183,10 @@ function baseDecayHalfLifeDays(params: {
 
   if (params.lifecycle === "temporary") {
     if (params.role === "plan" || params.role === "research" || params.role === "review") {
-      return { halfLifeDays: DECAY_HALF_LIFE_TEMPORARY_WORK_DAYS, basis: ["temporary", params.role] };
+      return {
+        halfLifeDays: DECAY_HALF_LIFE_TEMPORARY_WORK_DAYS,
+        basis: ["temporary", params.role],
+      };
     }
     return { halfLifeDays: DECAY_HALF_LIFE_TEMPORARY_CONTEXT_DAYS, basis: ["temporary"] };
   }
@@ -207,22 +218,21 @@ export function computeDecayInfo(params: {
         1 + Math.log(centrality + 1) * DECAY_CENTRALITY_EXTENSION_FACTOR,
       );
   const rawHalfLifeDays = base.halfLifeDays * centralityMultiplier;
-  const halfLifeDays = Number.isFinite(rawHalfLifeDays) && rawHalfLifeDays > 0
-    ? rawHalfLifeDays
-    : base.halfLifeDays;
-  const freshness = Math.exp(-Math.LN2 * ageDays / halfLifeDays);
+  const halfLifeDays =
+    Number.isFinite(rawHalfLifeDays) && rawHalfLifeDays > 0 ? rawHalfLifeDays : base.halfLifeDays;
+  const freshness = Math.exp((-Math.LN2 * ageDays) / halfLifeDays);
   const staleness = 1 - freshness;
-  const basis: readonly DecayBasis[] = centralityMultiplier > 1
-    ? [...base.basis, "centrality-extension"]
-    : base.basis;
+  const basis: readonly DecayBasis[] =
+    centralityMultiplier > 1 ? [...base.basis, "centrality-extension"] : base.basis;
 
   let maintenanceHint: DecayMaintenanceHint | undefined;
   if (params.superseded && staleness >= DECAY_STALENESS_REVIEW_THRESHOLD) {
     maintenanceHint = "prune-superseded";
   } else if (params.lifecycle === "temporary" && staleness >= DECAY_STALENESS_REVIEW_THRESHOLD) {
-    maintenanceHint = params.role === "plan" || params.role === "research" || params.role === "review"
-      ? "consolidate"
-      : "review";
+    maintenanceHint =
+      params.role === "plan" || params.role === "research" || params.role === "review"
+        ? "consolidate"
+        : "review";
   }
 
   return {
@@ -239,7 +249,7 @@ export function computeConfidence(
   lifecycle: NoteLifecycle,
   updatedAt: string,
   centrality: number,
-  signalStrength?: number
+  signalStrength?: number,
 ): Confidence {
   if (signalStrength !== undefined) {
     if (signalStrength >= CONFIDENCE_HIGH_THRESHOLD) return "high";

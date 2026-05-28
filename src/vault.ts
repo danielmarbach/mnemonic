@@ -89,7 +89,8 @@ export class VaultManager {
     await this.main.storage.init();
     await this.main.git.init();
     await ensureGitignore(path.join(this.main.storage.vaultPath, ".gitignore"));
-    this.mainGitRoot = (await findGitRoot(this.main.storage.vaultPath)) ?? this.main.storage.vaultPath;
+    this.mainGitRoot =
+      (await findGitRoot(this.main.storage.vaultPath)) ?? this.main.storage.vaultPath;
   }
 
   /**
@@ -130,7 +131,10 @@ export class VaultManager {
       await this.loadAllVaultsForRoot(gitRoot, false);
     }
 
-    return this.allProjectVaultsByRoot.get(resolved)?.find(v => v.vaultFolderName === folderName) ?? null;
+    return (
+      this.allProjectVaultsByRoot.get(resolved)?.find((v) => v.vaultFolderName === folderName) ??
+      null
+    );
   }
 
   /**
@@ -138,7 +142,11 @@ export class VaultManager {
    * then falling back through all other known vaults and finally the main vault.
    * When `mutable` is true, excludes attached (read-only) vaults from the search.
    */
-  async findNote(id: string, cwd?: string, options?: { mutable?: boolean; projectId?: string }): Promise<{ note: Note; vault: Vault } | null> {
+  async findNote(
+    id: string,
+    cwd?: string,
+    options?: { mutable?: boolean; projectId?: string },
+  ): Promise<{ note: Note; vault: Vault } | null> {
     const memoryIdArg = memoryId(id);
     const vaults = options?.mutable
       ? await this.searchOrderMutable(cwd, options?.projectId)
@@ -214,7 +222,7 @@ export class VaultManager {
    */
   async searchOrderMutable(cwd?: string, projectId?: string): Promise<Vault[]> {
     const vaults = await this.searchOrder(cwd, projectId);
-    return vaults.filter(v => v.writable);
+    return vaults.filter((v) => v.writable);
   }
 
   /** Build the file path for a note relative to the vault's git root. */
@@ -246,16 +254,19 @@ export class VaultManager {
 
   async loadAttachmentsForProject(projectSlug: string): Promise<Vault[]> {
     if (this.attachedVaults.has(projectSlug)) {
-      return this.attachedVaults.get(projectSlug)!;
+      return this.attachedVaults.get(projectSlug) ?? [];
     }
 
     const configs = this.attachmentConfigs.get(projectSlug) ?? [];
-    const enabledConfigs = configs.filter(c => c.enabled);
+    const enabledConfigs = configs.filter((c) => c.enabled);
 
     const vaultPromises = enabledConfigs.map(async (config) => {
       const resolvedLocalPath = path.resolve(expandHomePath(config.localPath));
-      if (!await pathExists(resolvedLocalPath)) {
-        debugLog("vault:attachment", `skipping attachment ${config.projectSlug}: path not found ${resolvedLocalPath}`);
+      if (!(await pathExists(resolvedLocalPath))) {
+        debugLog(
+          "vault:attachment",
+          `skipping attachment ${config.projectSlug}: path not found ${resolvedLocalPath}`,
+        );
         return null;
       }
 
@@ -272,7 +283,12 @@ export class VaultManager {
         }
       }
 
-      const attachmentsDir = path.join(resolvedLocalPath, config.vaultFolder, "attachments", projectSlug);
+      const attachmentsDir = path.join(
+        resolvedLocalPath,
+        config.vaultFolder,
+        "attachments",
+        projectSlug,
+      );
       await fs.mkdir(attachmentsDir, { recursive: true });
 
       const baseStorage = new Storage(attachmentsDir);
@@ -281,7 +297,14 @@ export class VaultManager {
       const repoStorage = new Storage(path.join(resolvedLocalPath, config.vaultFolder));
       await repoStorage.init();
 
-      const storage = new AttachedStorage(baseStorage, repoStorage, resolvedLocalPath, config.branch, `${config.vaultFolder}/notes`, config.writable === true);
+      const storage = new AttachedStorage(
+        baseStorage,
+        repoStorage,
+        resolvedLocalPath,
+        config.branch,
+        `${config.vaultFolder}/notes`,
+        config.writable === true,
+      );
 
       const git = new GitOps(resolvedLocalPath, `${config.vaultFolder}/notes`);
       await git.init();
@@ -326,13 +349,17 @@ export class VaultManager {
   removeAttachment(projectSlug: string, targetSlug: string): void {
     const vaults = this.attachedVaults.get(projectSlug);
     if (vaults) {
-      this.attachedVaults.set(projectSlug, vaults.filter(v =>
-        v.attachmentRef?.projectSlug !== targetSlug
-      ));
+      this.attachedVaults.set(
+        projectSlug,
+        vaults.filter((v) => v.attachmentRef?.projectSlug !== targetSlug),
+      );
     }
     const configs = this.attachmentConfigs.get(projectSlug);
     if (configs) {
-      this.attachmentConfigs.set(projectSlug, configs.filter(c => c.projectSlug !== targetSlug));
+      this.attachmentConfigs.set(
+        projectSlug,
+        configs.filter((c) => c.projectSlug !== targetSlug),
+      );
     }
   }
 
@@ -356,14 +383,20 @@ export class VaultManager {
     const resolved = path.resolve(gitRoot);
 
     if (this.primaryProjectVaults.has(resolved)) {
-      return this.primaryProjectVaults.get(resolved)!;
+      return this.primaryProjectVaults.get(resolved) ?? null;
     }
 
     const mnemonicPath = path.join(resolved, ".mnemonic");
 
     if (!create && !(await pathExists(mnemonicPath))) return null;
 
-    const primaryVault = makeVault(mnemonicPath, resolved, ".mnemonic/notes", "project-local", ".mnemonic");
+    const primaryVault = makeVault(
+      mnemonicPath,
+      resolved,
+      ".mnemonic/notes",
+      "project-local",
+      ".mnemonic",
+    );
     await primaryVault.storage.init();
     await primaryVault.git.init();
 
@@ -374,7 +407,9 @@ export class VaultManager {
 
       if (isNew) {
         // Commit the .gitignore so collaborators also ignore embeddings/
-        await primaryVault.git.commit("chore: initialize .mnemonic vault", [".mnemonic/.gitignore"]);
+        await primaryVault.git.commit("chore: initialize .mnemonic vault", [
+          ".mnemonic/.gitignore",
+        ]);
       }
     }
 
@@ -427,7 +462,9 @@ function makeVault(
     provenance,
     vaultFolderName,
     attachmentRef,
-    get writable() { return this.provenance !== "project-attached" || this.attachmentRef?.writable === true; },
+    get writable() {
+      return this.provenance !== "project-attached" || this.attachmentRef?.writable === true;
+    },
   } satisfies Vault;
 }
 
@@ -438,23 +475,24 @@ function makeVault(
  */
 async function discoverSubmoduleVaultFolders(gitRoot: string): Promise<string[]> {
   const result = await attempt("vault:discover-submodules", () =>
-    fs.readdir(gitRoot, { withFileTypes: true })
+    fs.readdir(gitRoot, { withFileTypes: true }),
   );
   if (!result.ok) {
     debugLog("vault:discover-submodules", `failed: ${getErrorMessage(result.error)}`);
     return [];
   }
   return result.value
-    .filter(e => e.isDirectory() && e.name.startsWith(".mnemonic-"))
-    .map(e => e.name)
+    .filter((e) => e.isDirectory() && e.name.startsWith(".mnemonic-"))
+    .map((e) => e.name)
     .sort();
 }
 
-export async function findGitRoot(cwd: string, visited: Set<string> = new Set()): Promise<string | null> {
+export async function findGitRoot(
+  cwd: string,
+  visited: Set<string> = new Set(),
+): Promise<string | null> {
   const git = simpleGit(cwd);
-  const rootResult = await attempt("vault:find-git-root", () =>
-    git.revparse(["--show-toplevel"])
-  );
+  const rootResult = await attempt("vault:find-git-root", () => git.revparse(["--show-toplevel"]));
   if (!rootResult.ok) {
     debugLog("vault:find-git-root", `failed: ${getErrorMessage(rootResult.error)}`);
     return null;
@@ -466,7 +504,7 @@ export async function findGitRoot(cwd: string, visited: Set<string> = new Set())
   visited.add(trimmedRoot);
 
   const superResult = await attempt("vault:find-git-root:superproject", () =>
-    git.revparse(["--show-superproject-working-tree"])
+    git.revparse(["--show-superproject-working-tree"]),
   );
   if (superResult.ok) {
     const trimmedSuperproject = superResult.value.trim();
@@ -474,7 +512,10 @@ export async function findGitRoot(cwd: string, visited: Set<string> = new Set())
       return findGitRoot(trimmedSuperproject, visited);
     }
   } else {
-    debugLog("vault:find-git-root", "not inside a submodule or flag unsupported, using current root");
+    debugLog(
+      "vault:find-git-root",
+      "not inside a submodule or flag unsupported, using current root",
+    );
   }
 
   return trimmedRoot;
@@ -483,13 +524,18 @@ export async function findGitRoot(cwd: string, visited: Set<string> = new Set())
 export async function ensureGitignore(ignorePath: string): Promise<void> {
   const requiredLines = ["attachments/", "embeddings/", "projections/"];
   const existingResult = await attempt("vault:ensure-gitignore", () =>
-    fs.readFile(ignorePath, "utf-8")
+    fs.readFile(ignorePath, "utf-8"),
   );
-  const existing = existingResult.ok ? existingResult.value : (() => {
-    debugLog("vault:ensure-gitignore", `no existing gitignore: ${getErrorMessage(existingResult.error)}`);
-    return "";
-  })();
-  const missing = requiredLines.filter(line => !existing.includes(line));
+  const existing = existingResult.ok
+    ? existingResult.value
+    : (() => {
+        debugLog(
+          "vault:ensure-gitignore",
+          `no existing gitignore: ${getErrorMessage(existingResult.error)}`,
+        );
+        return "";
+      })();
+  const missing = requiredLines.filter((line) => !existing.includes(line));
   if (missing.length === 0) return;
   const updated = existing.trimEnd() + "\n" + missing.join("\n") + "\n";
   await fs.writeFile(ignorePath, updated);

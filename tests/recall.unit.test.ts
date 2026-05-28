@@ -30,7 +30,7 @@ describe("selectRecallResults", () => {
         { id: "global-next", score: 0.8, boosted: 0.8, vault, isCurrentProject: false },
       ],
       3,
-      "all"
+      "all",
     );
 
     expect(results.map((result) => result.id)).toEqual(["project-a", "project-b", "global-best"]);
@@ -44,7 +44,7 @@ describe("selectRecallResults", () => {
         { id: "global-best", score: 0.99, boosted: 0.99, vault, isCurrentProject: false },
       ],
       2,
-      "all"
+      "all",
     );
 
     expect(results.map((result) => result.id)).toEqual(["project-a", "project-b"]);
@@ -64,8 +64,8 @@ describe("selectRecallResults", () => {
       selectRecallResults(
         [{ id: "global-best", score: 0.9, boosted: 0.9, vault, isCurrentProject: false }],
         1,
-        "all"
-      ).map((result) => result.id)
+        "all",
+      ).map((result) => result.id),
     ).toEqual(["global-best"]);
   });
 
@@ -77,7 +77,7 @@ describe("selectRecallResults", () => {
         { id: "project-b", score: 0.76, boosted: 0.91, vault, isCurrentProject: true },
       ],
       2,
-      "all"
+      "all",
     );
 
     expect(results.map((result) => result.id)).toEqual(["project-a", "project-b"]);
@@ -85,8 +85,24 @@ describe("selectRecallResults", () => {
 
   it("uses hybrid score for ordering when lexical scores are present", () => {
     const candidates: ScoredRecallCandidate[] = [
-      { id: "a", score: 0.5, boosted: 0.5, vault, isCurrentProject: true, semanticRank: 1, lexicalRank: 1 },
-      { id: "b", score: 0.52, boosted: 0.52, vault, isCurrentProject: true, semanticRank: 2, lexicalRank: 50 },
+      {
+        id: "a",
+        score: 0.5,
+        boosted: 0.5,
+        vault,
+        isCurrentProject: true,
+        semanticRank: 1,
+        lexicalRank: 1,
+      },
+      {
+        id: "b",
+        score: 0.52,
+        boosted: 0.52,
+        vault,
+        isCurrentProject: true,
+        semanticRank: 2,
+        lexicalRank: 50,
+      },
     ];
 
     const results = selectRecallResults(candidates, 2, "all");
@@ -194,7 +210,13 @@ describe("temporal retrieval boost", () => {
 
 describe("computeHybridScore", () => {
   it("returns boosted score when no lexical score", () => {
-    const candidate: ScoredRecallCandidate = { id: "a", score: 0.7, boosted: 0.8, vault, isCurrentProject: true };
+    const candidate: ScoredRecallCandidate = {
+      id: "a",
+      score: 0.7,
+      boosted: 0.8,
+      vault,
+      isCurrentProject: true,
+    };
     expect(computeHybridScore(candidate)).toBeCloseTo(0.8, 5);
   });
 
@@ -228,8 +250,22 @@ describe("computeHybridScore", () => {
   });
 
   it("lexical score cannot overcome large semantic gap", () => {
-    const lowSemantic: ScoredRecallCandidate = { id: "a", score: 0.3, boosted: 0.3, vault, isCurrentProject: false, lexicalScore: 1.0 };
-    const highSemantic: ScoredRecallCandidate = { id: "b", score: 0.8, boosted: 0.8, vault, isCurrentProject: false, lexicalScore: 0 };
+    const lowSemantic: ScoredRecallCandidate = {
+      id: "a",
+      score: 0.3,
+      boosted: 0.3,
+      vault,
+      isCurrentProject: false,
+      lexicalScore: 1.0,
+    };
+    const highSemantic: ScoredRecallCandidate = {
+      id: "b",
+      score: 0.8,
+      boosted: 0.8,
+      vault,
+      isCurrentProject: false,
+      lexicalScore: 0,
+    };
     expect(computeHybridScore(highSemantic)).toBeGreaterThan(computeHybridScore(lowSemantic));
   });
 
@@ -276,7 +312,9 @@ describe("applyLexicalReranking", () => {
       ["b", "Title: Random Note\nSummary: something unrelated"],
     ]);
 
-    const reranked = applyLexicalReranking(candidates, "design decisions", (id) => projectionTexts.get(id));
+    const reranked = applyLexicalReranking(candidates, "design decisions", (id) =>
+      projectionTexts.get(id),
+    );
 
     expect(reranked[0].lexicalScore).toBeGreaterThan(reranked[1].lexicalScore!);
     expect(reranked[0].id).toBe("a");
@@ -289,11 +327,16 @@ describe("applyLexicalReranking", () => {
     ];
 
     const projectionTexts = new Map([
-      ["canonical", "Title: Key design decisions\nSummary: embeddings gitignored because they are derived data and recomputable"],
+      [
+        "canonical",
+        "Title: Key design decisions\nSummary: embeddings gitignored because they are derived data and recomputable",
+      ],
       ["broad", "Title: Sync redesign\nSummary: embeddings sync redesign and reindex behavior"],
     ]);
 
-    const reranked = applyLexicalReranking(candidates, "why are embeddings gitignored", (id) => projectionTexts.get(id));
+    const reranked = applyLexicalReranking(candidates, "why are embeddings gitignored", (id) =>
+      projectionTexts.get(id),
+    );
 
     expect(reranked[0].id).toBe("canonical");
     expect(reranked[0].coverageScore).toBeGreaterThan(reranked[1].coverageScore ?? 0);
@@ -306,11 +349,16 @@ describe("applyLexicalReranking", () => {
     ];
 
     const projectionTexts = new Map([
-      ["canonical", "Title: Key design decisions\nSummary: embeddings gitignored because they are derived data and recomputable"],
+      [
+        "canonical",
+        "Title: Key design decisions\nSummary: embeddings gitignored because they are derived data and recomputable",
+      ],
       ["broad", "Title: Sync redesign\nSummary: embeddings redesign for sync and reindex behavior"],
     ]);
 
-    const reranked = applyLexicalReranking(candidates, "why are embeddings gitignored", (id) => projectionTexts.get(id));
+    const reranked = applyLexicalReranking(candidates, "why are embeddings gitignored", (id) =>
+      projectionTexts.get(id),
+    );
 
     expect(reranked[0].id).toBe("canonical");
     expect(reranked[0].phraseScore).toBe(1);
@@ -371,13 +419,32 @@ describe("applyLexicalReranking", () => {
 describe("enrichRescueCandidateScores", () => {
   it("computes coverageScore and phraseScore for rescue candidates missing them", () => {
     const candidates: ScoredRecallCandidate[] = [
-      { id: "semantic-a", score: 0.6, boosted: 0.6, vault, isCurrentProject: true, lexicalScore: 0.4, coverageScore: 0.5, phraseScore: 0 },
-      { id: "rescue-b", score: 0.2, boosted: 0.2, vault, isCurrentProject: true, lexicalScore: 0.3 },
+      {
+        id: "semantic-a",
+        score: 0.6,
+        boosted: 0.6,
+        vault,
+        isCurrentProject: true,
+        lexicalScore: 0.4,
+        coverageScore: 0.5,
+        phraseScore: 0,
+      },
+      {
+        id: "rescue-b",
+        score: 0.2,
+        boosted: 0.2,
+        vault,
+        isCurrentProject: true,
+        lexicalScore: 0.3,
+      },
     ];
 
     const projectionTexts = new Map([
       ["semantic-a", "Title: Design Decisions\nSummary: key design decisions for the system"],
-      ["rescue-b", "Title: Key Design Decisions\nSummary: embeddings gitignored because they are derived"],
+      [
+        "rescue-b",
+        "Title: Key Design Decisions\nSummary: embeddings gitignored because they are derived",
+      ],
     ]);
 
     enrichRescueCandidateScores(candidates, "design decisions", (id) => projectionTexts.get(id));
@@ -390,7 +457,16 @@ describe("enrichRescueCandidateScores", () => {
 
   it("skips candidates that already have coverageScore", () => {
     const candidates: ScoredRecallCandidate[] = [
-      { id: "a", score: 0.6, boosted: 0.6, vault, isCurrentProject: true, lexicalScore: 0.4, coverageScore: 0.5, phraseScore: 1 },
+      {
+        id: "a",
+        score: 0.6,
+        boosted: 0.6,
+        vault,
+        isCurrentProject: true,
+        lexicalScore: 0.4,
+        coverageScore: 0.5,
+        phraseScore: 1,
+      },
     ];
 
     enrichRescueCandidateScores(candidates, "test query", (id) => `text for ${id}`);
@@ -401,7 +477,14 @@ describe("enrichRescueCandidateScores", () => {
 
   it("handles missing projection text gracefully", () => {
     const candidates: ScoredRecallCandidate[] = [
-      { id: "rescue-a", score: 0.2, boosted: 0.2, vault, isCurrentProject: true, lexicalScore: 0.3 },
+      {
+        id: "rescue-a",
+        score: 0.2,
+        boosted: 0.2,
+        vault,
+        isCurrentProject: true,
+        lexicalScore: 0.3,
+      },
     ];
 
     enrichRescueCandidateScores(candidates, "test query", () => undefined);
@@ -412,7 +495,16 @@ describe("enrichRescueCandidateScores", () => {
 
   it("returns early when there are no rescue candidates to enrich", () => {
     const candidates: ScoredRecallCandidate[] = [
-      { id: "a", score: 0.6, boosted: 0.6, vault, isCurrentProject: true, lexicalScore: 0.4, coverageScore: 0.5, phraseScore: 0 },
+      {
+        id: "a",
+        score: 0.6,
+        boosted: 0.6,
+        vault,
+        isCurrentProject: true,
+        lexicalScore: 0.4,
+        coverageScore: 0.5,
+        phraseScore: 0,
+      },
     ];
 
     enrichRescueCandidateScores(candidates, "test query", (id) => `text for ${id}`);
@@ -423,8 +515,24 @@ describe("enrichRescueCandidateScores", () => {
   it("eliminates lexicalRankSignal asymmetry between semantic and rescue candidates with same lexicalScore", () => {
     const baseLexicalScore = 0.5;
     const candidates: ScoredRecallCandidate[] = [
-      { id: "semantic-a", score: 0.6, boosted: 0.6, vault, isCurrentProject: true, lexicalScore: baseLexicalScore, coverageScore: 0, phraseScore: 0 },
-      { id: "rescue-b", score: 0.2, boosted: 0.2, vault, isCurrentProject: true, lexicalScore: baseLexicalScore },
+      {
+        id: "semantic-a",
+        score: 0.6,
+        boosted: 0.6,
+        vault,
+        isCurrentProject: true,
+        lexicalScore: baseLexicalScore,
+        coverageScore: 0,
+        phraseScore: 0,
+      },
+      {
+        id: "rescue-b",
+        score: 0.2,
+        boosted: 0.2,
+        vault,
+        isCurrentProject: true,
+        lexicalScore: baseLexicalScore,
+      },
     ];
 
     const projectionTexts = new Map([
@@ -436,8 +544,14 @@ describe("enrichRescueCandidateScores", () => {
 
     expect(candidates[1].coverageScore).toBeDefined();
     expect(candidates[1].phraseScore).toBeDefined();
-    const signalA = (candidates[0].lexicalScore ?? 0) + (candidates[0].coverageScore ?? 0) * 0.3 + (candidates[0].phraseScore ?? 0) * 0.5;
-    const signalB = (candidates[1].lexicalScore ?? 0) + (candidates[1].coverageScore ?? 0) * 0.3 + (candidates[1].phraseScore ?? 0) * 0.5;
+    const signalA =
+      (candidates[0].lexicalScore ?? 0) +
+      (candidates[0].coverageScore ?? 0) * 0.3 +
+      (candidates[0].phraseScore ?? 0) * 0.5;
+    const signalB =
+      (candidates[1].lexicalScore ?? 0) +
+      (candidates[1].coverageScore ?? 0) * 0.3 +
+      (candidates[1].phraseScore ?? 0) * 0.5;
     expect(signalB).toBeGreaterThan(0);
     expect(signalB).toBeGreaterThanOrEqual(signalA);
   });
@@ -488,7 +602,9 @@ describe("canonical explanation promotion", () => {
 
     const promoted = applyCanonicalExplanationPromotion(candidates);
     expect(promoted[0].id).toBe("canonical");
-    expect(promoted[0].canonicalExplanationScore).toBeGreaterThan(promoted[1].canonicalExplanationScore ?? 0);
+    expect(promoted[0].canonicalExplanationScore).toBeGreaterThan(
+      promoted[1].canonicalExplanationScore ?? 0,
+    );
   });
 
   it("does not promote a highly central note when semantic plausibility is too low", () => {
@@ -819,7 +935,14 @@ describe("applyGraphSpreadingActivation", () => {
     const candidates: ScoredRecallCandidate[] = [
       { id: "entry-a", score: 0.6, boosted: 0.6, vault, isCurrentProject: true },
       { id: "entry-b", score: 0.55, boosted: 0.55, vault, isCurrentProject: true },
-      { id: "shared", score: 0.5, boosted: 0.5, vault, isCurrentProject: true, semanticScoreForPromotion: 0.5 },
+      {
+        id: "shared",
+        score: 0.5,
+        boosted: 0.5,
+        vault,
+        isCurrentProject: true,
+        semanticScoreForPromotion: 0.5,
+      },
     ];
 
     const getNoteRelationships = (id: string) => {
@@ -936,7 +1059,7 @@ describe("applyGraphSpreadingActivation", () => {
     const result = applyGraphSpreadingActivation(candidates, getNoteRelationships);
 
     const discovered = result.find((c) => c.id === "shared");
-    const expectedScore = (0.6 * 0.5 * 0.8) + (0.55 * 0.5 * 0.8);
+    const expectedScore = 0.6 * 0.5 * 0.8 + 0.55 * 0.5 * 0.8;
     expect(discovered!.graphScore).toBeCloseTo(expectedScore, 5);
   });
 
@@ -986,7 +1109,10 @@ describe("applyGraphSpreadingActivation", () => {
 
     const result = applyGraphSpreadingActivation(candidates, (id) => {
       if (id !== "entry") return undefined;
-      return Array.from({ length: 101 }, (_, i) => ({ id: `related-${i}`, type: "related-to" as const }));
+      return Array.from({ length: 101 }, (_, i) => ({
+        id: `related-${i}`,
+        type: "related-to" as const,
+      }));
     });
 
     const ranked = result
@@ -1004,7 +1130,13 @@ describe("resolveDiscoveredVaults", () => {
   it("resolves correct vault for graph-discovered candidates", async () => {
     const candidates: ScoredRecallCandidate[] = [
       { id: "entry", score: 0.6, boosted: 0.6, vault: projectVault, isCurrentProject: true },
-      { id: "discovered-global", score: 0.24, boosted: 0.24, vault: projectVault, isCurrentProject: true },
+      {
+        id: "discovered-global",
+        score: 0.24,
+        boosted: 0.24,
+        vault: projectVault,
+        isCurrentProject: true,
+      },
     ];
 
     const originalIds = new Set(["entry"]);
@@ -1041,7 +1173,13 @@ describe("resolveDiscoveredVaults", () => {
   it("does not change vault when resolver returns undefined", async () => {
     const candidates: ScoredRecallCandidate[] = [
       { id: "entry", score: 0.6, boosted: 0.6, vault: projectVault, isCurrentProject: true },
-      { id: "unresolvable", score: 0.24, boosted: 0.24, vault: projectVault, isCurrentProject: true },
+      {
+        id: "unresolvable",
+        score: 0.24,
+        boosted: 0.24,
+        vault: projectVault,
+        isCurrentProject: true,
+      },
     ];
 
     const originalIds = new Set(["entry"]);

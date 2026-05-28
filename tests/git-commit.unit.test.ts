@@ -14,7 +14,9 @@ vi.mock("../src/project.js", () => ({
 import { commitVaultWithProtection } from "../src/helpers/git-commit.js";
 
 function makeFakeVault(provenance: Vault["provenance"], extra: Partial<Vault> = {}): Vault {
-  const commitWithStatus = vi.fn<() => Promise<CommitResult>>().mockResolvedValue({ status: "committed" });
+  const commitWithStatus = vi
+    .fn<() => Promise<CommitResult>>()
+    .mockResolvedValue({ status: "committed" });
   return {
     storage: { vaultPath: "/tmp/fake-vault" } as unknown as Vault["storage"],
     git: { commitWithStatus } as unknown as Vault["git"],
@@ -53,7 +55,11 @@ describe("commitVaultWithProtection", () => {
     });
 
     expect(result).toEqual({ status: "committed" });
-    expect(vault.git.commitWithStatus).toHaveBeenCalledWith("test commit", ["notes/test.md"], undefined);
+    expect(vault.git.commitWithStatus).toHaveBeenCalledWith(
+      "test commit",
+      ["notes/test.md"],
+      undefined,
+    );
     expect(getCurrentGitBranchMock).not.toHaveBeenCalled();
   });
 
@@ -114,7 +120,11 @@ describe("commitVaultWithProtection", () => {
     });
 
     expect(result).toEqual({ status: "committed" });
-    expect(vault.git.commitWithStatus).toHaveBeenCalledWith("test commit", ["notes/test.md"], undefined);
+    expect(vault.git.commitWithStatus).toHaveBeenCalledWith(
+      "test commit",
+      ["notes/test.md"],
+      undefined,
+    );
   });
 
   it("blocks project-attached vault on protected branch", async () => {
@@ -188,7 +198,11 @@ describe("commitVaultWithProtection", () => {
     });
 
     expect(result).toEqual({ status: "committed" });
-    expect(vault.git.commitWithStatus).toHaveBeenCalledWith("test commit", ["notes/test.md"], undefined);
+    expect(vault.git.commitWithStatus).toHaveBeenCalledWith(
+      "test commit",
+      ["notes/test.md"],
+      undefined,
+    );
   });
 
   it("returns failed for read-only vault", async () => {

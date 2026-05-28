@@ -50,7 +50,19 @@ Content from the attached vault.`;
   await writeFile(path.join(notesDir, "attached-note.md"), noteContent, "utf-8");
 
   await execFileAsync("git", ["add", ".mnemonic/"], { cwd: attachedDir });
-  await execFileAsync("git", ["-c", "user.email=test@example.com", "-c", "user.name=Test User", "commit", "-m", "chore: add mnemonic notes"], { cwd: attachedDir });
+  await execFileAsync(
+    "git",
+    [
+      "-c",
+      "user.email=test@example.com",
+      "-c",
+      "user.name=Test User",
+      "commit",
+      "-m",
+      "chore: add mnemonic notes",
+    ],
+    { cwd: attachedDir },
+  );
   await execFileAsync("git", ["remote", "add", "origin", bareDir], { cwd: attachedDir });
   await execFileAsync("git", ["push", "-u", "origin", "main"], { cwd: attachedDir });
   await execFileAsync("git", ["remote", "set-head", "origin", "--auto"], { cwd: attachedDir });
@@ -68,16 +80,26 @@ describe("mutation errors on attached vault notes", () => {
     const embeddingServer = await startFakeEmbeddingServer();
 
     try {
-      await callLocalMcp(vaultDir, "add_attachment", {
-        cwd: repoDir,
-        localPath: attachedDir,
-      }, { ollamaUrl: embeddingServer.url, disableGit: false });
+      await callLocalMcp(
+        vaultDir,
+        "add_attachment",
+        {
+          cwd: repoDir,
+          localPath: attachedDir,
+        },
+        { ollamaUrl: embeddingServer.url, disableGit: false },
+      );
 
-      const response = await callLocalMcpResponse(vaultDir, "update", {
-        id: "attached-note",
-        content: "Attempted update on attached vault note.",
-        cwd: repoDir,
-      }, { ollamaUrl: embeddingServer.url, disableGit: false });
+      const response = await callLocalMcpResponse(
+        vaultDir,
+        "update",
+        {
+          id: "attached-note",
+          content: "Attempted update on attached vault note.",
+          cwd: repoDir,
+        },
+        { ollamaUrl: embeddingServer.url, disableGit: false },
+      );
 
       expect(response.text).toContain("attached vault");
       expect(response.text).toContain("cannot be modified");
@@ -91,15 +113,25 @@ describe("mutation errors on attached vault notes", () => {
     const embeddingServer = await startFakeEmbeddingServer();
 
     try {
-      await callLocalMcp(vaultDir, "add_attachment", {
-        cwd: repoDir,
-        localPath: attachedDir,
-      }, { ollamaUrl: embeddingServer.url, disableGit: false });
+      await callLocalMcp(
+        vaultDir,
+        "add_attachment",
+        {
+          cwd: repoDir,
+          localPath: attachedDir,
+        },
+        { ollamaUrl: embeddingServer.url, disableGit: false },
+      );
 
-      const response = await callLocalMcpResponse(vaultDir, "forget", {
-        id: "attached-note",
-        cwd: repoDir,
-      }, { ollamaUrl: embeddingServer.url, disableGit: false });
+      const response = await callLocalMcpResponse(
+        vaultDir,
+        "forget",
+        {
+          id: "attached-note",
+          cwd: repoDir,
+        },
+        { ollamaUrl: embeddingServer.url, disableGit: false },
+      );
 
       expect(response.text).toContain("attached vault");
       expect(response.text).toContain("cannot be modified");
@@ -111,7 +143,10 @@ describe("mutation errors on attached vault notes", () => {
   it("move_memory from attached vault returns specific error", async () => {
     const { vaultDir, repoDir, attachedDir } = await setupAttachedVaultFixture();
     const embeddingServer = await startFakeEmbeddingServer();
-    const session = await createPersistentMcpSession(vaultDir, { ollamaUrl: embeddingServer.url, disableGit: false });
+    const session = await createPersistentMcpSession(vaultDir, {
+      ollamaUrl: embeddingServer.url,
+      disableGit: false,
+    });
 
     try {
       await session.callTool("add_attachment", { cwd: repoDir, localPath: attachedDir });
@@ -132,7 +167,10 @@ describe("mutation errors on attached vault notes", () => {
   it("relate with attached note returns specific error", async () => {
     const { vaultDir, repoDir, attachedDir } = await setupAttachedVaultFixture();
     const embeddingServer = await startFakeEmbeddingServer();
-    const session = await createPersistentMcpSession(vaultDir, { ollamaUrl: embeddingServer.url, disableGit: false });
+    const session = await createPersistentMcpSession(vaultDir, {
+      ollamaUrl: embeddingServer.url,
+      disableGit: false,
+    });
 
     try {
       await session.callTool("add_attachment", { cwd: repoDir, localPath: attachedDir });
@@ -163,7 +201,10 @@ describe("mutation errors on attached vault notes", () => {
   it("unrelate with attached note returns specific error", async () => {
     const { vaultDir, repoDir, attachedDir } = await setupAttachedVaultFixture();
     const embeddingServer = await startFakeEmbeddingServer();
-    const session = await createPersistentMcpSession(vaultDir, { ollamaUrl: embeddingServer.url, disableGit: false });
+    const session = await createPersistentMcpSession(vaultDir, {
+      ollamaUrl: embeddingServer.url,
+      disableGit: false,
+    });
 
     try {
       await session.callTool("add_attachment", { cwd: repoDir, localPath: attachedDir });
@@ -194,7 +235,10 @@ describe("mutation errors on attached vault notes", () => {
   it("consolidate with attached note returns specific error", async () => {
     const { vaultDir, repoDir, attachedDir } = await setupAttachedVaultFixture();
     const embeddingServer = await startFakeEmbeddingServer();
-    const session = await createPersistentMcpSession(vaultDir, { ollamaUrl: embeddingServer.url, disableGit: false });
+    const session = await createPersistentMcpSession(vaultDir, {
+      ollamaUrl: embeddingServer.url,
+      disableGit: false,
+    });
 
     try {
       await session.callTool("add_attachment", { cwd: repoDir, localPath: attachedDir });

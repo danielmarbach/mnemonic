@@ -100,15 +100,30 @@ export function computeRecallMetadataBoost(metadata?: EffectiveNoteMetadata): nu
 
 const TEMPORAL_QUERY_HINTS = [
   // Ordered by specificity (longer/more specific patterns first) to avoid first-match-wins issues.
-  { pattern: /\b(in\s+the\s+past)\b/i, hint: { windowDays: 365, maxBoost: 0.03, confidence: "low" } },
-  { pattern: /\b(this\s+year|last\s+year)\b/i, hint: { windowDays: 366, maxBoost: 0.03, confidence: "medium" } },
-  { pattern: /\b(last\s+month)\b/i, hint: { windowDays: 62, maxBoost: 0.05, confidence: "medium" } },
-  { pattern: /\b(this\s+month)\b/i, hint: { windowDays: 31, maxBoost: 0.05, confidence: "medium" } },
+  {
+    pattern: /\b(in\s+the\s+past)\b/i,
+    hint: { windowDays: 365, maxBoost: 0.03, confidence: "low" },
+  },
+  {
+    pattern: /\b(this\s+year|last\s+year)\b/i,
+    hint: { windowDays: 366, maxBoost: 0.03, confidence: "medium" },
+  },
+  {
+    pattern: /\b(last\s+month)\b/i,
+    hint: { windowDays: 62, maxBoost: 0.05, confidence: "medium" },
+  },
+  {
+    pattern: /\b(this\s+month)\b/i,
+    hint: { windowDays: 31, maxBoost: 0.05, confidence: "medium" },
+  },
   { pattern: /\b(last\s+week)\b/i, hint: { windowDays: 14, maxBoost: 0.06, confidence: "medium" } },
   { pattern: /\b(this\s+week)\b/i, hint: { windowDays: 7, maxBoost: 0.06, confidence: "medium" } },
   { pattern: /\b(yesterday)\b/i, hint: { windowDays: 3, maxBoost: 0.08, confidence: "medium" } },
   { pattern: /\b(today|latest)\b/i, hint: { windowDays: 2, maxBoost: 0.08, confidence: "medium" } },
-  { pattern: /\b(recent|recently|newest)\b/i, hint: { windowDays: 30, maxBoost: 0.05, confidence: "low" } },
+  {
+    pattern: /\b(recent|recently|newest)\b/i,
+    hint: { windowDays: 30, maxBoost: 0.05, confidence: "low" },
+  },
 ] as const;
 
 const EXPLICIT_TEMPORAL_WINDOW_PATTERN =
@@ -130,7 +145,7 @@ export function detectTemporalQueryHint(query: string): TemporalQueryHint | unde
     if (valueStr !== undefined && unit !== undefined) {
       const value = Number.parseInt(valueStr, 10);
       if (Number.isFinite(value) && value > 0) {
-          const windowDays = toDays(value, unit);
+        const windowDays = toDays(value, unit);
         return {
           windowDays,
           filterWindowDays: windowDays,
@@ -153,7 +168,7 @@ export function detectTemporalQueryHint(query: string): TemporalQueryHint | unde
 export function computeTemporalRecencyBoost(
   updatedAt: string,
   hint: TemporalQueryHint,
-  now: Date = new Date()
+  now: Date = new Date(),
 ): number {
   const updated = new Date(updatedAt);
   if (Number.isNaN(updated.getTime())) {
@@ -176,7 +191,7 @@ export function shouldApplyTemporalFiltering(hint: TemporalQueryHint | undefined
 export function isWithinTemporalFilterWindow(
   updatedAt: string,
   windowDays: number,
-  now: Date = new Date()
+  now: Date = new Date(),
 ): boolean {
   const updated = new Date(updatedAt);
   if (Number.isNaN(updated.getTime())) {
@@ -201,19 +216,20 @@ export function isWithinTemporalFilterWindow(
 export function computeHybridScore(candidate: ScoredRecallCandidate): number {
   const canonical = candidate.canonicalExplanationScore ?? 0;
 
-  if (candidate.semanticRank === undefined && candidate.lexicalRank === undefined && candidate.graphRank === undefined) {
+  if (
+    candidate.semanticRank === undefined &&
+    candidate.lexicalRank === undefined &&
+    candidate.graphRank === undefined
+  ) {
     return candidate.boosted + canonical * CANONICAL_HYBRID_WEIGHT;
   }
 
-  const semanticContribution = candidate.semanticRank !== undefined
-    ? 1 / (RRF_K + candidate.semanticRank)
-    : 0;
-  const lexicalContribution = candidate.lexicalRank !== undefined
-    ? 1 / (RRF_K + candidate.lexicalRank)
-    : 0;
-  const graphContribution = candidate.graphRank !== undefined
-    ? 1 / (RRF_K + candidate.graphRank)
-    : 0;
+  const semanticContribution =
+    candidate.semanticRank !== undefined ? 1 / (RRF_K + candidate.semanticRank) : 0;
+  const lexicalContribution =
+    candidate.lexicalRank !== undefined ? 1 / (RRF_K + candidate.lexicalRank) : 0;
+  const graphContribution =
+    candidate.graphRank !== undefined ? 1 / (RRF_K + candidate.graphRank) : 0;
 
   // Scale RRF so its maximum influence is comparable to the old additive
   // lexical weight. With K = 60 and three channels the max RRF is roughly
@@ -237,7 +253,7 @@ export function assignDenseRanks<T>(
   items: T[],
   scoreOf: (item: T) => number,
   setRank: (item: T, rank: number | undefined) => void,
-  rankWindow = RRF_RANK_WINDOW
+  rankWindow = RRF_RANK_WINDOW,
 ): void {
   let currentRank = 0;
   let previousScore: number | undefined;
@@ -282,13 +298,14 @@ export function computeCanonicalExplanationScore(candidate: ScoredRecallCandidat
   }
 
   const permanence = candidate.lifecycle === "permanent" ? 0.05 : 0;
-  const role = candidate.metadata?.role === "decision"
-    ? 0.05
-    : candidate.metadata?.role === "context"
-      ? 0.04
-      : candidate.metadata?.role === "summary"
-        ? 0.02
-        : 0;
+  const role =
+    candidate.metadata?.role === "decision"
+      ? 0.05
+      : candidate.metadata?.role === "context"
+        ? 0.04
+        : candidate.metadata?.role === "summary"
+          ? 0.02
+          : 0;
   const centrality = Math.min(0.05, Math.log((candidate.relatedCount ?? 0) + 1) * 0.02);
   const diversity = Math.min(0.04, (candidate.connectionDiversity ?? 0) * 0.015);
   const structure = Math.min(0.03, candidate.structureScore ?? 0);
@@ -297,7 +314,9 @@ export function computeCanonicalExplanationScore(candidate: ScoredRecallCandidat
   return permanence + role + centrality + diversity + structure + wording;
 }
 
-export function applyCanonicalExplanationPromotion(candidates: ScoredRecallCandidate[]): ScoredRecallCandidate[] {
+export function applyCanonicalExplanationPromotion(
+  candidates: ScoredRecallCandidate[],
+): ScoredRecallCandidate[] {
   for (const candidate of candidates) {
     candidate.canonicalExplanationScore = computeCanonicalExplanationScore(candidate);
   }
@@ -323,7 +342,11 @@ function computeSignificantPhraseScore(query: string, candidateText: string): nu
   return normalizedCandidate.includes(phraseTokens.join(" ")) ? 1 : 0;
 }
 
-function computeWeightedQueryCoverage(query: string, candidateText: string, corpusTexts: string[]): number {
+function computeWeightedQueryCoverage(
+  query: string,
+  candidateText: string,
+  corpusTexts: string[],
+): number {
   const queryTokens = Array.from(new Set(tokenize(query))).filter((token) => token.length >= 4);
   if (queryTokens.length === 0) {
     return 0;
@@ -335,7 +358,10 @@ function computeWeightedQueryCoverage(query: string, candidateText: string, corp
   let totalWeight = 0;
 
   for (const token of queryTokens) {
-    const documentFrequency = corpusTokenSets.reduce((count, tokens) => count + (tokens.has(token) ? 1 : 0), 0);
+    const documentFrequency = corpusTokenSets.reduce(
+      (count, tokens) => count + (tokens.has(token) ? 1 : 0),
+      0,
+    );
     const weight = 1 / Math.max(documentFrequency, 1);
     totalWeight += weight;
     if (candidateTokens.has(token)) {
@@ -359,7 +385,7 @@ function computeWeightedQueryCoverage(query: string, candidateText: string, corp
 export function applyLexicalReranking(
   candidates: ScoredRecallCandidate[],
   query: string,
-  getProjectionText: (id: string) => string | undefined
+  getProjectionText: (id: string) => string | undefined,
 ): ScoredRecallCandidate[] {
   const corpusTexts = candidates
     .map((candidate) => getProjectionText(candidate.id))
@@ -376,10 +402,16 @@ export function applyLexicalReranking(
 
   // Assign semanticRank using dense semantic score ordering.
   // Tied semantic scores share the same rank so lexical rank can break ties.
-  const sortedBySemantic = [...candidates].sort((a, b) => b.score - a.score || b.boosted - a.boosted);
-  assignDenseRanks(sortedBySemantic, (candidate) => candidate.score, (candidate, rank) => {
-    candidate.semanticRank = rank;
-  });
+  const sortedBySemantic = [...candidates].sort(
+    (a, b) => b.score - a.score || b.boosted - a.boosted,
+  );
+  assignDenseRanks(
+    sortedBySemantic,
+    (candidate) => candidate.score,
+    (candidate, rank) => {
+      candidate.semanticRank = rank;
+    },
+  );
 
   return candidates;
 }
@@ -387,12 +419,12 @@ export function applyLexicalReranking(
 export function enrichRescueCandidateScores(
   allCandidates: ScoredRecallCandidate[],
   query: string,
-  getProjectionText: (id: string) => string | undefined
+  getProjectionText: (id: string) => string | undefined,
 ): void {
   const rescueIds = new Set(
     allCandidates
       .filter((c) => c.coverageScore === undefined && c.lexicalScore !== undefined)
-      .map((c) => c.id)
+      .map((c) => c.id),
   );
   if (rescueIds.size === 0) return;
 
@@ -413,7 +445,7 @@ export function enrichRescueCandidateScores(
 export function selectRecallResults(
   scored: ScoredRecallCandidate[],
   limit: number,
-  scope: "project" | "global" | "all"
+  scope: "project" | "global" | "all",
 ): ScoredRecallCandidate[] {
   const sorted = [...scored].sort(compareByHybridScore);
 
@@ -437,7 +469,9 @@ export function selectRecallResults(
 }
 
 function computeWorkflowScore(candidate: ScoredRecallCandidate): number {
-  const roleBoost = candidate.metadata?.role ? (WORKFLOW_ROLE_BOOSTS[candidate.metadata.role as keyof typeof WORKFLOW_ROLE_BOOSTS] ?? 0) : 0;
+  const roleBoost = candidate.metadata?.role
+    ? (WORKFLOW_ROLE_BOOSTS[candidate.metadata.role as keyof typeof WORKFLOW_ROLE_BOOSTS] ?? 0)
+    : 0;
   const temporaryBoost = candidate.lifecycle === "temporary" ? 0.01 : 0;
   const centralityBoost = Math.min(0.015, Math.log((candidate.relatedCount ?? 0) + 1) * 0.006);
   return computeHybridScore(candidate) + roleBoost + temporaryBoost + centralityBoost;
@@ -446,7 +480,7 @@ function computeWorkflowScore(candidate: ScoredRecallCandidate): number {
 export function selectWorkflowResults(
   scored: ScoredRecallCandidate[],
   limit: number,
-  scope: "project" | "global" | "all"
+  scope: "project" | "global" | "all",
 ): ScoredRecallCandidate[] {
   const sorted = [...scored].sort((a, b) => {
     const workflowDelta = computeWorkflowScore(b) - computeWorkflowScore(a);
@@ -494,7 +528,7 @@ function getRelationshipMultiplier(type: RelationshipType): number {
 
 export function applyGraphSpreadingActivation(
   candidates: ScoredRecallCandidate[],
-  getNoteRelationships: (id: string) => Array<{ id: string; type: RelationshipType }> | undefined
+  getNoteRelationships: (id: string) => Array<{ id: string; type: RelationshipType }> | undefined,
 ): ScoredRecallCandidate[] {
   if (candidates.length === 0) {
     return candidates;
@@ -533,19 +567,26 @@ export function applyGraphSpreadingActivation(
           isCurrentProject: entry.isCurrentProject,
         });
       } else {
-        const existing = discovered.get(rel.id)!;
-        existing.graphScore = (existing.graphScore ?? 0) + propagatedScore;
+        const existing = discovered.get(rel.id);
+        if (existing) {
+          existing.graphScore = (existing.graphScore ?? 0) + propagatedScore;
+        }
       }
     }
   }
 
-  const withDiscovered = discovered.size === 0 ? candidates : [...candidates, ...discovered.values()];
+  const withDiscovered =
+    discovered.size === 0 ? candidates : [...candidates, ...discovered.values()];
   const sortedByGraph = withDiscovered
     .filter((candidate) => candidate.graphScore !== undefined)
     .sort((a, b) => (b.graphScore ?? 0) - (a.graphScore ?? 0) || b.score - a.score);
-  assignDenseRanks(sortedByGraph, (candidate) => candidate.graphScore ?? 0, (candidate, rank) => {
-    candidate.graphRank = rank;
-  });
+  assignDenseRanks(
+    sortedByGraph,
+    (candidate) => candidate.graphScore ?? 0,
+    (candidate, rank) => {
+      candidate.graphRank = rank;
+    },
+  );
 
   return withDiscovered;
 }
@@ -553,10 +594,10 @@ export function applyGraphSpreadingActivation(
 export function resolveDiscoveredVaults(
   candidates: ScoredRecallCandidate[],
   originalCandidateIds: Set<string>,
-  resolveVault: (id: string) => Promise<{ vault: Vault; isCurrentProject: boolean } | undefined>
+  resolveVault: (id: string) => Promise<{ vault: Vault; isCurrentProject: boolean } | undefined>,
 ): Promise<void> {
   const discovered = candidates.filter(
-    (c) => !originalCandidateIds.has(c.id) && c.vault !== undefined
+    (c) => !originalCandidateIds.has(c.id) && c.vault !== undefined,
   );
   if (discovered.length === 0) return Promise.resolve();
 
@@ -567,6 +608,6 @@ export function resolveDiscoveredVaults(
         c.vault = resolved.vault;
         c.isCurrentProject = resolved.isCurrentProject;
       }
-    })
+    }),
   ).then(() => {});
 }

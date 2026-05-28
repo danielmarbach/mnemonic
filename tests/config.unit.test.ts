@@ -35,7 +35,7 @@ describe("MnemonicConfigStore", () => {
     await fs.writeFile(
       path.join(dir, "config.json"),
       JSON.stringify({ reindexEmbedConcurrency: 99 }, null, 2),
-      "utf-8"
+      "utf-8",
     );
 
     const store = new MnemonicConfigStore(dir);
@@ -57,7 +57,7 @@ describe("MnemonicConfigStore", () => {
     await fs.writeFile(
       path.join(dir, "config.json"),
       JSON.stringify({ schemaVersion: "vNext" }, null, 2),
-      "utf-8"
+      "utf-8",
     );
 
     const store = new MnemonicConfigStore(dir);
@@ -79,7 +79,7 @@ describe("MnemonicConfigStore", () => {
     await fs.writeFile(
       path.join(dir, "config.json"),
       JSON.stringify({ mutationPushMode: "none" }, null, 2),
-      "utf-8"
+      "utf-8",
     );
 
     const store = new MnemonicConfigStore(dir);
@@ -101,7 +101,7 @@ describe("MnemonicConfigStore", () => {
     await fs.writeFile(
       path.join(dir, "config.json"),
       JSON.stringify({ mutationPushMode: "sometimes" }, null, 2),
-      "utf-8"
+      "utf-8",
     );
 
     const store = new MnemonicConfigStore(dir);
@@ -191,20 +191,24 @@ describe("MnemonicConfigStore", () => {
 
     await fs.writeFile(
       path.join(dir, "config.json"),
-      JSON.stringify({
-        projectMemoryPolicies: {
-          "project-a": {
-            projectId: "project-a",
-            projectName: "Project A",
-            defaultScope: "not-a-scope",
-            consolidationMode: "supersedes",
-            protectedBranchBehavior: "sometimes",
-            protectedBranchPatterns: ["main", "", 42],
-            updatedAt: "2026-03-13T10:00:00.000Z",
+      JSON.stringify(
+        {
+          projectMemoryPolicies: {
+            "project-a": {
+              projectId: "project-a",
+              projectName: "Project A",
+              defaultScope: "not-a-scope",
+              consolidationMode: "supersedes",
+              protectedBranchBehavior: "sometimes",
+              protectedBranchPatterns: ["main", "", 42],
+              updatedAt: "2026-03-13T10:00:00.000Z",
+            },
           },
         },
-      }, null, 2),
-      "utf-8"
+        null,
+        2,
+      ),
+      "utf-8",
     );
 
     const store = new MnemonicConfigStore(dir);
@@ -218,5 +222,4 @@ describe("MnemonicConfigStore", () => {
       updatedAt: "2026-03-13T10:00:00.000Z",
     });
   });
-
 });

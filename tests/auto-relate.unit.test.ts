@@ -63,9 +63,11 @@ describe("suggestAutoRelationships", () => {
       project: "project-2",
     });
 
-    expect(suggestAutoRelationships(source, [
-      { note: temporary, accessedAt: "2026-04-05T00:01:00.000Z", accessKind: "get" },
-      { note: otherProject, accessedAt: "2026-04-05T00:02:00.000Z", accessKind: "get" },
-    ])).toEqual([]);
+    expect(
+      suggestAutoRelationships(source, [
+        { note: temporary, accessedAt: "2026-04-05T00:01:00.000Z", accessKind: "get" },
+        { note: otherProject, accessedAt: "2026-04-05T00:02:00.000Z", accessKind: "get" },
+      ]),
+    ).toEqual([]);
   });
 });

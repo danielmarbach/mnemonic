@@ -23,7 +23,7 @@ describe("VaultManager", () => {
     tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "mnemonic-vault-test-"));
     mainVaultPath = path.join(tempDir, "main-vault");
     await fs.mkdir(mainVaultPath, { recursive: true });
-    
+
     vaultManager = new VaultManager(mainVaultPath);
     await vaultManager.initMain();
   });
@@ -42,14 +42,20 @@ describe("VaultManager", () => {
       expect(vaultManager.main).toBeTruthy();
       expect(vaultManager.main.provenance).toBe("main");
       expect(vaultManager.main.notesRelDir).toBe("notes");
-      
+
       // Check directories created
       const notesDir = path.join(mainVaultPath, "notes");
       const embeddingsDir = path.join(mainVaultPath, "embeddings");
-      
-      const notesExists = await fs.stat(notesDir).then(() => true).catch(() => false);
-      const embeddingsExists = await fs.stat(embeddingsDir).then(() => true).catch(() => false);
-      
+
+      const notesExists = await fs
+        .stat(notesDir)
+        .then(() => true)
+        .catch(() => false);
+      const embeddingsExists = await fs
+        .stat(embeddingsDir)
+        .then(() => true)
+        .catch(() => false);
+
       expect(notesExists).toBe(true);
       expect(embeddingsExists).toBe(true);
     });
@@ -57,7 +63,7 @@ describe("VaultManager", () => {
     it("should create .gitignore file", async () => {
       const gitignorePath = path.join(mainVaultPath, ".gitignore");
       const content = await fs.readFile(gitignorePath, "utf-8");
-      
+
       expect(content).toContain("embeddings/");
     });
   });
@@ -67,18 +73,18 @@ describe("VaultManager", () => {
       // Create a fake project with git
       const projectDir = path.join(tempDir, "project-a");
       await fs.mkdir(projectDir, { recursive: true });
-      
+
       await initGitRepo(projectDir, "# Project A");
-      
+
       // Should not detect vault yet (no .mnemonic)
       const vaultBefore = await vaultManager.getProjectVaultIfExists(projectDir);
       expect(vaultBefore).toBeNull();
-      
+
       // Create .mnemonic directory
       const mnemonicDir = path.join(projectDir, ".mnemonic");
       await fs.mkdir(mnemonicDir, { recursive: true });
       await fs.writeFile(path.join(mnemonicDir, ".gitignore"), "embeddings/\n");
-      
+
       // Now should detect
       const vaultAfter = await vaultManager.getProjectVaultIfExists(projectDir);
       expect(vaultAfter).toBeTruthy();
@@ -88,19 +94,19 @@ describe("VaultManager", () => {
     it("should create project vault with getOrCreateProjectVault", async () => {
       const projectDir = path.join(tempDir, "project-b");
       await fs.mkdir(projectDir, { recursive: true });
-      
+
       await initGitRepo(projectDir, "# Project B");
-      
+
       // Vault doesn't exist yet
       const existsBefore = await vaultManager.getProjectVaultIfExists(projectDir);
       expect(existsBefore).toBeNull();
-      
+
       // Create it
       const vault = await vaultManager.getOrCreateProjectVault(projectDir);
       expect(vault).toBeTruthy();
       expect(vault!.provenance).toBe("project-local");
       expect(vault!.notesRelDir).toBe(".mnemonic/notes");
-      
+
       // Should exist now
       const existsAfter = await vaultManager.getProjectVaultIfExists(projectDir);
       expect(existsAfter).toBeTruthy();
@@ -116,7 +122,7 @@ describe("VaultManager", () => {
     it("should handle non-git directory", async () => {
       const nonGitDir = path.join(tempDir, "no-git");
       await fs.mkdir(nonGitDir, { recursive: true });
-      
+
       const vault = await vaultManager.getProjectVaultIfExists(nonGitDir);
       expect(vault).toBeNull();
     });
@@ -124,12 +130,12 @@ describe("VaultManager", () => {
     it("should return same vault instance on repeated calls", async () => {
       const projectDir = path.join(tempDir, "project-c");
       await fs.mkdir(projectDir, { recursive: true });
-      
+
       await initGitRepo(projectDir, "# Project C");
-      
+
       const vault1 = await vaultManager.getOrCreateProjectVault(projectDir);
       const vault2 = await vaultManager.getOrCreateProjectVault(projectDir);
-      
+
       expect(vault1).toBe(vault2); // Same instance
     });
 
@@ -137,21 +143,24 @@ describe("VaultManager", () => {
       const projectDir = path.join(tempDir, "project-gitignore-bug");
       await fs.mkdir(projectDir, { recursive: true });
       await initGitRepo(projectDir, "# Project Gitignore Bug");
-      
+
       const mnemonicDir = path.join(projectDir, ".mnemonic");
       await fs.mkdir(mnemonicDir, { recursive: true });
       await fs.mkdir(path.join(mnemonicDir, "notes"), { recursive: true });
       await fs.mkdir(path.join(mnemonicDir, "embeddings"), { recursive: true });
-      
+
       // NO .gitignore file created initially
-      
+
       // Load the existing project vault (create: false)
       const vault = await vaultManager.getProjectVaultIfExists(projectDir);
       expect(vault).toBeTruthy();
-      
+
       // Bug fix verification: gitignore should NOT be created when just loading an existing vault
       const gitignorePath = path.join(mnemonicDir, ".gitignore");
-      const gitignoreExists = await fs.stat(gitignorePath).then(() => true).catch(() => false);
+      const gitignoreExists = await fs
+        .stat(gitignorePath)
+        .then(() => true)
+        .catch(() => false);
       expect(gitignoreExists).toBe(false);
     });
   });
@@ -160,12 +169,12 @@ describe("VaultManager", () => {
     it("should find note in project vault when cwd provided", async () => {
       const projectDir = path.join(tempDir, "project-d");
       await fs.mkdir(projectDir, { recursive: true });
-      
+
       await initGitRepo(projectDir, "# Project D");
-      
+
       const projectVault = await vaultManager.getOrCreateProjectVault(projectDir);
       expect(projectVault).toBeTruthy();
-      
+
       // Write note to project vault
       const note: Note = {
         id: "project-note",
@@ -177,7 +186,7 @@ describe("VaultManager", () => {
         updatedAt: new Date().toISOString(),
       };
       await projectVault!.storage.writeNote(note);
-      
+
       // Find with cwd
       const found = await vaultManager.findNote("project-note", projectDir);
       expect(found).toBeTruthy();
@@ -188,12 +197,12 @@ describe("VaultManager", () => {
     it("should find note in main vault when note not in project", async () => {
       const projectDir = path.join(tempDir, "project-e");
       await fs.mkdir(projectDir, { recursive: true });
-      
+
       await initGitRepo(projectDir, "# Project E");
-      
+
       // Create project vault but don't write note there
       await vaultManager.getOrCreateProjectVault(projectDir);
-      
+
       // Write note to main vault instead
       const note: Note = {
         id: "main-only-note",
@@ -205,7 +214,7 @@ describe("VaultManager", () => {
         updatedAt: new Date().toISOString(),
       };
       await vaultManager.main.storage.writeNote(note);
-      
+
       // Should find in main vault even when searching from project
       const found = await vaultManager.findNote("main-only-note", projectDir);
       expect(found).toBeTruthy();
@@ -225,7 +234,7 @@ describe("VaultManager", () => {
         updatedAt: new Date().toISOString(),
       };
       await vaultManager.main.storage.writeNote(mainNote);
-      
+
       const found = await vaultManager.findNote("main-note");
       expect(found).toBeTruthy();
       expect(found!.vault.provenance).toBe("main");
@@ -239,11 +248,11 @@ describe("VaultManager", () => {
     it("should search project vault first when cwd provided", async () => {
       const projectDir = path.join(tempDir, "project-f");
       await fs.mkdir(projectDir, { recursive: true });
-      
+
       await initGitRepo(projectDir, "# Project F");
-      
+
       const projectVault = await vaultManager.getOrCreateProjectVault(projectDir);
-      
+
       // Write same ID to both vaults
       const note: Note = {
         id: "duplicate-id",
@@ -254,10 +263,10 @@ describe("VaultManager", () => {
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
-      
+
       await projectVault!.storage.writeNote({ ...note, content: "Project version" });
       await vaultManager.main.storage.writeNote({ ...note, content: "Main version" });
-      
+
       // Should find project version first
       const found = await vaultManager.findNote("duplicate-id", projectDir);
       expect(found).toBeTruthy();
@@ -278,16 +287,16 @@ describe("VaultManager", () => {
       for (let i = 0; i < 3; i++) {
         const projectDir = path.join(tempDir, `project-${i}`);
         await fs.mkdir(projectDir, { recursive: true });
-        
+
         await initGitRepo(projectDir, `# Project ${i}`);
-        
+
         await vaultManager.getOrCreateProjectVault(projectDir);
       }
-      
+
       const vaults = vaultManager.allKnownVaults();
       expect(vaults).toHaveLength(4); // main + 3 projects
-      
-      const projectVaults = vaults.filter(v => v.provenance === "project-local");
+
+      const projectVaults = vaults.filter((v) => v.provenance === "project-local");
       expect(projectVaults).toHaveLength(3);
     });
   });
@@ -301,12 +310,12 @@ describe("VaultManager", () => {
     it("should build correct path for project vault", async () => {
       const projectDir = path.join(tempDir, "project-g");
       await fs.mkdir(projectDir, { recursive: true });
-      
+
       await initGitRepo(projectDir, "# Project G");
-      
+
       const projectVault = await vaultManager.getOrCreateProjectVault(projectDir);
       const relPath = vaultManager.noteRelPath(projectVault!, "test-note");
-      
+
       expect(relPath).toBe(".mnemonic/notes/test-note.md");
     });
   });
@@ -370,12 +379,12 @@ describe("VaultManager", () => {
     it("should return project vault first when cwd provided", async () => {
       const projectDir = path.join(tempDir, "project-h");
       await fs.mkdir(projectDir, { recursive: true });
-      
+
       await initGitRepo(projectDir, "# Project H");
-      
+
       const projectVault = await vaultManager.getOrCreateProjectVault(projectDir);
       const order = await vaultManager.searchOrder(projectDir);
-      
+
       expect(order).toHaveLength(2);
       expect(order[0]).toBe(projectVault);
       expect(order[1]).toBe(vaultManager.main);
@@ -384,16 +393,16 @@ describe("VaultManager", () => {
     it("should deduplicate vaults in search order", async () => {
       const projectDir = path.join(tempDir, "project-i");
       await fs.mkdir(projectDir, { recursive: true });
-      
+
       await initGitRepo(projectDir, "# Project I");
-      
+
       const projectVault = await vaultManager.getOrCreateProjectVault(projectDir);
-      
+
       // Project vault is already loaded, should not appear twice
       const order = await vaultManager.searchOrder(projectDir);
-      
+
       expect(order).toHaveLength(2);
-      const projectCount = order.filter(v => v.provenance === "project-local").length;
+      const projectCount = order.filter((v) => v.provenance === "project-local").length;
       expect(projectCount).toBe(1);
     });
   });
@@ -415,10 +424,10 @@ describe("VaultManager", () => {
 
       // allKnownVaults should include main + primary + both submodule vaults
       const allVaults = vaultManager.allKnownVaults();
-      const projectVaults = allVaults.filter(v => v.provenance === "project-local");
+      const projectVaults = allVaults.filter((v) => v.provenance === "project-local");
       expect(projectVaults).toHaveLength(3);
 
-      const folderNames = projectVaults.map(v => v.vaultFolderName).sort();
+      const folderNames = projectVaults.map((v) => v.vaultFolderName).sort();
       expect(folderNames).toEqual([".mnemonic", ".mnemonic-sub1", ".mnemonic-sub2"]);
     });
 
@@ -434,7 +443,7 @@ describe("VaultManager", () => {
       expect(primaryVault).toBeTruthy();
 
       const allVaults = vaultManager.allKnownVaults();
-      const projectVaults = allVaults.filter(v => v.provenance === "project-local");
+      const projectVaults = allVaults.filter((v) => v.provenance === "project-local");
       expect(projectVaults).toHaveLength(1);
       expect(projectVaults[0]!.vaultFolderName).toBe(".mnemonic");
     });
@@ -504,7 +513,7 @@ describe("VaultManager", () => {
 
       // Should have: primary project vault, submodule vault, main vault
       expect(order.length).toBeGreaterThanOrEqual(3);
-      const projectVaultsInOrder = order.filter(v => v.provenance === "project-local");
+      const projectVaultsInOrder = order.filter((v) => v.provenance === "project-local");
       expect(projectVaultsInOrder).toHaveLength(2);
 
       // Primary project vault should come first
@@ -574,7 +583,9 @@ describe("VaultManager", () => {
       await initGitRepo(projectDir, "# Attach Project");
     });
 
-    function makeAttachmentConfig(overrides: Partial<ProjectAttachmentConfig> & { projectSlug: string }): ProjectAttachmentConfig {
+    function makeAttachmentConfig(
+      overrides: Partial<ProjectAttachmentConfig> & { projectSlug: string },
+    ): ProjectAttachmentConfig {
       return {
         projectName: overrides.projectSlug,
         localPath: path.join(tempDir, `attached-${overrides.projectSlug}`),
@@ -600,7 +611,10 @@ describe("VaultManager", () => {
       const attachedPath = path.join(tempDir, "attached-writable-test");
       await setupAttachedVault(attachedPath);
 
-      const config = makeAttachmentConfig({ projectSlug: "attached-writable-test", localPath: attachedPath });
+      const config = makeAttachmentConfig({
+        projectSlug: "attached-writable-test",
+        localPath: attachedPath,
+      });
       vaultManager.setAttachmentConfigs("attach-project", [config]);
       await vaultManager.loadAttachmentsForProject("attach-project");
 
@@ -628,13 +642,16 @@ describe("VaultManager", () => {
       const attachedPath = path.join(tempDir, "attached-search-order");
       await setupAttachedVault(attachedPath);
 
-      const config = makeAttachmentConfig({ projectSlug: "attached-search-order", localPath: attachedPath });
+      const config = makeAttachmentConfig({
+        projectSlug: "attached-search-order",
+        localPath: attachedPath,
+      });
       vaultManager.setAttachmentConfigs("attach-project", [config]);
       await vaultManager.loadAttachmentsForProject("attach-project");
 
       const order = await vaultManager.searchOrder(projectDir, "attach-project");
 
-      const provenances = order.map(v => v.provenance);
+      const provenances = order.map((v) => v.provenance);
       expect(provenances).toContain("project-local");
       expect(provenances).toContain("project-attached");
       expect(provenances).toContain("main");
@@ -653,13 +670,16 @@ describe("VaultManager", () => {
       const attachedPath = path.join(tempDir, "attached-mutable");
       await setupAttachedVault(attachedPath);
 
-      const config = makeAttachmentConfig({ projectSlug: "attached-mutable", localPath: attachedPath });
+      const config = makeAttachmentConfig({
+        projectSlug: "attached-mutable",
+        localPath: attachedPath,
+      });
       vaultManager.setAttachmentConfigs("attach-project", [config]);
       await vaultManager.loadAttachmentsForProject("attach-project");
 
       const mutable = await vaultManager.searchOrderMutable(projectDir, "attach-project");
 
-      const provenances = mutable.map(v => v.provenance);
+      const provenances = mutable.map((v) => v.provenance);
       expect(provenances).not.toContain("project-attached");
       expect(provenances).toContain("project-local");
       expect(provenances).toContain("main");
@@ -671,12 +691,15 @@ describe("VaultManager", () => {
       const attachedPath = path.join(tempDir, "attached-known");
       await setupAttachedVault(attachedPath);
 
-      const config = makeAttachmentConfig({ projectSlug: "attached-known", localPath: attachedPath });
+      const config = makeAttachmentConfig({
+        projectSlug: "attached-known",
+        localPath: attachedPath,
+      });
       vaultManager.setAttachmentConfigs("attach-project", [config]);
       await vaultManager.loadAttachmentsForProject("attach-project");
 
       const all = vaultManager.allKnownVaults("attach-project");
-      const provenances = all.map(v => v.provenance);
+      const provenances = all.map((v) => v.provenance);
       expect(provenances).toContain("project-attached");
       expect(provenances).toContain("main");
     });
@@ -687,12 +710,15 @@ describe("VaultManager", () => {
       const attachedPath = path.join(tempDir, "attached-no-pid");
       await setupAttachedVault(attachedPath);
 
-      const config = makeAttachmentConfig({ projectSlug: "attached-no-pid", localPath: attachedPath });
+      const config = makeAttachmentConfig({
+        projectSlug: "attached-no-pid",
+        localPath: attachedPath,
+      });
       vaultManager.setAttachmentConfigs("attach-project", [config]);
       await vaultManager.loadAttachmentsForProject("attach-project");
 
       const all = vaultManager.allKnownVaults();
-      const provenances = all.map(v => v.provenance);
+      const provenances = all.map((v) => v.provenance);
       expect(provenances).not.toContain("project-attached");
     });
 
@@ -702,12 +728,15 @@ describe("VaultManager", () => {
       const attachedPath = path.join(tempDir, "attached-mutable-known");
       await setupAttachedVault(attachedPath);
 
-      const config = makeAttachmentConfig({ projectSlug: "attached-mutable-known", localPath: attachedPath });
+      const config = makeAttachmentConfig({
+        projectSlug: "attached-mutable-known",
+        localPath: attachedPath,
+      });
       vaultManager.setAttachmentConfigs("attach-project", [config]);
       await vaultManager.loadAttachmentsForProject("attach-project");
 
       const mutable = vaultManager.allKnownVaultsMutable();
-      const provenances = mutable.map(v => v.provenance);
+      const provenances = mutable.map((v) => v.provenance);
       expect(provenances).not.toContain("project-attached");
       expect(provenances).toContain("main");
     });
@@ -718,7 +747,11 @@ describe("VaultManager", () => {
       const attachedPath = path.join(tempDir, "attached-find-mutable");
       await setupAttachedVault(attachedPath);
 
-      const config = makeAttachmentConfig({ projectSlug: "attached-find-mutable", localPath: attachedPath, branch: "" });
+      const config = makeAttachmentConfig({
+        projectSlug: "attached-find-mutable",
+        localPath: attachedPath,
+        branch: "",
+      });
       vaultManager.setAttachmentConfigs("attach-project", [config]);
       const attached = await vaultManager.loadAttachmentsForProject("attach-project");
       expect(attached).toHaveLength(1);
@@ -738,10 +771,15 @@ describe("VaultManager", () => {
       };
       await baseStorage.writeNote(note);
 
-      const foundMutable = await vaultManager.findNote("attached-note-mutable", projectDir, { mutable: true, projectId: "attach-project" });
+      const foundMutable = await vaultManager.findNote("attached-note-mutable", projectDir, {
+        mutable: true,
+        projectId: "attach-project",
+      });
       expect(foundMutable).toBeNull();
 
-      const foundRegular = await vaultManager.findNote("attached-note-mutable", projectDir, { projectId: "attach-project" });
+      const foundRegular = await vaultManager.findNote("attached-note-mutable", projectDir, {
+        projectId: "attach-project",
+      });
       expect(foundRegular).toBeTruthy();
       expect(foundRegular!.vault.provenance).toBe("project-attached");
     });
@@ -764,7 +802,10 @@ describe("VaultManager", () => {
       const attachedPath = path.join(tempDir, "attached-clear");
       await setupAttachedVault(attachedPath);
 
-      const config = makeAttachmentConfig({ projectSlug: "attached-clear", localPath: attachedPath });
+      const config = makeAttachmentConfig({
+        projectSlug: "attached-clear",
+        localPath: attachedPath,
+      });
       vaultManager.setAttachmentConfigs("attach-project", [config]);
       await vaultManager.loadAttachmentsForProject("attach-project");
 
@@ -807,14 +848,20 @@ describe("VaultManager", () => {
       const attachedPath = path.join(tempDir, "attached-writable-mutable");
       await setupAttachedVault(attachedPath);
 
-      const config = makeAttachmentConfig({ projectSlug: "attached-writable-mutable", localPath: attachedPath, writable: true });
+      const config = makeAttachmentConfig({
+        projectSlug: "attached-writable-mutable",
+        localPath: attachedPath,
+        writable: true,
+      });
       vaultManager.setAttachmentConfigs("attach-project", [config]);
       await vaultManager.loadAttachmentsForProject("attach-project");
 
       const mutable = vaultManager.allKnownVaultsMutable();
-      const provenances = mutable.map(v => v.provenance);
+      const provenances = mutable.map((v) => v.provenance);
       expect(provenances).toContain("project-attached");
-      expect(mutable.filter(v => v.provenance === "project-attached").every(v => v.writable)).toBe(true);
+      expect(
+        mutable.filter((v) => v.provenance === "project-attached").every((v) => v.writable),
+      ).toBe(true);
     });
 
     it("should include writable attached vaults in searchOrderMutable", async () => {
@@ -823,14 +870,20 @@ describe("VaultManager", () => {
       const attachedPath = path.join(tempDir, "attached-writable-search");
       await setupAttachedVault(attachedPath);
 
-      const config = makeAttachmentConfig({ projectSlug: "attached-writable-search", localPath: attachedPath, writable: true });
+      const config = makeAttachmentConfig({
+        projectSlug: "attached-writable-search",
+        localPath: attachedPath,
+        writable: true,
+      });
       vaultManager.setAttachmentConfigs("attach-project", [config]);
       await vaultManager.loadAttachmentsForProject("attach-project");
 
       const mutable = await vaultManager.searchOrderMutable(projectDir, "attach-project");
-      const provenances = mutable.map(v => v.provenance);
+      const provenances = mutable.map((v) => v.provenance);
       expect(provenances).toContain("project-attached");
-      expect(mutable.filter(v => v.provenance === "project-attached").every(v => v.writable)).toBe(true);
+      expect(
+        mutable.filter((v) => v.provenance === "project-attached").every((v) => v.writable),
+      ).toBe(true);
     });
 
     it("should find notes in writable attached vaults via findNote({ mutable: true })", async () => {
@@ -839,7 +892,12 @@ describe("VaultManager", () => {
       const attachedPath = path.join(tempDir, "attached-find-writable");
       await setupAttachedVault(attachedPath);
 
-      const config = makeAttachmentConfig({ projectSlug: "attached-find-writable", localPath: attachedPath, writable: true, branch: "" });
+      const config = makeAttachmentConfig({
+        projectSlug: "attached-find-writable",
+        localPath: attachedPath,
+        writable: true,
+        branch: "",
+      });
       vaultManager.setAttachmentConfigs("attach-project", [config]);
       const attached = await vaultManager.loadAttachmentsForProject("attach-project");
       expect(attached).toHaveLength(1);
@@ -859,7 +917,10 @@ describe("VaultManager", () => {
       };
       await baseStorage.writeNote(note);
 
-      const foundMutable = await vaultManager.findNote("writable-attached-note", projectDir, { mutable: true, projectId: "attach-project" });
+      const foundMutable = await vaultManager.findNote("writable-attached-note", projectDir, {
+        mutable: true,
+        projectId: "attach-project",
+      });
       expect(foundMutable).toBeTruthy();
       expect(foundMutable!.vault.provenance).toBe("project-attached");
       expect(foundMutable!.vault.writable).toBe(true);
@@ -871,7 +932,11 @@ describe("VaultManager", () => {
       const attachedPath = path.join(tempDir, "attached-writable-prop");
       await setupAttachedVault(attachedPath);
 
-      const config = makeAttachmentConfig({ projectSlug: "attached-writable-prop", localPath: attachedPath, writable: true });
+      const config = makeAttachmentConfig({
+        projectSlug: "attached-writable-prop",
+        localPath: attachedPath,
+        writable: true,
+      });
       vaultManager.setAttachmentConfigs("attach-project", [config]);
       await vaultManager.loadAttachmentsForProject("attach-project");
 
@@ -913,7 +978,7 @@ describe("VaultManager", () => {
       // Check for pending files
       const pendingFiles = await vaultMgr.getPendingNoteFiles(projectVault!, ["test-note"]);
       expect(pendingFiles).toContain(".mnemonic/notes/test-note.md");
-      
+
       process.env.DISABLE_GIT = "true";
     });
 
@@ -949,7 +1014,7 @@ describe("VaultManager", () => {
       // Check for pending files - should pick up modified file
       const pendingFiles = await vaultMgr.getPendingNoteFiles(projectVault!, ["test-note-mod"]);
       expect(pendingFiles).toContain(".mnemonic/notes/test-note-mod.md");
-      
+
       process.env.DISABLE_GIT = "true";
     });
 
@@ -973,7 +1038,7 @@ describe("VaultManager", () => {
 
       const pendingFiles = await vaultMgr.getPendingNoteFiles(projectVault!, ["nonexistent"]);
       expect(pendingFiles).toEqual([]);
-      
+
       process.env.DISABLE_GIT = "true";
     });
 
@@ -1010,7 +1075,7 @@ describe("VaultManager", () => {
       expect(pendingFiles).toHaveLength(2);
       expect(pendingFiles).toContain(".mnemonic/notes/note-1.md");
       expect(pendingFiles).toContain(".mnemonic/notes/note-2.md");
-      
+
       process.env.DISABLE_GIT = "true";
     });
   });
@@ -1027,10 +1092,55 @@ async function initGitRepo(projectDir: string, readmeContent: string): Promise<v
 async function initGitRepoWithCommit(projectDir: string, readmeContent: string): Promise<void> {
   await initGitRepo(projectDir, readmeContent);
   await execFileAsync("git", ["add", "README.md"], { cwd: projectDir });
-  await execFileAsync("git", ["-c", "user.email=test@example.com", "-c", "user.name=Test", "commit", "-m", "chore: initial commit"], { cwd: projectDir });
+  await execFileAsync(
+    "git",
+    [
+      "-c",
+      "user.email=test@example.com",
+      "-c",
+      "user.name=Test",
+      "commit",
+      "-m",
+      "chore: initial commit",
+    ],
+    { cwd: projectDir },
+  );
 }
 
-async function addSubmodule(parentDir: string, submoduleDir: string, submodulePath: string): Promise<void> {
-  await execFileAsync("git", ["-c", "protocol.file.allow=always", "-c", "user.email=test@example.com", "-c", "user.name=Test", "submodule", "add", submoduleDir, submodulePath], { cwd: parentDir });
-  await execFileAsync("git", ["-c", "user.email=test@example.com", "-c", "user.name=Test", "commit", "-m", "chore: add submodule", ".gitmodules", submodulePath], { cwd: parentDir });
+async function addSubmodule(
+  parentDir: string,
+  submoduleDir: string,
+  submodulePath: string,
+): Promise<void> {
+  await execFileAsync(
+    "git",
+    [
+      "-c",
+      "protocol.file.allow=always",
+      "-c",
+      "user.email=test@example.com",
+      "-c",
+      "user.name=Test",
+      "submodule",
+      "add",
+      submoduleDir,
+      submodulePath,
+    ],
+    { cwd: parentDir },
+  );
+  await execFileAsync(
+    "git",
+    [
+      "-c",
+      "user.email=test@example.com",
+      "-c",
+      "user.name=Test",
+      "commit",
+      "-m",
+      "chore: add submodule",
+      ".gitmodules",
+      submodulePath,
+    ],
+    { cwd: parentDir },
+  );
 }

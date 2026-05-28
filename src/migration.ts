@@ -3,7 +3,11 @@ import path from "path";
 import matter from "gray-matter";
 
 import { getErrorMessage, debugLog } from "./error-utils.js";
-import { MigrationAlreadyRegisteredError, UnknownMigrationError, InvalidSchemaVersionError } from "./domain-errors.js";
+import {
+  MigrationAlreadyRegisteredError,
+  UnknownMigrationError,
+  InvalidSchemaVersionError,
+} from "./domain-errors.js";
 
 import type { Vault, VaultManager } from "./vault.js";
 import type { Note } from "./storage.js";
@@ -63,12 +67,15 @@ export class Migrator {
     return Array.from(this.migrations.values());
   }
 
-  async getPendingMigrations(currentSchemaVersion: string, targetSchemaVersion?: string): Promise<Migration[]> {
+  async getPendingMigrations(
+    currentSchemaVersion: string,
+    targetSchemaVersion?: string,
+  ): Promise<Migration[]> {
     const all = this.listAvailableMigrations();
     const current = this.parseVersion(currentSchemaVersion);
     const target = targetSchemaVersion ? this.parseVersion(targetSchemaVersion) : undefined;
-    
-    const pending = all.filter(mig => {
+
+    const pending = all.filter((mig) => {
       // Primary filter: maxSchemaVersion means "this migration upgrades TO this version"
       // Run if current < max, don't run if current >= max
       if (mig.maxSchemaVersion) {
@@ -105,7 +112,7 @@ export class Migrator {
 
   async runMigration(
     migrationName: string,
-    options: { dryRun: boolean; backup?: boolean; cwd?: string }
+    options: { dryRun: boolean; backup?: boolean; cwd?: string },
   ): Promise<{ results: Map<string, MigrationResult>; vaultsProcessed: number }> {
     const migration = this.migrations.get(migrationName);
     if (!migration) {
@@ -129,7 +136,9 @@ export class Migrator {
         if (!options.dryRun && migrationResult.errors.length === 0) {
           const currentSchemaVersion = await readVaultSchemaVersion(vault.storage.vaultPath);
           const nextSchemaVersion = this.getLatestSchemaVersion(currentSchemaVersion, [migration]);
-          const filesToCommit = new Set(migrationResult.modifiedNoteIds.map((id) => `${vault.notesRelDir}/${id}.md`));
+          const filesToCommit = new Set(
+            migrationResult.modifiedNoteIds.map((id) => `${vault.notesRelDir}/${id}.md`),
+          );
 
           if (nextSchemaVersion !== currentSchemaVersion) {
             await writeVaultSchemaVersion(vault.storage.vaultPath, nextSchemaVersion);
@@ -241,14 +250,17 @@ export class Migrator {
                 await vault.git.push();
               } catch (err) {
                 const message = `Auto-commit failed: ${getErrorMessage(err)}`;
-                console.error(`[migration] Failed to commit for ${vault.storage.vaultPath}: ${err}`);
+                console.error(
+                  `[migration] Failed to commit for ${vault.storage.vaultPath}: ${err}`,
+                );
                 for (const { result } of lockedVaultResults) {
                   result.warnings.push(message);
                 }
               }
             }
           } else if (filesToCommit.size > 0) {
-            const warning = "Schema version not advanced because one or more migrations reported errors; staged note updates were rolled back.";
+            const warning =
+              "Schema version not advanced because one or more migrations reported errors; staged note updates were rolled back.";
             for (const { result } of lockedVaultResults) {
               result.warnings.push(warning);
             }
@@ -277,7 +289,7 @@ export class Migrator {
       throw new InvalidSchemaVersionError(version);
     }
 
-    return version.split(".").map(n => parseInt(n, 10));
+    return version.split(".").map((n) => parseInt(n, 10));
   }
 
   private compareVersions(a: number[], b: number[]): number {
@@ -327,7 +339,11 @@ export class Migrator {
     }
   }
 
-  private async runMigrationAtomically(vault: Vault, migration: Migration, dryRun: boolean): Promise<MigrationResult> {
+  private async runMigrationAtomically(
+    vault: Vault,
+    migration: Migration,
+    dryRun: boolean,
+  ): Promise<MigrationResult> {
     if (dryRun) {
       return migration.run(vault, true);
     }
@@ -339,7 +355,9 @@ export class Migrator {
       if (result.errors.length > 0) {
         await vault.storage.rollbackAtomicNotesWrite();
         if (result.notesModified > 0) {
-          result.warnings.push("Atomic migration rollback applied; note changes were not flushed to disk.");
+          result.warnings.push(
+            "Atomic migration rollback applied; note changes were not flushed to disk.",
+          );
         }
         return result;
       }
@@ -380,7 +398,7 @@ function createV010BackfillMemoryVersionMigration(): Migration {
           if (note.memoryVersion === undefined || note.memoryVersion === 0) {
             result.notesModified++;
             result.modifiedNoteIds.push(note.id);
-            
+
             if (!dryRun) {
               const updatedNote: Note = {
                 ...note,
@@ -426,7 +444,10 @@ function createV011BackfillLifecycleMigration(): Migration {
           const notePath = path.join(vault.storage.notesDir, `${note.id}.md`);
           const raw = await fs.readFile(notePath, "utf-8");
           const parsed = matter(raw);
-          if (parsed.data["lifecycle"] === "temporary" || parsed.data["lifecycle"] === "permanent") {
+          if (
+            parsed.data["lifecycle"] === "temporary" ||
+            parsed.data["lifecycle"] === "permanent"
+          ) {
             continue;
           }
 

@@ -5,13 +5,16 @@ import { projectParam, ensureBranchSynced, resolveProject } from "../helpers/pro
 import { isoDateString } from "../brands.js";
 import { attachedVaultErrorMessage, ensureAttachmentsLoaded } from "../helpers/vault.js";
 import type { Vault } from "../vault.js";
-import type { Relationship } from "../storage.js";
 import {
   RelateResultSchema,
   type RelateResult,
   type MutationRetryContract,
 } from "../structured-content.js";
-import { formatCommitBody, commitVaultWithProtection, checkVaultProtectedBranch } from "../helpers/git-commit.js";
+import {
+  formatCommitBody,
+  commitVaultWithProtection,
+  checkVaultProtectedBranch,
+} from "../helpers/git-commit.js";
 import {
   buildMutationRetryContract,
   formatRetrySummary,
@@ -46,7 +49,11 @@ export function registerUnrelateTool(server: McpServer, ctx: ServerContext): voi
       inputSchema: z.object({
         fromId: z.string().describe("Source memory id"),
         toId: z.string().describe("Target memory id"),
-        bidirectional: z.boolean().optional().default(true).describe("Remove relationship in both directions (default: true)"),
+        bidirectional: z
+          .boolean()
+          .optional()
+          .default(true)
+          .describe("Remove relationship in both directions (default: true)"),
         cwd: projectParam,
       }),
       outputSchema: RelateResultSchema,
@@ -68,10 +75,18 @@ export function registerUnrelateTool(server: McpServer, ctx: ServerContext): voi
           ctx.vaultManager.findNote(toId, cwd, { mutable: false, projectId }),
         ]);
         if (foundFromAny && foundFromAny.vault.provenance === "project-attached") {
-          return { content: [{ type: "text", text: attachedVaultErrorMessage(fromId, foundFromAny.vault) }], isError: true };
+          return {
+            content: [
+              { type: "text", text: attachedVaultErrorMessage(fromId, foundFromAny.vault) },
+            ],
+            isError: true,
+          };
         }
         if (foundToAny && foundToAny.vault.provenance === "project-attached") {
-          return { content: [{ type: "text", text: attachedVaultErrorMessage(toId, foundToAny.vault) }], isError: true };
+          return {
+            content: [{ type: "text", text: attachedVaultErrorMessage(toId, foundToAny.vault) }],
+            isError: true,
+          };
         }
       }
 
@@ -83,13 +98,30 @@ export function registerUnrelateTool(server: McpServer, ctx: ServerContext): voi
       if (foundFrom) mutableVaults.add(foundFrom.vault);
       if (bidirectional && foundTo) mutableVaults.add(foundTo.vault);
       const preChecks = await Promise.all(
-        Array.from(mutableVaults).map(vault =>
-          checkVaultProtectedBranch({ ctx, vault, allowProtectedBranch: false, toolName: "unrelate", noteProjectId: vault === foundFrom?.vault ? foundFrom.note.project ?? undefined : foundTo?.note.project ?? undefined })
-        )
+        Array.from(mutableVaults).map((vault) =>
+          checkVaultProtectedBranch({
+            ctx,
+            vault,
+            allowProtectedBranch: false,
+            toolName: "unrelate",
+            noteProjectId:
+              vault === foundFrom?.vault
+                ? (foundFrom.note.project ?? undefined)
+                : (foundTo?.note.project ?? undefined),
+          }),
+        ),
       );
       for (const check of preChecks) {
         if (check.blocked) {
-          return { content: [{ type: "text", text: check.message ?? "Protected branch policy blocked this commit." }], isError: true };
+          return {
+            content: [
+              {
+                type: "text",
+                text: check.message ?? "Protected branch policy blocked this commit.",
+              },
+            ],
+            isError: true,
+          };
         }
       }
 
@@ -123,14 +155,14 @@ export function registerUnrelateTool(server: McpServer, ctx: ServerContext): voi
         const allVaults = new Set<Vault>();
         if (foundFrom) allVaults.add(foundFrom.vault);
         if (bidirectional && foundTo) allVaults.add(foundTo.vault);
-        
+
         for (const vault of allVaults) {
           const noteIds: string[] = [];
           if (foundFrom && foundFrom.vault === vault) noteIds.push(fromId);
           if (bidirectional && foundTo && foundTo.vault === vault) noteIds.push(toId);
-          
+
           const pendingFiles = await ctx.vaultManager.getPendingNoteFiles(vault, noteIds);
-          
+
           if (pendingFiles.length > 0) {
             // Commit the pending changes from previous failed attempt
             const found = foundFrom?.vault === vault ? foundFrom : foundTo;
@@ -151,11 +183,11 @@ export function registerUnrelateTool(server: McpServer, ctx: ServerContext): voi
               allowProtectedBranch: false,
               toolName: "unrelate",
             });
-            
+
             if (commitStatus.status === "committed") {
               await pushAfterMutation(ctx, vault);
             }
-            
+
             const retry = buildMutationRetryContract({
               commit: commitStatus,
               commitMessage,
@@ -166,29 +198,36 @@ export function registerUnrelateTool(server: McpServer, ctx: ServerContext): voi
               mutationApplied: true,
               preferredRecovery: "rerun-tool-call-serial",
             });
-            
+
             const structuredContent: RelateResult = {
               action: "unrelated",
               fromId,
               toId,
               type: "related-to",
               bidirectional,
-              notesModified: pendingFiles.map((f: string) => path.basename(f, '.md')),
+              notesModified: pendingFiles.map((f: string) => path.basename(f, ".md")),
               retry,
             };
-            
+
             const retrySummary = formatRetrySummary(retry);
             return {
-              content: [{
-                type: "text",
-                text: `Reconciled pending commit for relationship removal between \`${fromId}\` and \`${toId}\`${retrySummary ? `\n${retrySummary}` : ""}`,
-              }],
+              content: [
+                {
+                  type: "text",
+                  text: `Reconciled pending commit for relationship removal between \`${fromId}\` and \`${toId}\`${retrySummary ? `\n${retrySummary}` : ""}`,
+                },
+              ],
               structuredContent,
             };
           }
         }
-        
-        return { content: [{ type: "text", text: `No relationship found between '${fromId}' and '${toId}'` }], isError: true };
+
+        return {
+          content: [
+            { type: "text", text: `No relationship found between '${fromId}' and '${toId}'` },
+          ],
+          isError: true,
+        };
       }
 
       let retry: MutationRetryContract | undefined;
@@ -230,9 +269,9 @@ export function registerUnrelateTool(server: McpServer, ctx: ServerContext): voi
 
       const modifiedNoteIds: string[] = [];
       for (const [, files] of vaultChanges) {
-        modifiedNoteIds.push(...files.map(f => path.basename(f, '.md')));
+        modifiedNoteIds.push(...files.map((f) => path.basename(f, ".md")));
       }
-      
+
       const structuredContent: RelateResult = {
         action: "unrelated",
         fromId,
@@ -242,16 +281,18 @@ export function registerUnrelateTool(server: McpServer, ctx: ServerContext): voi
         notesModified: modifiedNoteIds,
         retry,
       };
-      
+
       const retrySummary = formatRetrySummary(retry);
       invalidateActiveProjectCache();
       return {
-        content: [{
-          type: "text",
-          text: `Removed relationship between \`${fromId}\` and \`${toId}\`${retrySummary ? `\n${retrySummary}` : ""}`,
-        }],
+        content: [
+          {
+            type: "text",
+            text: `Removed relationship between \`${fromId}\` and \`${toId}\`${retrySummary ? `\n${retrySummary}` : ""}`,
+          },
+        ],
         structuredContent,
       };
-    }
+    },
   );
 }

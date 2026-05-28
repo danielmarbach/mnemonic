@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  RememberToolResultSchema,
-  UpdateToolResultSchema,
-} from "../src/structured-content.js";
+import { RememberToolResultSchema, UpdateToolResultSchema } from "../src/structured-content.js";
 
 describe("tool output schemas", () => {
   describe("RememberToolResultSchema", () => {

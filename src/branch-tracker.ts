@@ -19,7 +19,7 @@ export async function checkBranchChange(cwd: string): Promise<string | undefined
   if (!currentBranch) return undefined;
 
   const lastBranch = getLastBranch(cwd);
-  
+
   if (currentBranch !== lastBranch) {
     console.error(`[branch] Changed from '${lastBranch ?? "none"}' to '${currentBranch}'`);
     updateBranchHistory(cwd, currentBranch);

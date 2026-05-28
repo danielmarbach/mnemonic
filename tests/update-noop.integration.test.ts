@@ -22,8 +22,9 @@ describe("update no-op detection", () => {
     expect(noteId).toBeDefined();
 
     const getResult1 = await session.callTool("get", { ids: [noteId!] });
-    const updatedAt1 = getResult1.text.match(/updatedAt[:\s]+(['"]?)([^'"\n,]+)\1/)?.[2]
-      ?? getResult1.structuredContent?.updatedAt as string | undefined;
+    const updatedAt1 =
+      getResult1.text.match(/updatedAt[:\s]+(['"]?)([^'"\n,]+)\1/)?.[2] ??
+      (getResult1.structuredContent?.updatedAt as string | undefined);
 
     const updateResult = await session.callTool("update", {
       id: noteId,
@@ -33,8 +34,9 @@ describe("update no-op detection", () => {
     expect(updateResult.text).toContain("No changes");
 
     const getResult2 = await session.callTool("get", { ids: [noteId!] });
-    const updatedAt2 = getResult2.text.match(/updatedAt[:\s]+(['"]?)([^'"\n,]+)\1/)?.[2]
-      ?? getResult2.structuredContent?.updatedAt as string | undefined;
+    const updatedAt2 =
+      getResult2.text.match(/updatedAt[:\s]+(['"]?)([^'"\n,]+)\1/)?.[2] ??
+      (getResult2.structuredContent?.updatedAt as string | undefined);
 
     if (updatedAt1 && updatedAt2) {
       expect(updatedAt2).toBe(updatedAt1);

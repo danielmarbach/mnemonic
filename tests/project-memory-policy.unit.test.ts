@@ -82,11 +82,13 @@ describe("protected branch policy helpers", () => {
   });
 
   it("defaults to allow for existing project policies without branch behavior", () => {
-    expect(resolveProtectedBranchBehavior({
-      projectId: "p1",
-      defaultScope: "project",
-      updatedAt: "2026-03-13T10:00:00.000Z",
-    })).toBe("allow");
+    expect(
+      resolveProtectedBranchBehavior({
+        projectId: "p1",
+        defaultScope: "project",
+        updatedAt: "2026-03-13T10:00:00.000Z",
+      }),
+    ).toBe("allow");
   });
 
   it("matches protected branch globs", () => {

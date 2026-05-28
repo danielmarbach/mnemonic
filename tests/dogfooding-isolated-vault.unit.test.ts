@@ -17,7 +17,7 @@ describe("isolated dogfood vault", () => {
     await writeFile(
       path.join(sourceVault, "notes", "sample.md"),
       "---\ntitle: Sample\nlifecycle: permanent\n---\n\nhello",
-      "utf-8"
+      "utf-8",
     );
 
     const isolated = await createIsolatedDogfoodVault(sourceVault);
@@ -47,15 +47,21 @@ describe("isolated dogfood vault", () => {
     await writeFile(
       path.join(sourceVault, "notes", "sample.md"),
       "---\ntitle: Sample\nlifecycle: permanent\n---\n\nhello",
-      "utf-8"
+      "utf-8",
     );
 
     await execFileAsync("git", ["init"], { cwd: sourceRoot });
-    await execFileAsync("git", ["remote", "add", "origin", "https://github.com/example/mnemonic.git"], { cwd: sourceRoot });
+    await execFileAsync(
+      "git",
+      ["remote", "add", "origin", "https://github.com/example/mnemonic.git"],
+      { cwd: sourceRoot },
+    );
 
     const isolated = await createIsolatedDogfoodVault(sourceVault);
 
-    const { stdout: remoteUrl } = await execFileAsync("git", ["remote", "get-url", "origin"], { cwd: isolated.tempRoot });
+    const { stdout: remoteUrl } = await execFileAsync("git", ["remote", "get-url", "origin"], {
+      cwd: isolated.tempRoot,
+    });
     expect(remoteUrl.trim()).toBe("https://github.com/example/mnemonic.git");
   });
 });

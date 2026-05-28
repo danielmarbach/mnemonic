@@ -4,8 +4,15 @@ import type { ServerContext } from "../server-context.js";
 import { resolveProject as resolveProjectFromModule } from "../helpers/project.js";
 import { projectNotFoundResponse } from "../helpers/vault.js";
 import { formatCommitBody } from "../helpers/git-commit.js";
-import { pushAfterMutation as pushAfterMutationFromModule, buildMutationRetryContract, formatRetrySummary } from "../helpers/persistence.js";
-import { SetAttachmentEnabledResultSchema, type SetAttachmentEnabledResult } from "../structured-content.js";
+import {
+  pushAfterMutation as pushAfterMutationFromModule,
+  buildMutationRetryContract,
+  formatRetrySummary,
+} from "../helpers/persistence.js";
+import {
+  SetAttachmentEnabledResultSchema,
+  type SetAttachmentEnabledResult,
+} from "../structured-content.js";
 import { invalidateActiveProjectCache } from "../cache.js";
 
 export function registerSetAttachmentEnabledTool(server: McpServer, ctx: ServerContext): void {
@@ -31,7 +38,11 @@ export function registerSetAttachmentEnabledTool(server: McpServer, ctx: ServerC
         openWorldHint: false,
       },
       inputSchema: z.object({
-        cwd: z.string().describe("Absolute path of the project working directory. Required for project-scoped routing, vault selection, and search boosting."),
+        cwd: z
+          .string()
+          .describe(
+            "Absolute path of the project working directory. Required for project-scoped routing, vault selection, and search boosting.",
+          ),
         projectSlug: z.string().describe("The attached repository's project slug"),
         enabled: z.boolean().describe("Whether the attachment should be enabled"),
       }),
@@ -44,16 +55,21 @@ export function registerSetAttachmentEnabledTool(server: McpServer, ctx: ServerC
       }
 
       const currentAttachments = await ctx.configStore.getProjectAttachments(project.id);
-      const attachmentIndex = currentAttachments.findIndex(a => a.projectSlug === projectSlug);
+      const attachmentIndex = currentAttachments.findIndex((a) => a.projectSlug === projectSlug);
       if (attachmentIndex === -1) {
         return {
-          content: [{ type: "text", text: `No attachment found with slug '${projectSlug}' for project ${project.name}.` }],
+          content: [
+            {
+              type: "text",
+              text: `No attachment found with slug '${projectSlug}' for project ${project.name}.`,
+            },
+          ],
           isError: true,
         };
       }
 
       const updatedAttachments = currentAttachments.map((att, i) =>
-        i === attachmentIndex ? { ...att, enabled, updatedAt: new Date().toISOString() } : att
+        i === attachmentIndex ? { ...att, enabled, updatedAt: new Date().toISOString() } : att,
       );
 
       await ctx.configStore.setProjectAttachments(project.id, updatedAttachments);
@@ -68,10 +84,15 @@ export function registerSetAttachmentEnabledTool(server: McpServer, ctx: ServerC
       });
       const commitMessage = `attachment: ${enabled ? "enable" : "disable"} ${projectSlug} for ${project.name}`;
       const commitFiles = ["config.json"];
-      const commitStatus = await ctx.vaultManager.main.git.commitWithStatus(commitMessage, commitFiles, commitBody);
-      const pushStatus = commitStatus.status === "committed"
-        ? await pushAfterMutationFromModule(ctx, ctx.vaultManager.main)
-        : { status: "skipped" as const, reason: "commit-failed" as const };
+      const commitStatus = await ctx.vaultManager.main.git.commitWithStatus(
+        commitMessage,
+        commitFiles,
+        commitBody,
+      );
+      const pushStatus =
+        commitStatus.status === "committed"
+          ? await pushAfterMutationFromModule(ctx, ctx.vaultManager.main)
+          : { status: "skipped" as const, reason: "commit-failed" as const };
       const retry = buildMutationRetryContract({
         commit: commitStatus,
         commitMessage,
@@ -82,7 +103,18 @@ export function registerSetAttachmentEnabledTool(server: McpServer, ctx: ServerC
         mutationApplied: true,
       });
 
-      const updated = updatedAttachments[attachmentIndex]!;
+      const updated = updatedAttachments[attachmentIndex];
+      if (!updated) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: `Updated attachment at index ${attachmentIndex} not found.`,
+            },
+          ],
+          isError: true,
+        };
+      }
       const structuredContent: SetAttachmentEnabledResult = {
         action: "attachment_enabled_set",
         project: { id: project.id, name: project.name },
@@ -96,16 +128,18 @@ export function registerSetAttachmentEnabledTool(server: McpServer, ctx: ServerC
       };
 
       return {
-        content: [{
-          type: "text",
-          text:
-            `Attachment ${updated.projectName} (${projectSlug}) for ${project.name}: ${enabled ? "enabled" : "disabled"}` +
-            (commitStatus.status === "failed"
-              ? `\n${formatRetrySummary(retry) ?? `Commit failed. Push status: ${pushStatus.status}.`}`
-              : ""),
-        }],
+        content: [
+          {
+            type: "text",
+            text:
+              `Attachment ${updated.projectName} (${projectSlug}) for ${project.name}: ${enabled ? "enabled" : "disabled"}` +
+              (commitStatus.status === "failed"
+                ? `\n${formatRetrySummary(retry) ?? `Commit failed. Push status: ${pushStatus.status}.`}`
+                : ""),
+          },
+        ],
         structuredContent,
       };
-    }
+    },
   );
 }

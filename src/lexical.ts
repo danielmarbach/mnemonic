@@ -133,7 +133,11 @@ export function computeInverseDocumentFrequency(documents: string[][]): Map<stri
 /**
  * Compute cosine similarity between a query and document TF-IDF vectors.
  */
-export function computeTfIdfCosineSimilarity(query: string, document: string, corpusEntries: string[]): number {
+export function computeTfIdfCosineSimilarity(
+  query: string,
+  document: string,
+  corpusEntries: string[],
+): number {
   const corpusTokens = corpusEntries.map((entry) => tokenize(entry));
   const queryTokens = tokenize(query);
   const documentTokens = tokenize(document);
@@ -179,19 +183,19 @@ export interface PreparedTfIdfCorpus {
 }
 
 export function prepareTfIdfCorpus(
-  documents: Array<{ id: string; text: string }>
+  documents: Array<{ id: string; text: string }>,
 ): PreparedTfIdfCorpus {
   return prepareTfIdfCorpusFromTokenizedDocuments(
     documents.map((document) => ({
       id: document.id,
       text: document.text,
       tokens: tokenize(document.text),
-    }))
+    })),
   );
 }
 
 export function prepareTfIdfCorpusFromTokenizedDocuments(
-  documents: PreparedTfIdfDocument[]
+  documents: PreparedTfIdfDocument[],
 ): PreparedTfIdfCorpus {
   return {
     documents,
@@ -206,7 +210,7 @@ export function rankDocumentsByTfIdf(
   query: string,
   documents: Array<{ id: string; text: string }>,
   limit: number,
-  preparedCorpus?: PreparedTfIdfCorpus
+  preparedCorpus?: PreparedTfIdfCorpus,
 ): Array<{ id: string; score: number }> {
   if (limit <= 0 || documents.length === 0) {
     return [];
@@ -218,7 +222,11 @@ export function rankDocumentsByTfIdf(
 
   return prepared.documents
     .map((document) => {
-      const tfIdfScore = computeTfIdfCosineSimilarityWithPreparedData(queryTokens, document.tokens, idf);
+      const tfIdfScore = computeTfIdfCosineSimilarityWithPreparedData(
+        queryTokens,
+        document.tokens,
+        idf,
+      );
       const coverageScore = computeTfIdfWeightedQueryCoverage(queryTokens, document.tokens, idf);
       const titleScore = computeLexicalScore(query, extractProjectionTitle(document.text));
       return {
@@ -233,7 +241,7 @@ export function rankDocumentsByTfIdf(
 function computeTfIdfCosineSimilarityWithPreparedData(
   queryTokens: string[],
   documentTokens: string[],
-  idf: Map<string, number>
+  idf: Map<string, number>,
 ): number {
   if (queryTokens.length === 0 || documentTokens.length === 0) {
     return 0;
@@ -266,7 +274,7 @@ function computeTfIdfCosineSimilarityWithPreparedData(
 function computeTfIdfWeightedQueryCoverage(
   queryTokens: string[],
   documentTokens: string[],
-  idf: Map<string, number>
+  idf: Map<string, number>,
 ): number {
   const uniqueQueryTokens = Array.from(new Set(queryTokens));
   if (uniqueQueryTokens.length === 0) {
@@ -294,9 +302,7 @@ function extractProjectionTitle(text: string): string {
     return "";
   }
 
-  return titleLine.startsWith("Title:")
-    ? titleLine.slice("Title:".length).trim()
-    : titleLine;
+  return titleLine.startsWith("Title:") ? titleLine.slice("Title:".length).trim() : titleLine;
 }
 
 /**
@@ -323,7 +329,7 @@ export const LEXICAL_RESCUE_RESULT_LIMIT = 3;
  */
 export function shouldTriggerLexicalRescue(
   topSemanticScore: number | undefined,
-  semanticResultCount: number
+  semanticResultCount: number,
 ): boolean {
   if (semanticResultCount === 0) return true;
   if (topSemanticScore === undefined) return true;

@@ -5,7 +5,10 @@ import { registerDetectProjectTool } from "./detect-project.js";
 import { registerGetProjectIdentityTool } from "./get-project-identity.js";
 import { registerSetProjectIdentityTool } from "./set-project-identity.js";
 import { registerListMigrationsTool, registerExecuteMigrationTool } from "./migration.js";
-import { registerSetProjectMemoryPolicyTool, registerGetProjectMemoryPolicyTool } from "./policy.js";
+import {
+  registerSetProjectMemoryPolicyTool,
+  registerGetProjectMemoryPolicyTool,
+} from "./policy.js";
 import { registerRememberTool } from "./remember.js";
 import { registerRecallTool } from "./recall.js";
 import { registerUpdateTool } from "./update.js";

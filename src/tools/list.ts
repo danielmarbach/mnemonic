@@ -36,8 +36,8 @@ export function registerListTool(server: McpServer, ctx: ServerContext): void {
           .default("all")
           .describe(
             "'project' = this project's memories and attached vault notes; " +
-            "'global' = only unscoped memories (main/global storage); " +
-            "'all' = everything visible from this context (default)"
+              "'global' = only unscoped memories (main/global storage); " +
+              "'all' = everything visible from this context (default)",
           ),
         storedIn: z
           .enum(["project-vault", "main-vault", "any", "attached"])
@@ -45,38 +45,76 @@ export function registerListTool(server: McpServer, ctx: ServerContext): void {
           .default("any")
           .describe(
             "Storage-label filter. Use `main-vault` for main/global storage. " +
-            "Use `project-vault` as the broad filter for any project vault, including sub-vaults. " +
-            "Use `attached` for notes from attached external repositories only. " +
-            "Results may still return a more specific label such as `sub-vault:.mnemonic-lib`."
+              "Use `project-vault` as the broad filter for any project vault, including sub-vaults. " +
+              "Use `attached` for notes from attached external repositories only. " +
+              "Results may still return a more specific label such as `sub-vault:.mnemonic-lib`.",
           ),
-        tags: z.array(z.string()).optional().describe("Filter to notes matching all of these tags."),
-        includeRelations: z.boolean().optional().default(false).describe("Include related memory ids and relationship types"),
-        includePreview: z.boolean().optional().default(false).describe("Include a short content preview for each note"),
-        includeStorage: z.boolean().optional().default(false).describe("Show which vault each note is stored in"),
-        includeUpdated: z.boolean().optional().default(false).describe("Include last-updated timestamp for each note"),
+        tags: z
+          .array(z.string())
+          .optional()
+          .describe("Filter to notes matching all of these tags."),
+        includeRelations: z
+          .boolean()
+          .optional()
+          .default(false)
+          .describe("Include related memory ids and relationship types"),
+        includePreview: z
+          .boolean()
+          .optional()
+          .default(false)
+          .describe("Include a short content preview for each note"),
+        includeStorage: z
+          .boolean()
+          .optional()
+          .default(false)
+          .describe("Show which vault each note is stored in"),
+        includeUpdated: z
+          .boolean()
+          .optional()
+          .default(false)
+          .describe("Include last-updated timestamp for each note"),
       }),
       outputSchema: ListResultSchema,
     },
-    async ({ cwd, scope, storedIn, tags, includeRelations, includePreview, includeStorage, includeUpdated }) => {
+    async ({
+      cwd,
+      scope,
+      storedIn,
+      tags,
+      includeRelations,
+      includePreview,
+      includeStorage,
+      includeUpdated,
+    }) => {
       await ensureBranchSynced(ctx, cwd);
 
       const { project, entries } = await collectVisibleNotes(ctx, cwd, scope, tags, storedIn);
 
       if (entries.length === 0) {
-        const structuredContent: ListResult = { action: "listed", count: 0, scope: scope || "all", storedIn: storedIn || "any", project: project ? { id: project.id, name: project.name } : undefined, notes: [] };
+        const structuredContent: ListResult = {
+          action: "listed",
+          count: 0,
+          scope: scope || "all",
+          storedIn: storedIn || "any",
+          project: project ? { id: project.id, name: project.name } : undefined,
+          notes: [],
+        };
         return { content: [{ type: "text", text: "No memories found." }], structuredContent };
       }
 
-      const lines = entries.map((entry) => formatListEntry(entry, {
-        includeRelations,
-        includePreview,
-        includeStorage,
-        includeUpdated,
-      }));
+      const lines = entries.map((entry) =>
+        formatListEntry(entry, {
+          includeRelations,
+          includePreview,
+          includeStorage,
+          includeUpdated,
+        }),
+      );
 
-      const header = project && scope !== "global"
-        ? `${entries.length} memories (project: ${project.name}, scope: ${scope}, storedIn: ${storedIn}):`
-        : `${entries.length} memories (scope: ${scope}, storedIn: ${storedIn}):`;
+      const header =
+        project && scope !== "global"
+          ? `${entries.length} memories (project: ${project.name}, scope: ${scope}, storedIn: ${storedIn}):`
+          : `${entries.length} memories (scope: ${scope}, storedIn: ${storedIn}):`;
 
       const textContent = `${header}\n\n${lines.join("\n")}`;
 
@@ -118,6 +156,6 @@ export function registerListTool(server: McpServer, ctx: ServerContext): void {
       };
 
       return { content: [{ type: "text", text: textContent }], structuredContent };
-    }
+    },
   );
 }

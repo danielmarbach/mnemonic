@@ -26,7 +26,19 @@ async function initGitRepo(dir: string, readmeContent: string): Promise<void> {
 async function initGitRepoWithCommit(dir: string, readmeContent: string): Promise<void> {
   await initGitRepo(dir, readmeContent);
   await execFileAsync("git", ["add", "README.md"], { cwd: dir });
-  await execFileAsync("git", ["-c", "user.email=test@example.com", "-c", "user.name=Test", "commit", "-m", "chore: initial commit"], { cwd: dir });
+  await execFileAsync(
+    "git",
+    [
+      "-c",
+      "user.email=test@example.com",
+      "-c",
+      "user.name=Test",
+      "commit",
+      "-m",
+      "chore: initial commit",
+    ],
+    { cwd: dir },
+  );
 }
 
 function makeNote(id: string, overrides: Partial<Note> = {}): Note {
@@ -199,7 +211,13 @@ Test note body`;
 
       baseStorage = new Storage(path.join(tempDir, "vault"));
       await baseStorage.init();
-      const attached = new AttachedStorage(baseStorage, baseStorage, repoDir, "main", ".mnemonic/notes");
+      const attached = new AttachedStorage(
+        baseStorage,
+        baseStorage,
+        repoDir,
+        "main",
+        ".mnemonic/notes",
+      );
 
       const ids = await attached.listNoteIds();
       expect(ids).toContain(memoryId("my-note"));
@@ -232,7 +250,13 @@ Branch note body`;
 
       baseStorage = new Storage(path.join(tempDir, "vault"));
       await baseStorage.init();
-      const attached = new AttachedStorage(baseStorage, baseStorage, repoDir, "main", ".mnemonic/notes");
+      const attached = new AttachedStorage(
+        baseStorage,
+        baseStorage,
+        repoDir,
+        "main",
+        ".mnemonic/notes",
+      );
 
       const note = await attached.readNote(memoryId("branch-note"));
       expect(note).toBeTruthy();
@@ -249,7 +273,13 @@ Branch note body`;
 
       baseStorage = new Storage(path.join(tempDir, "vault"));
       await baseStorage.init();
-      const attached = new AttachedStorage(baseStorage, baseStorage, repoDir, "main", ".mnemonic/notes");
+      const attached = new AttachedStorage(
+        baseStorage,
+        baseStorage,
+        repoDir,
+        "main",
+        ".mnemonic/notes",
+      );
 
       const note = await attached.readNote(memoryId("nonexistent"));
       expect(note).toBeNull();
@@ -263,7 +293,11 @@ Branch note body`;
 
       const notesDir = path.join(repoDir, ".mnemonic", "notes");
       await fs.mkdir(notesDir, { recursive: true });
-      await fs.writeFile(path.join(notesDir, "real-note.md"), "---\ntitle: Real\ntags: []\nlifecycle: permanent\ncreatedAt: 2024-01-01T00:00:00.000Z\nupdatedAt: 2024-01-01T00:00:00.000Z\n---\n\nBody", "utf-8");
+      await fs.writeFile(
+        path.join(notesDir, "real-note.md"),
+        "---\ntitle: Real\ntags: []\nlifecycle: permanent\ncreatedAt: 2024-01-01T00:00:00.000Z\nupdatedAt: 2024-01-01T00:00:00.000Z\n---\n\nBody",
+        "utf-8",
+      );
       await fs.writeFile(path.join(notesDir, "data.json"), "{}", "utf-8");
 
       const git = simpleGit(repoDir);
@@ -272,7 +306,13 @@ Branch note body`;
 
       baseStorage = new Storage(path.join(tempDir, "vault"));
       await baseStorage.init();
-      const attached = new AttachedStorage(baseStorage, baseStorage, repoDir, "main", ".mnemonic/notes");
+      const attached = new AttachedStorage(
+        baseStorage,
+        baseStorage,
+        repoDir,
+        "main",
+        ".mnemonic/notes",
+      );
 
       const ids = await attached.listNoteIds();
       expect(ids).toContain(memoryId("real-note"));
@@ -284,7 +324,13 @@ Branch note body`;
     it("throws InvalidBranchNameError when branch name is invalid", async () => {
       baseStorage = new Storage(path.join(tempDir, "vault"));
       await baseStorage.init();
-      const attached = new AttachedStorage(baseStorage, baseStorage, repoDir, "bad branch;rm -rf /", ".mnemonic/notes");
+      const attached = new AttachedStorage(
+        baseStorage,
+        baseStorage,
+        repoDir,
+        "bad branch;rm -rf /",
+        ".mnemonic/notes",
+      );
 
       await expect(attached.listNoteIds()).rejects.toThrow(InvalidBranchNameError);
       await expect(attached.readNote(memoryId("x"))).rejects.toThrow(InvalidBranchNameError);
@@ -298,7 +344,11 @@ Branch note body`;
 
       const notesDir = path.join(repoDir, ".mnemonic", "notes");
       await fs.mkdir(notesDir, { recursive: true });
-      await fs.writeFile(path.join(notesDir, "feature-note.md"), "---\ntitle: Feature Note\ntags: []\nlifecycle: permanent\ncreatedAt: 2024-01-01T00:00:00.000Z\nupdatedAt: 2024-01-01T00:00:00.000Z\n---\n\nFeature body", "utf-8");
+      await fs.writeFile(
+        path.join(notesDir, "feature-note.md"),
+        "---\ntitle: Feature Note\ntags: []\nlifecycle: permanent\ncreatedAt: 2024-01-01T00:00:00.000Z\nupdatedAt: 2024-01-01T00:00:00.000Z\n---\n\nFeature body",
+        "utf-8",
+      );
 
       const git = simpleGit(repoDir);
       await git.add(".mnemonic/notes/feature-note.md");
@@ -306,7 +356,13 @@ Branch note body`;
 
       baseStorage = new Storage(path.join(tempDir, "vault"));
       await baseStorage.init();
-      const attached = new AttachedStorage(baseStorage, baseStorage, repoDir, "feature/test", ".mnemonic/notes");
+      const attached = new AttachedStorage(
+        baseStorage,
+        baseStorage,
+        repoDir,
+        "feature/test",
+        ".mnemonic/notes",
+      );
 
       const ids = await attached.listNoteIds();
       expect(ids).toContain(memoryId("feature-note"));
@@ -336,7 +392,11 @@ Branch note body`;
 
         const notesDir = path.join(repoDir, ".mnemonic", "notes");
         await fs.mkdir(notesDir, { recursive: true });
-        await fs.writeFile(path.join(notesDir, "cached-read.md"), "---\ntitle: Cached Read\ntags: []\nlifecycle: permanent\ncreatedAt: 2024-01-01T00:00:00.000Z\nupdatedAt: 2024-01-01T00:00:00.000Z\n---\n\nCached read body", "utf-8");
+        await fs.writeFile(
+          path.join(notesDir, "cached-read.md"),
+          "---\ntitle: Cached Read\ntags: []\nlifecycle: permanent\ncreatedAt: 2024-01-01T00:00:00.000Z\nupdatedAt: 2024-01-01T00:00:00.000Z\n---\n\nCached read body",
+          "utf-8",
+        );
 
         const git = simpleGit(repoDir);
         await git.add(".mnemonic/notes/cached-read.md");
@@ -344,7 +404,13 @@ Branch note body`;
 
         baseStorage = new Storage(path.join(tempDir, "vault"));
         await baseStorage.init();
-      const attached = new AttachedStorage(baseStorage, baseStorage, repoDir, "main", ".mnemonic/notes");
+        const attached = new AttachedStorage(
+          baseStorage,
+          baseStorage,
+          repoDir,
+          "main",
+          ".mnemonic/notes",
+        );
 
         const note1 = await attached.readNote(memoryId("cached-read"));
         const note2 = await attached.readNote(memoryId("cached-read"));
@@ -404,7 +470,9 @@ Branch note body`;
     });
 
     it("writeNote throws", async () => {
-      await expect(attached.writeNote(makeNote("whatever"))).rejects.toThrow(AttachedVaultReadOnlyError);
+      await expect(attached.writeNote(makeNote("whatever"))).rejects.toThrow(
+        AttachedVaultReadOnlyError,
+      );
       try {
         await attached.writeNote(makeNote("whatever"));
       } catch (err) {
@@ -413,7 +481,9 @@ Branch note body`;
     });
 
     it("deleteNote throws", async () => {
-      await expect(attached.deleteNote(memoryId("whatever"))).rejects.toThrow(AttachedVaultReadOnlyError);
+      await expect(attached.deleteNote(memoryId("whatever"))).rejects.toThrow(
+        AttachedVaultReadOnlyError,
+      );
       try {
         await attached.deleteNote(memoryId("whatever"));
       } catch (err) {
@@ -576,11 +646,15 @@ Branch note body`;
     });
 
     it("embeddingPath delegates to baseStorage", () => {
-      expect(attached.embeddingPath(memoryId("abc"))).toBe(baseStorage.embeddingPath(memoryId("abc")));
+      expect(attached.embeddingPath(memoryId("abc"))).toBe(
+        baseStorage.embeddingPath(memoryId("abc")),
+      );
     });
 
     it("projectionPath delegates to baseStorage", () => {
-      expect(attached.projectionPath(memoryId("abc"))).toBe(baseStorage.projectionPath(memoryId("abc")));
+      expect(attached.projectionPath(memoryId("abc"))).toBe(
+        baseStorage.projectionPath(memoryId("abc")),
+      );
     });
   });
 
@@ -588,7 +662,13 @@ Branch note body`;
     it("listNoteIds returns empty array for invalid repo path", async () => {
       baseStorage = new Storage(path.join(tempDir, "vault"));
       await baseStorage.init();
-      const attached = new AttachedStorage(baseStorage, baseStorage, "/nonexistent/path/to/repo", "main", ".mnemonic/notes");
+      const attached = new AttachedStorage(
+        baseStorage,
+        baseStorage,
+        "/nonexistent/path/to/repo",
+        "main",
+        ".mnemonic/notes",
+      );
 
       const ids = await attached.listNoteIds();
       expect(ids).toEqual([]);
@@ -597,7 +677,13 @@ Branch note body`;
     it("readNote returns null for invalid repo path", async () => {
       baseStorage = new Storage(path.join(tempDir, "vault"));
       await baseStorage.init();
-      const attached = new AttachedStorage(baseStorage, baseStorage, "/nonexistent/path/to/repo", "main", ".mnemonic/notes");
+      const attached = new AttachedStorage(
+        baseStorage,
+        baseStorage,
+        "/nonexistent/path/to/repo",
+        "main",
+        ".mnemonic/notes",
+      );
 
       const note = await attached.readNote(memoryId("missing"));
       expect(note).toBeNull();
@@ -611,7 +697,13 @@ Branch note body`;
 
         baseStorage = new Storage(path.join(tempDir, "vault"));
         await baseStorage.init();
-        const attached = new AttachedStorage(baseStorage, baseStorage, repoDir, "nonexistent-branch", ".mnemonic/notes");
+        const attached = new AttachedStorage(
+          baseStorage,
+          baseStorage,
+          repoDir,
+          "nonexistent-branch",
+          ".mnemonic/notes",
+        );
 
         const ids = await attached.listNoteIds();
         expect(ids).toEqual([]);
@@ -629,7 +721,13 @@ Branch note body`;
 
         baseStorage = new Storage(path.join(tempDir, "vault"));
         await baseStorage.init();
-        const attached = new AttachedStorage(baseStorage, baseStorage, repoDir, "nonexistent-branch", ".mnemonic/notes");
+        const attached = new AttachedStorage(
+          baseStorage,
+          baseStorage,
+          repoDir,
+          "nonexistent-branch",
+          ".mnemonic/notes",
+        );
 
         const note = await attached.readNote(memoryId("no-note"));
         expect(note).toBeNull();
@@ -693,7 +791,11 @@ describe("detectDefaultBranch", () => {
   it("detects main via symbolic-ref when origin/HEAD points to main", async () => {
     await initGitRepoWithCommit(repoDir, "# Init");
     await execFileAsync("git", ["remote", "add", "origin", repoDir], { cwd: repoDir });
-    await execFileAsync("git", ["symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main"], { cwd: repoDir });
+    await execFileAsync(
+      "git",
+      ["symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main"],
+      { cwd: repoDir },
+    );
 
     const branch = await detectDefaultBranch(repoDir);
     expect(branch).toBe("main");
@@ -705,9 +807,25 @@ describe("detectDefaultBranch", () => {
     await execFileAsync("git", ["checkout", "-b", "master"], { cwd: repoDir });
     await fs.writeFile(path.join(repoDir, "master-file.txt"), "content");
     await execFileAsync("git", ["add", "master-file.txt"], { cwd: repoDir });
-    await execFileAsync("git", ["-c", "user.email=test@example.com", "-c", "user.name=Test", "commit", "-m", "master commit"], { cwd: repoDir });
+    await execFileAsync(
+      "git",
+      [
+        "-c",
+        "user.email=test@example.com",
+        "-c",
+        "user.name=Test",
+        "commit",
+        "-m",
+        "master commit",
+      ],
+      { cwd: repoDir },
+    );
     await execFileAsync("git", ["remote", "add", "origin", repoDir], { cwd: repoDir });
-    await execFileAsync("git", ["symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/master"], { cwd: repoDir });
+    await execFileAsync(
+      "git",
+      ["symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/master"],
+      { cwd: repoDir },
+    );
 
     const branch = await detectDefaultBranch(repoDir);
     expect(branch).toBe("master");
