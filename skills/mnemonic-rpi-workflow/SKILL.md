@@ -15,6 +15,21 @@ Note creation is the attention filter: capture decisions, outcomes, corrections,
 
 Use `derives-from` for lineage and `follows` for sequence by default. Fall back to `related-to` only when direction is unclear. Keep relationships sparse — link only to immediate upstream artifacts.
 
+## Common Failure Modes
+
+Avoid these shortcuts; they are workflow violations, not harmless simplifications:
+
+- Do not skip Research for multi-step, plan-heavy, delegated, or review-sensitive work. Do research first: create/update the request root, call `recall`, and capture only durable findings.
+- Do not create a plan immediately after research without a user handoff. Present the research findings and confirm direction, priorities, and constraints first.
+- Do not implement from a stale plan. If scope, architecture, dependencies, assumptions, or constraints change materially, update the plan note before continuing.
+- Do not use vague plans with placeholders such as TBD/TODO or generic steps like "fix code". Each research requirement must map to an executable plan item.
+- Do not hand a subagent broad instructions such as "fix everything". Handoffs must be narrow and include files/modules, goal, validation, and required return format.
+- Do not let the implementer review their own non-trivial work. Review requires a fresh-context subagent with an adversarial constraint-violation posture.
+- Do not accept review claims without evidence. Each explicit plan constraint needs a cited satisfying code path or a flagged violation; silent omissions are violations.
+- Do not reuse implementation verification during review. Review verification commands must be run fresh and recorded with command, result, and details.
+- Do not mix memory commits and work commits. Commit workflow artifacts and implementation changes separately.
+- Do not stage with `git add .` or `git add -A`. Run `git status --short`, then stage only intended paths; ask if dirty files may not belong together.
+
 ## Stage Checklists
 
 ### 1. Research
@@ -48,7 +63,7 @@ Only after confirmation: proceed to Plan checklist.
 
 Before dispatching subagents or starting implementation:
 1. Confirm the plan is endorsed
-2. Confirm scope and priorities haven't shifted since planning
+2. Confirm scope and priorities have not shifted since planning
 
 Only after confirmation: proceed to Implement checklist.
 
