@@ -11,6 +11,10 @@ mnemonic stores workflow artifacts; it does not run the workflow.
 
 Note creation is the attention filter: capture decisions, outcomes, corrections, durable constraints, and validated learnings; skip routine low-signal chatter.
 
+Treat all workflow output as advisory. Never blindly apply a plan, review finding, or suggestion without verifying it against real code paths and adjacent files.
+
+Stop when the workflow is complete. Do not gold-plate: once review exits clean and consolidation is done, do not run extra cycles just to get a nicer closeout.
+
 ## Relationship Conventions
 
 Use `derives-from` for lineage and `follows` for sequence by default. Fall back to `related-to` only when direction is unclear. Keep relationships sparse — link only to immediate upstream artifacts.
@@ -37,8 +41,10 @@ Avoid these shortcuts; they are workflow violations, not harmless simplification
 - Create or update one request root: `role: context`, `lifecycle: temporary`, `tags: ["workflow", "request"]`.
 - Call `recall` before creating notes to avoid duplicates.
 - Create research notes: `role: research`, `lifecycle: temporary`.
-- Distill when findings are scattered.
+- **Distill findings** when they are scattered across multiple sources or conversations. Write a single consolidated summary per topic, linking back to sources. Do not keep raw, unreduced copies as research notes.
 - Link research to request root (`derives-from` preferred).
+
+> **When to distill:** after the third related finding, after a conversation shift changes the topic, or when the research spans more than one hour of elapsed time.
 
 ### 1a. Research → Plan Handoff
 
@@ -59,11 +65,14 @@ Only after confirmation: proceed to Plan checklist.
 - Update plan note before continuing if scope, architecture, dependencies, or assumptions change materially.
 - After drafting, run a self-check: does each research requirement map to a plan item? Are there placeholders (TBD, TODO)? Are step references internally consistent?
 
+> **An executable plan means:** concrete steps with a clear owner/agent, no speculative guesses, no placeholders, each step ends with a verifiable outcome — "add a test that asserts X" not "improve test coverage".
+
 ### 2a. Plan → Implement Handoff
 
 Before dispatching subagents or starting implementation:
 1. Confirm the plan is endorsed
 2. Confirm scope and priorities have not shifted since planning
+3. If scope, architecture, dependencies, assumptions, or constraints have changed materially since the plan was drafted, update the plan note first — do not proceed with a stale plan
 
 Only after confirmation: proceed to Implement checklist.
 
@@ -74,6 +83,7 @@ Only after confirmation: proceed to Implement checklist.
 - Keep checkbox state current as work advances (`[ ]` → `[x]`), and add new items when scope expands.
 - Link to plan note (`follows` for ordered steps).
 - For non-trivial work, dispatch a subagent with narrow scope (see [handoff template](#subagent-handoff-template)).
+- **Record deviations:** if implementation touches files outside the handoff scope, skips requested validation, or discovers undocumented behavior that changes the approach, flag each deviation in the apply note before continuing. Unflagged deviations become review violations.
 
 ### 4. Review (Fresh-Context Subagent Required)
 
@@ -91,6 +101,8 @@ The implementer's own context is contaminated — they designed the code, so the
 - For each constraint: cite the exact code path(s) that satisfy it, or flag it as a violation
 - If any constraint is unmentioned in the apply note, flag it — silent omission is a violation
 
+> **Cardinal rule:** Silent omission is a violation. If a planned constraint is not mentioned in the apply note, treat it as a violation until proven otherwise. A missing citation equals an automatic failure — the reviewer must never let a constraint go unaddressed.
+
 **B. Deliverable completeness**
 - Does the implementation satisfy every requirement from research?
 - Were all planned deliverables completed? If not, why, and is the deferral explicit?
@@ -103,10 +115,22 @@ The implementer's own context is contaminated — they designed the code, so the
 
 The review subagent must adopt an adversarial posture: assume violations exist and prove they don't. A review that only confirms what the apply note claims is not sufficient.
 
+**General review principles (borrowed from code-review best practice):**
+- Verify every finding by reading the real code path and adjacent files — do not rely on the reviewer's reasoning alone
+- Read dependency docs, source types, or external behavior contracts when a finding depends on assumptions about their behavior
+- Reject unrealistic edge cases, speculative risks, and fixes that over-complicate the codebase
+- Prefer small fixes at the right ownership boundary; no refactor unless it clearly prevents the same bug class
+- Include a security perspective, but report security findings only when the change creates a concrete, actionable risk or removes an important safety check — do not let security cripple legitimate functionality
+- If rejecting a finding as intentional or not worth fixing, add a brief inline code comment only when it explains a real invariant or ownership decision that future maintainers should know about
+
 Create review notes: `role: review`, `lifecycle: temporary`.
 Link to apply/task notes or plan (`derives-from` when conclusions derive from specific artifacts).
 
-Record outcome: continue, block, or update plan.
+**Record outcome as a visible header** — one of:
+- `Outcome: continue` — review passed, proceed to consolidation
+- `Outcome: block` — review found violations that must be fixed before proceeding
+- `Outcome: update plan` — review uncovered issues requiring a plan revision before implementation resumes
+
 Reconcile checklist state with verification evidence; call out any unchecked items explicitly.
 If review causes a material plan change, update plan note first.
 
@@ -131,7 +155,9 @@ And a constraint checklist:
 - Create permanent decision note(s) and summary note(s).
 - Promote reusable patterns into permanent reference notes.
 - Deduplicate overlap while preserving unique evidence; do not aggressively summarize away factual detail.
-- Explicitly remove temporary scaffolding through consolidation choices when safe. mnemonic does not auto-expire notes.
+- **Explicitly remove temporary scaffolding** through consolidation choices when safe. If a temporary note has been distilled into a permanent note, delete or retire the temporary. mnemonic does not auto-expire notes.
+- Connect consolidation to commit discipline: consolidation artifacts are **memory** commits and must not be mixed with **work** commits.
+- **Regression provenance** (when applicable): for findings that relate to a regression, keep roles separate — blamed code author, blamed PR author, PR merger/committer, current PR author, and PR/date. If no blamed PR is traceable, use the blamed commit SHA, date, and author.
 
 Use the templates in [closeout-templates.md](closeout-templates.md).
 
@@ -178,7 +204,9 @@ Adversarial review mandate:
 3. For each research requirement: confirm it is addressed or explicitly deferred
 4. For each plan deliverable: verify matching evidence exists
 5. Run all verification commands fresh — do not reuse implementation results
-6. If a constraint is not mentioned in the apply note, flag it as a potential violation
+6. If a constraint is not mentioned in the apply note, flag it as a potential violation — silent omission is a violation
+
+> **Cardinal rule:** Silent omission is a violation. If a planned constraint is not mentioned in the apply note, treat it as a violation until proven otherwise.
 
 Return: review note content with constraint checklist, recommendation (continue | block | update plan), and any unchecked items.
 ```
