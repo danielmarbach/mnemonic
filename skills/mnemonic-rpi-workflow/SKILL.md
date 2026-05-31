@@ -21,18 +21,18 @@ Use `derives-from` for lineage and `follows` for sequence by default. Fall back 
 
 ## Common Failure Modes
 
-Avoid these shortcuts:
+Avoid these shortcuts; they are workflow violations, not harmless simplifications:
 
-- Do not skip Research. Do research first: create request root, call `recall`, capture durable findings.
-- Do not plan without user confirmation. Present findings and confirm direction, priorities, constraints first.
-- Do not implement from a stale plan. Update the plan when scope, architecture, or dependencies change.
-- Do not use vague plans (TBD, TODO). Each research requirement must map to an executable plan item.
-- Do not hand a subagent broad instructions like "fix everything". Handoffs must include files, goal, validation, and return format.
-- Do not self-review non-trivial work. Use a fresh-context subagent with adversarial constraint-violation posture.
-- Do not accept review claims without evidence. Each constraint needs a cited code path or a flagged violation.
-- Do not reuse implementation verification. Review commands must be run fresh with result and details.
-- Do not mix memory and work commits. Commit separately.
-- Do not use `git add .` or `git add -A`. Stage only intended paths; ask if unsure.
+- Do not skip Research for multi-step, plan-heavy, delegated, or review-sensitive work. Do research first: create/update the request root, call `recall`, and capture only durable findings.
+- Do not create a plan immediately after research without a user handoff. Present the research findings and confirm direction, priorities, and constraints first.
+- Do not implement from a stale plan. If scope, architecture, dependencies, assumptions, or constraints change materially, update the plan note before continuing.
+- Do not use vague plans with placeholders such as TBD/TODO or generic steps like "fix code". Each research requirement must map to an executable plan item.
+- Do not hand a subagent broad instructions such as "fix everything". Handoffs must be narrow and include files/modules, goal, validation, and required return format.
+- Do not let the implementer review their own non-trivial work. Review requires a fresh-context subagent with an adversarial constraint-violation posture.
+- Do not accept review claims without evidence. Each explicit plan constraint needs a cited satisfying code path or a flagged violation; silent omissions are violations.
+- Do not reuse implementation verification during review. Review verification commands must be run fresh and recorded with command, result, and details.
+- Do not mix memory commits and work commits. Commit workflow artifacts and implementation changes separately.
+- Do not stage with `git add .` or `git add -A`. Run `git status --short`, then stage only intended paths; ask if dirty files may not belong together.
 
 ## Stage Checklists
 
@@ -83,16 +83,16 @@ Only after confirmation: proceed to Implement checklist.
 - Keep checkbox state current as work advances (`[ ]` → `[x]`), and add new items when scope expands.
 - Link to plan note (`follows` for ordered steps).
 - For non-trivial work, dispatch a subagent with narrow scope (see [handoff template](#subagent-handoff-template)).
-- **Record deviations:** flag out-of-scope files, skipped validation, or undocumented behavior changes in the apply note before continuing. Unflagged deviations become review violations.
+- **Record deviations:** if implementation touches files outside the handoff scope, skips requested validation, or discovers undocumented behavior that changes the approach, flag each deviation in the apply note before continuing. Unflagged deviations become review violations.
 
 ### 4. Review (Fresh-Context Subagent Required)
 
 The implementer's own context is contaminated — they designed the code, so they see intent rather than behavior. Review must be performed by a fresh-context subagent that has no prior exposure to the implementation decisions.
 
-Before writing the review, the orchestrator must:
-1. `get` research, plan, and apply/task notes
-2. Read apply note to confirm what shipped
-3. Extract plan constraints (performance, I/O, fail-soft, schema, etc.) into a constraint checklist
+**Before writing the review, the orchestrator must:**
+1. `get` the research note(s), plan note, and apply/task note(s) linked to this work
+2. Read the apply/task note(s) to confirm what actually shipped
+3. Extract all explicit constraints from the plan (performance constraints, I/O constraints, fail-soft requirements, schema requirements, etc.) into a constraint checklist
 
 **The review subagent receives the full artifact chain and must:**
 
@@ -115,12 +115,13 @@ Before writing the review, the orchestrator must:
 
 The review subagent must adopt an adversarial posture: assume violations exist and prove they don't. A review that only confirms what the apply note claims is not sufficient.
 
-**Review principles:**
-- Verify findings against real code paths and dependencies — not the reviewer's reasoning alone
-- Reject speculative risks, unrealistic edge cases, and broad rewrites
-- Prefer small fixes at ownership boundaries; refactor only to prevent a bug class
-- Report security only for concrete, actionable risks; do not cripple legitimate functionality
-- Add inline code comments only when explaining invariants that future maintainers need
+**General review principles (borrowed from code-review best practice):**
+- Verify every finding by reading the real code path and adjacent files — do not rely on the reviewer's reasoning alone
+- Read dependency docs, source types, or external behavior contracts when a finding depends on assumptions about their behavior
+- Reject unrealistic edge cases, speculative risks, and fixes that over-complicate the codebase
+- Prefer small fixes at the right ownership boundary; no refactor unless it clearly prevents the same bug class
+- Include a security perspective, but report security findings only when the change creates a concrete, actionable risk or removes an important safety check — do not let security cripple legitimate functionality
+- If rejecting a finding as intentional or not worth fixing, add a brief inline code comment only when it explains a real invariant or ownership decision that future maintainers should know about
 
 Create review notes: `role: review`, `lifecycle: temporary`.
 Link to apply/task notes or plan (`derives-from` when conclusions derive from specific artifacts).
@@ -154,9 +155,9 @@ And a constraint checklist:
 - Create permanent decision note(s) and summary note(s).
 - Promote reusable patterns into permanent reference notes.
 - Deduplicate overlap while preserving unique evidence; do not aggressively summarize away factual detail.
-- **Explicitly remove temporary scaffolding** when safe. If distilled into a permanent note, retire the temporary. mnemonic does not auto-expire.
-- Connect to commit discipline: consolidation is **memory** — do not mix with **work** commits.
-- **Regression provenance:** for regressions, record blamed author, PR, merger, current PR, and commit SHA/date.
+- **Explicitly remove temporary scaffolding** through consolidation choices when safe. If a temporary note has been distilled into a permanent note, delete or retire the temporary. mnemonic does not auto-expire notes.
+- Connect consolidation to commit discipline: consolidation artifacts are **memory** commits and must not be mixed with **work** commits.
+- **Regression provenance** (when applicable): for findings that relate to a regression, keep roles separate — blamed code author, blamed PR author, PR merger/committer, current PR author, and PR/date. If no blamed PR is traceable, use the blamed commit SHA, date, and author.
 
 Use the templates in [closeout-templates.md](closeout-templates.md).
 
@@ -178,34 +179,36 @@ Must return: apply note content, optional review note, recommendation (continue 
 
 ### Review Handoff Variant
 
-Dispatch a fresh-context subagent with the full artifact chain.
+Dispatch a fresh-context subagent with the full artifact chain. The reviewer has no prior exposure to implementation decisions and must adopt an adversarial posture.
 
 ```text
-Request:       <note-id>
-Research:      <note-id>, ...
-Plan:          <note-id>
-Apply/tasks:   <note-id>, ...
-Durable:       <note-id>, ...
+Request note:      <note-id/title>
+Research notes:    <note-id/title>, ...
+Plan note:         <note-id/title>
+Apply/task notes:  <note-id/title>, ...
+Durable context:   <note-id/title>, ...
 
-Constraints (from plan):
+Constraint checklist (extracted from plan):
 | Constraint | Status | Evidence |
 |---|---|---|
-| <...> | ? | <to verify> |
+| <explicit constraint from plan> | ? | <to be verified> |
 
-Scope:
-- Planned: <summary>
-- Shipped: <summary>
+Review scope:
+- What was planned: <summary from plan note>
+- What was implemented: <summary from apply note>
 - Validation: <tests/checks>
 
-Mandate:
-1. Assume violations — prove absent
-2. Cite code path or flag violation for each constraint
-3. Confirm each research requirement is addressed
-4. Verify each plan deliverable
-5. Run fresh verification commands
-6. Unmentioned constraint = silent omission = violation
+Adversarial review mandate:
+1. Assume violations exist — prove they don't
+2. For each explicit plan constraint: cite the code path that satisfies it, or flag it as a violation
+3. For each research requirement: confirm it is addressed or explicitly deferred
+4. For each plan deliverable: verify matching evidence exists
+5. Run all verification commands fresh — do not reuse implementation results
+6. If a constraint is not mentioned in the apply note, flag it as a potential violation — silent omission is a violation
 
-Return: review note + constraint checklist + recommendation (continue | block | update plan)
+> **Cardinal rule:** Silent omission is a violation. If a planned constraint is not mentioned in the apply note, treat it as a violation until proven otherwise.
+
+Return: review note content with constraint checklist, recommendation (continue | block | update plan), and any unchecked items.
 ```
 
 ## Canonical Graph
