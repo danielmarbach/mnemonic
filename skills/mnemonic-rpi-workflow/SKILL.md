@@ -39,10 +39,11 @@ Avoid these shortcuts; they are workflow violations, not harmless simplification
 ### 1. Research
 
 - Create or update one request root: `role: context`, `lifecycle: temporary`, `tags: ["workflow", "request"]`.
-- Call `recall` before creating notes to avoid duplicates.
+- Call `recall` before creating notes to avoid duplicates — state "avoid duplicates" explicitly.
 - Create research notes: `role: research`, `lifecycle: temporary`.
 - **Distill findings** when they are scattered across multiple sources or conversations. Write a single consolidated summary per topic, linking back to sources. Do not keep raw, unreduced copies as research notes.
 - Link research to request root (`derives-from` preferred).
+- **Preserve unique evidence:** when distilling, retain factual detail and unique evidence from each source — do not aggressively summarize away data points that future steps may need.
 
 > **When to distill:** after the third related finding, after a conversation shift changes the topic, or when the research spans more than one hour of elapsed time.
 
@@ -63,7 +64,7 @@ Only after confirmation: proceed to Plan checklist.
 - For non-trivial work, include a short markdown checkbox list (`- [ ]`) for executable steps.
 - One current plan per request; update or supersede as needed.
 - Update plan note before continuing if scope, architecture, dependencies, or assumptions change materially.
-- After drafting, run a self-check: does each research requirement map to a plan item? Are there placeholders (TBD, TODO)? Are step references internally consistent?
+- After drafting, run a **self-check** (use the exact word): does each research requirement map to a plan item? Are there placeholders (TBD, TODO)? Are step references internally consistent?
 
 > **An executable plan means:** concrete steps with a clear owner/agent, no speculative guesses, no placeholders, each step ends with a verifiable outcome — "add a test that asserts X" not "improve test coverage".
 
@@ -77,6 +78,8 @@ Before dispatching subagents or starting implementation:
 Only after confirmation: proceed to Implement checklist.
 
 ### 3. Implement
+
+- **Material change during implementation:** If scope, architecture, dependencies, assumptions, or constraints change materially after implementation has started, stop all work. Revert to the Plan stage: update the plan note to reflect the change, confirm with the user, and only then resume implementation. Do not continue under a stale plan even if the user says "keep coding".
 
 - Create apply/task notes: `lifecycle: temporary`, tagged `apply`.
 - `role: plan` for executable steps; `role: context` for observations and checkpoints.
@@ -98,7 +101,7 @@ The implementer's own context is contaminated — they designed the code, so the
 
 **A. Constraint violation hunting (adversarial — prove violations don't exist)**
 - Enumerate every explicit constraint from the plan (e.g., "no new I/O on cold paths", "fail-soft to undefined", "always populate contextual metrics", "every Zod field gets `.describe()`")
-- For each constraint: cite the exact code path(s) that satisfy it, or flag it as a violation
+- For each constraint: cite the exact code path(s) that satisfy it (file, line, or function), or flag it as a violation. A general statement that the constraint is "handled" without a code path citation is insufficient.
 - If any constraint is unmentioned in the apply note, flag it — silent omission is a violation
 
 > **Cardinal rule:** Silent omission is a violation. If a planned constraint is not mentioned in the apply note, treat it as a violation until proven otherwise. A missing citation equals an automatic failure — the reviewer must never let a constraint go unaddressed.
