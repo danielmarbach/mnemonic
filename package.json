@@ -42,7 +42,7 @@
     "lint:fix": "eslint src/ tests/ --fix",
     "format": "prettier --write \"src/**/*.ts\" \"tests/**/*.ts\"",
     "format:check": "prettier --check \"src/**/*.ts\" \"tests/**/*.ts\"",
-    "prepare": "simple-git-hooks"
+    "prepare": "node scripts/prepare.mjs"
   },
   "simple-git-hooks": {
     "pre-commit": "npx lint-staged"
