@@ -6,6 +6,12 @@ The format is loosely based on Keep a Changelog and uses semver-style version he
 
 ## [Unreleased]
 
+## [0.35.0] - 2026-06-01
+
+### Changed
+
+- RPIR workflow skill: added Common Failure Modes section, strengthened all stage checklists (distill triggers, executable plan definition, scope-change gates, deviation recording, visible outcome headers, constraint-citation requirements), and integrated review principles from autoreview practice. Adversarial posture, regression provenance, and commitment discipline are now explicit.
+
 ## [0.34.0] - 2026-05-25
 
 ### Changed
