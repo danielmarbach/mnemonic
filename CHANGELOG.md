@@ -6,6 +6,12 @@ The format is loosely based on Keep a Changelog and uses semver-style version he
 
 ## [Unreleased]
 
+## [0.35.1] - 2026-06-01
+
+### Fixed
+
+- Fixed the docker container build.
+
 ## [0.35.0] - 2026-06-01
 
 ### Changed
