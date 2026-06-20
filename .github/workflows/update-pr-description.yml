@@ -40,7 +40,7 @@ jobs:
       # Always check out the base branch so we only run trusted script code.
       # Note file contents are fetched via GitHub API using the resolved head SHA.
       - name: Check out base branch
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Generate and update PR description
         env:
