@@ -183,12 +183,7 @@ export interface RecallRetrievalCoverage {
 }
 
 export type RetrievalEvidenceChannel =
-  | "semantic"
-  | "lexical"
-  | "graph-rank"
-  | "temporal-boost"
-  | "canonical"
-  | "rescue";
+  "semantic" | "lexical" | "graph-rank" | "temporal-boost" | "canonical" | "rescue";
 export type RetrievalEvidenceRankBand = "top3" | "top10" | "lower";
 export type RetrievalEvidenceFreshness = "today" | "thisWeek" | "thisMonth" | "older";
 

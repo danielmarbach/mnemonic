@@ -514,8 +514,7 @@ export async function listLocalMcpTools(
 ): Promise<Array<{ name: string; description?: string }>> {
   const response = await callLocalMcpMethod(vaultDir, 1, "tools/list", {});
   const tools = response?.result?.tools as
-    | Array<{ name: string; description?: string }>
-    | undefined;
+    Array<{ name: string; description?: string }> | undefined;
   if (!tools) {
     throw new Error("Missing tools/list response");
   }
