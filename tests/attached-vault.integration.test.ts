@@ -6,9 +6,7 @@ import path from "path";
 import {
   callLocalMcp,
   callLocalMcpResponse,
-  createPersistentMcpSession,
   execFileAsync,
-  extractRememberedId,
   initTestRepo,
   initTestVaultRepo,
   startFakeEmbeddingServer,

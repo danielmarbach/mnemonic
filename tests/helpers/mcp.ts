@@ -1,6 +1,5 @@
-import { afterAll, afterEach, beforeAll } from "vitest";
-import { access, mkdir, mkdtemp, rm } from "fs/promises";
-import os from "os";
+import { afterEach, beforeAll } from "vitest";
+import { access, mkdir, rm } from "fs/promises";
 import path from "path";
 import { spawn } from "child_process";
 import http from "http";
@@ -292,8 +291,6 @@ export async function callLocalMcpMethod(
 
     let stdoutData = "";
     let stderrData = "";
-    let stdinReady = false;
-
     child.stdout.on("data", (chunk) => {
       stdoutData += chunk.toString();
     });
@@ -310,7 +307,6 @@ export async function callLocalMcpMethod(
     });
 
     child.stdin.write(messages.map((message) => JSON.stringify(message)).join("\n") + "\n", () => {
-      stdinReady = true;
       setTimeout(() => child.stdin.end(), 200);
     });
   });
@@ -518,8 +514,7 @@ export async function listLocalMcpTools(
 ): Promise<Array<{ name: string; description?: string }>> {
   const response = await callLocalMcpMethod(vaultDir, 1, "tools/list", {});
   const tools = response?.result?.tools as
-    | Array<{ name: string; description?: string }>
-    | undefined;
+    Array<{ name: string; description?: string }> | undefined;
   if (!tools) {
     throw new Error("Missing tools/list response");
   }

@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { VaultManager, type ProjectAttachmentConfig } from "../src/vault.js";
 import { Storage, type Note } from "../src/storage.js";
-import { GitOps } from "../src/git.js";
 import * as fs from "fs/promises";
 import * as path from "path";
 import os from "os";
@@ -396,7 +395,7 @@ describe("VaultManager", () => {
 
       await initGitRepo(projectDir, "# Project I");
 
-      const projectVault = await vaultManager.getOrCreateProjectVault(projectDir);
+      await vaultManager.getOrCreateProjectVault(projectDir);
 
       // Project vault is already loaded, should not appear twice
       const order = await vaultManager.searchOrder(projectDir);

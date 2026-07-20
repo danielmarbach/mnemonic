@@ -11,12 +11,7 @@ import {
   ProjectSummaryResultSchema,
   RecallResultSchema,
 } from "../src/structured-content.js";
-import {
-  callLocalMcpResponse,
-  extractRememberedId,
-  startFakeEmbeddingServer,
-  tempDirs,
-} from "./helpers/mcp.js";
+import { callLocalMcpResponse, startFakeEmbeddingServer, tempDirs } from "./helpers/mcp.js";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const execFileAsync = promisify(execFile);

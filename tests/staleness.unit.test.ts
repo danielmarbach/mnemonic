@@ -238,7 +238,6 @@ describe("VaultManager staleness detection", () => {
 });
 
 describe("removeStaleEmbeddings", () => {
-  let tempDir: string;
   let storage: Storage;
   const tempDirs: string[] = [];
 

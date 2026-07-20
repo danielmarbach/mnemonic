@@ -3,7 +3,7 @@ import { simpleGit } from "simple-git";
 import { Storage, type Note, type EmbeddingRecord } from "../src/storage.js";
 import { AttachedStorage, detectDefaultBranch, validateBranch } from "../src/attached-storage.js";
 import { AttachedVaultReadOnlyError, InvalidBranchNameError } from "../src/domain-errors.js";
-import { memoryId, type MemoryId, isoDateString, embeddingModelId } from "../src/brands.js";
+import { memoryId, isoDateString, embeddingModelId } from "../src/brands.js";
 import * as fs from "fs/promises";
 import * as path from "path";
 import os from "os";

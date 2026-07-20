@@ -3,9 +3,6 @@ import { mkdtemp, rm } from "fs/promises";
 import os from "os";
 import path from "path";
 import { fileURLToPath } from "url";
-import { execFile } from "child_process";
-import { promisify } from "util";
-
 import {
   callLocalMcp,
   callLocalMcpResponse,

@@ -405,11 +405,6 @@ describe("getDirectRelatedNotes", () => {
 
 describe("Phase 4 acceptance criteria", () => {
   it("1-hop expansion only (no transitive relations)", () => {
-    const directRelated = createNote({
-      id: "direct",
-      title: "Direct",
-      relatedTo: [{ id: "transitive", type: "related-to" }],
-    });
     const sourceNote = createNote({
       relatedTo: [{ id: "direct", type: "related-to" }],
     });

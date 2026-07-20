@@ -13,7 +13,7 @@ import {
   tempDirs,
 } from "./helpers/mcp.js";
 
-import { MemoryGraphResultSchema, ProjectSummaryResultSchema } from "../src/structured-content.js";
+import { ProjectSummaryResultSchema } from "../src/structured-content.js";
 
 /**
  * Directly updates note frontmatter - USE SPARINGLY.
