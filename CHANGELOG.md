@@ -4,6 +4,12 @@ All notable changes to `mnemonic` will be documented in this file.
 
 The format is loosely based on Keep a Changelog and uses semver-style version headings.
 
+## [0.36.1] - 2026-07-20
+
+### Fixed
+
+- Docker builds no longer run repository-only git-hook setup during dependency installation.
+
 ## [0.36.0] - 2026-07-20
 
 ### Changed

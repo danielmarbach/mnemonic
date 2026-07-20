@@ -81,3 +81,14 @@ jobs:
         with:
           name: ci-learning
           path: artifacts/ci-learning
+
+  docker-build:
+    needs: check-toolchain-sync
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Build Docker image
+        run: docker build --tag mnemonic-mcp:ci .

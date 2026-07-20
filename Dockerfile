@@ -3,7 +3,8 @@ FROM node:24 AS builder
 WORKDIR /app
 
 COPY package*.json ./
-RUN npm ci
+# Docker builds do not need to install repository git hooks.
+RUN npm ci --ignore-scripts
 
 COPY tsconfig*.json ./
 COPY src ./src
@@ -15,7 +16,8 @@ FROM node:24
 WORKDIR /app
 
 COPY package*.json ./
-RUN npm ci --omit=dev
+# The runtime image does not contain repository tooling or git hooks.
+RUN npm ci --omit=dev --ignore-scripts
 
 COPY --from=builder /app/build ./build
 
