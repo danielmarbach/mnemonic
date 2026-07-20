@@ -9,11 +9,14 @@ tags:
   - skill-improvement
 lifecycle: temporary
 createdAt: '2026-07-20T15:37:18.258Z'
-updatedAt: '2026-07-20T15:37:18.258Z'
+updatedAt: '2026-07-20T15:40:17.380Z'
 role: context
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: research-findings-mcp-versus-cli-for-mnemonic-495d45dc
+    type: derives-from
 memoryVersion: 1
 ---
 Investigate what the MCP-versus-CLI debate implies for mnemonic and whether the project should support a complementary CLI plus a CLI-oriented skill. Compare the supplied articles and repository evidence, then identify a recommendation, product boundary, and next-step validation questions. This is the request root for an RPIR research phase; no implementation is authorized yet.
