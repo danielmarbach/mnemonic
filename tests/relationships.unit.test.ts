@@ -399,6 +399,36 @@ describe("getDirectRelatedNotes", () => {
     expect(result[0].note.id).toBe("cross-vault-target");
     expect(result[0].vault).toBe(vaultB);
   });
+
+  it("uses the source vault for legacy unqualified duplicate ids", async () => {
+    const vaultPathA = "/tmp/vault-a-source";
+    const vaultPathB = "/tmp/vault-b-source";
+    const source = createNote({
+      id: "source",
+      relatedTo: [{ id: "duplicate-target", type: "related-to" }],
+    });
+    const targetA = createNote({ id: "duplicate-target", title: "Source Vault Target" });
+    const targetB = createNote({ id: "duplicate-target", title: "Other Vault Target" });
+    const vaultA = mockVault({
+      storage: {
+        vaultPath: vaultPathA,
+        readNote: async () => null,
+        listNotes: async () => [source, targetA],
+      } as unknown as Vault["storage"],
+    });
+    const vaultB = mockVault({
+      storage: {
+        vaultPath: vaultPathB,
+        readNote: async () => null,
+        listNotes: async () => [targetB],
+      } as unknown as Vault["storage"],
+    });
+
+    const result = await getDirectRelatedNotes(source, [vaultB, vaultA], undefined, vaultPathA);
+
+    expect(result[0]?.note.title).toBe("Source Vault Target");
+    expect(result[0]?.vault).toBe(vaultA);
+  });
 });
 
 // ── Acceptance criteria validation ────────────────────────────────────────────

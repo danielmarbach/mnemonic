@@ -17,7 +17,7 @@ import {
 describe("Attachment boost constants", () => {
   it("ATTACHMENT_BOOST is half of PROJECT_SCOPE_BOOST", () => {
     expect(ATTACHMENT_BOOST).toBe(PROJECT_SCOPE_BOOST / 2);
-    expect(ATTACHMENT_BOOST).toBe(0.015);
+    expect(ATTACHMENT_BOOST).toBe(0.0025);
   });
 });
 

@@ -99,9 +99,9 @@ sequenceDiagram
 
 ### Recall flow
 
-Recall searches embeddings from the project vault first when `cwd` is present, then widens to the main vault. Project matches receive a small tiebreaker boost (+0.03), and the lightweight heuristic in `src/recall.ts` prefers current-project hits before filling remaining slots with global matches.
+Recall searches embeddings from the project vault first when `cwd` is present, then widens to the main vault. Current-project matches receive a bounded policy prior (+0.005); selection remains score-ordered so project affinity cannot hard-select over strong global retrieval.
 
-The ranking pipeline has expanded with the hindsight-driven phases while staying additive and fail-soft: graph spreading activation, RRF-based fusion of semantic and lexical channels, session-scoped lexical rescue precomputation, temporal recency boosts, and confidence-gated strict temporal filtering for explicit high-confidence windows.
+The ranking pipeline is bounded and fail-soft: semantic embeddings, an always-on lexical channel over compact projections, and semantic-conditioned graph expansion each produce channel ranks; RRF fuses those ranks, followed by bounded semantic-confidence, project, metadata, temporal, and canonical adjustments. Explicit high-confidence temporal windows still filter candidates before ranking. Lexical candidate generation reuses the existing session projection/token cache and TF-IDF machinery, without introducing a database or synced index.
 
 ```mermaid
 flowchart TD
@@ -109,10 +109,15 @@ flowchart TD
     Embed --> Search[VaultManager.searchOrder#40;cwd#41;]
     Search --> ProjectEmbeddings[Project vault embeddings]
     Search --> MainEmbeddings[Main vault embeddings]
-    ProjectEmbeddings --> Score[cosine similarity + project tiebreaker]
-    MainEmbeddings --> Score
-    Score --> Rank[semantic + lexical RRF\ngraph spread + temporal boosts]
-    Rank --> Filter[scope / tags / minSimilarity\n+ optional temporal strict filter]
+    ProjectEmbeddings --> Semantic[semantic channel rank]
+    MainEmbeddings --> Semantic
+    Search --> Lexical[bounded lexical projection channel]
+    Search --> Graph[bounded graph expansion from semantic entry points]
+    Semantic --> Fusion[RRF: semantic + lexical + graph ranks]
+    Lexical --> Fusion
+    Graph --> Fusion
+    Fusion --> Rank[bounded confidence + policy priors]
+    Rank --> Filter[scope / tags / semantic minSimilarity\n+ optional temporal strict filter]
     Filter --> Select[src/recall.ts\nselectRecallResults]
     Select --> Enrich[optional evidence and temporal enrichment]
     Enrich --> Format[format notes for MCP output]
@@ -123,7 +128,7 @@ flowchart TD
 - `recall` supports optional `evidence: "compact"` output (default off).
 - Consolidation strategies and `execute-merge` default `evidence: true` for safety.
 - Evidence is serialized at the output boundary, not as a separate pipeline stage.
-- Per-result `retrievalEvidence` includes compact rationale fields such as channels, rank band, project relevance, freshness, and supersession hints.
+- Per-result `retrievalEvidence` includes compact rationale fields such as channels, rank band, project relevance, freshness, supersession hints, and optional RRF/policy score decomposition.
 - Consolidation evidence includes lifecycle, role, age, risk, and merge warnings.
 
 ### Sync and migration flow
@@ -142,25 +147,25 @@ flowchart TD
 
 ## Source layout and responsibilities
 
-| Path | Responsibility |
-| --- | --- |
-| `src/index.ts` | MCP server entry point, tool registration, orchestration, CLI migration command |
-| `src/storage.ts` | Markdown note persistence, embedding JSON persistence, core types |
-| `src/vault.ts` | Main/project vault lifecycle, search order, vault routing |
-| `src/project.ts` | Stable project detection from git metadata |
-| `src/project-memory-policy.ts` | Write-scope and consolidation policy rules |
-| `src/embeddings.ts` | Ollama HTTP client and cosine similarity |
-| `src/git.ts` | Git initialization, commit, push, sync, and diff helpers |
-| `src/markdown.ts` | Markdown linting and normalization before persistence |
-| `src/migration.ts` | Schema migration registry and execution |
-| `src/consolidate.ts` | Consolidation helper logic for merge plans and relationship cleanup |
-| `src/recall.ts` | Recall ranking and selection pipeline (RRF, graph spread, temporal gating helpers) |
-| `src/lexical.ts` | Lexical scoring and TF-IDF rescue helpers used by recall |
-| `src/cache.ts` | Session-scoped project cache including prepared lexical rescue corpus |
-| `src/structured-content.ts` | MCP structured output schemas, including recall/consolidate evidence shapes |
-| `src/relationships.ts` | Bounded 1-hop relationship expansion: scoring, preview construction, and fail-soft enrichment |
-| `src/config.ts` | Main-vault runtime config and per-project policy storage |
-| `tests/` | Vitest unit and integration coverage, including MCP smoke tests |
+| Path                           | Responsibility                                                                                |
+| ------------------------------ | --------------------------------------------------------------------------------------------- |
+| `src/index.ts`                 | MCP server entry point, tool registration, orchestration, CLI migration command               |
+| `src/storage.ts`               | Markdown note persistence, embedding JSON persistence, core types                             |
+| `src/vault.ts`                 | Main/project vault lifecycle, search order, vault routing                                     |
+| `src/project.ts`               | Stable project detection from git metadata                                                    |
+| `src/project-memory-policy.ts` | Write-scope and consolidation policy rules                                                    |
+| `src/embeddings.ts`            | Ollama HTTP client and cosine similarity                                                      |
+| `src/git.ts`                   | Git initialization, commit, push, sync, and diff helpers                                      |
+| `src/markdown.ts`              | Markdown linting and normalization before persistence                                         |
+| `src/migration.ts`             | Schema migration registry and execution                                                       |
+| `src/consolidate.ts`           | Consolidation helper logic for merge plans and relationship cleanup                           |
+| `src/recall.ts`                | Recall ranking and selection pipeline (RRF, graph spread, temporal gating helpers)            |
+| `src/lexical.ts`               | Lexical scoring and bounded TF-IDF candidate ranking used by recall                           |
+| `src/cache.ts`                 | Session-scoped project cache including prepared lexical projection tokens                     |
+| `src/structured-content.ts`    | MCP structured output schemas, including recall/consolidate evidence shapes                   |
+| `src/relationships.ts`         | Bounded 1-hop relationship expansion: scoring, preview construction, and fail-soft enrichment |
+| `src/config.ts`                | Main-vault runtime config and per-project policy storage                                      |
+| `tests/`                       | Vitest unit and integration coverage, including MCP smoke tests                               |
 
 ## Data model
 

@@ -65,7 +65,10 @@ export function formatTemporalHistory(
 
 export function formatRelationshipPreview(preview: RelationshipPreview): string {
   const shown = preview.shown
-    .map((r) => `${r.title} (\`${r.id}\`) [${r.relationType ?? "related-to"}]`)
+    .map(
+      (r) =>
+        `${r.title} (\`${r.id}\`) [${r.relationType ?? "related-to"}]${r.vault ? ` {${r.vault}}` : ""}`,
+    )
     .join(", ");
   const more = preview.truncated
     ? ` [+${preview.totalDirectRelations - preview.shown.length} more]`
@@ -91,9 +94,17 @@ export function toRecallFreshness(updatedAt: string): "today" | "thisWeek" | "th
   return "older";
 }
 
-export function toRecallRankBand(semanticRank?: number): "top3" | "top10" | "lower" {
-  if (semanticRank !== undefined && semanticRank <= 3) return "top3";
-  if (semanticRank !== undefined && semanticRank <= 10) return "top10";
+export function toRecallRankBand(
+  semanticRank?: number,
+  lexicalRank?: number,
+  graphRank?: number,
+): "top3" | "top10" | "lower" {
+  const ranks = [semanticRank, lexicalRank, graphRank].filter(
+    (rank): rank is number => rank !== undefined,
+  );
+  const bestRank = ranks.length > 0 ? Math.min(...ranks) : undefined;
+  if (bestRank !== undefined && bestRank <= 3) return "top3";
+  if (bestRank !== undefined && bestRank <= 10) return "top10";
   return "lower";
 }
 
@@ -102,5 +113,8 @@ export function formatRetrievalEvidenceHint(evidence: RetrievalEvidence, role?: 
   const supersedesPart = evidence.superseded
     ? ` | supersedes ${evidence.supersededCount ?? 1} note${(evidence.supersededCount ?? 1) === 1 ? "" : "s"}`
     : "";
-  return `${evidence.rankBand} | channels: ${evidence.channels.join(", ")} | ${evidence.projectRelevant ? "project-relevant" : "cross-project"}\n${rolePart}, ${evidence.freshness}${supersedesPart}`;
+  const scorePart = evidence.scoreDecomposition
+    ? `\nrrf: ${evidence.scoreDecomposition.rrfScore.toFixed(4)} | final: ${evidence.scoreDecomposition.finalScore.toFixed(4)}`
+    : "";
+  return `${evidence.rankBand} | channels: ${evidence.channels.join(", ")} | ${evidence.projectRelevant ? "project-relevant" : "cross-project"}\n${rolePart}, ${evidence.freshness}${supersedesPart}${scorePart}`;
 }

@@ -4,7 +4,11 @@ All notable changes to `mnemonic` will be documented in this file.
 
 The format is loosely based on Keep a Changelog and uses semver-style version headings.
 
-## [Unreleased]
+## [0.36.0] - 2026-07-20
+
+### Changed
+
+- `recall` now does a better job finding exact names, identifiers, and phrases—even when they are not semantically similar—while continuing to prioritize conceptually relevant and connected memories. Results are more stable across project and global memories, and optional compact evidence can explain why a result ranked highly.
 
 ## [0.35.1] - 2026-06-01
 

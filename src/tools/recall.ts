@@ -29,13 +29,12 @@ import {
   selectRecallResults,
   selectWorkflowResults,
   applyLexicalReranking,
-  enrichRescueCandidateScores,
   resolveDiscoveredVaults,
   applyCanonicalExplanationPromotion,
   applyGraphSpreadingActivation,
+  recallCandidateIdentity,
   type ScoredRecallCandidate,
 } from "../recall.js";
-import { shouldTriggerLexicalRescue } from "../lexical.js";
 import { attempt } from "../error-utils.js";
 import {
   getOrBuildVaultEmbeddings,
@@ -72,7 +71,7 @@ import {
 import { enrichTemporalHistory } from "../temporal-interpretation.js";
 import { getRelationshipPreview } from "../relationships.js";
 import {
-  collectLexicalRescueCandidates,
+  collectLexicalCandidates,
   buildRecallCandidateContext,
   identifyHighPriorityAnchors,
   computeRecallDiversity,
@@ -95,7 +94,7 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
         "Do not use this when:\n" +
         "- You already know the exact id; use `get`\n" +
         "- You just want to browse by tags or scope; use `list`\n\n" +
-        "Returns: ranked matches (id, title, score, vault, tags, lifecycle, updatedAt), 1-hop relationship previews on top results, temporal history (mode: temporal), retrieval evidence (evidence: compact), diagnostics: recallScopeNoteCount, diversity, retrievalCoverage, signalStrength.\n\n" +
+        "Returns: ranked matches (id, title, score, vault, tags, lifecycle, updatedAt), 1-hop relationship previews on top results, temporal history (mode: temporal), retrieval evidence (evidence: compact), including optional score decomposition, diagnostics: recallScopeNoteCount, diversity, retrievalCoverage, signalStrength.\n\n" +
         "Typical next step:\n" +
         "- Use `get`, `update`, `relate`, or `consolidate` based on the results.",
       annotations: {
@@ -112,7 +111,15 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
           ),
         cwd: projectParam,
         limit: z.number().int().min(1).max(20).optional().default(ctx.defaultRecallLimit),
-        minSimilarity: z.number().min(0).max(1).optional().default(ctx.defaultMinSimilarity),
+        minSimilarity: z
+          .number()
+          .min(0)
+          .max(1)
+          .optional()
+          .default(ctx.defaultMinSimilarity)
+          .describe(
+            "Minimum similarity for semantic candidates. Lexical and graph channels remain independently bounded.",
+          ),
         mode: z
           .enum(["default", "temporal", "workflow"])
           .optional()
@@ -291,8 +298,14 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
           const boost = scopeBoost + context.metadataBoost + temporalBoost;
           scored.push({
             id: rec.id,
+            identityKey: `${vault.storage.vaultPath}::${rec.id}`,
             score: rawScore,
+            semanticScore: rawScore,
             semanticScoreForPromotion: rawScore,
+            lexicalChannelCandidate: false,
+            projectPrior: scopeBoost,
+            temporalPrior: temporalBoost,
+            metadataPrior: context.metadataBoost,
             boosted: rawScore + boost,
             vault,
             isCurrentProject: Boolean(isCurrentProject),
@@ -306,7 +319,10 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
       }
 
       const projectionTexts = new Map<string, string>();
-      const noteRelationships = new Map<string, Array<{ id: string; type: RelationshipType }>>();
+      const noteRelationships = new Map<
+        string,
+        Array<{ id: string; type: RelationshipType; vaultPath?: string }>
+      >();
       for (const candidate of scored) {
         const note = await readCachedNote(candidate.vault, candidate.id).catch(() => null);
         if (!note) {
@@ -315,8 +331,8 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
 
         if (note.relatedTo && note.relatedTo.length > 0) {
           noteRelationships.set(
-            candidate.id,
-            note.relatedTo.map((r) => ({ id: r.id, type: r.type })),
+            recallCandidateIdentity(candidate),
+            note.relatedTo.map((r) => ({ id: r.id, type: r.type, vaultPath: r.vaultPath })),
           );
         }
 
@@ -327,43 +343,59 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
           continue;
         }
 
-        projectionTexts.set(candidate.id, projection.projectionText);
+        projectionTexts.set(recallCandidateIdentity(candidate), projection.projectionText);
         if (project) {
-          setSessionCachedProjection(project.id, candidate.id, projection);
+          setSessionCachedProjection(
+            project.id,
+            candidate.vault.storage.vaultPath,
+            candidate.id,
+            projection,
+          );
         }
       }
 
       // Apply lexical reranking over semantic candidates (fail-soft)
-      const getProjectionText = (id: string): string | undefined => {
-        const inlineProjection = projectionTexts.get(id);
+      const getProjectionText = (
+        id: string,
+        candidate?: ScoredRecallCandidate,
+      ): string | undefined => {
+        const identityKey = candidate ? recallCandidateIdentity(candidate) : id;
+        const inlineProjection = projectionTexts.get(identityKey);
         if (inlineProjection) {
           return inlineProjection;
         }
-        if (project) {
-          const cached = getSessionCachedProjection(project.id, id);
+        if (project && candidate) {
+          const cached = getSessionCachedProjection(
+            project.id,
+            candidate.vault.storage.vaultPath,
+            id,
+          );
           if (cached) return cached.projectionText;
         }
         return undefined;
       };
-      const strongestSemanticScore = scored.reduce<number | undefined>(
-        (max, candidate) => (max === undefined ? candidate.score : Math.max(max, candidate.score)),
-        undefined,
-      );
       const reranked = applyLexicalReranking(scored, query, getProjectionText);
 
       // Apply graph spreading activation: traverse related notes and boost their scores
-      const preSpreadIds = new Set(reranked.map((c) => c.id));
+      const preSpreadIds = new Set(reranked.map((candidate) => recallCandidateIdentity(candidate)));
       const getNoteRelationships = (
         id: string,
-      ): Array<{ id: string; type: RelationshipType }> | undefined => {
-        return noteRelationships.get(id);
+        vault: Vault,
+      ): Array<{ id: string; type: RelationshipType; vaultPath?: string }> | undefined => {
+        return noteRelationships.get(`${vault.storage.vaultPath}::${id}`);
       };
       const withGraphSpread = applyGraphSpreadingActivation(reranked, getNoteRelationships);
 
       // Resolve correct vault for graph-discovered candidates that inherited their
       // entry point's vault instead of their own.
-      await resolveDiscoveredVaults(withGraphSpread, preSpreadIds, async (id) => {
-        for (const v of vaults) {
+      await resolveDiscoveredVaults(withGraphSpread, preSpreadIds, async (id, candidate) => {
+        const separator = candidate.identityKey?.lastIndexOf("::") ?? -1;
+        const targetVaultPath =
+          separator >= 0 ? candidate.identityKey?.slice(0, separator) : undefined;
+        const candidateVaults = targetVaultPath
+          ? vaults.filter((vault) => vault.storage.vaultPath === targetVaultPath)
+          : vaults;
+        for (const v of candidateVaults) {
           const note = await v.storage.readNote(memoryId(id)).catch(() => null);
           if (note) {
             const isCurrentProject = project ? note.project === project.id : false;
@@ -373,29 +405,71 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
         return undefined;
       });
 
-      let promoted = applyCanonicalExplanationPromotion(withGraphSpread);
-      let rescueCandidateIds = new Set<string>();
+      // Graph candidates must obey the same visibility and temporal policies as
+      // semantic candidates after their vault has been resolved.
+      const graphFiltered: ScoredRecallCandidate[] = [];
+      for (const candidate of withGraphSpread) {
+        if (preSpreadIds.has(recallCandidateIdentity(candidate))) {
+          graphFiltered.push(candidate);
+          continue;
+        }
 
-      // Lexical rescue: when semantic results are weak, scan projections for additional candidates.
-      // Skip rescue when the caller set a strict minSimilarity above the default,
-      // because rescue candidates lack genuine semantic backing.
-      const rescueAllowed = minSimilarity <= ctx.defaultMinSimilarity;
-      if (rescueAllowed && shouldTriggerLexicalRescue(strongestSemanticScore, scored.length)) {
-        const rescueCandidates = await collectLexicalRescueCandidates(
-          vaults,
-          query,
-          temporalQueryHint,
-          project ?? undefined,
-          scope,
-          tags,
-          lifecycle,
-          promoted,
-        );
-        promoted.push(...rescueCandidates);
-        rescueCandidateIds = new Set(rescueCandidates.map((candidate) => candidate.id));
-        enrichRescueCandidateScores(promoted, query, getProjectionText);
-        promoted = applyCanonicalExplanationPromotion(promoted);
+        const note = await readCachedNote(candidate.vault, candidate.id);
+        if (!note) continue;
+        if (tags && tags.length > 0 && !tags.every((tag) => note.tags.includes(tag))) continue;
+        if (lifecycle && note.lifecycle !== lifecycle) continue;
+        const isAttachedVault = candidate.vault.provenance === "project-attached";
+        if (scope === "project" && !candidate.isCurrentProject && !isAttachedVault) continue;
+        if (scope === "global" && note.project !== undefined && !isAttachedVault) continue;
+        if (
+          applyTemporalFilter &&
+          temporalFilterWindowDays !== undefined &&
+          !isWithinTemporalFilterWindow(note.updatedAt, temporalFilterWindowDays)
+        ) {
+          continue;
+        }
+
+        candidate.projectPrior = candidate.isCurrentProject
+          ? ctx.projectScopeBoost
+          : isAttachedVault
+            ? ATTACHMENT_BOOST
+            : 0;
+        candidate.temporalPrior = 0;
+        candidate.metadataPrior = 0;
+        candidate.boosted = candidate.projectPrior;
+        graphFiltered.push(candidate);
       }
+
+      // Lexical retrieval is an independent bounded channel. It runs for every
+      // recall, including when semantic retrieval is strong, and is not gated by
+      // minSimilarity because that option applies to semantic candidates only.
+      const lexicalCandidates = await collectLexicalCandidates(
+        vaults,
+        query,
+        temporalQueryHint,
+        project ?? undefined,
+        scope,
+        tags,
+        lifecycle,
+        graphFiltered,
+      );
+      const candidatesById = new Map(
+        graphFiltered.map((candidate) => [recallCandidateIdentity(candidate), candidate]),
+      );
+      for (const lexicalCandidate of lexicalCandidates) {
+        const existing = candidatesById.get(recallCandidateIdentity(lexicalCandidate));
+        if (existing) {
+          existing.lexicalChannelCandidate = true;
+          existing.lexicalChannelScore = lexicalCandidate.lexicalChannelScore;
+          existing.lexicalScore = lexicalCandidate.lexicalScore;
+          existing.projectPrior = existing.projectPrior ?? lexicalCandidate.projectPrior;
+          existing.temporalPrior = existing.temporalPrior ?? lexicalCandidate.temporalPrior;
+          existing.metadataPrior = existing.metadataPrior ?? lexicalCandidate.metadataPrior;
+        } else {
+          candidatesById.set(recallCandidateIdentity(lexicalCandidate), lexicalCandidate);
+        }
+      }
+      const promoted = applyCanonicalExplanationPromotion([...candidatesById.values()]);
 
       const top =
         mode === "workflow"
@@ -461,21 +535,21 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
       // Top 1 by default, top 3 if result count is small
       const recallRelationshipLimit = top.length <= 3 ? 3 : 1;
 
-      for (const [
-        index,
-        {
+      for (const [index, candidate] of top.entries()) {
+        const {
           id,
           score,
           vault,
           boosted,
+          semanticScore,
           semanticRank,
           lexicalRank,
           graphRank,
           canonicalExplanationScore,
           metadata,
           isCurrentProject,
-        },
-      ] of top.entries()) {
+        } = candidate;
+        const finalScore = computeHybridScore(candidate);
         const note = await readCachedNote(vault, id);
         if (note) {
           const centrality = note.relatedTo?.length ?? 0;
@@ -540,7 +614,11 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
             relationships = await getRelationshipPreview(
               note,
               ctx.vaultManager.allKnownVaults(project?.id),
-              { activeProjectId: project?.id, limit: 3 },
+              {
+                activeProjectId: project?.id,
+                sourceVaultPath: vault.storage.vaultPath,
+                limit: 3,
+              },
             );
           }
 
@@ -566,7 +644,6 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
                     semanticRank !== undefined ? "semantic" : undefined,
                     lexicalRank !== undefined ? "lexical" : undefined,
                     graphRank !== undefined ? "graph-rank" : undefined,
-                    rescueCandidateIds.has(id) ? "rescue" : undefined,
                     canonicalExplanationScore !== undefined && canonicalExplanationScore > 0
                       ? "canonical"
                       : undefined,
@@ -574,7 +651,7 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
                   ].filter(
                     (value): value is RetrievalEvidence["channels"][number] => value !== undefined,
                   ),
-                  rankBand: toRecallRankBand(semanticRank),
+                  rankBand: toRecallRankBand(semanticRank, lexicalRank, graphRank),
                   projectRelevant: isCurrentProject,
                   freshness: toRecallFreshness(note.updatedAt),
                   superseded: supersededRelations.length > 0,
@@ -582,6 +659,19 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
                     supersededRelations.length > 0 ? supersededRelations[0]?.id : undefined,
                   supersededCount:
                     supersededRelations.length > 0 ? supersededRelations.length : undefined,
+                  scoreDecomposition: {
+                    semanticScore,
+                    semanticRank,
+                    lexicalRank,
+                    graphRank,
+                    rrfScore: candidate.rrfScore ?? 0,
+                    semanticConfidencePrior: candidate.semanticConfidencePrior ?? 0,
+                    projectPrior: candidate.projectPrior ?? 0,
+                    temporalPrior: candidate.temporalPrior ?? 0,
+                    metadataPrior: candidate.metadataPrior ?? 0,
+                    canonicalPrior: candidate.canonicalPrior ?? 0,
+                    finalScore: candidate.finalScore ?? finalScore,
+                  },
                 }
               : undefined;
           const evidenceLine = retrievalEvidence

@@ -248,31 +248,43 @@ describe("projection cache", () => {
     await getOrBuildVaultNoteList("test-project", vault);
 
     const projection = makeProjection("note-1");
-    setSessionCachedProjection("test-project", "note-1", projection);
+    setSessionCachedProjection("test-project", "/vault/project", "note-1", projection);
 
-    expect(getSessionCachedProjection("test-project", "note-1")).toEqual(projection);
+    expect(getSessionCachedProjection("test-project", "/vault/project", "note-1")).toEqual(
+      projection,
+    );
   });
 
   it("returns undefined for unknown projection", async () => {
     const vault = makeVault("/vault/project", [], []);
     await getOrBuildVaultNoteList("test-project", vault);
 
-    expect(getSessionCachedProjection("test-project", "missing")).toBeUndefined();
+    expect(getSessionCachedProjection("test-project", "/vault/project", "missing")).toBeUndefined();
   });
 
   it("projection is cleared on invalidation", async () => {
     const vault = makeVault("/vault/project", [], []);
     await getOrBuildVaultNoteList("test-project", vault);
 
-    setSessionCachedProjection("test-project", "note-1", makeProjection("note-1"));
+    setSessionCachedProjection(
+      "test-project",
+      "/vault/project",
+      "note-1",
+      makeProjection("note-1"),
+    );
     invalidateActiveProjectCache();
 
-    expect(getSessionCachedProjection("test-project", "note-1")).toBeUndefined();
+    expect(getSessionCachedProjection("test-project", "/vault/project", "note-1")).toBeUndefined();
   });
 
   it("setSessionCachedProjection is a no-op when no cache exists", () => {
     expect(() =>
-      setSessionCachedProjection("test-project", "note-1", makeProjection("note-1")),
+      setSessionCachedProjection(
+        "test-project",
+        "/vault/project",
+        "note-1",
+        makeProjection("note-1"),
+      ),
     ).not.toThrow();
   });
 

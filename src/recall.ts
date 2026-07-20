@@ -15,11 +15,20 @@ const CANONICAL_HYBRID_WEIGHT = 0.05;
 // Multiplied by 3.0 ≈ 0.150, matching the old additive lexical weight's order-of-magnitude
 // while remaining calibration-free.
 const RRF_SCALING_FACTOR = 3.0;
+const MAX_SEMANTIC_CONFIDENCE_PRIOR = 0.05;
 
 const RECALL_ALWAYS_LOAD_BOOST = 0.01;
 const RECALL_SUMMARY_BOOST = 0.012;
 const RECALL_DECISION_BOOST = 0.009;
 const RECALL_HIGH_IMPORTANCE_BOOST = 0.006;
+
+const MAX_PROJECT_PRIOR = 0.005;
+const MAX_TEMPORAL_PRIOR = 0.08;
+const MAX_METADATA_PRIOR =
+  RECALL_ALWAYS_LOAD_BOOST +
+  Math.max(RECALL_SUMMARY_BOOST, RECALL_DECISION_BOOST) +
+  RECALL_HIGH_IMPORTANCE_BOOST;
+const MAX_CANONICAL_PRIOR = 0.0115;
 
 const SPREADING_ENTRY_POINT_LIMIT = 5;
 const SPREADING_HOP_DECAY = 0.5;
@@ -46,6 +55,8 @@ export interface TemporalQueryHint {
 
 export interface ScoredRecallCandidate {
   id: string;
+  /** Vault-qualified identity used when federated vaults contain duplicate note ids. */
+  identityKey?: string;
   score: number;
   /** Semantic plausibility used to gate canonical explanation promotion. */
   semanticScoreForPromotion?: number;
@@ -57,11 +68,28 @@ export interface ScoredRecallCandidate {
   graphScore?: number;
   /** Rank from the graph spreading activation channel (1-based). */
   graphRank?: number;
+  /** Backward-compatible raw semantic score plus policy boosts for output/diagnostics. */
   boosted: number;
   vault: Vault;
   isCurrentProject: boolean;
   /** Lexical overlap score in [0, 1]. Undefined when not computed. */
   lexicalScore?: number;
+  /** Score produced by the independent lexical candidate channel. */
+  lexicalChannelScore?: number;
+  /** Whether this candidate is present in the bounded lexical result list. */
+  lexicalChannelCandidate?: boolean;
+  /** Original semantic channel score, when semantic retrieval found this note. */
+  semanticScore?: number;
+  /** Bounded semantic confidence contribution to final ranking. */
+  semanticConfidencePrior?: number;
+  /** Bounded product-policy contributions to final ranking. */
+  projectPrior?: number;
+  temporalPrior?: number;
+  metadataPrior?: number;
+  /** Individual fusion and final-score contributions, populated during ranking. */
+  rrfScore?: number;
+  canonicalPrior?: number;
+  finalScore?: number;
   /** Coverage of rarer query tokens across the current candidate set. */
   coverageScore?: number;
   /** Exact contiguous phrase coverage across significant query tokens. */
@@ -72,6 +100,10 @@ export interface ScoredRecallCandidate {
   structureScore?: number;
   metadata?: EffectiveNoteMetadata;
   canonicalExplanationScore?: number;
+}
+
+export function recallCandidateIdentity(candidate: ScoredRecallCandidate): string {
+  return candidate.identityKey ?? `${candidate.vault.storage?.vaultPath ?? ""}::${candidate.id}`;
 }
 
 export function computeRecallMetadataBoost(metadata?: EffectiveNoteMetadata): number {
@@ -203,48 +235,77 @@ export function isWithinTemporalFilterWindow(
 }
 
 /**
- * Compute RRF-based hybrid score.
+ * Compute the bounded hybrid score.
  *
- * Formula:
- *   boosted + RRF + canonicalExplanationScore * CANONICAL_HYBRID_WEIGHT
+ * Retrieval evidence is rank-only:
+ *   RRF = Σ 1/(K + channelRank)
  *
- * where RRF = 1/(K + semanticRank) + 1/(K + lexicalRank) + 1/(K + graphRank)
- *
- * Missing channels contribute 0. When all ranks are missing, the function keeps
- * only the boosted score plus the bounded canonical explanation contribution.
+ * Raw semantic magnitude is retained for diagnostics and rank assignment, but
+ * never added directly to the fused score. Missing channels contribute zero.
+ * The semantic confidence prior is deliberately capped so it can resolve close
+ * results without defeating agreement from another retrieval channel.
  */
+function clampPrior(value: number, maximum: number): number {
+  if (!Number.isFinite(value)) return 0;
+  return Math.min(maximum, Math.max(0, value));
+}
+
 export function computeHybridScore(candidate: ScoredRecallCandidate): number {
-  const canonical = candidate.canonicalExplanationScore ?? 0;
-
-  if (
-    candidate.semanticRank === undefined &&
-    candidate.lexicalRank === undefined &&
-    candidate.graphRank === undefined
-  ) {
-    return candidate.boosted + canonical * CANONICAL_HYBRID_WEIGHT;
-  }
-
   const semanticContribution =
     candidate.semanticRank !== undefined ? 1 / (RRF_K + candidate.semanticRank) : 0;
   const lexicalContribution =
     candidate.lexicalRank !== undefined ? 1 / (RRF_K + candidate.lexicalRank) : 0;
   const graphContribution =
     candidate.graphRank !== undefined ? 1 / (RRF_K + candidate.graphRank) : 0;
-
-  // Scale RRF so its maximum influence is comparable to the old additive
-  // lexical weight. With K = 60 and three channels the max RRF is roughly
-  // 3/60 ≈ 0.050. Multiplied by 3.0 this hits ~0.150, matching the
-  // old order-of-magnitude while remaining calibration-free.
   const rrf = semanticContribution + lexicalContribution + graphContribution;
 
-  return candidate.boosted + rrf * RRF_SCALING_FACTOR + canonical * CANONICAL_HYBRID_WEIGHT;
+  const derivedSemanticConfidencePrior =
+    (candidate.semanticScore ??
+      (candidate.semanticRank !== undefined ? candidate.score : undefined)) !== undefined &&
+    candidate.semanticRank !== undefined
+      ? (candidate.semanticScore ?? candidate.score) * MAX_SEMANTIC_CONFIDENCE_PRIOR
+      : 0;
+  const semanticConfidencePrior = clampPrior(
+    candidate.semanticConfidencePrior ?? derivedSemanticConfidencePrior,
+    MAX_SEMANTIC_CONFIDENCE_PRIOR,
+  );
+  const projectPrior = clampPrior(candidate.projectPrior ?? 0, MAX_PROJECT_PRIOR);
+  const temporalPrior = clampPrior(candidate.temporalPrior ?? 0, MAX_TEMPORAL_PRIOR);
+  const metadataPrior = clampPrior(candidate.metadataPrior ?? 0, MAX_METADATA_PRIOR);
+  const canonicalPrior = clampPrior(
+    (candidate.canonicalExplanationScore ?? 0) * CANONICAL_HYBRID_WEIGHT,
+    MAX_CANONICAL_PRIOR,
+  );
+  const rrfScore = rrf * RRF_SCALING_FACTOR;
+  const finalScore =
+    rrfScore +
+    semanticConfidencePrior +
+    projectPrior +
+    temporalPrior +
+    metadataPrior +
+    canonicalPrior;
+
+  candidate.rrfScore = rrfScore;
+  candidate.semanticConfidencePrior = semanticConfidencePrior;
+  candidate.canonicalPrior = canonicalPrior;
+  candidate.finalScore = finalScore;
+
+  return finalScore;
 }
 
 function computeLexicalRankSignal(candidate: ScoredRecallCandidate): number {
+  if (candidate.lexicalChannelScore !== undefined) {
+    return candidate.lexicalChannelScore;
+  }
+
   const lexical = candidate.lexicalScore ?? 0;
   const coverage = candidate.coverageScore ?? 0;
   const phrase = candidate.phraseScore ?? 0;
   return lexical + coverage * 0.3 + phrase * 0.5;
+}
+
+function compareIds(a: ScoredRecallCandidate, b: ScoredRecallCandidate): number {
+  return recallCandidateIdentity(a).localeCompare(recallCandidateIdentity(b));
 }
 
 const RANK_EPSILON = 1e-9;
@@ -269,7 +330,7 @@ export function assignDenseRanks<T>(
       currentRank = i + 1;
       previousScore = score;
     }
-    setRank(item, currentRank);
+    setRank(item, currentRank <= rankWindow ? currentRank : undefined);
   }
 }
 
@@ -279,17 +340,12 @@ function compareByHybridScore(a: ScoredRecallCandidate, b: ScoredRecallCandidate
     return hybridDelta;
   }
 
-  const boostedDelta = b.boosted - a.boosted;
-  if (boostedDelta !== 0) {
-    return boostedDelta;
-  }
-
   const lexicalDelta = computeLexicalRankSignal(b) - computeLexicalRankSignal(a);
   if (lexicalDelta !== 0) {
     return lexicalDelta;
   }
 
-  return b.score - a.score;
+  return compareIds(a, b);
 }
 
 export function computeCanonicalExplanationScore(candidate: ScoredRecallCandidate): number {
@@ -322,9 +378,20 @@ export function applyCanonicalExplanationPromotion(
   }
 
   // Assign lexicalRank only to candidates with lexical evidence.
+  const hasIndependentLexicalChannel = candidates.some(
+    (candidate) => candidate.lexicalChannelCandidate !== undefined,
+  );
   const sortedByLexical = candidates
-    .filter((candidate) => computeLexicalRankSignal(candidate) > 0)
-    .sort((a, b) => computeLexicalRankSignal(b) - computeLexicalRankSignal(a) || b.score - a.score);
+    .filter(
+      (candidate) =>
+        (!hasIndependentLexicalChannel || candidate.lexicalChannelCandidate === true) &&
+        computeLexicalRankSignal(candidate) > 0,
+    )
+    .sort((a, b) => {
+      const lexicalDelta = computeLexicalRankSignal(b) - computeLexicalRankSignal(a);
+      if (lexicalDelta !== 0) return lexicalDelta;
+      return compareIds(a, b);
+    });
   assignDenseRanks(sortedByLexical, computeLexicalRankSignal, (candidate, rank) => {
     candidate.lexicalRank = rank;
   });
@@ -385,14 +452,14 @@ function computeWeightedQueryCoverage(
 export function applyLexicalReranking(
   candidates: ScoredRecallCandidate[],
   query: string,
-  getProjectionText: (id: string) => string | undefined,
+  getProjectionText: (id: string, candidate?: ScoredRecallCandidate) => string | undefined,
 ): ScoredRecallCandidate[] {
   const corpusTexts = candidates
-    .map((candidate) => getProjectionText(candidate.id))
+    .map((candidate) => getProjectionText(candidate.id, candidate))
     .filter((text): text is string => Boolean(text));
 
   for (const candidate of candidates) {
-    const projText = getProjectionText(candidate.id);
+    const projText = getProjectionText(candidate.id, candidate);
     if (projText) {
       candidate.lexicalScore = computeLexicalScore(query, projText);
       candidate.coverageScore = computeWeightedQueryCoverage(query, projText, corpusTexts);
@@ -402,9 +469,10 @@ export function applyLexicalReranking(
 
   // Assign semanticRank using dense semantic score ordering.
   // Tied semantic scores share the same rank so lexical rank can break ties.
-  const sortedBySemantic = [...candidates].sort(
-    (a, b) => b.score - a.score || b.boosted - a.boosted,
-  );
+  const sortedBySemantic = [...candidates].sort((a, b) => {
+    const semanticDelta = b.score - a.score;
+    return semanticDelta !== 0 ? semanticDelta : compareIds(a, b);
+  });
   assignDenseRanks(
     sortedBySemantic,
     (candidate) => candidate.score,
@@ -419,7 +487,7 @@ export function applyLexicalReranking(
 export function enrichRescueCandidateScores(
   allCandidates: ScoredRecallCandidate[],
   query: string,
-  getProjectionText: (id: string) => string | undefined,
+  getProjectionText: (id: string, candidate?: ScoredRecallCandidate) => string | undefined,
 ): void {
   const rescueIds = new Set(
     allCandidates
@@ -429,12 +497,12 @@ export function enrichRescueCandidateScores(
   if (rescueIds.size === 0) return;
 
   const corpusTexts = allCandidates
-    .map((candidate) => getProjectionText(candidate.id))
+    .map((candidate) => getProjectionText(candidate.id, candidate))
     .filter((text): text is string => Boolean(text));
 
   for (const candidate of allCandidates) {
     if (!rescueIds.has(candidate.id)) continue;
-    const projText = getProjectionText(candidate.id);
+    const projText = getProjectionText(candidate.id, candidate);
     if (projText) {
       candidate.coverageScore = computeWeightedQueryCoverage(query, projText, corpusTexts);
       candidate.phraseScore = computeSignificantPhraseScore(query, projText);
@@ -447,25 +515,9 @@ export function selectRecallResults(
   limit: number,
   scope: "project" | "global" | "all",
 ): ScoredRecallCandidate[] {
+  void scope;
   const sorted = [...scored].sort(compareByHybridScore);
-
-  if (scope !== "all") {
-    return sorted.slice(0, limit);
-  }
-
-  const projectMatches = sorted.filter((candidate) => candidate.isCurrentProject);
-  if (projectMatches.length === 0) {
-    return sorted.slice(0, limit);
-  }
-
-  const topProject = projectMatches.slice(0, limit);
-  if (topProject.length >= limit) {
-    return topProject;
-  }
-
-  const selectedIds = new Set(topProject.map((candidate) => candidate.id));
-  const fallback = sorted.filter((candidate) => !selectedIds.has(candidate.id));
-  return [...topProject, ...fallback].slice(0, limit);
+  return sorted.slice(0, limit);
 }
 
 function computeWorkflowScore(candidate: ScoredRecallCandidate): number {
@@ -482,6 +534,7 @@ export function selectWorkflowResults(
   limit: number,
   scope: "project" | "global" | "all",
 ): ScoredRecallCandidate[] {
+  void scope;
   const sorted = [...scored].sort((a, b) => {
     const workflowDelta = computeWorkflowScore(b) - computeWorkflowScore(a);
     if (workflowDelta !== 0) {
@@ -490,23 +543,7 @@ export function selectWorkflowResults(
     return compareByHybridScore(a, b);
   });
 
-  if (scope !== "all") {
-    return sorted.slice(0, limit);
-  }
-
-  const projectMatches = sorted.filter((candidate) => candidate.isCurrentProject);
-  if (projectMatches.length === 0) {
-    return sorted.slice(0, limit);
-  }
-
-  const topProject = projectMatches.slice(0, limit);
-  if (topProject.length >= limit) {
-    return topProject;
-  }
-
-  const selectedIds = new Set(topProject.map((candidate) => candidate.id));
-  const fallback = sorted.filter((candidate) => !selectedIds.has(candidate.id));
-  return [...topProject, ...fallback].slice(0, limit);
+  return sorted.slice(0, limit);
 }
 
 function getRelationshipMultiplier(type: RelationshipType): number {
@@ -528,13 +565,19 @@ function getRelationshipMultiplier(type: RelationshipType): number {
 
 export function applyGraphSpreadingActivation(
   candidates: ScoredRecallCandidate[],
-  getNoteRelationships: (id: string) => Array<{ id: string; type: RelationshipType }> | undefined,
+  getNoteRelationships: (
+    id: string,
+    vault: Vault,
+  ) => Array<{ id: string; type: RelationshipType; vaultPath?: string }> | undefined,
 ): ScoredRecallCandidate[] {
   if (candidates.length === 0) {
     return candidates;
   }
 
-  const sortedByScore = [...candidates].sort((a, b) => b.score - a.score);
+  const sortedByScore = [...candidates].sort((a, b) => {
+    const scoreDelta = b.score - a.score;
+    return scoreDelta !== 0 ? scoreDelta : compareIds(a, b);
+  });
   const entryPoints = sortedByScore.slice(0, SPREADING_ENTRY_POINT_LIMIT);
 
   const eligibleEntries = entryPoints.filter((e) => e.score >= SPREADING_ACTIVATION_GATE);
@@ -542,23 +585,27 @@ export function applyGraphSpreadingActivation(
     return candidates;
   }
 
-  const candidateMap = new Map(candidates.map((c) => [c.id, c]));
+  const candidateMap = new Map(candidates.map((c) => [recallCandidateIdentity(c), c]));
   const discovered = new Map<string, ScoredRecallCandidate>();
 
   for (const entry of eligibleEntries) {
-    const relationships = getNoteRelationships(entry.id);
+    const entryVaultPath = entry.vault.storage?.vaultPath ?? "";
+    const relationships = getNoteRelationships(entry.id, entry.vault);
     if (!relationships) continue;
 
     for (const rel of relationships) {
       const multiplier = getRelationshipMultiplier(rel.type);
       const propagatedScore = entry.score * SPREADING_HOP_DECAY * multiplier;
 
-      const existingCandidate = candidateMap.get(rel.id);
+      const relatedVaultPath = rel.vaultPath ?? entryVaultPath;
+      const relatedIdentity = `${relatedVaultPath}::${rel.id}`;
+      const existingCandidate = candidateMap.get(relatedIdentity);
       if (existingCandidate) {
         existingCandidate.graphScore = (existingCandidate.graphScore ?? 0) + propagatedScore;
-      } else if (!discovered.has(rel.id)) {
-        discovered.set(rel.id, {
+      } else if (!discovered.has(relatedIdentity)) {
+        discovered.set(relatedIdentity, {
           id: rel.id,
+          identityKey: relatedIdentity,
           score: 0,
           semanticScoreForPromotion: 0,
           graphScore: propagatedScore,
@@ -567,7 +614,7 @@ export function applyGraphSpreadingActivation(
           isCurrentProject: entry.isCurrentProject,
         });
       } else {
-        const existing = discovered.get(rel.id);
+        const existing = discovered.get(relatedIdentity);
         if (existing) {
           existing.graphScore = (existing.graphScore ?? 0) + propagatedScore;
         }
@@ -579,7 +626,11 @@ export function applyGraphSpreadingActivation(
     discovered.size === 0 ? candidates : [...candidates, ...discovered.values()];
   const sortedByGraph = withDiscovered
     .filter((candidate) => candidate.graphScore !== undefined)
-    .sort((a, b) => (b.graphScore ?? 0) - (a.graphScore ?? 0) || b.score - a.score);
+    .sort((a, b) => {
+      const graphDelta = (b.graphScore ?? 0) - (a.graphScore ?? 0);
+      if (graphDelta !== 0) return graphDelta;
+      return compareIds(a, b);
+    });
   assignDenseRanks(
     sortedByGraph,
     (candidate) => candidate.graphScore ?? 0,
@@ -594,18 +645,22 @@ export function applyGraphSpreadingActivation(
 export function resolveDiscoveredVaults(
   candidates: ScoredRecallCandidate[],
   originalCandidateIds: Set<string>,
-  resolveVault: (id: string) => Promise<{ vault: Vault; isCurrentProject: boolean } | undefined>,
+  resolveVault: (
+    id: string,
+    candidate: ScoredRecallCandidate,
+  ) => Promise<{ vault: Vault; isCurrentProject: boolean } | undefined>,
 ): Promise<void> {
   const discovered = candidates.filter(
-    (c) => !originalCandidateIds.has(c.id) && c.vault !== undefined,
+    (c) => !originalCandidateIds.has(recallCandidateIdentity(c)) && c.vault !== undefined,
   );
   if (discovered.length === 0) return Promise.resolve();
 
   return Promise.all(
     discovered.map(async (c) => {
-      const resolved = await resolveVault(c.id);
+      const resolved = await resolveVault(c.id, c);
       if (resolved) {
         c.vault = resolved.vault;
+        c.identityKey = `${resolved.vault.storage.vaultPath}::${c.id}`;
         c.isCurrentProject = resolved.isCurrentProject;
       }
     }),

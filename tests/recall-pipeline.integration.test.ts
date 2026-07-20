@@ -198,6 +198,50 @@ describe("recall pipeline integration", () => {
     }
   }, 20000);
 
+  it("admits an exact lexical candidate even when semantic retrieval is strong", async () => {
+    const vaultDir = await mkdtemp(
+      path.join(os.tmpdir(), "mnemonic-pipeline-independent-lexical-"),
+    );
+    tempDirs.push(vaultDir);
+    const embeddingServer = await startFakeEmbeddingServer();
+
+    try {
+      await writeSeedNote(vaultDir, {
+        id: "semantic-winner",
+        title: "Semantic architecture result",
+        content: "A semantically strong result that does not contain the requested identifier.",
+      });
+      await writeSeedNote(vaultDir, {
+        id: "exact-identifier-result",
+        title: "ERR-9F3A exact identifier reference",
+        content: "The exact identifier ERR-9F3A is documented here for lexical retrieval.",
+      });
+      await writeSeedEmbedding(vaultDir, "semantic-winner", [0.1, 0.2, 0.3]);
+      await writeSeedEmbedding(vaultDir, "exact-identifier-result", [0.1, 0.2, -0.3]);
+
+      const response = await callLocalMcpResponse(
+        vaultDir,
+        "recall",
+        {
+          query: "ERR-9F3A exact identifier",
+          limit: 10,
+          minSimilarity: 0.3,
+          scope: "global",
+          evidence: "compact",
+        },
+        embeddingServer.url,
+      );
+
+      const parsed = RecallResultSchema.parse(response.structuredContent);
+      const exact = parsed.results.find((result) => result.id === "exact-identifier-result");
+      expect(exact).toBeDefined();
+      expect(exact?.retrievalEvidence?.channels).toContain("lexical");
+      expect(exact?.retrievalEvidence?.scoreDecomposition?.lexicalRank).toBeDefined();
+    } finally {
+      await embeddingServer.close();
+    }
+  }, 20000);
+
   it("rescue candidates with coverage and phrase scores are not systematically depressed", async () => {
     const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-pipeline-rescue-"));
     tempDirs.push(vaultDir);

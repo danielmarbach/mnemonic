@@ -187,6 +187,20 @@ export type RetrievalEvidenceChannel =
 export type RetrievalEvidenceRankBand = "top3" | "top10" | "lower";
 export type RetrievalEvidenceFreshness = "today" | "thisWeek" | "thisMonth" | "older";
 
+export interface RetrievalScoreDecomposition {
+  semanticScore?: number;
+  semanticRank?: number;
+  lexicalRank?: number;
+  graphRank?: number;
+  rrfScore: number;
+  semanticConfidencePrior: number;
+  projectPrior: number;
+  temporalPrior: number;
+  metadataPrior: number;
+  canonicalPrior: number;
+  finalScore: number;
+}
+
 export interface RetrievalEvidence {
   channels: RetrievalEvidenceChannel[];
   rankBand: RetrievalEvidenceRankBand;
@@ -195,6 +209,7 @@ export interface RetrievalEvidence {
   superseded: boolean;
   supersededBy?: string;
   supersededCount?: number;
+  scoreDecomposition?: RetrievalScoreDecomposition;
 }
 
 export interface ListResult extends Record<string, unknown> {
@@ -695,6 +710,7 @@ export const RelatedNotePreviewSchema = z.object({
   id: z.string(),
   title: z.string(),
   projectId: z.string().optional(),
+  vault: z.string().optional().describe("Storage label for disambiguating related notes"),
   theme: z.string().optional(),
   relationType: _RelationshipType.optional(),
   updatedAt: z.string(),
@@ -992,6 +1008,58 @@ export const RecallResultSchema = z.object({
           superseded: z.boolean(),
           supersededBy: z.string().optional(),
           supersededCount: z.number().int().optional(),
+          scoreDecomposition: z
+            .object({
+              semanticScore: z
+                .number()
+                .optional()
+                .describe("Raw semantic channel score for diagnostics"),
+              semanticRank: z
+                .number()
+                .int()
+                .min(1)
+                .optional()
+                .describe("1-based semantic channel rank"),
+              lexicalRank: z
+                .number()
+                .int()
+                .min(1)
+                .optional()
+                .describe("1-based lexical channel rank"),
+              graphRank: z.number().int().min(1).optional().describe("1-based graph channel rank"),
+              rrfScore: z
+                .number()
+                .min(0)
+                .max(0.1476)
+                .describe("Scaled reciprocal-rank fusion contribution"),
+              semanticConfidencePrior: z
+                .number()
+                .min(0)
+                .max(0.05)
+                .describe("Bounded semantic confidence contribution"),
+              projectPrior: z
+                .number()
+                .min(0)
+                .max(0.005)
+                .describe("Bounded current-project contribution"),
+              temporalPrior: z
+                .number()
+                .min(0)
+                .max(0.08)
+                .describe("Bounded temporal recency contribution"),
+              metadataPrior: z
+                .number()
+                .min(0)
+                .max(0.028)
+                .describe("Bounded role/importance contribution"),
+              canonicalPrior: z
+                .number()
+                .min(0)
+                .max(0.0115)
+                .describe("Bounded canonical explanation contribution"),
+              finalScore: z.number().min(0).max(0.3221).describe("Final score used for selection"),
+            })
+            .describe("Bounded rank and policy contributions used for this result"),
         })
         .optional(),
     }),
@@ -1679,6 +1747,7 @@ export interface RelatedNotePreview {
   id: string;
   title: string;
   projectId?: string;
+  vault?: string;
   theme?: string;
   relationType?: RelationshipType;
   updatedAt: string;

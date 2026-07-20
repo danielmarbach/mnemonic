@@ -8,11 +8,14 @@ tags:
   - recall
 lifecycle: permanent
 createdAt: '2026-05-25T17:37:51.641Z'
-updatedAt: '2026-05-25T17:37:51.641Z'
+updatedAt: '2026-07-20T16:48:31.449Z'
 role: reference
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: canonical-design-bounded-rrf-hybrid-recall-172a96ab
+    type: supersedes
 memoryVersion: 1
 ---
 # Multi-Channel Ranking Fusion Principles
