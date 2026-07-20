@@ -36,7 +36,13 @@ export const RELATIONSHIP_TYPES = [
 export type RelationshipType = (typeof RELATIONSHIP_TYPES)[number];
 export type NoteLifecycle = "temporary" | "permanent";
 export type NoteRole =
-  "summary" | "decision" | "plan" | "context" | "reference" | "research" | "review";
+  | "summary"
+  | "decision"
+  | "plan"
+  | "context"
+  | "reference"
+  | "research"
+  | "review";
 export type NoteImportance = "high" | "normal" | "low";
 export const NOTE_LIFECYCLES = [
   "temporary",
