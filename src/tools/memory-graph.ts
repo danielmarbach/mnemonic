@@ -100,7 +100,7 @@ export function registerMemoryGraphTool(server: McpServer, ctx: ServerContext): 
             edges: edges.length > 0 ? edges : [],
           };
         })
-        .filter((node: { edges: any[] }) => node.edges.length > 0);
+        .filter((node) => node.edges.length > 0);
 
       const structuredContent: MemoryGraphResult = {
         action: "graph_shown",

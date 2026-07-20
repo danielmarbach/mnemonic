@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mkdtemp, stat, readFile } from "fs/promises";
+import { mkdtemp, readFile } from "fs/promises";
 import os from "os";
 import path from "path";
 import matter from "gray-matter";

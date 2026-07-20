@@ -241,9 +241,9 @@ describe("attached vault output rendering", () => {
       });
 
       expect(result.structuredContent).toBeDefined();
-      const results = (result.structuredContent as Record<string, unknown>)?.results as
-        | Array<Record<string, unknown>>
-        | undefined;
+      const results = (result.structuredContent as Record<string, unknown>)?.results as Array<
+        Record<string, unknown>
+      >;
       expect(results).toBeDefined();
       const attachedResult = results?.find((r) => String(r.id).includes("attached-note"));
       expect(attachedResult).toBeDefined();

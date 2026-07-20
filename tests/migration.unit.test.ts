@@ -945,7 +945,7 @@ Main content 2`,
 
         // Should not process any notes (idempotent)
         expect(secondResult.vaultsProcessed).toBe(3);
-        for (const [vaultPath, result] of secondResult.results) {
+        for (const [_vaultPath, result] of secondResult.results) {
           expect(result.notesModified).toBe(0);
         }
       } finally {

@@ -4,7 +4,6 @@ import os from "os";
 import path from "path";
 
 import {
-  builtEntryPoint,
   callLocalMcp,
   callLocalMcpResponse,
   execFileAsync,

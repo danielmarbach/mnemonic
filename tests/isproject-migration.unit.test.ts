@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Vault, VaultProvenance } from "../src/vault.js";
-import { readdir, readFile, stat } from "fs/promises";
+import { readdir, readFile } from "fs/promises";
 import path from "path";
 
 async function getTsFiles(dir: string): Promise<string[]> {

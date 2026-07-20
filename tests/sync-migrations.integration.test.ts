@@ -6,10 +6,8 @@ import path from "path";
 import {
   callLocalMcp,
   callLocalMcpResponse,
-  execFileAsync,
   extractRememberedId,
   initTestRepo,
-  initTestVaultRepo,
   startFakeEmbeddingServer,
   startFakeOpenAICompatibleEmbeddingServer,
   tempDirs,
@@ -19,7 +17,6 @@ import {
   GetResultSchema,
   ListResultSchema,
   MemoryGraphResultSchema,
-  MigrationExecuteResultSchema,
   MigrationListResultSchema,
   RecallResultSchema,
   RecentResultSchema,
@@ -34,7 +31,7 @@ describe("sync-migrations", () => {
     const embeddingServer = await startFakeEmbeddingServer();
 
     try {
-      const rememberText = await callLocalMcp(
+      await callLocalMcp(
         vaultDir,
         "remember",
         {

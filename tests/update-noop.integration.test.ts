@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from "fs/promises";
+import { mkdtemp } from "fs/promises";
 import { describe, expect, it } from "vitest";
 import os from "os";
 import path from "path";
