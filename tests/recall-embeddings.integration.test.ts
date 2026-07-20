@@ -871,7 +871,7 @@ This note has no embedding.`,
     }
   }, 15000);
 
-  it("does not let lexical boosts displace a stronger non-English semantic match", async () => {
+  it("keeps a stronger non-English semantic match ahead of lexical candidates", async () => {
     const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-cross-language-"));
     tempDirs.push(vaultDir);
     const embeddingServer = await startFakeEmbeddingServer();
@@ -905,7 +905,7 @@ This note has no embedding.`,
       );
 
       const parsed = RecallResultSchema.parse(response.structuredContent);
-      expect(parsed.results).toHaveLength(1);
+      expect(parsed.results).toHaveLength(2);
       expect(parsed.results[0]?.id).toBe("italian-target");
     } finally {
       await embeddingServer.close();

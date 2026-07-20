@@ -567,7 +567,11 @@ export function registerProjectMemorySummaryTool(server: McpServer, ctx: ServerC
         const relationships = await getRelationshipPreview(
           note,
           ctx.vaultManager.allKnownVaults(project.id),
-          { activeProjectId: project.id, limit: 3 },
+          {
+            activeProjectId: project.id,
+            sourceVaultPath: vault.storage.vaultPath,
+            limit: 3,
+          },
         );
         return { relationships };
       };
@@ -631,7 +635,11 @@ export function registerProjectMemorySummaryTool(server: McpServer, ctx: ServerC
         const preview = await getRelationshipPreview(
           fallbackNote,
           ctx.vaultManager.allKnownVaults(project.id),
-          { activeProjectId: project.id, limit: 3 },
+          {
+            activeProjectId: project.id,
+            sourceVaultPath: vault?.storage.vaultPath,
+            limit: 3,
+          },
         );
         if (preview) fallbackRelationships = { relationships: preview };
       }

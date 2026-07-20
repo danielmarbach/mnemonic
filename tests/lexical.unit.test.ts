@@ -14,6 +14,9 @@ import {
   prepareTfIdfCorpus,
   rankDocumentsByTfIdf,
   shouldTriggerLexicalRescue,
+  LEXICAL_RETRIEVAL_CANDIDATE_LIMIT,
+  LEXICAL_RETRIEVAL_RESULT_LIMIT,
+  LEXICAL_RETRIEVAL_THRESHOLD,
   LEXICAL_RESCUE_CANDIDATE_LIMIT,
   LEXICAL_RESCUE_THRESHOLD,
   LEXICAL_RESCUE_RESULT_LIMIT,
@@ -335,6 +338,13 @@ describe("shouldTriggerLexicalRescue", () => {
 });
 
 describe("lexical constants", () => {
+  it("keeps always-on lexical retrieval bounded", () => {
+    expect(LEXICAL_RETRIEVAL_CANDIDATE_LIMIT).toBe(25);
+    expect(LEXICAL_RETRIEVAL_RESULT_LIMIT).toBe(25);
+    expect(LEXICAL_RETRIEVAL_THRESHOLD).toBeGreaterThan(0);
+    expect(LEXICAL_RETRIEVAL_THRESHOLD).toBeLessThan(1);
+  });
+
   it("has reasonable rescue candidate limit", () => {
     expect(LEXICAL_RESCUE_CANDIDATE_LIMIT).toBeGreaterThan(0);
     expect(LEXICAL_RESCUE_CANDIDATE_LIMIT).toBeLessThanOrEqual(50);

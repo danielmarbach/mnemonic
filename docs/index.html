@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>mnemonic — AI memory that lives in your repo</title>
-  <meta name="description" content="A local MCP memory server backed by plain markdown, synced via git. Project-scoped semantic search. No database required." />
+  <meta name="description" content="A local MCP memory server backed by plain markdown, synced via git. Project-scoped hybrid recall finds concepts, exact identifiers, and connected context. No database required." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
@@ -1171,7 +1171,7 @@
 
     <p class="hero-sub">
       mnemonic is a local MCP server that stores memories as plain markdown in git.
-      Project-scoped semantic search with configurable embeddings. No database. No always-on service.
+      Project-scoped hybrid recall finds concepts, exact names, identifiers, and connected context. No database. No always-on service.
     </p>
 
     <div class="hero-actions">
@@ -1252,7 +1252,7 @@
       <div class="feature-card fade-up">
         <span class="feature-icon">&#x1F3AF;</span>
         <h3>Project-scoped recall</h3>
-        <p>Memories belong to projects. When you're in a repo, relevant notes surface first with a similarity boost. Global memories stay accessible but don't crowd out context.</p>
+        <p>Memories belong to projects. When you're in a repo, relevant notes receive a bounded project preference without hiding stronger global matches. Semantic, exact-wording, and relationship signals work together to surface the right context.</p>
       </div>
       <div class="feature-card fade-up">
         <span class="feature-icon">&#x1F33F;</span>
@@ -1261,8 +1261,8 @@
       </div>
       <div class="feature-card fade-up">
         <span class="feature-icon">&#x1F50D;</span>
-        <h3>Semantic search, provider-aware</h3>
-        <p>Ollama is the local default, and advanced users can choose OpenAI-compatible endpoints, native OpenAI, or Gemini. <code style="font-family:JetBrains Mono,monospace;font-size:0.8em;color:var(--primary-lt)">recall</code> finds the right note even when you don't remember the exact words; <code style="font-family:JetBrains Mono,monospace;font-size:0.8em;color:var(--primary-lt)">grep</code> and file tools only match strings you already know. Embeddings are gitignored, recomputed on each machine, and never committed.</p>
+        <h3>Hybrid recall, provider-aware</h3>
+        <p>Ollama is the local default, and advanced users can choose OpenAI-compatible endpoints, native OpenAI, or Gemini. <code style="font-family:JetBrains Mono,monospace;font-size:0.8em;color:var(--primary-lt)">recall</code> combines conceptual search with exact names, identifiers, phrases, error codes, versions, and connected notes. Embeddings are gitignored, recomputed on each machine, and never committed.</p>
       </div>
       <div class="feature-card fade-up">
         <span class="feature-icon">&#x1F91D;</span>
@@ -1456,8 +1456,8 @@
     </p>
 
     <div class="recall-flow fade-up">
-      <h3>Recall flow &mdash; hybrid semantic + lexical search</h3>
-      <p class="section-desc" style="margin-bottom:16px;font-size:0.875rem;">Semantic search finds the right note even when you don't remember exact words. When results are weak, keyword matching rescues relevant candidates. Notes that explain key decisions and concepts then get a boost so "why"-style questions surface the right answer.</p>
+      <h3>Recall flow &mdash; bounded hybrid search</h3>
+      <p class="section-desc" style="margin-bottom:16px;font-size:0.875rem;">Semantic search finds conceptual matches while lexical search catches exact names, identifiers, phrases, and versions on every query. Relationship context adds connected notes, and bounded rank fusion keeps the final result stable and fail-soft.</p>
       <div class="flow-steps">
         <div class="flow-step">
           <div class="flow-step-box" style="border-color:rgba(74,222,128,0.25);color:var(--primary-lt)">recall query</div>
@@ -1470,18 +1470,18 @@
         </div>
         <div class="flow-arrow">&#x2192;</div>
         <div class="flow-step">
-          <div class="flow-step-box">lexical rerank</div>
-          <div class="flow-step-label"><span class="boost-badge">tiebreaker</span></div>
+          <div class="flow-step-box">exact wording</div>
+          <div class="flow-step-label">lexical channel</div>
         </div>
         <div class="flow-arrow">+</div>
         <div class="flow-step">
-          <div class="flow-step-box">lexical rescue</div>
-          <div class="flow-step-label">TF-IDF ranked</div>
+          <div class="flow-step-box">relationship context</div>
+          <div class="flow-step-label">connected notes</div>
         </div>
         <div class="flow-arrow">&#x2192;</div>
         <div class="flow-step">
-          <div class="flow-step-box">canonical promotion</div>
-          <div class="flow-step-label"><span class="boost-badge">explanations</span></div>
+          <div class="flow-step-box">bounded rank fusion</div>
+          <div class="flow-step-label"><span class="boost-badge">stable ranking</span></div>
         </div>
         <div class="flow-arrow">&#x2192;</div>
         <div class="flow-step">
@@ -2210,8 +2210,8 @@ VAULT_PATH = <span class="str">"/Users/you/mnemonic-vault"</span></pre>
         </div>
         <h3 class="dogfood-title">Enrichment layer design: provenance, temporal recall, projections, and relationship expansion</h3>
         <div class="dogfood-body">
-          <p>Four post-processing layers added on top of semantic recall, each additive and fail-soft: provenance and confidence metadata from git; opt-in temporal history enriched after semantic selection; projection-based embedding from structured note representations; bounded 1-hop relationship previews scored by project affinity, anchor status, and recency.</p>
-          <p>Core recall ranking is unaffected by any layer. Failures degrade gracefully to basic results.</p>
+          <p>Recall combines bounded semantic, lexical, and relationship signals while preserving provenance, confidence metadata, projection-based embeddings, and compact temporal history. Exact wording is always available as a rescue channel, while relationship expansion remains bounded and semantic-conditioned.</p>
+          <p>Rank fusion and priors stay bounded; failures degrade gracefully to useful basic results.</p>
         </div>
         <div class="dogfood-footer">
           <span class="dogfood-rel">relates to session-cache, role-heuristics</span>

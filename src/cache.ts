@@ -223,11 +223,12 @@ export function getSessionCachedNote(
  */
 export function getSessionCachedProjection(
   projectId: string,
+  vaultPath: string,
   noteId: string,
 ): NoteProjection | undefined {
   const cache = sessionCaches.activeProject;
   if (!cache || cache.projectId !== projectId) return undefined;
-  return cache.projectionsById.get(noteId);
+  return cache.projectionsById.get(`${vaultPath}::${noteId}`);
 }
 
 export function setSessionCachedNote(projectId: string, vaultPath: string, note: Note): void {
@@ -268,12 +269,13 @@ export function getRecentSessionAccessNote(
  */
 export function setSessionCachedProjection(
   projectId: string,
+  vaultPath: string,
   noteId: string,
   projection: NoteProjection,
 ): void {
   const cache = sessionCaches.activeProject;
   if (!cache || cache.projectId !== projectId) return;
-  cache.projectionsById.set(noteId, projection);
+  cache.projectionsById.set(`${vaultPath}::${noteId}`, projection);
 }
 
 function projectionTokenKey(vaultPath: string, noteId: string): string {

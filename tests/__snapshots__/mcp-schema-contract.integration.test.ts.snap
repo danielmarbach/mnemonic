@@ -2413,6 +2413,10 @@ Typical next step:
                         "updatedAt": {
                           "type": "string",
                         },
+                        "vault": {
+                          "description": "Storage label for disambiguating related notes",
+                          "type": "string",
+                        },
                       },
                       "required": [
                         "id",
@@ -4180,6 +4184,10 @@ Typical next step:
                           "updatedAt": {
                             "type": "string",
                           },
+                          "vault": {
+                            "description": "Storage label for disambiguating related notes",
+                            "type": "string",
+                          },
                         },
                         "required": [
                           "id",
@@ -4296,6 +4304,10 @@ Typical next step:
                               "type": "string",
                             },
                             "updatedAt": {
+                              "type": "string",
+                            },
+                            "vault": {
+                              "description": "Storage label for disambiguating related notes",
                               "type": "string",
                             },
                           },
@@ -4557,7 +4569,7 @@ Do not use this when:
 - You already know the exact id; use \`get\`
 - You just want to browse by tags or scope; use \`list\`
 
-Returns: ranked matches (id, title, score, vault, tags, lifecycle, updatedAt), 1-hop relationship previews on top results, temporal history (mode: temporal), retrieval evidence (evidence: compact), diagnostics: recallScopeNoteCount, diversity, retrievalCoverage, signalStrength.
+Returns: ranked matches (id, title, score, vault, tags, lifecycle, updatedAt), 1-hop relationship previews on top results, temporal history (mode: temporal), retrieval evidence (evidence: compact), including optional score decomposition, diagnostics: recallScopeNoteCount, diversity, retrievalCoverage, signalStrength.
 
 Typical next step:
 - Use \`get\`, \`update\`, \`relate\`, or \`consolidate\` based on the results.",
@@ -4591,6 +4603,7 @@ Typical next step:
         },
         "minSimilarity": {
           "default": 0.3,
+          "description": "Minimum similarity for semantic candidates. Lexical and graph channels remain independently bounded.",
           "maximum": 1,
           "minimum": 0,
           "type": "number",
@@ -4873,6 +4886,10 @@ Typical next step:
                         "updatedAt": {
                           "type": "string",
                         },
+                        "vault": {
+                          "description": "Storage label for disambiguating related notes",
+                          "type": "string",
+                        },
                       },
                       "required": [
                         "id",
@@ -4934,6 +4951,86 @@ Typical next step:
                     ],
                     "type": "string",
                   },
+                  "scoreDecomposition": {
+                    "additionalProperties": false,
+                    "description": "Bounded rank and policy contributions used for this result",
+                    "properties": {
+                      "canonicalPrior": {
+                        "description": "Bounded canonical explanation contribution",
+                        "maximum": 0.0115,
+                        "minimum": 0,
+                        "type": "number",
+                      },
+                      "finalScore": {
+                        "description": "Final score used for selection",
+                        "maximum": 0.3221,
+                        "minimum": 0,
+                        "type": "number",
+                      },
+                      "graphRank": {
+                        "description": "1-based graph channel rank",
+                        "maximum": 9007199254740991,
+                        "minimum": 1,
+                        "type": "integer",
+                      },
+                      "lexicalRank": {
+                        "description": "1-based lexical channel rank",
+                        "maximum": 9007199254740991,
+                        "minimum": 1,
+                        "type": "integer",
+                      },
+                      "metadataPrior": {
+                        "description": "Bounded role/importance contribution",
+                        "maximum": 0.028,
+                        "minimum": 0,
+                        "type": "number",
+                      },
+                      "projectPrior": {
+                        "description": "Bounded current-project contribution",
+                        "maximum": 0.005,
+                        "minimum": 0,
+                        "type": "number",
+                      },
+                      "rrfScore": {
+                        "description": "Scaled reciprocal-rank fusion contribution",
+                        "maximum": 0.1476,
+                        "minimum": 0,
+                        "type": "number",
+                      },
+                      "semanticConfidencePrior": {
+                        "description": "Bounded semantic confidence contribution",
+                        "maximum": 0.05,
+                        "minimum": 0,
+                        "type": "number",
+                      },
+                      "semanticRank": {
+                        "description": "1-based semantic channel rank",
+                        "maximum": 9007199254740991,
+                        "minimum": 1,
+                        "type": "integer",
+                      },
+                      "semanticScore": {
+                        "description": "Raw semantic channel score for diagnostics",
+                        "type": "number",
+                      },
+                      "temporalPrior": {
+                        "description": "Bounded temporal recency contribution",
+                        "maximum": 0.08,
+                        "minimum": 0,
+                        "type": "number",
+                      },
+                    },
+                    "required": [
+                      "rrfScore",
+                      "semanticConfidencePrior",
+                      "projectPrior",
+                      "temporalPrior",
+                      "metadataPrior",
+                      "canonicalPrior",
+                      "finalScore",
+                    ],
+                    "type": "object",
+                  },
                   "superseded": {
                     "type": "boolean",
                   },
@@ -4952,6 +5049,7 @@ Typical next step:
                   "projectRelevant",
                   "freshness",
                   "superseded",
+                  "scoreDecomposition",
                 ],
                 "type": "object",
               },

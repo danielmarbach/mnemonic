@@ -88,7 +88,11 @@ export function registerGetTool(server: McpServer, ctx: ServerContext): void {
           relationships = await getRelationshipPreview(
             note,
             ctx.vaultManager.allKnownVaults(project?.id),
-            { activeProjectId: project?.id, limit: 3 },
+            {
+              activeProjectId: project?.id,
+              sourceVaultPath: vault.storage.vaultPath,
+              limit: 3,
+            },
           );
         }
 

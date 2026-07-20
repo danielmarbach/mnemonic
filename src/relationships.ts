@@ -10,6 +10,7 @@ import {
 import { daysSince } from "./date-utils.js";
 import { attempt } from "./error-utils.js";
 import { memoryId } from "./brands.js";
+import { storageLabel } from "./helpers/vault.js";
 
 const RECENTLY_CHANGED_DAYS = 5;
 const HIGH_CONFIDENCE_CENTRALITY = 5;
@@ -32,6 +33,8 @@ export interface RelationshipExpansionOptions {
   limit?: number;
   /** Whether to include global notes (default: true if directly related) */
   includeGlobal?: boolean;
+  /** Vault path of the source note, used to disambiguate legacy unqualified relations. */
+  sourceVaultPath?: string;
 }
 
 // ── Scoring ───────────────────────────────────────────────────────────────────
@@ -164,16 +167,21 @@ export async function getDirectRelatedNotes(
   note: Note,
   allVaults: Vault[],
   activeProjectId?: string,
+  sourceVaultPath?: string,
 ): Promise<ScoredRelatedNote[]> {
-  const relatedIds = note.relatedTo?.map((r) => r.id) ?? [];
-  if (relatedIds.length === 0) {
+  const relationships = note.relatedTo ?? [];
+  if (relationships.length === 0) {
     return [];
   }
 
   const scored: ScoredRelatedNote[] = [];
   const noteById = new Map<string, { note: Note; vault: Vault }>();
+  const sourceVault = allVaults.find((vault) => vault.storage.vaultPath === sourceVaultPath);
+  const orderedVaults = sourceVault
+    ? [sourceVault, ...allVaults.filter((vault) => vault !== sourceVault)]
+    : allVaults;
 
-  for (const vault of allVaults) {
+  for (const vault of orderedVaults) {
     const notes = await vault.storage.listNotes();
     for (const n of notes) {
       if (!noteById.has(n.id)) {
@@ -184,10 +192,7 @@ export async function getDirectRelatedNotes(
 
   const visibleNotes = [...noteById.values()].map((v) => v.note);
 
-  for (const relatedId of relatedIds) {
-    const relationship = note.relatedTo?.find((r) => r.id === relatedId);
-    if (!relationship) continue;
-
+  for (const relationship of relationships) {
     let entry: { note: Note; vault: Vault } | undefined;
 
     if (relationship.vaultPath) {
@@ -201,7 +206,7 @@ export async function getDirectRelatedNotes(
     }
 
     if (!entry) {
-      entry = noteById.get(relatedId);
+      entry = noteById.get(relationship.id);
     }
 
     if (!entry) continue;
@@ -247,6 +252,7 @@ function buildRelatedNotePreview(
     id: note.id,
     title: note.title,
     projectId: note.project,
+    vault: storageLabel(scored.vault),
     theme: theme !== "other" ? theme : undefined,
     relationType,
     updatedAt: note.updatedAt,
@@ -291,7 +297,12 @@ export async function getRelationshipPreview(
   options: RelationshipExpansionOptions,
 ): Promise<RelationshipPreview | undefined> {
   const result = await attempt("relationships:preview", async () => {
-    const scored = await getDirectRelatedNotes(note, allVaults, options.activeProjectId);
+    const scored = await getDirectRelatedNotes(
+      note,
+      allVaults,
+      options.activeProjectId,
+      options.sourceVaultPath,
+    );
     return buildRelationshipPreview(scored, options);
   });
   if (!result.ok) return undefined;

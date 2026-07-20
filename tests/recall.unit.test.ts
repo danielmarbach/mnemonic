@@ -21,66 +21,117 @@ import type { EffectiveNoteMetadata } from "../src/role-suggestions.js";
 const vault = {} as ScoredRecallCandidate["vault"];
 
 describe("selectRecallResults", () => {
-  it("prefers current-project matches before widening to global results", () => {
+  it("uses project affinity as a bounded prior rather than hard selection", () => {
     const results = selectRecallResults(
       [
-        { id: "global-best", score: 0.95, boosted: 0.95, vault, isCurrentProject: false },
-        { id: "project-a", score: 0.72, boosted: 0.87, vault, isCurrentProject: true },
-        { id: "project-b", score: 0.7, boosted: 0.85, vault, isCurrentProject: true },
-        { id: "global-next", score: 0.8, boosted: 0.8, vault, isCurrentProject: false },
+        {
+          id: "global-best",
+          score: 0.95,
+          semanticScore: 0.95,
+          semanticRank: 1,
+          boosted: 0.95,
+          vault,
+          isCurrentProject: false,
+        },
+        {
+          id: "project-a",
+          score: 0.72,
+          semanticScore: 0.72,
+          semanticRank: 2,
+          projectPrior: 0.005,
+          boosted: 0.73,
+          vault,
+          isCurrentProject: true,
+        },
+        {
+          id: "project-b",
+          score: 0.7,
+          semanticScore: 0.7,
+          semanticRank: 3,
+          projectPrior: 0.005,
+          boosted: 0.71,
+          vault,
+          isCurrentProject: true,
+        },
+        {
+          id: "global-next",
+          score: 0.8,
+          semanticScore: 0.8,
+          semanticRank: 4,
+          boosted: 0.8,
+          vault,
+          isCurrentProject: false,
+        },
       ],
-      3,
+      4,
       "all",
     );
 
-    expect(results.map((result) => result.id)).toEqual(["project-a", "project-b", "global-best"]);
+    expect(results.map((result) => result.id)).toEqual([
+      "global-best",
+      "project-a",
+      "project-b",
+      "global-next",
+    ]);
   });
 
-  it("returns only project matches when they fill the limit", () => {
+  it("does not let project affinity replace a strong global result", () => {
     const results = selectRecallResults(
       [
-        { id: "project-a", score: 0.82, boosted: 0.97, vault, isCurrentProject: true },
-        { id: "project-b", score: 0.8, boosted: 0.95, vault, isCurrentProject: true },
-        { id: "global-best", score: 0.99, boosted: 0.99, vault, isCurrentProject: false },
+        {
+          id: "global-best",
+          score: 0.99,
+          semanticScore: 0.99,
+          semanticRank: 1,
+          boosted: 0.99,
+          vault,
+          isCurrentProject: false,
+        },
+        {
+          id: "project-a",
+          score: 0.82,
+          semanticScore: 0.82,
+          semanticRank: 2,
+          projectPrior: 0.005,
+          boosted: 0.83,
+          vault,
+          isCurrentProject: true,
+        },
       ],
-      2,
+      1,
       "all",
     );
 
-    expect(results.map((result) => result.id)).toEqual(["project-a", "project-b"]);
+    expect(results.map((result) => result.id)).toEqual(["global-best"]);
   });
 
-  it("falls back to standard boosted ordering for non-all scopes or no project matches", () => {
+  it("keeps standard ordering for explicit non-all scopes", () => {
     const candidates = [
-      { id: "global-best", score: 0.9, boosted: 0.9, vault, isCurrentProject: false },
-      { id: "project-a", score: 0.7, boosted: 0.85, vault, isCurrentProject: true },
+      {
+        id: "global-best",
+        score: 0.9,
+        semanticScore: 0.9,
+        semanticRank: 1,
+        boosted: 0.9,
+        vault,
+        isCurrentProject: false,
+      },
+      {
+        id: "project-a",
+        score: 0.7,
+        semanticScore: 0.7,
+        semanticRank: 2,
+        projectPrior: 0.005,
+        boosted: 0.71,
+        vault,
+        isCurrentProject: true,
+      },
     ];
 
     expect(selectRecallResults(candidates, 2, "global").map((result) => result.id)).toEqual([
       "global-best",
       "project-a",
     ]);
-    expect(
-      selectRecallResults(
-        [{ id: "global-best", score: 0.9, boosted: 0.9, vault, isCurrentProject: false }],
-        1,
-        "all",
-      ).map((result) => result.id),
-    ).toEqual(["global-best"]);
-  });
-
-  it("keeps stronger project preference behavior intact after additive metadata boosts", () => {
-    const results = selectRecallResults(
-      [
-        { id: "global-metadata", score: 0.91, boosted: 0.94, vault, isCurrentProject: false },
-        { id: "project-a", score: 0.78, boosted: 0.93, vault, isCurrentProject: true },
-        { id: "project-b", score: 0.76, boosted: 0.91, vault, isCurrentProject: true },
-      ],
-      2,
-      "all",
-    );
-
-    expect(results.map((result) => result.id)).toEqual(["project-a", "project-b"]);
   });
 
   it("uses hybrid score for ordering when lexical scores are present", () => {
@@ -209,21 +260,27 @@ describe("temporal retrieval boost", () => {
 });
 
 describe("computeHybridScore", () => {
-  it("returns boosted score when no lexical score", () => {
+  it("uses rank evidence and bounded priors instead of raw semantic magnitude", () => {
     const candidate: ScoredRecallCandidate = {
       id: "a",
       score: 0.7,
+      semanticScore: 0.7,
       boosted: 0.8,
       vault,
       isCurrentProject: true,
+      semanticRank: 1,
     };
-    expect(computeHybridScore(candidate)).toBeCloseTo(0.8, 5);
+    const hybrid = computeHybridScore(candidate);
+
+    expect(hybrid).toBeCloseTo((1 / 61) * 3 + 0.035, 5);
+    expect(hybrid).toBeLessThan(0.1);
   });
 
   it("adds lexical contribution when present", () => {
     const candidate: ScoredRecallCandidate = {
       id: "a",
       score: 0.7,
+      semanticScore: 0.7,
       boosted: 0.8,
       vault,
       isCurrentProject: true,
@@ -231,13 +288,14 @@ describe("computeHybridScore", () => {
       lexicalRank: 1,
     };
     const hybrid = computeHybridScore(candidate);
-    expect(hybrid).toBeGreaterThan(0.8);
+    expect(hybrid).toBeGreaterThan((1 / 61) * 3 + 0.035);
   });
 
   it("adds graph rank as a third RRF channel", () => {
     const twoChannel: ScoredRecallCandidate = {
       id: "a",
       score: 0.7,
+      semanticScore: 0.7,
       boosted: 0.8,
       vault,
       isCurrentProject: true,
@@ -249,30 +307,40 @@ describe("computeHybridScore", () => {
     expect(computeHybridScore(threeChannel)).toBeGreaterThan(computeHybridScore(twoChannel));
   });
 
-  it("lexical score cannot overcome large semantic gap", () => {
-    const lowSemantic: ScoredRecallCandidate = {
+  it("does not let semantic score magnitude change the fused order when rank is unchanged", () => {
+    const lower: ScoredRecallCandidate = {
       id: "a",
-      score: 0.3,
-      boosted: 0.3,
+      score: 0.4,
+      semanticScore: 0.4,
+      boosted: 0.4,
       vault,
       isCurrentProject: false,
-      lexicalScore: 1.0,
+      semanticRank: 1,
     };
-    const highSemantic: ScoredRecallCandidate = {
-      id: "b",
-      score: 0.8,
-      boosted: 0.8,
-      vault,
-      isCurrentProject: false,
-      lexicalScore: 0,
-    };
-    expect(computeHybridScore(highSemantic)).toBeGreaterThan(computeHybridScore(lowSemantic));
+    const higher: ScoredRecallCandidate = { ...lower, semanticScore: 0.9, score: 0.9 };
+
+    expect(computeHybridScore(higher)).toBeGreaterThan(computeHybridScore(lower));
+    expect(computeHybridScore(higher) - computeHybridScore(lower)).toBeLessThanOrEqual(0.025001);
   });
 
-  it("adds a small canonical contribution in RRF mode", () => {
+  it("suppresses semantic confidence outside the rank window", () => {
+    const candidate: ScoredRecallCandidate = {
+      id: "tail",
+      score: 0.99,
+      semanticScore: 0.99,
+      boosted: 0.99,
+      vault,
+      isCurrentProject: false,
+    };
+
+    expect(computeHybridScore(candidate)).toBe(0);
+  });
+
+  it("adds a bounded canonical contribution in RRF mode", () => {
     const candidate: ScoredRecallCandidate = {
       id: "a",
       score: 0.7,
+      semanticScore: 0.7,
       boosted: 0.5,
       vault,
       isCurrentProject: true,
@@ -284,19 +352,7 @@ describe("computeHybridScore", () => {
     const withCanonical = computeHybridScore(candidate);
     const withoutCanonical = computeHybridScore({ ...candidate, canonicalExplanationScore: 0 });
     expect(withCanonical).toBeGreaterThan(withoutCanonical);
-  });
-
-  it("keeps canonical contribution weighted when all rank channels are missing", () => {
-    const candidate: ScoredRecallCandidate = {
-      id: "tail-canonical",
-      score: 0.4,
-      boosted: 0.4,
-      vault,
-      isCurrentProject: true,
-      canonicalExplanationScore: 0.1,
-    };
-
-    expect(computeHybridScore(candidate)).toBeCloseTo(0.405, 5);
+    expect(candidate.canonicalPrior ?? 0).toBeCloseTo(0.0035, 5);
   });
 });
 
@@ -413,6 +469,53 @@ describe("applyLexicalReranking", () => {
     const reranked = applyLexicalReranking(candidates, "test", (id) => `text for ${id}`);
 
     expect(reranked).toHaveLength(2);
+  });
+
+  it("uses stable note-id tie breaking for the independent lexical channel", () => {
+    const candidates: ScoredRecallCandidate[] = [
+      {
+        id: "note-b",
+        score: 0.5,
+        boosted: 0.5,
+        lexicalScore: 0.5,
+        lexicalChannelScore: 0.5,
+        lexicalChannelCandidate: true,
+        vault,
+        isCurrentProject: true,
+      },
+      {
+        id: "note-a",
+        score: 0.5,
+        boosted: 0.5,
+        lexicalScore: 0.5,
+        lexicalChannelScore: 0.5,
+        lexicalChannelCandidate: true,
+        vault,
+        isCurrentProject: true,
+      },
+    ];
+
+    expect(applyCanonicalExplanationPromotion(candidates).map((candidate) => candidate.id)).toEqual(
+      ["note-a", "note-b"],
+    );
+  });
+
+  it("does not invent lexical ranks when the independent channel has no hits", () => {
+    const promoted = applyCanonicalExplanationPromotion([
+      {
+        id: "semantic-only",
+        score: 0.8,
+        semanticScore: 0.8,
+        semanticRank: 1,
+        boosted: 0.8,
+        lexicalScore: 1,
+        lexicalChannelCandidate: false,
+        vault,
+        isCurrentProject: true,
+      },
+    ]);
+
+    expect(promoted[0]?.lexicalRank).toBeUndefined();
   });
 });
 
@@ -931,6 +1034,26 @@ describe("applyGraphSpreadingActivation", () => {
     expect(boosted.graphRank).toBe(1);
   });
 
+  it("keeps graph identity vault-qualified when note ids collide", () => {
+    const projectVault = { storage: { vaultPath: "/project" } } as ScoredRecallCandidate["vault"];
+    const mainVault = { storage: { vaultPath: "/main" } } as ScoredRecallCandidate["vault"];
+    const candidates: ScoredRecallCandidate[] = [
+      { id: "same-id", score: 0.7, boosted: 0.7, vault: projectVault, isCurrentProject: true },
+      { id: "same-id", score: 0.6, boosted: 0.6, vault: mainVault, isCurrentProject: false },
+    ];
+
+    const result = applyGraphSpreadingActivation(candidates, (id, sourceVault) =>
+      id === "same-id" && sourceVault.storage.vaultPath === "/project"
+        ? [{ id: "project-related", type: "related-to" as const }]
+        : undefined,
+    );
+
+    expect(result.find((candidate) => candidate.id === "project-related")?.graphScore).toBeCloseTo(
+      0.7 * 0.5 * 0.8,
+      5,
+    );
+  });
+
   it("accumulates propagated scores onto an existing candidate from multiple entry points", () => {
     const candidates: ScoredRecallCandidate[] = [
       { id: "entry-a", score: 0.6, boosted: 0.6, vault, isCurrentProject: true },
@@ -1115,11 +1238,10 @@ describe("applyGraphSpreadingActivation", () => {
       }));
     });
 
-    const ranked = result
-      .filter((candidate) => candidate.id.startsWith("related-"))
-      .sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true }));
-    expect(ranked[99].graphRank).toBe(1);
-    expect(ranked[100].graphRank).toBeUndefined();
+    const related99 = result.find((candidate) => candidate.id === "related-99");
+    const related100 = result.find((candidate) => candidate.id === "related-100");
+    expect(related99?.graphRank).toBeUndefined();
+    expect(related100?.graphRank).toBe(1);
   });
 });
 
@@ -1139,7 +1261,7 @@ describe("resolveDiscoveredVaults", () => {
       },
     ];
 
-    const originalIds = new Set(["entry"]);
+    const originalIds = new Set(["/project::entry"]);
     const resolveVault = async (id: string) => {
       if (id === "discovered-global") {
         return { vault: mainVault, isCurrentProject: false };
@@ -1160,7 +1282,7 @@ describe("resolveDiscoveredVaults", () => {
       { id: "existing", score: 0.6, boosted: 0.6, vault: projectVault, isCurrentProject: true },
     ];
 
-    const originalIds = new Set(["existing"]);
+    const originalIds = new Set(["/project::existing"]);
 
     await resolveDiscoveredVaults(candidates, originalIds, async () => {
       throw new Error("should not be called for existing candidates");
@@ -1182,7 +1304,7 @@ describe("resolveDiscoveredVaults", () => {
       },
     ];
 
-    const originalIds = new Set(["entry"]);
+    const originalIds = new Set(["/project::entry"]);
 
     await resolveDiscoveredVaults(candidates, originalIds, async () => undefined);
 

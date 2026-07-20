@@ -234,7 +234,10 @@ export function rankDocumentsByTfIdf(
         score: tfIdfScore + 0.35 * coverageScore + 0.2 * titleScore,
       };
     })
-    .sort((a, b) => b.score - a.score)
+    .sort((a, b) => {
+      const scoreDelta = b.score - a.score;
+      return scoreDelta !== 0 ? scoreDelta : a.id.localeCompare(b.id);
+    })
     .slice(0, limit);
 }
 
@@ -306,7 +309,22 @@ function extractProjectionTitle(text: string): string {
 }
 
 /**
- * Maximum number of candidates to consider for lexical rescue.
+ * Maximum number of candidates considered by the always-on lexical channel.
+ */
+export const LEXICAL_RETRIEVAL_CANDIDATE_LIMIT = 25;
+
+/**
+ * Maximum number of candidates returned by the always-on lexical channel.
+ */
+export const LEXICAL_RETRIEVAL_RESULT_LIMIT = 25;
+
+/**
+ * Minimum positive lexical signal for the always-on channel.
+ */
+export const LEXICAL_RETRIEVAL_THRESHOLD = 0.05;
+
+/**
+ * Maximum number of candidates to consider for lexical rescue compatibility.
  */
 export const LEXICAL_RESCUE_CANDIDATE_LIMIT = 20;
 

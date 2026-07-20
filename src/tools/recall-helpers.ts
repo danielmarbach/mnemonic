@@ -3,6 +3,7 @@ import type { Vault } from "../vault.js";
 import { getEffectiveMetadata } from "../role-suggestions.js";
 import {
   computeRecallMetadataBoost,
+  recallCandidateIdentity,
   type ScoredRecallCandidate,
   type TemporalQueryHint,
   shouldApplyTemporalFiltering,
@@ -12,14 +13,20 @@ import {
 import { getOrBuildProjection } from "../projections.js";
 import { attempt } from "../error-utils.js";
 import {
+  getSessionCachedProjection,
+  setSessionCachedProjection,
   getSessionCachedProjectionTokens,
   setSessionCachedProjectionTokens,
   getOrBuildVaultNoteList,
 } from "../cache.js";
 import {
   tokenize,
+  computeLexicalScore,
   prepareTfIdfCorpusFromTokenizedDocuments,
   rankDocumentsByTfIdf,
+  LEXICAL_RETRIEVAL_CANDIDATE_LIMIT,
+  LEXICAL_RETRIEVAL_RESULT_LIMIT,
+  LEXICAL_RETRIEVAL_THRESHOLD,
   LEXICAL_RESCUE_CANDIDATE_LIMIT,
   LEXICAL_RESCUE_THRESHOLD,
   LEXICAL_RESCUE_RESULT_LIMIT,
@@ -50,10 +57,32 @@ export function buildRecallCandidateContext(note: Note) {
 
 // ── Lexical rescue ────────────────────────────────────────────────────────────
 
-export const PROJECT_SCOPE_BOOST = 0.03;
+// Bounded policy priors remain smaller than meaningful multi-channel RRF agreement.
+export const PROJECT_SCOPE_BOOST = 0.005;
 export const ATTACHMENT_BOOST = PROJECT_SCOPE_BOOST / 2;
 
-export async function collectLexicalRescueCandidates(
+interface LexicalCandidateOptions {
+  excludeExisting: boolean;
+  candidateLimit: number;
+  resultLimit: number;
+  minimumScore: number;
+}
+
+const ALWAYS_ON_LEXICAL_OPTIONS: LexicalCandidateOptions = {
+  excludeExisting: false,
+  candidateLimit: LEXICAL_RETRIEVAL_CANDIDATE_LIMIT,
+  resultLimit: LEXICAL_RETRIEVAL_RESULT_LIMIT,
+  minimumScore: LEXICAL_RETRIEVAL_THRESHOLD,
+};
+
+const RESCUE_LEXICAL_OPTIONS: LexicalCandidateOptions = {
+  excludeExisting: true,
+  candidateLimit: LEXICAL_RESCUE_CANDIDATE_LIMIT,
+  resultLimit: LEXICAL_RESCUE_RESULT_LIMIT,
+  minimumScore: LEXICAL_RESCUE_THRESHOLD,
+};
+
+export async function collectLexicalCandidates(
   vaults: Vault[],
   query: string,
   temporalQueryHint: TemporalQueryHint | undefined,
@@ -62,15 +91,17 @@ export async function collectLexicalRescueCandidates(
   tags: string[] | undefined,
   lifecycle: NoteLifecycle | undefined,
   existingIds: ScoredRecallCandidate[],
+  options: LexicalCandidateOptions = ALWAYS_ON_LEXICAL_OPTIONS,
 ): Promise<ScoredRecallCandidate[]> {
   const projectId = project?.id;
   const applyTemporalFilter = shouldApplyTemporalFiltering(temporalQueryHint);
   const temporalFilterWindowDays = applyTemporalFilter
     ? temporalQueryHint?.filterWindowDays
     : undefined;
-  const existingIdSet = new Set(existingIds.map((c) => c.id));
-  const rescuePool: Array<{
+  const existingIdSet = new Set(existingIds.map((candidate) => recallCandidateIdentity(candidate)));
+  const lexicalPool: Array<{
     id: string;
+    identityKey: string;
     vault: Vault;
     isCurrentProject: boolean;
     isAttachedVault: boolean;
@@ -81,9 +112,12 @@ export async function collectLexicalRescueCandidates(
   }> = [];
 
   for (const vault of vaults) {
-    const notes = await vault.storage.listNotes().catch(() => []);
+    const notes = projectId
+      ? ((await getOrBuildVaultNoteList(projectId, vault)) ?? [])
+      : await vault.storage.listNotes().catch(() => []);
     for (const note of notes) {
-      if (existingIdSet.has(note.id)) continue;
+      const identityKey = `${vault.storage.vaultPath}::${note.id}`;
+      if (options.excludeExisting && existingIdSet.has(identityKey)) continue;
 
       if (tags && tags.length > 0) {
         const noteTags = new Set(note.tags);
@@ -106,86 +140,102 @@ export async function collectLexicalRescueCandidates(
         continue;
       }
 
-      const projection = await getOrBuildProjection(vault.storage, note).catch(() => undefined);
+      const cachedProjection = projectId
+        ? getSessionCachedProjection(projectId, vault.storage.vaultPath, note.id)
+        : undefined;
+      const projection =
+        cachedProjection ??
+        (await getOrBuildProjection(vault.storage, note).catch(() => undefined));
       if (!projection) continue;
 
-      rescuePool.push({
+      const projectionTokens = projectId
+        ? (getSessionCachedProjectionTokens(
+            projectId,
+            vault.storage.vaultPath,
+            note.id,
+            projection.projectionText,
+          ) ?? tokenize(projection.projectionText))
+        : tokenize(projection.projectionText);
+      lexicalPool.push({
         id: note.id,
+        identityKey,
         vault,
         isCurrentProject: Boolean(isCurrentProject),
         isAttachedVault: Boolean(isAttachedVault),
         updatedAt: note.updatedAt,
         projectionText: projection.projectionText,
-        projectionTokens: projectId
-          ? (getSessionCachedProjectionTokens(
-              projectId,
-              vault.storage.vaultPath,
-              note.id,
-              projection.projectionText,
-            ) ?? tokenize(projection.projectionText))
-          : tokenize(projection.projectionText),
+        projectionTokens,
         context: buildRecallCandidateContext(note),
       });
 
       if (projectId) {
+        if (cachedProjection === undefined) {
+          setSessionCachedProjection(projectId, vault.storage.vaultPath, note.id, projection);
+        }
         setSessionCachedProjectionTokens(
           projectId,
           vault.storage.vaultPath,
           note.id,
           projection.projectionText,
-          rescuePool[rescuePool.length - 1]?.projectionTokens ?? [],
+          projectionTokens,
         );
       }
     }
   }
 
-  const rescueDocuments = rescuePool.map((candidate) => ({
-    id: candidate.id,
+  const documents = lexicalPool.map((candidate) => ({
+    id: candidate.identityKey,
     text: candidate.projectionText,
   }));
-
-  const preparedRescueCorpus = prepareTfIdfCorpusFromTokenizedDocuments(
-    rescuePool.map((candidate) => ({
-      id: candidate.id,
+  const preparedCorpus = prepareTfIdfCorpusFromTokenizedDocuments(
+    lexicalPool.map((candidate) => ({
+      id: candidate.identityKey,
       text: candidate.projectionText,
       tokens: candidate.projectionTokens,
     })),
   );
-
-  const rankedRescueIds = new Map(
-    rankDocumentsByTfIdf(
-      query,
-      rescueDocuments,
-      LEXICAL_RESCUE_CANDIDATE_LIMIT,
-      preparedRescueCorpus,
-    ).map((candidate) => [candidate.id, candidate.score]),
+  const rankedScores = new Map(
+    rankDocumentsByTfIdf(query, documents, options.candidateLimit, preparedCorpus).map(
+      (candidate) => [candidate.id, candidate.score],
+    ),
   );
 
   const candidates: ScoredRecallCandidate[] = [];
-  for (const candidate of rescuePool) {
-    const tfIdfScore = rankedRescueIds.get(candidate.id);
-    if (tfIdfScore === undefined || tfIdfScore <= 0) continue;
+  for (const candidate of lexicalPool) {
+    const lexicalChannelScore = rankedScores.get(candidate.identityKey);
+    if (
+      lexicalChannelScore === undefined ||
+      lexicalChannelScore <= 0 ||
+      lexicalChannelScore < options.minimumScore
+    ) {
+      continue;
+    }
 
-    const lexicalScore = tfIdfScore;
-    if (lexicalScore < LEXICAL_RESCUE_THRESHOLD) continue;
-
-    const temporalBoost = temporalQueryHint
+    const temporalPrior = temporalQueryHint
       ? computeTemporalRecencyBoost(candidate.updatedAt, temporalQueryHint)
       : 0;
-    const scopeBoost = candidate.isCurrentProject
+    const projectPrior = candidate.isCurrentProject
       ? PROJECT_SCOPE_BOOST
       : candidate.isAttachedVault
         ? ATTACHMENT_BOOST
         : 0;
-    const boost = scopeBoost + candidate.context.metadataBoost + temporalBoost;
+    const metadataPrior = candidate.context.metadataBoost;
     candidates.push({
       id: candidate.id,
-      score: lexicalScore,
+      identityKey: `${candidate.vault.storage.vaultPath}::${candidate.id}`,
+      score: 0,
       semanticScoreForPromotion: 0,
-      boosted: boost,
+      semanticScore: undefined,
+      semanticConfidencePrior: 0,
+      lexicalScore: computeLexicalScore(query, candidate.projectionText),
+      lexicalChannelScore,
+      lexicalChannelCandidate: true,
+      boosted: projectPrior + metadataPrior + temporalPrior,
+      projectPrior,
+      temporalPrior,
+      metadataPrior,
       vault: candidate.vault,
       isCurrentProject: candidate.isCurrentProject,
-      lexicalScore,
       lifecycle: candidate.context.lifecycle,
       relatedCount: candidate.context.relatedCount,
       connectionDiversity: candidate.context.connectionDiversity,
@@ -195,8 +245,36 @@ export async function collectLexicalRescueCandidates(
   }
 
   return candidates
-    .sort((a, b) => (b.lexicalScore ?? 0) - (a.lexicalScore ?? 0))
-    .slice(0, LEXICAL_RESCUE_RESULT_LIMIT);
+    .sort((a, b) => {
+      const scoreDelta = (b.lexicalChannelScore ?? 0) - (a.lexicalChannelScore ?? 0);
+      return scoreDelta !== 0
+        ? scoreDelta
+        : recallCandidateIdentity(a).localeCompare(recallCandidateIdentity(b));
+    })
+    .slice(0, options.resultLimit);
+}
+
+export function collectLexicalRescueCandidates(
+  vaults: Vault[],
+  query: string,
+  temporalQueryHint: TemporalQueryHint | undefined,
+  project: { id: string; name: string } | undefined,
+  scope: "project" | "global" | "all",
+  tags: string[] | undefined,
+  lifecycle: NoteLifecycle | undefined,
+  existingIds: ScoredRecallCandidate[],
+): Promise<ScoredRecallCandidate[]> {
+  return collectLexicalCandidates(
+    vaults,
+    query,
+    temporalQueryHint,
+    project,
+    scope,
+    tags,
+    lifecycle,
+    existingIds,
+    RESCUE_LEXICAL_OPTIONS,
+  );
 }
 
 // ── Tag discovery helpers ─────────────────────────────────────────────────────

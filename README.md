@@ -1,6 +1,6 @@
 # mnemonic
 
-A local MCP memory server backed by plain markdown files, synced via git. No database. Project-scoped memory with semantic search.
+A local MCP memory server backed by plain markdown files, synced via git. No database. Project-scoped memory with hybrid semantic, exact-match, and relationship-aware recall.
 
 For the high-level system map, see [`ARCHITECTURE.md`](ARCHITECTURE.md). For release notes, see [`CHANGELOG.md`](CHANGELOG.md).
 
@@ -9,9 +9,10 @@ For the high-level system map, see [`ARCHITECTURE.md`](ARCHITECTURE.md). For rel
 - 🧠 Your MCP client remembers decisions, fixes, and context across sessions — no re-explaining the same project.
 - 📁 Memories are plain markdown with YAML frontmatter: readable, diffable, mergeable, and easy to back up.
 - 🚫 No database or always-on service: just files, git, and a local Node process.
-- 🎯 Project-scoped recall surfaces the right repo context first while keeping global memories accessible.
+- 🎯 Project-scoped recall favors the right repo context while keeping stronger global matches accessible.
+- 🔎 Hybrid recall finds conceptual matches plus exact names, identifiers, phrases, error codes, and versions.
 - 🤝 Shared `.mnemonic/` notes travel with the repository, so project knowledge isn't trapped in one person's chat history.
-- 🔒 Embeddings stay local and gitignored — semantic search without committing generated vector data.
+- 🔒 Embeddings stay local and gitignored — semantic retrieval without committing generated vector data.
 - 📝 Every `remember`, `update`, and `consolidate` creates a semantic git commit — decision log and plans travel with the code in the same history.
 - 🔓 Designed for removability — though we're quietly confident you won't use that exit. Every note is plain markdown with YAML frontmatter; the knowledge you gather is independent of mnemonic and always yours.
 
@@ -268,20 +269,20 @@ For local development against this repository's source tree, use `npm run mcp:lo
 
 ## Configuration
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `VAULT_PATH` | `~/mnemonic-vault` | Path to your markdown vault |
-| `EMBED_PROVIDER` | `ollama` | `ollama`, `openai-compatible`, `openai`, or `gemini` |
-| `EMBED_MODEL` | provider default | Embedding model. Defaults to `nomic-embed-text-v2-moe` for Ollama, `text-embedding-3-small` for OpenAI, and `gemini-embedding-2` for Gemini. Required for `openai-compatible`. |
-| `EMBED_DIMENSIONS` | unset | Optional provider-supported output dimensions |
-| `OLLAMA_URL` | `http://localhost:11434` | Ollama server URL, validated to localhost/private-network addresses |
-| `EMBED_BASE_URL` | unset | Base URL for `openai-compatible` endpoints such as LiteLLM, LM Studio, vLLM, or Ollama's OpenAI-compatible API |
-| `EMBED_API_KEY` | unset | Optional bearer token for `openai-compatible`; never persisted by mnemonic |
-| `OPENAI_BASE_URL` | `https://api.openai.com` | Native OpenAI base URL; also used as fallback for `openai-compatible` when `EMBED_BASE_URL` is unset |
-| `OPENAI_API_KEY` | unset | Required for `EMBED_PROVIDER=openai`; also used as fallback for `openai-compatible` when `EMBED_API_KEY` is unset |
-| `GEMINI_BASE_URL` | `https://generativelanguage.googleapis.com` | Native Gemini API base URL |
-| `GEMINI_API_KEY` | unset | Required for `EMBED_PROVIDER=gemini`; never persisted by mnemonic |
-| `DISABLE_GIT` | `false` | Set `true` to skip all git ops |
+| Variable           | Default                                     | Description                                                                                                                                                                    |
+| ------------------ | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `VAULT_PATH`       | `~/mnemonic-vault`                          | Path to your markdown vault                                                                                                                                                    |
+| `EMBED_PROVIDER`   | `ollama`                                    | `ollama`, `openai-compatible`, `openai`, or `gemini`                                                                                                                           |
+| `EMBED_MODEL`      | provider default                            | Embedding model. Defaults to `nomic-embed-text-v2-moe` for Ollama, `text-embedding-3-small` for OpenAI, and `gemini-embedding-2` for Gemini. Required for `openai-compatible`. |
+| `EMBED_DIMENSIONS` | unset                                       | Optional provider-supported output dimensions                                                                                                                                  |
+| `OLLAMA_URL`       | `http://localhost:11434`                    | Ollama server URL, validated to localhost/private-network addresses                                                                                                            |
+| `EMBED_BASE_URL`   | unset                                       | Base URL for `openai-compatible` endpoints such as LiteLLM, LM Studio, vLLM, or Ollama's OpenAI-compatible API                                                                 |
+| `EMBED_API_KEY`    | unset                                       | Optional bearer token for `openai-compatible`; never persisted by mnemonic                                                                                                     |
+| `OPENAI_BASE_URL`  | `https://api.openai.com`                    | Native OpenAI base URL; also used as fallback for `openai-compatible` when `EMBED_BASE_URL` is unset                                                                           |
+| `OPENAI_API_KEY`   | unset                                       | Required for `EMBED_PROVIDER=openai`; also used as fallback for `openai-compatible` when `EMBED_API_KEY` is unset                                                              |
+| `GEMINI_BASE_URL`  | `https://generativelanguage.googleapis.com` | Native Gemini API base URL                                                                                                                                                     |
+| `GEMINI_API_KEY`   | unset                                       | Required for `EMBED_PROVIDER=gemini`; never persisted by mnemonic                                                                                                              |
+| `DISABLE_GIT`      | `false`                                     | Set `true` to skip all git ops                                                                                                                                                 |
 
 Provider configuration is read from the process environment at startup. Only non-secret compatibility metadata is stored in local gitignored embedding JSON files: provider, model, dimensions, metric, optional input mode, and compatibility key.
 
@@ -295,10 +296,10 @@ The main vault's `~/mnemonic-vault/config.json` holds machine-local settings tha
 
 User-tunable fields:
 
-| Field | Default | Description |
-|-------|---------|-------------|
-| `reindexEmbedConcurrency` | `4` | Parallel embedding requests during `sync` (capped 1–16) |
-| `mutationPushMode` | `"main-only"` | When to auto-push after a write: `"all"`, `"main-only"`, or `"none"` |
+| Field                     | Default       | Description                                                          |
+| ------------------------- | ------------- | -------------------------------------------------------------------- |
+| `reindexEmbedConcurrency` | `4`           | Parallel embedding requests during `sync` (capped 1–16)              |
+| `mutationPushMode`        | `"main-only"` | When to auto-push after a write: `"all"`, `"main-only"`, or `"none"` |
 
 `projectMemoryPolicies` and `projectIdentityOverrides` are written automatically by `set_project_memory_policy` and `set_project_identity` — no need to edit them by hand.
 Project memory policies can include protected-branch settings (`protectedBranchBehavior`, `protectedBranchPatterns`) used by mutating tools when they commit to project vaults (`remember`, `update`, `forget`, `move_memory`, and mutating `consolidate` strategies).
@@ -349,7 +350,7 @@ Two vault types store notes:
 
 `cwd` sets project context; `scope` picks storage:
 
-- `cwd` + `scope: "project"` *(default when `cwd` is present)* → project vault (`.mnemonic/`)
+- `cwd` + `scope: "project"` _(default when `cwd` is present)_ → project vault (`.mnemonic/`)
 - `cwd` + `scope: "global"` → main vault, with project association in frontmatter
 - no `cwd` → main vault as a plain global memory
 
@@ -377,18 +378,18 @@ Every result carries structured quality signals to help agents decide what to tr
 - **`diversity`** — theme count, role mix, and lifecycle mix across selected results.
 - **`retrievalCoverage`** — fraction of high-priority anchors (alwaysLoad and summary notes) represented in results.
 
-**Hybrid recall** enhances semantic search with lightweight lexical reranking over note projections. When semantic results are weak, a bounded lexical rescue path scans projections for additional candidates, improving exact-match and identifier-heavy recall without changing the storage model or adding new infrastructure. **Canonical explanation promotion** boosts notes that explain key decisions and concepts for "why"-style questions, using structural signals like role, connections, and format rather than keyword matching. **Temporal recency:** when a query suggests temporal intent, newer notes receive an additive ranking nudge in default mode.
+**Hybrid recall** combines semantic similarity, exact wording, and relationship context on every query. It can now find exact names, identifiers, phrases, error codes, and version strings even when they are not semantically similar, while still favoring conceptually relevant and well-connected notes. The ranking remains bounded and fail-soft, uses compact projections without new infrastructure, and preserves canonical explanation promotion and temporal recency hints.
 
 Recall modes:
 
-- `mode: "default"` (default): semantic recall with optional lexical reranking and bounded relationship previews.
+- `mode: "default"` (default): hybrid recall across semantic, lexical, and graph evidence with bounded relationship previews.
 - `mode: "temporal"`: enrich top matches with compact git-backed history (no raw diffs by default).
 - `mode: "workflow"`: prioritize RPIR-style chain reconstruction while remaining compatible with legacy `related-to` links.
 
 Recall evidence:
 
 - `evidence: "compact"` (optional recall): add compact retrieval rationale per result in text and structured output.
-- `retrievalEvidence` includes stable abstractions such as `channels`, `rankBand`, `projectRelevant`, `freshness`, and optional supersession hints (`supersededBy`, `supersededCount`).
+- `retrievalEvidence` includes stable abstractions such as `channels`, `rankBand`, `projectRelevant`, `freshness`, optional supersession hints (`supersededBy`, `supersededCount`), and score decomposition when available.
 - Recall evidence defaults off; consolidate evidence defaults `true` for safety.
 
 **What temporal mode shows:**
@@ -405,7 +406,7 @@ Use `verbose: true` together with temporal mode when you want richer change stat
 
 The `scope` parameter on `recall` narrows results:
 
-- `"all"` *(default)* — project memories boosted, then global
+- `"all"` _(default)_ — project memories boosted, then global
 - `"project"` — only memories for the detected project
 - `"global"` — only memories with no project association
 
@@ -413,7 +414,7 @@ The `scope` parameter on `recall` narrows results:
 
 Each note carries a `lifecycle`:
 
-- `"permanent"` *(default)* — durable knowledge for future sessions
+- `"permanent"` _(default)_ — durable knowledge for future sessions
 - `"temporary"` — working-state scaffolding (plans, WIP checkpoints) that can be cleaned up once consolidated
 
 Store what should help future work: decisions, outcomes, corrections, constraints, and lessons learned. Leave routine chatter out. Cleanup stays explicit through lifecycle and consolidation choices; mnemonic does not auto-expire notes.
@@ -482,7 +483,7 @@ Each vault has its own `config.json` with a `schemaVersion`, so main and project
 
 The main vault `config.json` also controls mutation push behavior:
 
-- `mutationPushMode: "main-only"` *(default)* - auto-push main-vault mutations, but leave project-vault commits local until the user pushes or runs `sync`
+- `mutationPushMode: "main-only"` _(default)_ - auto-push main-vault mutations, but leave project-vault commits local until the user pushes or runs `sync`
 - `mutationPushMode: "all"` - auto-push mutating writes in both vault types
 - `mutationPushMode: "none"` - never auto-push mutating writes; use `sync` or manual git commands instead
 
@@ -533,43 +534,43 @@ Imported notes are written to the main vault with `lifecycle: permanent` and `sc
 
 ## Prompts
 
-| Prompt | Description |
-|--------|-------------|
-| `mnemonic-rpi-workflow` | Optional. Returns RPIR stage protocol and conventions: request root note pattern, stage checklists, apply/task split, sparse relationships, subagent handoff contract, and commit discipline. |
+| Prompt                   | Description                                                                                                                                                                                                                                              |
+| ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `mnemonic-rpi-workflow`  | Optional. Returns RPIR stage protocol and conventions: request root note pattern, stage checklists, apply/task split, sparse relationships, subagent handoff contract, and commit discipline.                                                            |
 | `mnemonic-workflow-hint` | Optional. Returns a compact decision protocol: recall/list first, inspect with `get`, update before remember, then organize. Reinforces summary-first orientation, attention-filter capture, evidence before consolidation, and lifecycle as durability. |
 
 ## Tools
 
-| Tool                        | Description                                                              |
-|-----------------------------|--------------------------------------------------------------------------|
-| `add_attachment`            | Add an external repository as a federated knowledge source; requires `localPath`, optional `branch`, `vaultFolder`, `writable`, and `pushBranch` |
+| Tool                        | Description                                                                                                                                         |
+| --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `add_attachment`            | Add an external repository as a federated knowledge source; requires `localPath`, optional `branch`, `vaultFolder`, `writable`, and `pushBranch`    |
 | `consolidate`               | Merge and analyze overlapping notes; evidence defaults `true` for analysis strategies and execute-merge (lifecycle, risk, classification, warnings) |
-| `detect_project`            | Resolve `cwd` to stable project id via git remote URL                   |
-| `discover_tags`            | Suggest canonical tags for a note using title/content/query context; `mode: "browse"` opts into broader inventory output |
-| `execute_migration`         | Execute a named migration (supports dry-run)                             |
-| `forget`                    | Delete note + embedding, git commit + push, cleanup relationships        |
-| `get`                       | Fetch one or more notes by exact id; `includeRelationships: true` adds bounded 1-hop previews |
-| `get_project_identity`      | Show effective project identity and remote override                      |
-| `get_project_memory_policy` | Show saved write scope, consolidation mode, protected-branch settings, and `maxAttachmentsPerProject` |
-| `list`                      | List notes filtered by scope/tags/storage; `storedIn: "attached"` filters to attached-repo notes |
-| `list_attachments`          | List all attached repositories for the current project with status        |
-| `list_migrations`           | List available migrations and pending count                              |
-| `memory_graph`              | Show compact adjacency list of relationships                             |
-| `move_memory`               | Move note between vaults without changing id                             |
-| `project_memory_summary`    | Session-start entrypoint: themes, anchors, orientation, maintenance warnings, and working-state recovery hints |
-| `recall`                    | Semantic search with optional project boost, temporal/workflow modes, and optional `evidence: "compact"` rationale |
-| `recent_memories`           | Show most recently updated notes for scope                               |
-| `remember`                  | Write note + embedding; `cwd` sets context, `scope` picks storage, `lifecycle` picks temporary vs permanent |
-| `relate`                    | Create typed relationship between notes (bidirectional)                  |
-| `remove_attachment`         | Remove an attached repository by `projectSlug`                           |
-| `set_attachment_branch`     | Change the branch an attached repository reads from; requires `projectSlug` and `branch` |
-| `set_attachment_enabled`    | Enable or disable an attached repository; requires `projectSlug` and `enabled` |
-| `set_project_identity`      | Save which git remote defines project identity                           |
-| `set_project_memory_policy` | Save project policy defaults (scope, consolidation mode, protected-branch behavior/patterns, `maxAttachmentsPerProject`) |
-| `sync`                      | Git sync + embedding backfill + attached repo reconciliation; `force: true` rebuilds all embeddings |
-| `unrelate`                  | Remove relationship between notes                                        |
-| `update`                    | Update note content/title/tags/lifecycle; re-embeds when content changes |
-| `where_is_memory`           | Show note's project association and storage location                     |
+| `detect_project`            | Resolve `cwd` to stable project id via git remote URL                                                                                               |
+| `discover_tags`             | Suggest canonical tags for a note using title/content/query context; `mode: "browse"` opts into broader inventory output                            |
+| `execute_migration`         | Execute a named migration (supports dry-run)                                                                                                        |
+| `forget`                    | Delete note + embedding, git commit + push, cleanup relationships                                                                                   |
+| `get`                       | Fetch one or more notes by exact id; `includeRelationships: true` adds bounded 1-hop previews                                                       |
+| `get_project_identity`      | Show effective project identity and remote override                                                                                                 |
+| `get_project_memory_policy` | Show saved write scope, consolidation mode, protected-branch settings, and `maxAttachmentsPerProject`                                               |
+| `list`                      | List notes filtered by scope/tags/storage; `storedIn: "attached"` filters to attached-repo notes                                                    |
+| `list_attachments`          | List all attached repositories for the current project with status                                                                                  |
+| `list_migrations`           | List available migrations and pending count                                                                                                         |
+| `memory_graph`              | Show compact adjacency list of relationships                                                                                                        |
+| `move_memory`               | Move note between vaults without changing id                                                                                                        |
+| `project_memory_summary`    | Session-start entrypoint: themes, anchors, orientation, maintenance warnings, and working-state recovery hints                                      |
+| `recall`                    | Hybrid semantic, exact-wording, and relationship search with temporal/workflow modes and optional `evidence: "compact"` rationale                   |
+| `recent_memories`           | Show most recently updated notes for scope                                                                                                          |
+| `remember`                  | Write note + embedding; `cwd` sets context, `scope` picks storage, `lifecycle` picks temporary vs permanent                                         |
+| `relate`                    | Create typed relationship between notes (bidirectional)                                                                                             |
+| `remove_attachment`         | Remove an attached repository by `projectSlug`                                                                                                      |
+| `set_attachment_branch`     | Change the branch an attached repository reads from; requires `projectSlug` and `branch`                                                            |
+| `set_attachment_enabled`    | Enable or disable an attached repository; requires `projectSlug` and `enabled`                                                                      |
+| `set_project_identity`      | Save which git remote defines project identity                                                                                                      |
+| `set_project_memory_policy` | Save project policy defaults (scope, consolidation mode, protected-branch behavior/patterns, `maxAttachmentsPerProject`)                            |
+| `sync`                      | Git sync + embedding backfill + attached repo reconciliation; `force: true` rebuilds all embeddings                                                 |
+| `unrelate`                  | Remove relationship between notes                                                                                                                   |
+| `update`                    | Update note content/title/tags/lifecycle; re-embeds when content changes                                                                            |
+| `where_is_memory`           | Show note's project association and storage location                                                                                                |
 
 ### Theme emergence
 
@@ -595,14 +596,14 @@ relatedTo:
     type: explains
 ```
 
-| Type         | Meaning                                  |
-|--------------|------------------------------------------|
-| `related-to` | Generic association (default)            |
-| `explains`   | `fromId` explains `toId`                 |
-| `example-of` | `fromId` is a concrete example of `toId` |
-| `supersedes` | `fromId` is the newer version of `toId`  |
-| `derives-from` | `fromId` is derived from `toId`        |
-| `follows` | `fromId` follows `toId` in sequence         |
+| Type           | Meaning                                  |
+| -------------- | ---------------------------------------- |
+| `related-to`   | Generic association (default)            |
+| `explains`     | `fromId` explains `toId`                 |
+| `example-of`   | `fromId` is a concrete example of `toId` |
+| `supersedes`   | `fromId` is the newer version of `toId`  |
+| `derives-from` | `fromId` is derived from `toId`          |
+| `follows`      | `fromId` follows `toId` in sequence      |
 
 `workflow` recall mode prefers directional and typed relationships first, then falls back to `related-to` for long-term compatibility with older vaults.
 
@@ -665,7 +666,7 @@ No. The embeddings here are **retrieval vectors** generated by the provider you 
 
 **Why do project memories appear first in `recall` results even when global memories are more similar?**
 
-When you call `recall` with `cwd`, mnemonic adds a small fixed project tiebreaker (**currently +0.03**) to notes belonging to the detected project. This is a soft boost, not a hard filter — global memories are still included when relevant. The tiebreaker helps project context float to the top without overwhelming stronger global matches.
+When you call `recall` with `cwd`, mnemonic adds a small bounded project tiebreaker (**currently +0.005**) to notes belonging to the detected project. Recall also combines semantic similarity, exact wording, and relationship context, so global memories can still rank highly when they have stronger retrieval evidence.
 
 **I want to brainstorm with no repo yet. Should I create a temp folder first?**
 
