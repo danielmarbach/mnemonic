@@ -10,13 +10,15 @@ tags:
   - review
 lifecycle: temporary
 createdAt: '2026-07-20T16:02:11.020Z'
-updatedAt: '2026-07-20T16:02:16.716Z'
+updatedAt: '2026-07-20T16:18:47.011Z'
 role: research
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
   - id: validate-mnemonic-recall-against-reciprocal-rank-fusion-9619d67b
+    type: derives-from
+  - id: plan-one-shot-bounded-rrf-hybrid-recall-alignment-7aa73aaa
     type: derives-from
 memoryVersion: 1
 ---
