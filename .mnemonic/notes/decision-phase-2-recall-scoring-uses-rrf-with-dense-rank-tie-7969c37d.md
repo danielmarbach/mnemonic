@@ -8,7 +8,7 @@ tags:
   - workflow
 lifecycle: permanent
 createdAt: '2026-04-25T07:46:10.910Z'
-updatedAt: '2026-05-25T14:17:30.658Z'
+updatedAt: '2026-07-20T16:48:31.449Z'
 role: decision
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -18,6 +18,8 @@ relatedTo:
     type: derives-from
   - id: mnemonic-key-design-decisions-3f2a6273
     type: related-to
+  - id: canonical-design-bounded-rrf-hybrid-recall-172a96ab
+    type: supersedes
 memoryVersion: 1
 ---
 # Decision: Phase 2 recall scoring uses RRF with dense rank tie handling
