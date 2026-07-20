@@ -9,7 +9,7 @@ tags:
   - hybrid-search
 lifecycle: temporary
 createdAt: '2026-07-20T16:18:34.107Z'
-updatedAt: '2026-07-20T16:18:47.010Z'
+updatedAt: '2026-07-20T16:21:41.109Z'
 role: plan
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -17,6 +17,8 @@ projectName: mnemonic
 relatedTo:
   - id: validate-mnemonic-recall-against-reciprocal-rank-fusion-9619d67b
     type: derives-from
+  - id: apply-bounded-rrf-hybrid-recall-alignment-0175c033
+    type: follows
 memoryVersion: 1
 ---
 Implement one coherent recall-ranking change, preserving mnemonic's file-first and semantic-first product constraints while making retrieval channels materially RRF-correct.
