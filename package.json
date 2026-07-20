@@ -74,7 +74,7 @@
     "lint-staged": "^17.0.5",
     "prettier": "3.9.5",
     "simple-git-hooks": "^2.13.1",
-    "typescript": "6.0.3",
+    "typescript": "7.0.2",
     "typescript-eslint": "8.65.0",
     "vitest": "^4.0.18"
   }
