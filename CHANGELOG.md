@@ -4,6 +4,12 @@ All notable changes to `mnemonic` will be documented in this file.
 
 The format is loosely based on Keep a Changelog and uses semver-style version headings.
 
+## [0.37.1] - 2026-07-25
+
+### Fixed
+
+- JSON Schema 2020-12 migration now uses a runtime override instead of `patch-package`, so the correct dialect is emitted even when `npm install` runs with `--ignore-scripts` (e.g. Homebrew).
+
 ## [0.37.0] - 2026-07-25
 
 ### Changed
