@@ -1,0 +1,24 @@
+diff --git a/node_modules/@modelcontextprotocol/sdk/dist/esm/server/mcp.js b/node_modules/@modelcontextprotocol/sdk/dist/esm/server/mcp.js
+index 2314d88..3374c5d 100644
+--- a/node_modules/@modelcontextprotocol/sdk/dist/esm/server/mcp.js
++++ b/node_modules/@modelcontextprotocol/sdk/dist/esm/server/mcp.js
+@@ -77,7 +77,8 @@ export class McpServer {
+                         return obj
+                             ? toJsonSchemaCompat(obj, {
+                                 strictUnions: true,
+-                                pipeStrategy: 'input'
++                                pipeStrategy: 'input',
++                                target: 'draft-2020-12'
+                             })
+                             : EMPTY_OBJECT_JSON_SCHEMA;
+                     })(),
+@@ -90,7 +91,8 @@ export class McpServer {
+                     if (obj) {
+                         toolDefinition.outputSchema = toJsonSchemaCompat(obj, {
+                             strictUnions: true,
+-                            pipeStrategy: 'output'
++                            pipeStrategy: 'output',
++                            target: 'draft-2020-12'
+                         });
+                     }
+                 }

@@ -1,6 +1,6 @@
 {
   "name": "@danielmarbach/mnemonic-mcp",
-  "version": "0.36.1",
+  "version": "0.37.0",
   "description": "A local MCP memory server backed by markdown + JSON files, synced via git",
   "type": "module",
   "repository": {
@@ -42,7 +42,8 @@
     "lint:fix": "eslint src/ tests/ --fix",
     "format": "prettier --write \"src/**/*.ts\" \"tests/**/*.ts\"",
     "format:check": "prettier --check \"src/**/*.ts\" \"tests/**/*.ts\"",
-    "prepare": "node scripts/prepare.mjs"
+    "prepare": "node scripts/prepare.mjs",
+    "postinstall": "patch-package"
   },
   "simple-git-hooks": {
     "pre-commit": "npx lint-staged"
@@ -72,6 +73,7 @@
     "eslint-config-prettier": "10.1.8",
     "eslint-plugin-prettier": "5.5.6",
     "lint-staged": "^17.0.5",
+    "patch-package": "^8.0.1",
     "prettier": "3.9.6",
     "simple-git-hooks": "^2.13.1",
     "typescript": "npm:@typescript/typescript6@^6.0.2",

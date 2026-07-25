@@ -25,7 +25,7 @@ Typical next step:
 - Use \`list_attachments\` to verify the attachment was added.
 - Use \`recall\` with the project context to search across attached vaults.",
     "inputSchema": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "properties": {
         "branch": {
           "description": "Git branch to read notes from in the attached repo (default: auto-detected)",
@@ -61,7 +61,7 @@ Typical next step:
     },
     "name": "add_attachment",
     "outputSchema": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "additionalProperties": false,
       "properties": {
         "action": {
@@ -304,7 +304,7 @@ Typical next step:
 - Use \`get\` to inspect the canonical note and \`recall\` to confirm duplication is reduced.
 - Evidence defaults on for consolidate analysis strategies and execute-merge (lifecycle, risk, warnings).",
     "inputSchema": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "properties": {
         "allowProtectedBranch": {
           "description": "One-time override for protected branch checks. When true, consolidate can commit on a protected branch without changing project policy.",
@@ -395,7 +395,7 @@ Typical next step:
     },
     "name": "consolidate",
     "outputSchema": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "additionalProperties": false,
       "properties": {
         "action": {
@@ -1410,7 +1410,7 @@ Returns: effective project id, name, source, policy hint.
 Typical next step:
 - Use \`recall\` or \`project_memory_summary\` to orient on existing memory.",
     "inputSchema": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "properties": {
         "cwd": {
           "description": "Absolute path of the project working directory. Required for project-scoped routing, vault selection, and search boosting.",
@@ -1424,7 +1424,7 @@ Typical next step:
     },
     "name": "detect_project",
     "outputSchema": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "additionalProperties": false,
       "properties": {
         "action": {
@@ -1665,7 +1665,7 @@ Returns: recommendedTags ranked by relevance and usage, with canonicality/lifecy
 Typical next step:
 - Reuse suggested canonical tags when they fit, or create a new tag only when genuinely novel.",
     "inputSchema": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "properties": {
         "candidateTags": {
           "items": {
@@ -1732,7 +1732,7 @@ Typical next step:
     },
     "name": "discover_tags",
     "outputSchema": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "additionalProperties": false,
       "properties": {
         "action": {
@@ -1898,7 +1898,7 @@ Returns: per-vault migration results, counts, warnings, errors.
 Typical next step:
 - Re-run \`list_migrations\` to confirm nothing is pending.",
     "inputSchema": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "properties": {
         "backup": {
           "default": true,
@@ -1926,7 +1926,7 @@ Typical next step:
     },
     "name": "execute_migration",
     "outputSchema": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "additionalProperties": false,
       "properties": {
         "action": {
@@ -2030,7 +2030,7 @@ Writable attachments: can delete notes in writable attached vaults.
 Typical next step:
 - Use \`recall\` or \`list\` to confirm the remaining memory set is clean.",
     "inputSchema": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "properties": {
         "allowProtectedBranch": {
           "description": "One-time override for protected branch checks. When true, forget can commit on a protected branch without changing project policy.",
@@ -2053,7 +2053,7 @@ Typical next step:
     },
     "name": "forget",
     "outputSchema": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "additionalProperties": false,
       "properties": {
         "action": {
@@ -2262,7 +2262,7 @@ Returns: full note content, metadata, storage label. With includeRelationships: 
 Typical next step:
 - Use \`update\`, \`forget\`, \`move_memory\`, or \`relate\` after inspection.",
     "inputSchema": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "properties": {
         "cwd": {
           "description": "Absolute path of the project working directory. Required for project-scoped routing, vault selection, and search boosting.",
@@ -2290,7 +2290,7 @@ Typical next step:
     },
     "name": "get",
     "outputSchema": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "additionalProperties": false,
       "properties": {
         "action": {
@@ -2514,7 +2514,7 @@ Returns: effective project identity, default identity, any configured override.
 Typical next step:
 - Use \`set_project_identity\` only if the wrong remote is defining identity.",
     "inputSchema": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "properties": {
         "cwd": {
           "description": "Absolute path of the project working directory. Required for project-scoped routing, vault selection, and search boosting.",
@@ -2528,7 +2528,7 @@ Typical next step:
     },
     "name": "get_project_identity",
     "outputSchema": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "additionalProperties": false,
       "properties": {
         "action": {
@@ -2765,7 +2765,7 @@ Returns: saved policy values or an explanation of the fallback behavior.
 Typical next step:
 - Call \`remember\` with explicit \`scope\` for a one-off override, or \`set_project_memory_policy\` to change defaults.",
     "inputSchema": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "properties": {
         "cwd": {
           "description": "Absolute path of the project working directory. Required for project-scoped routing, vault selection, and search boosting.",
@@ -2779,7 +2779,7 @@ Typical next step:
     },
     "name": "get_project_memory_policy",
     "outputSchema": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "additionalProperties": false,
       "properties": {
         "action": {
@@ -2993,7 +2993,7 @@ Returns: matching memories with ids, titles, scope/storage context, metadata.
 Typical next step:
 - Use \`get\` for exact inspection or \`update\` / \`consolidate\` for cleanup.",
     "inputSchema": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "properties": {
         "cwd": {
           "description": "Absolute path of the project working directory. Required for project-scoped routing, vault selection, and search boosting.",
@@ -3052,7 +3052,7 @@ Typical next step:
     },
     "name": "list",
     "outputSchema": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "additionalProperties": false,
       "properties": {
         "action": {
@@ -3218,7 +3218,7 @@ Returns: list of attachments with their status, branch, and path information.
 Typical next step:
 - Use \`set_attachment_enabled\` to toggle an attachment, or \`recall\` to search across attached vaults.",
     "inputSchema": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "properties": {
         "cwd": {
           "description": "Absolute path of the project working directory. Required for project-scoped routing, vault selection, and search boosting.",
@@ -3232,7 +3232,7 @@ Typical next step:
     },
     "name": "list_attachments",
     "outputSchema": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "additionalProperties": false,
       "properties": {
         "action": {
@@ -3341,13 +3341,13 @@ Returns: available migrations, vault schema versions, pending counts.
 Typical next step:
 - Run \`execute_migration\` with \`dryRun: true\` first.",
     "inputSchema": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "properties": {},
       "type": "object",
     },
     "name": "list_migrations",
     "outputSchema": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "additionalProperties": false,
       "properties": {
         "action": {
@@ -3438,7 +3438,7 @@ Returns: memory nodes and relationship edges for the requested slice.
 Typical next step:
 - Use \`get\`, \`relate\`, \`unrelate\`, or \`consolidate\` based on what the graph reveals.",
     "inputSchema": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "properties": {
         "cwd": {
           "description": "Absolute path of the project working directory. Required for project-scoped routing, vault selection, and search boosting.",
@@ -3475,7 +3475,7 @@ Typical next step:
     },
     "name": "memory_graph",
     "outputSchema": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "additionalProperties": false,
       "properties": {
         "action": {
@@ -3590,7 +3590,7 @@ Typical next step:
 - Use \`where_is_memory\` or \`get\` to verify the final state.
 - Use \`relate\` if the moved memory connects to existing notes in the new vault.",
     "inputSchema": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "properties": {
         "allowProtectedBranch": {
           "description": "One-time override for protected branch checks. When true, move_memory can commit on a protected branch without changing project policy.",
@@ -3626,7 +3626,7 @@ Typical next step:
     },
     "name": "move_memory",
     "outputSchema": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "additionalProperties": false,
       "properties": {
         "action": {
@@ -3925,7 +3925,7 @@ Returns: synthesized project summary, themes, anchors, orientation entry points 
 Typical next step:
 - Use \`recall\` or \`list\` to drill down into specific areas.",
     "inputSchema": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "properties": {
         "anchorLimit": {
           "default": 5,
@@ -3967,7 +3967,7 @@ Typical next step:
     },
     "name": "project_memory_summary",
     "outputSchema": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "additionalProperties": false,
       "properties": {
         "action": {
@@ -4574,7 +4574,7 @@ Returns: ranked matches (id, title, score, vault, tags, lifecycle, updatedAt), 1
 Typical next step:
 - Use \`get\`, \`update\`, \`relate\`, or \`consolidate\` based on the results.",
     "inputSchema": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "properties": {
         "cwd": {
           "description": "Absolute path of the project working directory. Required for project-scoped routing, vault selection, and search boosting.",
@@ -4652,7 +4652,7 @@ Typical next step:
     },
     "name": "recall",
     "outputSchema": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "additionalProperties": false,
       "properties": {
         "action": {
@@ -5194,7 +5194,7 @@ Returns: recently updated memories with ids, timestamps, storage labels, metadat
 Typical next step:
 - Use \`get\` for exact inspection or \`update\` to continue refining a recent note.",
     "inputSchema": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "properties": {
         "cwd": {
           "description": "Absolute path of the project working directory. Required for project-scoped routing, vault selection, and search boosting.",
@@ -5247,7 +5247,7 @@ Typical next step:
     },
     "name": "recent_memories",
     "outputSchema": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "additionalProperties": false,
       "properties": {
         "action": {
@@ -5375,7 +5375,7 @@ Writable attachments: can relate notes in writable attached vaults.
 Typical next step:
 - Use \`get\` on both notes to verify the relationship context reads well.",
     "inputSchema": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "properties": {
         "bidirectional": {
           "default": true,
@@ -5416,7 +5416,7 @@ Typical next step:
     },
     "name": "relate",
     "outputSchema": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "additionalProperties": false,
       "properties": {
         "action": {
@@ -5629,7 +5629,7 @@ Writable attachments: set \`writable: true\` on \`add_attachment\` to enable wri
 Typical next step:
 - Use \`relate\` if this new memory connects to something recalled earlier.",
     "inputSchema": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "properties": {
         "allowProtectedBranch": {
           "description": "One-time override for protected branch checks. When true, remember can commit on a protected branch without changing project policy.",
@@ -5707,7 +5707,7 @@ Typical next step:
     },
     "name": "remember",
     "outputSchema": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "additionalProperties": false,
       "properties": {
         "action": {
@@ -6055,7 +6055,7 @@ Returns: confirmation of the removed attachment.
 Typical next step:
 - Use \`list_attachments\` to verify the attachment was removed.",
     "inputSchema": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "properties": {
         "cwd": {
           "description": "Absolute path of the project working directory. Required for project-scoped routing, vault selection, and search boosting.",
@@ -6074,7 +6074,7 @@ Typical next step:
     },
     "name": "remove_attachment",
     "outputSchema": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "additionalProperties": false,
       "properties": {
         "action": {
@@ -6294,7 +6294,7 @@ Returns: the updated attachment config with new branch and tip hash.
 Typical next step:
 - Use \`list_attachments\` to verify the branch change.",
     "inputSchema": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "properties": {
         "branch": {
           "description": "The branch to read notes from. Use empty string for working-tree mode (not recommended).",
@@ -6318,7 +6318,7 @@ Typical next step:
     },
     "name": "set_attachment_branch",
     "outputSchema": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "additionalProperties": false,
       "properties": {
         "action": {
@@ -6552,7 +6552,7 @@ Returns: the updated attachment config.
 Typical next step:
 - Use \`list_attachments\` to verify the change.",
     "inputSchema": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "properties": {
         "cwd": {
           "description": "Absolute path of the project working directory. Required for project-scoped routing, vault selection, and search boosting.",
@@ -6576,7 +6576,7 @@ Typical next step:
     },
     "name": "set_attachment_enabled",
     "outputSchema": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "additionalProperties": false,
       "properties": {
         "action": {
@@ -6791,7 +6791,7 @@ Returns: the new effective project identity after applying the override.
 Typical next step:
 - Re-run \`detect_project\` or \`get_project_identity\` to verify the result.",
     "inputSchema": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "properties": {
         "cwd": {
           "description": "Absolute path of the project working directory. Required for project-scoped routing, vault selection, and search boosting.",
@@ -6811,7 +6811,7 @@ Typical next step:
     },
     "name": "set_project_identity",
     "outputSchema": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "additionalProperties": false,
       "properties": {
         "action": {
@@ -7049,7 +7049,7 @@ Returns: saved project policy and effective values.
 Typical next step:
 - Use \`get_project_memory_policy\` to verify the saved policy.",
     "inputSchema": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "properties": {
         "consolidationMode": {
           "description": "Default consolidation mode: 'supersedes' preserves history (default), 'delete' removes sources immediately",
@@ -7102,7 +7102,7 @@ Typical next step:
     },
     "name": "set_project_memory_policy",
     "outputSchema": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "additionalProperties": false,
       "properties": {
         "action": {
@@ -7316,7 +7316,7 @@ Returns: per-vault pull/push results, deletions, additions, embedding rebuild in
 Typical next step:
 - Use \`recent_memories\`, \`list\`, or \`recall\` to inspect newly synced changes.",
     "inputSchema": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "properties": {
         "cwd": {
           "description": "Absolute path of the project working directory. Required for project-scoped routing, vault selection, and search boosting.",
@@ -7332,7 +7332,7 @@ Typical next step:
     },
     "name": "sync",
     "outputSchema": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "additionalProperties": false,
       "properties": {
         "action": {
@@ -7470,7 +7470,7 @@ Writable attachments: can unrelate notes in writable attached vaults.
 Typical next step:
 - Use \`get\` to verify both notes now stand on their own.",
     "inputSchema": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "properties": {
         "bidirectional": {
           "default": true,
@@ -7498,7 +7498,7 @@ Typical next step:
     },
     "name": "unrelate",
     "outputSchema": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "additionalProperties": false,
       "properties": {
         "action": {
@@ -7712,7 +7712,7 @@ Typical next step:
 
 Use \`semanticPatch\` for targeted edits (more token-efficient). Use \`content\` only for complete rewrites.",
     "inputSchema": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "properties": {
         "allowProtectedBranch": {
           "description": "One-time override for protected branch checks. When true, update can commit on a protected branch without changing project policy.",
@@ -7957,7 +7957,7 @@ IMPORTANT: \`appendChild\`, \`prependChild\`, and \`replaceChildren\` do NOT wor
     },
     "name": "update",
     "outputSchema": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "additionalProperties": false,
       "properties": {
         "action": {
@@ -8311,7 +8311,7 @@ Returns: title, project association, storage label, updated time, relationship c
 Typical next step:
 - Use \`move_memory\` if the storage location is wrong, or \`get\` for full inspection.",
     "inputSchema": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "properties": {
         "cwd": {
           "description": "Absolute path of the project working directory. Required for project-scoped routing, vault selection, and search boosting.",
@@ -8330,7 +8330,7 @@ Typical next step:
     },
     "name": "where_is_memory",
     "outputSchema": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "additionalProperties": false,
       "properties": {
         "action": {

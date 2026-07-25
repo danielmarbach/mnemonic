@@ -4,6 +4,12 @@ All notable changes to `mnemonic` will be documented in this file.
 
 The format is loosely based on Keep a Changelog and uses semver-style version headings.
 
+## [0.37.0] - 2026-07-25
+
+### Changed
+
+- MCP tool schemas now declare JSON Schema 2020-12 (`https://json-schema.org/draft/2020-12/schema`) instead of draft-07, aligning with the dialect used by OpenAPI 3.1, Pydantic 2, and modern MCP SDKs.
+
 ## [0.36.1] - 2026-07-20
 
 ### Fixed

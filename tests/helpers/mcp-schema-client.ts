@@ -1,4 +1,5 @@
-import Ajv, { type ValidateFunction } from "ajv";
+import Ajv2020 from "ajv/dist/2020.js";
+import type { ValidateFunction } from "ajv";
 
 import { createPersistentMcpSession } from "./mcp.js";
 
@@ -55,7 +56,7 @@ export async function createSchemaDrivenMcpClient(
     throw new Error("Missing tools/list response");
   }
 
-  const ajv = new Ajv({ allErrors: true, strict: false, validateSchema: true });
+  const ajv = new Ajv2020({ allErrors: true, strict: false, validateSchema: true });
   const inputValidators = new Map<string, ValidateFunction>();
   const outputValidators = new Map<string, ValidateFunction>();
   const toolByName = new Map<string, MpcListedTool>();
