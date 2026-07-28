@@ -9,11 +9,14 @@ tags:
   - retrieval
 lifecycle: temporary
 createdAt: '2026-07-28T08:10:39.665Z'
-updatedAt: '2026-07-28T08:10:39.665Z'
+updatedAt: '2026-07-28T08:11:14.959Z'
 role: review
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: plan-read-only-markdown-attachment-retrieval-f4619b6e
+    type: derives-from
 memoryVersion: 1
 ---
 Two independent architecture reviews converged on the same verdict: narrow and proceed.
