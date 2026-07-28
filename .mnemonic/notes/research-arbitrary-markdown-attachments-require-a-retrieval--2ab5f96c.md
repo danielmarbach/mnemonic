@@ -9,11 +9,14 @@ tags:
   - retrieval
 lifecycle: temporary
 createdAt: '2026-07-28T08:07:20.310Z'
-updatedAt: '2026-07-28T08:07:20.310Z'
+updatedAt: '2026-07-28T08:07:32.622Z'
 role: research
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: request-assess-arbitrary-markdown-repository-attachments-6aff8f56
+    type: derives-from
 memoryVersion: 1
 ---
 Recommendation: narrow and proceed. Keep `Attachment` as the user-facing federation concept, but do not represent arbitrary Markdown repositories internally as mnemonic vaults and do not claim a projection provider leaves upper layers unchanged.

@@ -7,11 +7,14 @@ tags:
   - markdown
 lifecycle: temporary
 createdAt: '2026-07-28T07:54:22.604Z'
-updatedAt: '2026-07-28T07:54:22.604Z'
+updatedAt: '2026-07-28T08:07:32.622Z'
 role: context
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: research-arbitrary-markdown-attachments-require-a-retrieval--2ab5f96c
+    type: derives-from
 memoryVersion: 1
 ---
 Assess whether mnemonic should extend its existing attachment model so an arbitrary Git repository containing Markdown can participate in recall without containing a `.mnemonic` vault.
