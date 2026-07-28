@@ -9,7 +9,7 @@ tags:
   - retrieval
 lifecycle: temporary
 createdAt: '2026-07-28T08:08:25.305Z'
-updatedAt: '2026-07-28T08:11:14.959Z'
+updatedAt: '2026-07-28T08:26:59.567Z'
 role: plan
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -40,6 +40,7 @@ Likely files: `src/vault.ts`, `src/config.ts`, attachment management tools, `src
 - Enumerate tracked Markdown blobs from a pinned Git commit using recursive, NUL-safe Git output plus include/exclude/root rules.
 - Parse with the existing MDAST stack, preserve heading ancestry, emit an introduction chunk, and split headingless or oversized sections by paragraph.
 - Derive stable opaque chunk IDs from attachment ID, normalized path, heading ancestry, duplicate occurrence, and split ordinal; store content hashes separately.
+- Preserve a stable document ID alongside each chunk ID so recall can retrieve the complete source document.
 - Enforce limits for file count, bytes per file, chunks per document, and total chunks.
 - Persist an atomic consumer-local manifest, projections, and embeddings; never write derived state to the source repository.
 - Add tests for nested files, duplicate headings, code fences, headingless documents, oversized sections, stable IDs, bounds, failures, and zero source-repository writes.
@@ -63,16 +64,26 @@ Likely files: `src/tools/sync.ts`, new index store, cache helpers, sync and stal
 - Add a narrow discriminated retrieval candidate boundary: `memory` adapts the existing Note/Vault path; `markdown-chunk` uses the derived index.
 - Merge Markdown semantic and lexical candidates into the existing bounded ranking while excluding graph, canonical-memory, role, lifecycle, relationship, confidence, and temporal boosts.
 - Apply project scope and per-document diversity caps.
-- Extend human-readable and structured recall results with a required kind, source path, heading ancestry, excerpt, attachment identity, and indexed revision.
+- Extend human-readable and structured recall results with a required kind, chunk ID, document ID, source path, heading ancestry, excerpt, attachment identity, and indexed revision.
 - Keep existing memory result fields and behavior compatible.
 - Exclude Markdown chunks for tag/lifecycle filters and temporal/workflow modes in the MVP.
 - Test mixed ranking, citations, excerpts, scope/filter/mode behavior, failure isolation, schema parsing, text rendering, and absence from mutation paths and project memory summaries.
 
 Likely files: `src/tools/recall.ts`, `src/tools/recall-helpers.ts`, `src/recall.ts`, `src/structured-content.ts`, recall/schema/rendering tests.
 
+## Stage 5: exact Markdown document retrieval
+
+- Extend `get` so a Markdown `documentId` returned by recall retrieves the complete source file from the same pinned indexed revision.
+- Return a discriminated `markdown-document` result containing attachment identity, repository-relative path, indexed revision, media type, and full Markdown content rather than fabricating Note metadata.
+- Keep chunk lookup distinct: a chunk hit points to its parent document ID; callers use the document ID when full context is needed.
+- Add explicit response-size handling. Return full content when within the configured bound; for oversized documents, return a clear bounded response with document size and guidance rather than silently truncating or exhausting the MCP context.
+- Preserve existing memory `get` behavior and response fields unchanged.
+- Test mixed memory/document requests, exact revision consistency, deleted or stale documents, duplicate paths across attachments, schema parsing, text rendering, and size-limit behavior.
+
+Likely files: `src/tools/get.ts`, `src/structured-content.ts`, the Markdown index store, get integration tests, and MCP schema snapshots.
+
 ## Deferred
 
-- Exact document retrieval through `get` or a new source-content tool.
 - `list`, recent memories, project summary, memory graph, relationships, consolidation, workflow recall, temporal recall, and write-through Markdown editing.
 
 ## Documentation and verification
