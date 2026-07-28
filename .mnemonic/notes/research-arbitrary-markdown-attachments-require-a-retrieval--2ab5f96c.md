@@ -9,13 +9,15 @@ tags:
   - retrieval
 lifecycle: temporary
 createdAt: '2026-07-28T08:07:20.310Z'
-updatedAt: '2026-07-28T08:07:32.622Z'
+updatedAt: '2026-07-28T08:08:31.518Z'
 role: research
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
   - id: request-assess-arbitrary-markdown-repository-attachments-6aff8f56
+    type: derives-from
+  - id: plan-read-only-markdown-attachment-retrieval-f4619b6e
     type: derives-from
 memoryVersion: 1
 ---

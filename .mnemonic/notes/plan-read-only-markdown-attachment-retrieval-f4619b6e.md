@@ -9,11 +9,14 @@ tags:
   - retrieval
 lifecycle: temporary
 createdAt: '2026-07-28T08:08:25.305Z'
-updatedAt: '2026-07-28T08:08:25.305Z'
+updatedAt: '2026-07-28T08:08:31.518Z'
 role: plan
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: research-arbitrary-markdown-attachments-require-a-retrieval--2ab5f96c
+    type: derives-from
 memoryVersion: 1
 ---
 Implement arbitrary Markdown repository attachments as a staged, read-only retrieval feature after the two open product contracts are accepted.
