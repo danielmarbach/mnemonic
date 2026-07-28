@@ -9,7 +9,7 @@ tags:
   - retrieval
 lifecycle: temporary
 createdAt: '2026-07-28T08:08:25.305Z'
-updatedAt: '2026-07-28T08:46:06.781Z'
+updatedAt: '2026-07-28T08:51:58.890Z'
 role: plan
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -23,90 +23,141 @@ relatedTo:
     type: derives-from
 memoryVersion: 1
 ---
-Implement arbitrary Markdown repository attachments as a staged, read-only document retrieval feature after the public contracts are accepted.
+Implement repository-backed, read-only document retrieval as a staged extension of attachments. The MVP supports `text/markdown`, while the contracts remain extensible to formats such as PDF without treating external documents as Mnemonic notes.
 
-The domain distinction is behavioral, not file-format based. A Mnemonic note is already Markdown with frontmatter. Therefore no `Note` gains a `markdown` type. Attachment configuration distinguishes a managed `mnemonic-vault` from a read-only `document-source`. Document representations use canonical IANA media types; the initial supported media type is `text/markdown`.
+The domain distinction is behavioral, not file-format based. A Mnemonic `Note` is managed memory stored as Markdown with frontmatter. A `document-source` exposes immutable external documents. No `Note` gains a `markdown` type, and document identifiers never become Memory IDs.
 
-## Stage 1: contracts and configuration
+The public feature remains disabled until configuration, indexing, exact retrieval, mutation rejection, sync publication, and recall integration are all available together.
+
+## Stage 1: attachment contracts, migration, and source scope
 
 - Make attachment configuration a normalized discriminated union:
-  - `kind: "mnemonic-vault"` for managed Mnemonic notes; legacy configurations with no kind normalize to this branch.
-  - `kind: "document-source"` with `acceptedMediaTypes: ["text/markdown"]` for arbitrary repository documents.
-- Treat accepted media types as canonical, lower-case IANA media-type strings rather than a closed enum. Runtime validation checks the extractor registry and rejects unsupported types with an explicit error.
-- Keep media-type parameters and character encoding separate from the base media type. The initial Markdown extractor reads UTF-8 source text.
-- Allow a document source to accept multiple media types in the future, for example `text/markdown` and `application/pdf`, without adding another attachment kind.
-- Add stable `attachmentId` distinct from `projectSlug` so one repository can host multiple attachment kinds or roots.
-- Preserve existing Mnemonic attachment behavior unchanged.
-- Document sources are always source-read-only. Reject `writable`, `pushBranch`, working-tree mode, and Mnemonic-only vault fields on this branch.
-- Extend add/list/remove/enable/branch tools and schemas to address attachments by ID and report kind, accepted media types, and index state.
-- Add compatibility, validation, identity, unsupported-media-type, and schema-contract tests.
+  - `kind: "mnemonic-vault"` for managed Mnemonic notes. Legacy configurations with no kind normalize to this branch.
+  - `kind: "document-source"` for immutable repository documents.
+- Give every attachment a persisted opaque `attachmentId`, separate from repository identity (`projectSlug`).
+- Add an explicit migration that persists IDs for legacy attachments. Until migration, derive the same deterministic legacy ID from project association, repository slug, and normalized vault folder so old configuration remains readable.
+- New attachments receive a generated persistent ID. Changing local path, branch, enabled state, or source filters does not change it.
+- Continue accepting `projectSlug` in existing remove/enable/branch tool calls when it resolves to exactly one attachment. Return a deprecation hint plus the resolved `attachmentId`. Once multiple attachments share a repository slug, reject slug-only selection with an ambiguity error listing attachment IDs.
+- Always return both `attachmentId` and repository identity from attachment tools.
+- Define document-source scope in configuration:
+  - `root`: normalized repository-relative POSIX path, default `.`; reject absolute paths, `..`, and paths outside the repository.
+  - `include`: non-empty documented glob list relative to `root`; default `**/*.md` for the initial Markdown source.
+  - `exclude`: documented glob list relative to `root`; define deterministic defaults for generated/vendor paths.
+  - Matching is case-sensitive against Git tree paths on every platform.
+  - Enumerate tracked Git blobs only. Skip symlinks, submodules, directories, and untracked working-tree files.
+- Define accepted representations as a non-empty, open array of canonical lower-case IANA base media-type strings: initially `acceptedMediaTypes: ["text/markdown"]`.
+- Validate media-type syntax, reject parameters in the base field, deduplicate values, and keep character encoding separate. The initial Markdown extractor accepts UTF-8.
+- Current binaries reject newly submitted unsupported media types. When an older binary reads configuration written by a newer version, preserve unsupported values, expose `unsupported-media-type` status, and never drop or rewrite them during unrelated config updates. Enable/index only supported values; fail explicitly if none are supported.
+- Preserve writable `mnemonic-vault` behavior unchanged. Forbid `vaultFolder`, `writable`, `pushBranch`, and working-tree mode only on `document-source`.
+- Branch `add_attachment` validation and attachment loading immediately by kind. Document sources must not require `.mnemonic/notes`, instantiate `Vault`/`AttachedStorage`, initialize storage inside the source repository, or edit its `.gitignore`.
 
-Likely files: `src/vault.ts`, `src/config.ts`, attachment management tools, `src/structured-content.ts`, attachment config and schema tests.
+Likely files: `src/vault.ts`, `src/config.ts`, `src/migration.ts`, attachment management tools, attachment-loading helpers, `src/structured-content.ts`, configuration/migration/schema tests.
 
-## Stage 2: bounded Markdown document index
+## Stage 2: document model, extraction, chunking, and identity
 
-- Add internal `RetrievalDocument` and `RetrievalChunk` types without widening `NoteStorage` or adding a new Note variant.
-- Enumerate tracked Markdown blobs from a pinned Git commit using recursive, NUL-safe Git output plus include/exclude/root rules.
-- Detect each file's media type using bounded extension and content checks, then dispatch through a media-type extractor registry. Unknown or mismatched files fail soft with diagnostics.
-- Record each document's canonical `mediaType`, source path, blob identity, byte size, and extraction metadata.
-- Keep `extractorId`, `extractorVersion`, and `chunkerVersion` separate from `mediaType`; changing extraction or chunking behavior invalidates derived artifacts even when source bytes are unchanged.
-- Parse Markdown with the existing MDAST stack, preserve heading ancestry, emit an introduction chunk, and split headingless or oversized sections by paragraph.
-- Derive stable opaque chunk IDs from attachment ID, normalized path, heading ancestry, duplicate occurrence, and split ordinal; store content hashes separately.
-- Preserve a stable document ID alongside each chunk ID so recall can retrieve the complete source document.
-- Namespace document and chunk IDs separately from Memory IDs.
-- Enforce limits for file count, bytes per file, chunks per document, and total chunks.
-- Persist an atomic consumer-local manifest, projections, extracted text where needed, and embeddings; never write derived state to the source repository.
-- Add tests for nested files, duplicate headings, code fences, headingless documents, oversized sections, stable IDs, media detection, extractor-version invalidation, bounds, failures, and zero source-repository writes.
+- Add internal `RetrievalDocument`, `RetrievalChunk`, `DocumentGeneration`, and extractor contracts without widening `NoteStorage` or adding a Note variant.
+- Use a media-type extractor registry. Detect source representation using bounded extension and content checks, validate it against `acceptedMediaTypes`, and dispatch to a registered extractor. Unknown or mismatched blobs fail soft with diagnostics.
+- Use representation names consistently:
+  - `sourceMediaType` describes source bytes, such as `text/markdown`.
+  - `extractedContentMediaType` describes extractor output used for chunking.
+  - `chunkContentMediaType` and `excerptContentMediaType` describe derived text.
+  - `contentMediaType` describes content returned by `get`.
+- Record source path, blob OID, byte size, source media type, encoding, and extraction metadata per document.
+- Include complete invalidation identity in the manifest: `extractorId`, `extractorVersion`, extractor options hash, `chunkerId`, `chunkerVersion`, chunker options hash, projection schema version, index schema version, and existing embedding compatibility identity.
+- Parse Markdown with the existing MDAST stack. Preserve heading ancestry, emit an introduction chunk, and split headingless or oversized sections by paragraph with deterministic bounds.
+- Define stable logical identities:
+  - `documentId` derives from attachment ID plus normalized root-relative path. A rename is documented as delete/add.
+  - `chunkId` derives from document ID plus heading ancestry, duplicate-heading occurrence, and split ordinal.
+  - Source/content hashes detect changes but are not logical identity.
+- Define parseable namespaces that cannot match the current Memory ID grammar. Use reserved delimiters such as `doc:` and `chunk:` and update relevant input schemas to recognize these entity references explicitly.
+- Add a central entity resolver that distinguishes managed memory, read-only attached Mnemonic memory, writable attached Mnemonic memory, document, chunk, and genuinely unknown IDs.
+- Enforce limits for tracked files, bytes per file, extracted text, chunks per document, total chunks, and embedding work.
 
-Recommended new files: `src/retrieval-document.ts`, `src/document-extractor.ts`, `src/markdown-extractor.ts`, `src/markdown-chunker.ts`, `src/document-source-index.ts`.
+Recommended new files: `src/retrieval-document.ts`, `src/document-entity-ref.ts`, `src/document-extractor.ts`, `src/markdown-extractor.ts`, `src/markdown-chunker.ts`, `src/document-source-index.ts`, and focused unit tests.
 
-## Stage 3: explicit sync reconciliation
+## Stage 3: atomic generations and exact retrieval contracts
 
-- Fetch and resolve an exact remote-tracking commit rather than assuming a local branch advances.
-- Compare commit/blob/content fingerprints plus extractor and chunker versions with the last complete manifest.
-- Rebuild only changed/new/invalidated chunks, remove deleted projections and embeddings, and preserve the previous complete snapshot on failure.
-- Make `force` rebuild the full document index.
-- Invalidate retrieval caches after successful reconciliation.
-- Report indexed commit, media-type counts, document/chunk counts, additions/updates/deletions, embeddings, failures, and stale state.
-- Add unit and integration tests for add/change/delete, extractor upgrades, provider failure, partial failure, cache invalidation, and structured sync output.
+- Store consumer-local derived state under per-attachment generation directories. Never depend on mutable source working-tree files for retrieval.
+- Build each generation in a temporary directory, validate its manifest and identities, then atomically publish it by replacing a small current-generation pointer. Readers capture one generation at request start and use it for the entire request.
+- Cache invalidation occurs only after successful publication.
+- Define failure policy:
+  - Repository/ref/enumeration failures, manifest corruption, identity collisions, and publication failures are fatal for that attachment generation; retain the previous generation.
+  - Unsupported, oversized, malformed, or extractor-failed individual files are skipped with bounded diagnostics.
+  - Embedding failures preserve coherent document/chunk artifacts and publish with explicit lexical-only coverage diagnostics, matching Mnemonic's fail-soft embedding behavior.
+  - If the first build fails fatally, expose `index-unavailable` and contribute no document candidates.
+  - Sync may succeed for some attachments and fail for others, but each attachment publishes atomically.
+- Retain source bytes for text documents and extracted representations inside the generation so exact retrieval does not depend on Git objects surviving force-push or garbage collection.
+- Retain the current and previous bounded generations per attachment, and pin generations referenced by the active MCP session. Define a configurable retention owner/default before implementation. When an unpinned handle references an evicted generation, return `snapshot-evicted` with current revision information rather than silently returning newer content.
+- Separate stable identity from revision-qualified retrieval:
+  - Recall exposes stable `documentId` and `chunkId` for grouping.
+  - Recall also returns an opaque revision-qualified `retrievalHandle` containing or resolving to attachment ID, generation ID, and document identity.
+  - The handle uses a namespace invalid for Memory IDs and is the value passed to `get` when exact recalled content is required.
+- Extend `get` without breaking memory-only callers:
+  - Existing memory-only calls and `notes` output remain unchanged.
+  - A revision-qualified document handle resolves to a discriminated `document` result from the pinned generation.
+  - Mixed calls expose an ordered discriminated `items` array while retaining existing `notes` and `notFound` fields for compatibility.
+  - `count` means total successfully resolved items; this is unchanged for memory-only calls.
+  - Add `documents` and per-item `itemErrors` for stale, evicted, oversized, unavailable, or unknown document references so one failure does not fail unrelated results.
+- For `text/markdown`, return exact source text preserving line endings, leading/trailing blank lines, BOM policy, and terminal-newline state, with `sourceMediaType: "text/markdown"` and `contentMediaType: "text/markdown"`.
+- Keep source and extracted representations separate. A future PDF extractor may return extracted text while raw `application/pdf` bytes use a separate MCP resource mechanism; never label extracted text as PDF content.
+- Define the full-response size limit in public configuration. Return full text within the bound; otherwise return an explicit `content-too-large` item error with size and retrieval guidance. Never silently truncate.
+- Update `get` tool guidance so mutation follow-ups apply only to memory results.
 
-Likely files: `src/tools/sync.ts`, new index store and extractor registry, cache helpers, sync and staleness tests.
+Likely files: `src/tools/get.ts`, `src/structured-content.ts`, document generation/index storage, entity resolver, cache helpers, schema snapshots, and exact-source/get integration tests.
 
-## Stage 4: mixed default recall
+## Stage 4: centralized mutation rejection
 
-- Add a narrow discriminated retrieval candidate boundary: `memory` adapts the existing Note/Vault path; `document-chunk` uses the derived document index.
-- Merge document semantic and lexical candidates into the existing bounded ranking while excluding graph, canonical-memory, role, lifecycle, relationship, confidence, and temporal boosts.
-- Apply project scope and per-document diversity caps.
-- Extend human-readable and structured recall results with a required kind, chunk ID, document ID, source path, heading ancestry, excerpt, attachment identity, source media type, extraction metadata, and indexed revision.
-- Keep existing memory result fields and behavior compatible.
-- Exclude document chunks for tag/lifecycle filters and temporal/workflow modes in the MVP.
-- Test mixed ranking, citations, excerpts, scope/filter/mode behavior, failure isolation, schema parsing, text rendering, and absence from mutation paths and project memory summaries.
+- Broaden mutation input validation only enough to parse reserved document/chunk namespaces, then route every target through the central entity resolver before vault lookup.
+- `update`, `forget`, `move_memory`, `relate`, `unrelate`, and `consolidate` continue to mutate managed Memory IDs only.
+- Return distinct errors:
+  - external document/chunk: explicit immutable external-document error;
+  - read-only Mnemonic attachment: existing attached-vault read-only error;
+  - writable Mnemonic attachment: continue through current mutation guards;
+  - unknown identifier: genuine not-found error.
+- Tool descriptions and structured results must never imply documents can be updated through Mnemonic.
+- Add contract tests for every mutation path and every entity classification.
 
-Likely files: `src/tools/recall.ts`, `src/tools/recall-helpers.ts`, `src/recall.ts`, `src/structured-content.ts`, recall/schema/rendering tests.
+Likely files: entity resolver and mutation guard helpers, mutating tools, domain errors, structured schemas, tool descriptions, and mutation integration tests.
 
-## Stage 5: exact document retrieval and mutation boundaries
+## Stage 5: explicit sync and reconciliation
 
-- Extend `get` so a document ID returned by recall retrieves the complete source representation from the same pinned indexed revision.
-- For `text/markdown`, return the exact source Markdown with `sourceMediaType: "text/markdown"` and `contentMediaType: "text/markdown"`.
-- Keep source representation separate from extracted representation. A future binary type such as `application/pdf` may return extracted text through `get` while exposing source metadata or a separate resource mechanism for raw bytes; do not mislabel extracted text as PDF content.
-- Return a discriminated `document` result containing attachment identity, repository-relative path, indexed revision, source media type, returned content media type, extraction metadata when applicable, and content.
-- Keep chunk lookup distinct: a chunk hit points to its parent document ID; callers use the document ID when full context is needed.
-- Add explicit response-size handling. Return full text content when within the configured bound; for oversized documents, return a clear bounded response with document size and guidance rather than silently truncating or exhausting the MCP context.
-- Preserve existing memory `get` behavior and response fields unchanged.
-- Centralize the mutation boundary: `update`, `forget`, `move_memory`, `relate`, `unrelate`, and `consolidate` accept managed memory IDs only. If passed a document or chunk ID, return an explicit read-only external-document error rather than `not found`.
-- Tool descriptions and structured results must never suggest that a retrieved document can be updated through Mnemonic.
-- Test mixed memory/document requests, exact revision consistency, deleted or stale documents, duplicate paths across attachments, source-versus-content media types, schema parsing, text rendering, size-limit behavior, and explicit rejection by every mutation path.
+- Fetch and resolve an exact remote-tracking commit rather than assuming a configured local branch advances.
+- Enumerate and read all source blobs from that one commit.
+- Compare commit/blob/content fingerprints and complete extraction/index compatibility identity with the current generation.
+- Rebuild only changed/new/invalidated chunks, remove deleted derived records, and publish one coherent generation. `force` rebuilds all document artifacts.
+- Publish only after manifest validation. Invalidate caches after pointer swap.
+- Report indexed commit, generation ID, source media-type counts, document/chunk counts, skipped files, semantic coverage, additions/updates/deletions, embeddings, failures, and stale/index status.
+- Add concurrency tests where `get` or recall reads the old generation while sync publishes the next generation.
 
-Likely files: `src/tools/get.ts`, mutation guard/helpers and mutating tools, `src/structured-content.ts`, the document index store, get integration tests, mutation-error tests, and MCP schema snapshots.
+Likely files: `src/tools/sync.ts`, Git/ref helpers, document index/extractor registry, cache helpers, sync/staleness/concurrency tests.
 
-## Deferred
+## Stage 6: mixed default recall activation
 
-- Additional extractors such as PDF and HTML.
-- Raw binary document delivery through MCP resources.
-- `list`, recent memories, project summary, memory graph, relationships, consolidation of document content, workflow recall, temporal recall, and write-through document editing.
+- Keep document candidates feature-gated until Stages 1-5 are complete. Do not expose unusable document IDs in an intermediate release.
+- Adapt existing Note/Vault candidates as `memory`; derived document candidates are `document-chunk`.
+- Document chunks participate in the common semantic and lexical candidate pools before dense ranks are assigned so RRF channels remain comparable.
+- Apply a bounded per-document chunk cap before the rank window so one document cannot consume the candidate pool. After final scoring, enforce result diversity while scanning farther down the ranked list to refill the requested limit.
+- Apply project attachment prior only. Exclude document chunks from graph, canonical-memory, role, lifecycle, relationship, confidence, and temporal contributions.
+- Include document chunks only for project/all default recall. Exclude them from global scope, tag/lifecycle filters, temporal mode, and workflow mode in the MVP.
+- Return `kind: "document-chunk"`, stable chunk/document IDs, revision-qualified retrieval handle, source path, heading ancestry, excerpt, attachment identity, source media type, extraction metadata, indexed revision, and generation ID.
+- Preserve existing memory result fields and rendering.
+- Add mixed ranking tests for semantic/lexical admission, dense-rank placement, per-document caps, limit refill, compatible embedding spaces, citations, filters/modes/scopes, generation pinning, failure isolation, and schema/text output.
+
+Likely files: `src/tools/recall.ts`, `src/tools/recall-helpers.ts`, `src/recall.ts`, `src/structured-content.ts`, cache/index adapters, and recall integration tests.
+
+## Release gate and deferred work
+
+The first public release requires all six stages so recall, exact retrieval, mutation behavior, and synchronization form one coherent contract.
+
+Deferred:
+
+- PDF, HTML, and other extractors.
+- Raw binary delivery through MCP resources.
+- Document browsing through `list`, recent memories, project summary, memory graph, relationships, consolidation of document content, temporal/workflow document recall, and write-through document editing.
 
 ## Documentation and verification
 
-- Update `ARCHITECTURE.md`, `AGENT.md`, `README.md`, `docs/index.html`, and `CHANGELOG.md` as stages land.
-- At each stage run typecheck, targeted tests, full tests, lint, Slopwatch, and isolated MCP dogfooding.
-- Do not start implementation until the public contracts are accepted: document results are non-memory content; attachment identity is separate from repository slug; document sources are retrievable through `get` but immutable through Mnemonic; media types describe source representation while extractors and returned content representation are versioned separately.
+- Update `ARCHITECTURE.md`, `AGENT.md`, `README.md`, `SYSTEM_PROMPT.md` where behavior guidance changes, `docs/index.html`, and `CHANGELOG.md` as stages land.
+- Update all attachment tool descriptions, output schemas, `.describe()` metadata, MCP schema snapshots, and real response-parsing tests.
+- At each stage run typecheck, focused unit/integration tests, full tests, lint, Slopwatch, and isolated MCP dogfooding.
+- Before implementation, ratify the remaining public defaults: generation retention count/TTL, full-response size limit, default exclude patterns, per-document chunk cap, and whether unsupported media types partially index supported files or disable the attachment.
