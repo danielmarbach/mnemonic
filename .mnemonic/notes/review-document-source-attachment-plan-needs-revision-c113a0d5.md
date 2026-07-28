@@ -9,11 +9,14 @@ tags:
   - markdown
 lifecycle: temporary
 createdAt: '2026-07-28T08:45:59.625Z'
-updatedAt: '2026-07-28T08:45:59.625Z'
+updatedAt: '2026-07-28T08:46:06.781Z'
 role: review
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: plan-read-only-markdown-attachment-retrieval-f4619b6e
+    type: derives-from
 memoryVersion: 1
 ---
 Independent fresh-context review verdict: the document-source attachment direction is sound, but the current plan needs revision before implementation.
