@@ -116,7 +116,7 @@ describe("Migrator", () => {
     });
 
     it("should return no migrations when already at latest version", async () => {
-      const pending = await migrator.getPendingMigrations("1.1");
+      const pending = await migrator.getPendingMigrations("1.4");
       expect(pending.length).toBe(0);
     });
   });
@@ -509,7 +509,7 @@ Test content`;
       const config = JSON.parse(await fs.readFile(path.join(tempDir, "config.json"), "utf-8")) as {
         schemaVersion: string;
       };
-      expect(config.schemaVersion).toBe("1.1");
+      expect(config.schemaVersion).toBe("1.4");
     });
 
     it("does not persist schema version during dry-run", async () => {
@@ -530,17 +530,17 @@ Test content`;
       const config = JSON.parse(await fs.readFile(path.join(tempDir, "config.json"), "utf-8")) as {
         schemaVersion: string;
       };
-      expect(config.schemaVersion).toBe("1.1");
+      expect(config.schemaVersion).toBe("1.4");
     });
 
     it("only migrates vaults that are behind on schema version", async () => {
-      // Create a second vault already at 1.1
+      // Create a second vault already at 1.4
       const otherDir = await fs.mkdtemp(path.join(os.tmpdir(), "mnemonic-other-"));
       const otherStorage = new Storage(otherDir);
       await otherStorage.init();
       await fs.writeFile(
         path.join(otherDir, "config.json"),
-        JSON.stringify({ schemaVersion: "1.1" }),
+        JSON.stringify({ schemaVersion: "1.4" }),
         "utf-8",
       );
       const otherVault: Vault = {
@@ -852,8 +852,8 @@ Main content 2`,
         const mainVersion = await readVersion(tempDir);
         const otherVersion = await readVersion(otherTempDir);
 
-        expect(mainVersion).toBe("1.1");
-        expect(otherVersion).toBe("1.1");
+        expect(mainVersion).toBe("1.4");
+        expect(otherVersion).toBe("1.4");
       } finally {
         await fs.rm(otherTempDir, { recursive: true, force: true });
       }
@@ -975,7 +975,7 @@ Main content 2`,
       const config = JSON.parse(await fs.readFile(path.join(tempDir, "config.json"), "utf-8")) as {
         schemaVersion: string;
       };
-      expect(config.schemaVersion).toBe("1.1");
+      expect(config.schemaVersion).toBe("1.4");
     });
 
     it("skips a project vault that was already migrated in an earlier session", async () => {
@@ -1033,7 +1033,7 @@ Project content`,
       ) as {
         schemaVersion: string;
       };
-      expect(projectConfig.schemaVersion).toBe("1.1");
+      expect(projectConfig.schemaVersion).toBe("1.4");
 
       const sessionTwoVaultManager = {
         main: vault,
@@ -1060,17 +1060,18 @@ Project content`,
       ) as {
         schemaVersion: string;
       };
-      expect(projectConfig.schemaVersion).toBe("1.1");
+      expect(projectConfig.schemaVersion).toBe("1.4");
     });
   });
 
   describe("Version comparison", () => {
     it("should correctly compare version strings", async () => {
       const migratorAny = new Migrator(vaultManager);
-      expect(await migratorAny.getPendingMigrations("0.0")).toHaveLength(2);
-      expect(await migratorAny.getPendingMigrations("0.9")).toHaveLength(2);
-      expect(await migratorAny.getPendingMigrations("1.0")).toHaveLength(1);
-      expect(await migratorAny.getPendingMigrations("1.1")).toHaveLength(0);
+      expect(await migratorAny.getPendingMigrations("0.0")).toHaveLength(3);
+      expect(await migratorAny.getPendingMigrations("0.9")).toHaveLength(3);
+      expect(await migratorAny.getPendingMigrations("1.0")).toHaveLength(2);
+      expect(await migratorAny.getPendingMigrations("1.1")).toHaveLength(1);
+      expect(await migratorAny.getPendingMigrations("1.4")).toHaveLength(0);
     });
 
     it("rejects invalid schema versions", async () => {
@@ -1121,6 +1122,7 @@ Project content`,
       expect(names).toEqual([
         "v0.1.0-backfill-memory-versions", // maxSchemaVersion 1.0
         "v0.1.1-backfill-note-lifecycle", // maxSchemaVersion 1.1
+        "v0.1.4-normalize-attachment-config", // maxSchemaVersion 1.4
         "upgrade-to-2.0", // maxSchemaVersion 2.0
         "upgrade-to-3.0", // maxSchemaVersion 3.0
       ]);
@@ -1162,6 +1164,7 @@ Project content`,
       expect(names).toEqual([
         "v0.1.0-backfill-memory-versions", // maxSchemaVersion 1.0
         "v0.1.1-backfill-note-lifecycle", // maxSchemaVersion 1.1
+        "v0.1.4-normalize-attachment-config", // maxSchemaVersion 1.4
         "upgrade-to-2.0", // maxSchemaVersion 2.0
         "always-run-fixup", // unbounded — last
       ]);
@@ -1204,6 +1207,7 @@ Project content`,
       expect(names).toEqual([
         "v0.1.0-backfill-memory-versions", // maxSchemaVersion 1.0
         "v0.1.1-backfill-note-lifecycle", // maxSchemaVersion 1.1
+        "v0.1.4-normalize-attachment-config", // maxSchemaVersion 1.4
         "upgrade-to-2.0", // maxSchemaVersion 2.0
         "min-only-at-3.0", // minSchemaVersion 3.0
       ]);

@@ -89,7 +89,7 @@ describe("attached vault integration", () => {
           { ollamaUrl: embeddingServer.url, disableGit: false },
         );
 
-        expect(result.text).toContain("Attachment added");
+        expect(result.text).toContain("vault attachment added");
       } finally {
         await embeddingServer.close();
       }
@@ -111,7 +111,7 @@ describe("attached vault integration", () => {
           { ollamaUrl: embeddingServer.url, disableGit: false },
         );
 
-        expect(result.text).toContain("Attachment added");
+        expect(result.text).toContain("vault attachment added");
       } finally {
         await embeddingServer.close();
       }
@@ -160,7 +160,7 @@ describe("attached vault integration", () => {
           { ollamaUrl: embeddingServer.url, disableGit: false },
         );
 
-        expect(result.text).toContain("Attachment added");
+        expect(result.text).toContain("vault attachment added");
       } finally {
         await embeddingServer.close();
       }

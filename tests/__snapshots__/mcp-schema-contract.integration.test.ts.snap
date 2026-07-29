@@ -12,6 +12,7 @@ exports[`mcp schema-driven contract integration > snapshots stable public tool c
     "description": "Use this when:
 - You want to attach an external repository's mnemonic vault to the current project
 - You need read-only or write-through access to another project's memories
+- You want to attach a document source (e.g., markdown files) for read-only retrieval
 
 Do not use this when:
 - You want to modify memories in another project without enabling write-through (set writable=false)
@@ -27,12 +28,42 @@ Typical next step:
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "properties": {
+        "acceptedMediaTypes": {
+          "description": "Canonical lower-case IANA base media types (default: ['text/markdown']). Only for document-source attachments.",
+          "items": {
+            "type": "string",
+          },
+          "type": "array",
+        },
         "branch": {
-          "description": "Git branch to read notes from in the attached repo (default: auto-detected)",
+          "description": "Git branch to read notes from in the attached repo (default: auto-detected). Only for mnemonic-vault attachments.",
           "type": "string",
         },
         "cwd": {
           "description": "Absolute path of the project working directory. Required for project-scoped routing, vault selection, and search boosting.",
+          "type": "string",
+        },
+        "exclude": {
+          "description": "Glob patterns relative to root for files to exclude. Only for document-source attachments.",
+          "items": {
+            "type": "string",
+          },
+          "type": "array",
+        },
+        "include": {
+          "description": "Glob patterns relative to root for files to include (default: ['**/*.md']). Only for document-source attachments.",
+          "items": {
+            "type": "string",
+          },
+          "type": "array",
+        },
+        "kind": {
+          "default": "mnemonic-vault",
+          "description": "Attachment kind: 'mnemonic-vault' for managed Mnemonic notes, 'document-source' for immutable repository documents.",
+          "enum": [
+            "mnemonic-vault",
+            "document-source",
+          ],
           "type": "string",
         },
         "localPath": {
@@ -40,16 +71,20 @@ Typical next step:
           "type": "string",
         },
         "pushBranch": {
-          "description": "Git branch to push mutations to when writable. Defaults to the read branch. If empty, commits locally without push.",
+          "description": "Git branch to push mutations to when writable. Only for mnemonic-vault attachments.",
+          "type": "string",
+        },
+        "root": {
+          "description": "Repository-relative POSIX path for document root (default: '.'). Only for document-source attachments.",
           "type": "string",
         },
         "vaultFolder": {
-          "description": "Vault folder name within the attached repo (default: .mnemonic)",
+          "description": "Vault folder name within the attached repo (default: .mnemonic). Only for mnemonic-vault attachments.",
           "type": "string",
         },
         "writable": {
           "default": false,
-          "description": "Whether this attachment supports write operations (default: false). When true, remember/update/forget/relate/unrelate can modify notes in this attached vault.",
+          "description": "Whether this attachment supports write operations (default: false). Only for mnemonic-vault attachments.",
           "type": "boolean",
         },
       },
@@ -71,7 +106,19 @@ Typical next step:
         "attachment": {
           "additionalProperties": false,
           "properties": {
+            "acceptedMediaTypes": {
+              "description": "Accepted media types, present for document-source attachments",
+              "items": {
+                "type": "string",
+              },
+              "type": "array",
+            },
+            "attachmentId": {
+              "description": "Persistent opaque attachment identifier",
+              "type": "string",
+            },
             "branch": {
+              "description": "Git branch, present for mnemonic-vault attachments",
               "type": "string",
             },
             "branchTipHash": {
@@ -79,6 +126,28 @@ Typical next step:
             },
             "enabled": {
               "type": "boolean",
+            },
+            "exclude": {
+              "description": "Glob patterns for files to exclude, present for document-source attachments",
+              "items": {
+                "type": "string",
+              },
+              "type": "array",
+            },
+            "include": {
+              "description": "Glob patterns for files to include, present for document-source attachments",
+              "items": {
+                "type": "string",
+              },
+              "type": "array",
+            },
+            "kind": {
+              "description": "Attachment kind discriminator",
+              "enum": [
+                "mnemonic-vault",
+                "document-source",
+              ],
+              "type": "string",
             },
             "localPath": {
               "type": "string",
@@ -92,7 +161,12 @@ Typical next step:
             "pushBranch": {
               "type": "string",
             },
+            "root": {
+              "description": "Repository-relative document root, present for document-source attachments",
+              "type": "string",
+            },
             "vaultFolder": {
+              "description": "Vault folder name, present for mnemonic-vault attachments",
               "type": "string",
             },
             "writable": {
@@ -100,13 +174,12 @@ Typical next step:
             },
           },
           "required": [
+            "kind",
+            "attachmentId",
             "projectSlug",
             "projectName",
             "localPath",
-            "vaultFolder",
             "enabled",
-            "branch",
-            "branchTipHash",
           ],
           "type": "object",
         },
@@ -2252,12 +2325,15 @@ Typical next step:
 Use this when:
 - You already know the memory id and need the full note content
 - A previous tool returned ids that you now want to inspect exactly
+- You have a document or chunk retrieval handle (doc: or chunk: prefix) and need the full content
 
 Do not use this when:
 - You are still searching by topic; use \`recall\`
 - You want to browse many notes; use \`list\`
 
 Returns: full note content, metadata, storage label. With includeRelationships: bounded 1-hop previews.
+
+Document-source entities (doc:/chunk: IDs) return source text with media type info. Mutation follow-ups (update, forget, etc.) apply only to memory results.
 
 Typical next step:
 - Use \`update\`, \`forget\`, \`move_memory\`, or \`relate\` after inspection.",
@@ -2299,6 +2375,291 @@ Typical next step:
         },
         "count": {
           "type": "number",
+        },
+        "documents": {
+          "description": "Document results from document-source attachments (read-only)",
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "attachmentId": {
+                "description": "Attachment identifier",
+                "type": "string",
+              },
+              "content": {
+                "description": "Full document content",
+                "type": "string",
+              },
+              "contentMediaType": {
+                "description": "Content media type",
+                "type": "string",
+              },
+              "documentId": {
+                "description": "Stable document identifier",
+                "type": "string",
+              },
+              "generationId": {
+                "description": "Generation identifier",
+                "type": "string",
+              },
+              "indexedCommit": {
+                "description": "Git commit hash at index time",
+                "type": "string",
+              },
+              "sourceMediaType": {
+                "description": "Source media type (e.g., text/markdown)",
+                "type": "string",
+              },
+              "sourcePath": {
+                "description": "Repository-relative source path",
+                "type": "string",
+              },
+            },
+            "required": [
+              "documentId",
+              "sourcePath",
+              "sourceMediaType",
+              "content",
+              "contentMediaType",
+              "attachmentId",
+              "generationId",
+              "indexedCommit",
+            ],
+            "type": "object",
+          },
+          "type": "array",
+        },
+        "itemErrors": {
+          "description": "Per-item errors for stale, evicted, oversized, or unavailable references",
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "code": {
+                "enum": [
+                  "snapshot-evicted",
+                  "content-too-large",
+                  "index-unavailable",
+                  "unknown-document",
+                ],
+                "type": "string",
+              },
+              "error": {
+                "type": "string",
+              },
+              "id": {
+                "type": "string",
+              },
+            },
+            "required": [
+              "id",
+              "error",
+              "code",
+            ],
+            "type": "object",
+          },
+          "type": "array",
+        },
+        "items": {
+          "description": "Ordered discriminated items combining notes and documents",
+          "items": {
+            "oneOf": [
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "content": {
+                    "type": "string",
+                  },
+                  "createdAt": {
+                    "type": "string",
+                  },
+                  "id": {
+                    "type": "string",
+                  },
+                  "kind": {
+                    "const": "note",
+                    "type": "string",
+                  },
+                  "lifecycle": {
+                    "enum": [
+                      "temporary",
+                      "permanent",
+                    ],
+                    "type": "string",
+                  },
+                  "project": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                      },
+                      "name": {
+                        "type": "string",
+                      },
+                    },
+                    "required": [
+                      "id",
+                      "name",
+                    ],
+                    "type": "object",
+                  },
+                  "relationships": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "shown": {
+                        "items": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "confidence": {
+                              "enum": [
+                                "high",
+                                "medium",
+                                "low",
+                              ],
+                              "type": "string",
+                            },
+                            "id": {
+                              "type": "string",
+                            },
+                            "projectId": {
+                              "type": "string",
+                            },
+                            "relationType": {
+                              "enum": [
+                                "related-to",
+                                "explains",
+                                "example-of",
+                                "supersedes",
+                                "derives-from",
+                                "follows",
+                              ],
+                              "type": "string",
+                            },
+                            "theme": {
+                              "type": "string",
+                            },
+                            "title": {
+                              "type": "string",
+                            },
+                            "updatedAt": {
+                              "type": "string",
+                            },
+                            "vault": {
+                              "description": "Storage label for disambiguating related notes",
+                              "type": "string",
+                            },
+                          },
+                          "required": [
+                            "id",
+                            "title",
+                            "updatedAt",
+                          ],
+                          "type": "object",
+                        },
+                        "type": "array",
+                      },
+                      "totalDirectRelations": {
+                        "type": "number",
+                      },
+                      "truncated": {
+                        "type": "boolean",
+                      },
+                    },
+                    "required": [
+                      "totalDirectRelations",
+                      "shown",
+                      "truncated",
+                    ],
+                    "type": "object",
+                  },
+                  "role": {
+                    "enum": [
+                      "summary",
+                      "decision",
+                      "plan",
+                      "context",
+                      "reference",
+                      "research",
+                      "review",
+                    ],
+                    "type": "string",
+                  },
+                  "tags": {
+                    "items": {
+                      "type": "string",
+                    },
+                    "type": "array",
+                  },
+                  "title": {
+                    "type": "string",
+                  },
+                  "updatedAt": {
+                    "type": "string",
+                  },
+                  "vault": {
+                    "pattern": "^main-vault$|^project-vault$|^sub-vault:\\.mnemonic-.+$|^attached:[a-z0-9][-a-z0-9]*\\/\\.mnemonic(-.+)?$",
+                    "type": "string",
+                  },
+                },
+                "required": [
+                  "kind",
+                  "id",
+                  "title",
+                  "content",
+                  "tags",
+                  "lifecycle",
+                  "vault",
+                  "createdAt",
+                  "updatedAt",
+                ],
+                "type": "object",
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "attachmentId": {
+                    "type": "string",
+                  },
+                  "content": {
+                    "type": "string",
+                  },
+                  "contentMediaType": {
+                    "type": "string",
+                  },
+                  "documentId": {
+                    "type": "string",
+                  },
+                  "generationId": {
+                    "type": "string",
+                  },
+                  "indexedCommit": {
+                    "type": "string",
+                  },
+                  "kind": {
+                    "const": "document",
+                    "type": "string",
+                  },
+                  "sourceMediaType": {
+                    "type": "string",
+                  },
+                  "sourcePath": {
+                    "type": "string",
+                  },
+                },
+                "required": [
+                  "kind",
+                  "documentId",
+                  "sourcePath",
+                  "sourceMediaType",
+                  "content",
+                  "contentMediaType",
+                  "attachmentId",
+                  "generationId",
+                  "indexedCommit",
+                ],
+                "type": "object",
+              },
+            ],
+          },
+          "type": "array",
         },
         "notFound": {
           "items": {
@@ -3243,7 +3604,19 @@ Typical next step:
           "items": {
             "additionalProperties": false,
             "properties": {
+              "acceptedMediaTypes": {
+                "description": "Accepted media types, present for document-source attachments",
+                "items": {
+                  "type": "string",
+                },
+                "type": "array",
+              },
+              "attachmentId": {
+                "description": "Persistent opaque attachment identifier",
+                "type": "string",
+              },
               "branch": {
+                "description": "Git branch, present for mnemonic-vault attachments",
                 "type": "string",
               },
               "branchTipHash": {
@@ -3251,6 +3624,28 @@ Typical next step:
               },
               "enabled": {
                 "type": "boolean",
+              },
+              "exclude": {
+                "description": "Glob patterns for files to exclude, present for document-source attachments",
+                "items": {
+                  "type": "string",
+                },
+                "type": "array",
+              },
+              "include": {
+                "description": "Glob patterns for files to include, present for document-source attachments",
+                "items": {
+                  "type": "string",
+                },
+                "type": "array",
+              },
+              "kind": {
+                "description": "Attachment kind discriminator",
+                "enum": [
+                  "mnemonic-vault",
+                  "document-source",
+                ],
+                "type": "string",
               },
               "localPath": {
                 "type": "string",
@@ -3270,7 +3665,12 @@ Typical next step:
               "pushBranch": {
                 "type": "string",
               },
+              "root": {
+                "description": "Repository-relative document root, present for document-source attachments",
+                "type": "string",
+              },
               "vaultFolder": {
+                "description": "Vault folder name, present for mnemonic-vault attachments",
                 "type": "string",
               },
               "writable": {
@@ -3278,15 +3678,12 @@ Typical next step:
               },
             },
             "required": [
+              "kind",
+              "attachmentId",
               "projectSlug",
               "projectName",
               "localPath",
-              "vaultFolder",
               "enabled",
-              "branch",
-              "branchTipHash",
-              "pathExists",
-              "noteCount",
             ],
             "type": "object",
           },
@@ -4697,6 +5094,112 @@ Typical next step:
           ],
           "type": "object",
         },
+        "documentChunks": {
+          "description": "Document-chunk results from document-source attachments",
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "attachmentId": {
+                "description": "Attachment identifier",
+                "type": "string",
+              },
+              "boosted": {
+                "description": "Score after policy boosts",
+                "type": "number",
+              },
+              "chunkId": {
+                "description": "Stable chunk identifier",
+                "type": "string",
+              },
+              "documentId": {
+                "description": "Stable document identifier",
+                "type": "string",
+              },
+              "excerpt": {
+                "description": "Short content preview",
+                "type": "string",
+              },
+              "extractionMetadata": {
+                "additionalProperties": {},
+                "description": "Extraction metadata",
+                "propertyNames": {
+                  "type": "string",
+                },
+                "type": "object",
+              },
+              "generationId": {
+                "description": "Generation identifier",
+                "type": "string",
+              },
+              "headingAncestry": {
+                "description": "Heading ancestry for context",
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "depth": {
+                      "description": "Heading depth (1-6)",
+                      "maximum": 9007199254740991,
+                      "minimum": -9007199254740991,
+                      "type": "integer",
+                    },
+                    "text": {
+                      "description": "Heading text",
+                      "type": "string",
+                    },
+                  },
+                  "required": [
+                    "depth",
+                    "text",
+                  ],
+                  "type": "object",
+                },
+                "type": "array",
+              },
+              "indexedCommit": {
+                "description": "Git commit hash at index time",
+                "type": "string",
+              },
+              "kind": {
+                "const": "document-chunk",
+                "description": "Result kind discriminator",
+                "type": "string",
+              },
+              "retrievalHandle": {
+                "description": "Revision-qualified handle for exact retrieval via get",
+                "type": "string",
+              },
+              "score": {
+                "description": "Composite relevance score",
+                "type": "number",
+              },
+              "sourceMediaType": {
+                "description": "Source media type (e.g., text/markdown)",
+                "type": "string",
+              },
+              "sourcePath": {
+                "description": "Repository-relative source path",
+                "type": "string",
+              },
+            },
+            "required": [
+              "kind",
+              "chunkId",
+              "documentId",
+              "score",
+              "boosted",
+              "sourcePath",
+              "headingAncestry",
+              "excerpt",
+              "attachmentId",
+              "sourceMediaType",
+              "indexedCommit",
+              "generationId",
+              "retrievalHandle",
+            ],
+            "type": "object",
+          },
+          "type": "array",
+        },
         "query": {
           "type": "string",
         },
@@ -6057,18 +6560,21 @@ Typical next step:
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "properties": {
+        "attachmentId": {
+          "description": "The persistent attachment identifier (as returned by add_attachment or list_attachments).",
+          "type": "string",
+        },
         "cwd": {
           "description": "Absolute path of the project working directory. Required for project-scoped routing, vault selection, and search boosting.",
           "type": "string",
         },
         "projectSlug": {
-          "description": "The attached repository's project slug (as returned by add_attachment or list_attachments)",
+          "description": "The attached repository's project slug (as returned by add_attachment or list_attachments). Deprecated: prefer attachmentId.",
           "type": "string",
         },
       },
       "required": [
         "cwd",
-        "projectSlug",
       ],
       "type": "object",
     },
@@ -6100,7 +6606,20 @@ Typical next step:
         "removedAttachment": {
           "additionalProperties": false,
           "properties": {
+            "attachmentId": {
+              "description": "Persistent opaque attachment identifier",
+              "type": "string",
+            },
             "branch": {
+              "description": "Git branch, present for mnemonic-vault attachments",
+              "type": "string",
+            },
+            "kind": {
+              "description": "Attachment kind discriminator",
+              "enum": [
+                "mnemonic-vault",
+                "document-source",
+              ],
               "type": "string",
             },
             "localPath": {
@@ -6113,15 +6632,16 @@ Typical next step:
               "type": "string",
             },
             "vaultFolder": {
+              "description": "Vault folder name, present for mnemonic-vault attachments",
               "type": "string",
             },
           },
           "required": [
+            "kind",
+            "attachmentId",
             "projectSlug",
             "projectName",
             "localPath",
-            "vaultFolder",
-            "branch",
           ],
           "type": "object",
         },
@@ -6286,6 +6806,7 @@ Typical next step:
 Do not use this when:
 - You want to enable/disable an attachment (use \`set_attachment_enabled\`)
 - You want to remove an attachment (use \`remove_attachment\`)
+- The attachment is a document-source (document sources have no branch concept)
 
 Returns: the updated attachment config with new branch and tip hash.
 
@@ -6296,6 +6817,10 @@ Typical next step:
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "properties": {
+        "attachmentId": {
+          "description": "The persistent attachment identifier.",
+          "type": "string",
+        },
         "branch": {
           "description": "The branch to read notes from. Use empty string for working-tree mode (not recommended).",
           "type": "string",
@@ -6305,13 +6830,12 @@ Typical next step:
           "type": "string",
         },
         "projectSlug": {
-          "description": "The attached repository's project slug",
+          "description": "The attached repository's project slug. Deprecated: prefer attachmentId.",
           "type": "string",
         },
       },
       "required": [
         "cwd",
-        "projectSlug",
         "branch",
       ],
       "type": "object",
@@ -6328,6 +6852,10 @@ Typical next step:
         "attachment": {
           "additionalProperties": false,
           "properties": {
+            "attachmentId": {
+              "description": "Persistent opaque attachment identifier",
+              "type": "string",
+            },
             "branch": {
               "type": "string",
             },
@@ -6336,6 +6864,14 @@ Typical next step:
             },
             "enabled": {
               "type": "boolean",
+            },
+            "kind": {
+              "description": "Attachment kind discriminator",
+              "enum": [
+                "mnemonic-vault",
+                "document-source",
+              ],
+              "type": "string",
             },
             "localPath": {
               "type": "string",
@@ -6351,6 +6887,8 @@ Typical next step:
             },
           },
           "required": [
+            "kind",
+            "attachmentId",
             "projectSlug",
             "projectName",
             "localPath",
@@ -6554,6 +7092,10 @@ Typical next step:
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "properties": {
+        "attachmentId": {
+          "description": "The persistent attachment identifier.",
+          "type": "string",
+        },
         "cwd": {
           "description": "Absolute path of the project working directory. Required for project-scoped routing, vault selection, and search boosting.",
           "type": "string",
@@ -6563,13 +7105,12 @@ Typical next step:
           "type": "boolean",
         },
         "projectSlug": {
-          "description": "The attached repository's project slug",
+          "description": "The attached repository's project slug. Deprecated: prefer attachmentId.",
           "type": "string",
         },
       },
       "required": [
         "cwd",
-        "projectSlug",
         "enabled",
       ],
       "type": "object",
@@ -6586,11 +7127,24 @@ Typical next step:
         "attachment": {
           "additionalProperties": false,
           "properties": {
+            "attachmentId": {
+              "description": "Persistent opaque attachment identifier",
+              "type": "string",
+            },
             "branch": {
+              "description": "Git branch, present for mnemonic-vault attachments",
               "type": "string",
             },
             "enabled": {
               "type": "boolean",
+            },
+            "kind": {
+              "description": "Attachment kind discriminator",
+              "enum": [
+                "mnemonic-vault",
+                "document-source",
+              ],
+              "type": "string",
             },
             "projectName": {
               "type": "string",
@@ -6600,10 +7154,11 @@ Typical next step:
             },
           },
           "required": [
+            "kind",
+            "attachmentId",
             "projectSlug",
             "projectName",
             "enabled",
-            "branch",
           ],
           "type": "object",
         },

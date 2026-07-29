@@ -96,6 +96,8 @@ describe("VaultManager staleness detection", () => {
     overrides: Partial<ProjectAttachmentConfig> & { projectSlug: string },
   ): ProjectAttachmentConfig {
     return {
+      kind: "mnemonic-vault",
+      attachmentId: `test-${overrides.projectSlug}`,
       projectName: overrides.projectSlug,
       localPath: path.join(tempDir, `attached-${overrides.projectSlug}`),
       vaultFolder: ".mnemonic",
@@ -380,6 +382,8 @@ describe("VaultManager clearAttachmentCaches and reload", () => {
     overrides: Partial<ProjectAttachmentConfig> & { projectSlug: string },
   ): ProjectAttachmentConfig {
     return {
+      kind: "mnemonic-vault",
+      attachmentId: `test-${overrides.projectSlug}`,
       projectName: overrides.projectSlug,
       localPath: path.join(tempDir, `attached-${overrides.projectSlug}`),
       vaultFolder: ".mnemonic",

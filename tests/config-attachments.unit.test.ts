@@ -4,7 +4,7 @@ import path from "path";
 import os from "os";
 
 import { MnemonicConfigStore } from "../src/config.js";
-import type { ProjectAttachmentConfig } from "../src/vault.js";
+import type { ProjectAttachmentConfig, MnemonicVaultAttachmentConfig } from "../src/vault.js";
 
 describe("normalizeProjectAttachments", () => {
   let tempDir: string;
@@ -84,7 +84,14 @@ describe("normalizeProjectAttachments", () => {
     });
     const result = await readConfigAttachments();
     expect(result["proj-1"]).toHaveLength(1);
-    expect(result["proj-1"][0]).toEqual(attachment);
+    expect(result["proj-1"][0].projectSlug).toBe("my-org/my-repo");
+    expect(result["proj-1"][0].projectName).toBe("My Repo");
+    expect(result["proj-1"][0].localPath).toBe("/home/user/projects/my-repo");
+    expect(result["proj-1"][0].vaultFolder).toBe(".mnemonic");
+    expect(result["proj-1"][0].enabled).toBe(true);
+    expect(result["proj-1"][0].branch).toBe("develop");
+    expect(result["proj-1"][0].kind).toBe("mnemonic-vault");
+    expect(result["proj-1"][0].attachmentId).toBeDefined();
   });
 
   it("filters out entries with missing projectSlug", async () => {
@@ -580,7 +587,9 @@ describe("Schema migration for projectAttachments", () => {
   });
 
   it("preserves projectAttachments through read/write cycle", async () => {
-    const attachment: ProjectAttachmentConfig = {
+    const attachment: MnemonicVaultAttachmentConfig = {
+      kind: "mnemonic-vault",
+      attachmentId: "test-id-123",
       projectSlug: "org/repo",
       projectName: "Repo",
       localPath: "/path/to/repo",
