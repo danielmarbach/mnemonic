@@ -59,8 +59,7 @@ export interface DocumentSourceAttachmentConfig {
 }
 
 export type ProjectAttachmentConfig =
-  | MnemonicVaultAttachmentConfig
-  | DocumentSourceAttachmentConfig;
+  MnemonicVaultAttachmentConfig | DocumentSourceAttachmentConfig;
 
 export interface Vault {
   storage: NoteStorage;

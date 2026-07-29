@@ -37,7 +37,7 @@ describe("buildGenerationFromFiles", () => {
 
   it("publishes the generation so it can be retrieved", () => {
     const files = [makeFile("docs/test.md", "# Test\n\nContent here.")];
-    const result = buildGenerationFromFiles(
+    buildGenerationFromFiles(
       "att-2",
       files,
       ["text/markdown"],

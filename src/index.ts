@@ -60,7 +60,7 @@ const internalServer = (server as any).server;
 const registeredTools = (server as any)._registeredTools;
 
 internalServer.setRequestHandler(ListToolsRequestSchema, () => ({
-  tools: Object.entries(registeredTools as Record<string, any>)
+  tools: (Object.entries(registeredTools) as Array<[string, { enabled: boolean }]>)
     .filter(([, tool]) => tool.enabled)
     .map(([name, tool]) => {
       const toolDefinition: Record<string, unknown> = {

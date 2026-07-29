@@ -498,8 +498,7 @@ function createV014NormalizeAttachmentConfigMigration(): Migration {
         const config = JSON.parse(raw) as Record<string, unknown>;
 
         const projectAttachments = config.projectAttachments as
-          | Record<string, unknown[]>
-          | undefined;
+          Record<string, unknown[]> | undefined;
         if (!projectAttachments || typeof projectAttachments !== "object") {
           return result;
         }

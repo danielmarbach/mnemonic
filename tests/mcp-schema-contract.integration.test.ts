@@ -41,8 +41,7 @@ describe("mcp schema-driven contract integration", () => {
       expect(recallResponse.structuredContent).toBeDefined();
 
       const results = recallResponse.structuredContent?.["results"] as
-        | Array<Record<string, unknown>>
-        | undefined;
+        Array<Record<string, unknown>> | undefined;
       expect(results?.some((result) => result["id"] === rememberedId)).toBe(true);
     } finally {
       await client.close();

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import type { DocumentExtractor } from "../src/retrieval-document.js";
 
 // Helper to get a fresh module instance by resetting the module registry

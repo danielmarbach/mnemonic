@@ -84,7 +84,6 @@ describe("markdownChunker", () => {
   describe("oversized sections", () => {
     it("splits oversized sections into multiple chunks with incrementing splitOrdinal", () => {
       // Create content under a heading that exceeds MAX_CHUNK_CHARS (4000)
-      const longContent = "A".repeat(500) + "\n\n" + "B".repeat(500) + "\n\n" + "C".repeat(500);
       // Repeat to make it oversized
       const body = Array.from({ length: 10 }, (_, i) => `Paragraph ${i}: ` + "X".repeat(500)).join(
         "\n\n",

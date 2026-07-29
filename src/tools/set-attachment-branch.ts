@@ -205,8 +205,7 @@ export function registerSetAttachmentBranchTool(server: McpServer, ctx: ServerCo
       });
 
       const updated = updatedAttachments[attachmentIndex] as
-        | MnemonicVaultAttachmentConfig
-        | undefined;
+        MnemonicVaultAttachmentConfig | undefined;
       if (!updated) {
         return {
           content: [
