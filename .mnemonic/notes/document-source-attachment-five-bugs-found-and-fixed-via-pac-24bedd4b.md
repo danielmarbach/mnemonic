@@ -8,11 +8,14 @@ tags:
   - fixed
 lifecycle: permanent
 createdAt: '2026-07-29T21:44:03.817Z'
-updatedAt: '2026-07-29T21:44:03.817Z'
+updatedAt: '2026-07-29T21:44:18.255Z'
 role: review
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: review-read-only-markdown-attachment-retrieval-all-6-stages--e6d2d533
+    type: follows
 memoryVersion: 1
 ---
 # Document-source attachment: five bugs found and fixed via Pack D dogfooding
