@@ -8,7 +8,7 @@ import {
 } from "../project.js";
 import type { ServerContext } from "../server-context.js";
 import type { ProjectRef } from "../structured-content.js";
-import type { Vault } from "../vault.js";
+import type { Vault, MnemonicVaultAttachmentConfig } from "../vault.js";
 import type { WriteScope } from "../project-memory-policy.js";
 import { invalidateActiveProjectCache } from "../cache.js";
 import { checkBranchChange } from "../branch-tracker.js";
@@ -147,7 +147,10 @@ async function syncAttachedVaultsOnBranchChange(
   projectId: string,
 ): Promise<void> {
   const attachmentConfigs = await ctx.configStore.getProjectAttachments(projectId);
-  const enabledAttachments = attachmentConfigs.filter((a) => a.enabled && a.branch);
+  const enabledAttachments = attachmentConfigs.filter(
+    (a): a is MnemonicVaultAttachmentConfig =>
+      a.enabled && a.kind === "mnemonic-vault" && !!(a as MnemonicVaultAttachmentConfig).branch,
+  );
   if (enabledAttachments.length === 0) return;
 
   for (const attConfig of enabledAttachments) {

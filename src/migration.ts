@@ -282,6 +282,7 @@ export class Migrator {
   private registerBuiltInMigrations(): void {
     this.registerMigration(createV010BackfillMemoryVersionMigration());
     this.registerMigration(createV011BackfillLifecycleMigration());
+    this.registerMigration(createV014NormalizeAttachmentConfigMigration());
   }
 
   private parseVersion(version: string): number[] {
@@ -467,6 +468,91 @@ function createV011BackfillLifecycleMigration(): Migration {
             error: getErrorMessage(err),
           });
         }
+      }
+
+      return result;
+    },
+  };
+}
+
+function createV014NormalizeAttachmentConfigMigration(): Migration {
+  return {
+    name: "v0.1.4-normalize-attachment-config",
+    description: "Adds kind and attachmentId to legacy attachment configs in config.json",
+    minSchemaVersion: "1.3",
+    maxSchemaVersion: "1.4",
+    async run(vault, dryRun): Promise<MigrationResult> {
+      const result: MigrationResult = {
+        notesProcessed: 0,
+        notesModified: 0,
+        modifiedNoteIds: [],
+        errors: [],
+        warnings: [],
+      };
+
+      // This migration operates on config.json, not notes
+      const fullConfigPath = path.join(vault.storage.vaultPath, "config.json");
+
+      try {
+        const raw = await fs.readFile(fullConfigPath, "utf-8");
+        const config = JSON.parse(raw) as Record<string, unknown>;
+
+        const projectAttachments = config.projectAttachments as
+          | Record<string, unknown[]>
+          | undefined;
+        if (!projectAttachments || typeof projectAttachments !== "object") {
+          return result;
+        }
+
+        let modified = false;
+        for (const [, attachments] of Object.entries(projectAttachments)) {
+          if (!Array.isArray(attachments)) continue;
+
+          for (let i = 0; i < attachments.length; i++) {
+            const att = attachments[i] as Record<string, unknown> | undefined;
+            if (!att || typeof att !== "object") continue;
+
+            // Add kind if missing
+            if (!att.kind) {
+              att.kind = "mnemonic-vault";
+              modified = true;
+            }
+
+            // Add attachmentId if missing
+            if (
+              !att.attachmentId ||
+              typeof att.attachmentId !== "string" ||
+              !att.attachmentId.trim()
+            ) {
+              const slug = typeof att.projectSlug === "string" ? att.projectSlug : "";
+              const folder =
+                typeof att.vaultFolder === "string" && att.vaultFolder.trim()
+                  ? att.vaultFolder.trim()
+                  : ".mnemonic";
+              const raw = `${slug}::${folder}`;
+              let hash = 0;
+              for (let j = 0; j < raw.length; j++) {
+                const char = raw.charCodeAt(j);
+                hash = (hash << 5) - hash + char;
+                hash = hash & hash;
+              }
+              const hashStr = Math.abs(hash).toString(36).padStart(6, "0");
+              att.attachmentId = `legacy-${hashStr}`;
+              modified = true;
+            }
+          }
+        }
+
+        if (modified && !dryRun) {
+          await fs.writeFile(fullConfigPath, JSON.stringify(config, null, 2) + "\n", "utf-8");
+          result.notesModified = 1; // config.json was modified
+        }
+
+        result.notesProcessed = 1; // config.json processed
+      } catch (err) {
+        const message = getErrorMessage(err);
+        debugLog("migration:normalize-attachment-config", `failed: ${message}`);
+        result.errors.push({ noteId: "config.json", error: message });
       }
 
       return result;

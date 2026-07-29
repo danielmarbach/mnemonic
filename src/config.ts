@@ -10,7 +10,11 @@ import {
   type ProjectMemoryPolicy,
 } from "./project-memory-policy.js";
 import type { ProjectIdentityOverride } from "./project.js";
-import type { ProjectAttachmentConfig } from "./vault.js";
+import type {
+  ProjectAttachmentConfig,
+  MnemonicVaultAttachmentConfig,
+  DocumentSourceAttachmentConfig,
+} from "./vault.js";
 import { attachmentSlug } from "./brands.js";
 
 export type MutationPushMode = "all" | "main-only" | "none";
@@ -29,7 +33,7 @@ const defaultConfig: MnemonicConfig = {
   // Keep this at the latest schema version. When adding a new latest-schema
   // migration, bump this value in the same change so fresh installs start at
   // the current schema instead of missing that migration.
-  schemaVersion: "1.3",
+  schemaVersion: "1.4",
   reindexEmbedConcurrency: 4,
   mutationPushMode: "main-only",
   projectMemoryPolicies: {},
@@ -172,29 +176,108 @@ function normalizeProjectAttachments(value: unknown): Record<string, ProjectAtta
       const a = att as Record<string, unknown>;
       if (typeof a.projectSlug !== "string" || !a.projectSlug.trim()) continue;
       if (typeof a.localPath !== "string" || !a.localPath.trim()) continue;
-      validAttachments.push({
-        projectSlug: attachmentSlug(a.projectSlug.trim()),
-        projectName:
-          typeof a.projectName === "string" ? a.projectName.trim() : a.projectSlug.trim(),
-        localPath: a.localPath.trim(),
-        vaultFolder:
-          typeof a.vaultFolder === "string" && a.vaultFolder.trim()
-            ? a.vaultFolder.trim()
-            : ".mnemonic",
-        enabled: typeof a.enabled === "boolean" ? a.enabled : true,
-        branch: typeof a.branch === "string" ? a.branch : "main",
-        addedAt: typeof a.addedAt === "string" ? a.addedAt : "",
-        updatedAt: typeof a.updatedAt === "string" ? a.updatedAt : "",
-        branchTipHash: typeof a.branchTipHash === "string" ? a.branchTipHash : "",
-        writable: typeof a.writable === "boolean" ? a.writable : false,
-        pushBranch: typeof a.pushBranch === "string" ? a.pushBranch.trim() : undefined,
-      });
+
+      const kind = a.kind === "document-source" ? "document-source" : "mnemonic-vault";
+      const attachmentId =
+        typeof a.attachmentId === "string" && a.attachmentId.trim()
+          ? a.attachmentId.trim()
+          : deriveLegacyAttachmentId(a.projectSlug.trim(), a.vaultFolder);
+
+      if (kind === "document-source") {
+        const root =
+          typeof a.root === "string" && a.root.trim() ? normalizeDocumentRoot(a.root.trim()) : ".";
+        const include = Array.isArray(a.include)
+          ? a.include
+              .filter((p): p is string => typeof p === "string" && p.trim().length > 0)
+              .map((p) => p.trim())
+          : ["**/*.md"];
+        const exclude = Array.isArray(a.exclude)
+          ? a.exclude.filter((p): p is string => typeof p === "string").map((p) => p.trim())
+          : ["node_modules", ".git", "dist", "build", ".next", ".cache", "coverage"];
+        const acceptedMediaTypes = Array.isArray(a.acceptedMediaTypes)
+          ? a.acceptedMediaTypes
+              .filter(
+                (mt): mt is string =>
+                  typeof mt === "string" &&
+                  /^[a-z][a-z0-9.!#$&'*+\-.^_|~]+\/[a-z][a-z0-9.!#$&'*+\-.^_|~]+$/.test(mt.trim()),
+              )
+              .map((mt) => mt.trim().toLowerCase())
+          : ["text/markdown"];
+
+        const docConfig: DocumentSourceAttachmentConfig = {
+          kind: "document-source",
+          attachmentId,
+          projectSlug: attachmentSlug(a.projectSlug.trim()),
+          projectName:
+            typeof a.projectName === "string" ? a.projectName.trim() : a.projectSlug.trim(),
+          localPath: a.localPath.trim(),
+          enabled: typeof a.enabled === "boolean" ? a.enabled : true,
+          addedAt: typeof a.addedAt === "string" ? a.addedAt : "",
+          updatedAt: typeof a.updatedAt === "string" ? a.updatedAt : "",
+          root,
+          include,
+          exclude,
+          acceptedMediaTypes:
+            acceptedMediaTypes.length > 0 ? acceptedMediaTypes : ["text/markdown"],
+        };
+        validAttachments.push(docConfig);
+      } else {
+        const vaultConfig: MnemonicVaultAttachmentConfig = {
+          kind: "mnemonic-vault",
+          attachmentId,
+          projectSlug: attachmentSlug(a.projectSlug.trim()),
+          projectName:
+            typeof a.projectName === "string" ? a.projectName.trim() : a.projectSlug.trim(),
+          localPath: a.localPath.trim(),
+          vaultFolder:
+            typeof a.vaultFolder === "string" && a.vaultFolder.trim()
+              ? a.vaultFolder.trim()
+              : ".mnemonic",
+          enabled: typeof a.enabled === "boolean" ? a.enabled : true,
+          branch: typeof a.branch === "string" ? a.branch : "main",
+          addedAt: typeof a.addedAt === "string" ? a.addedAt : "",
+          updatedAt: typeof a.updatedAt === "string" ? a.updatedAt : "",
+          branchTipHash: typeof a.branchTipHash === "string" ? a.branchTipHash : "",
+          writable: typeof a.writable === "boolean" ? a.writable : false,
+          pushBranch: typeof a.pushBranch === "string" ? a.pushBranch.trim() : undefined,
+        };
+        validAttachments.push(vaultConfig);
+      }
     }
     if (validAttachments.length > 0) {
       normalized[projectId] = validAttachments;
     }
   }
   return normalized;
+}
+
+/**
+ * Derive a deterministic legacy attachment ID from project association, slug, and vault folder.
+ * Used for legacy configs that don't have a persisted attachmentId.
+ */
+function deriveLegacyAttachmentId(projectSlug: string, vaultFolder: unknown): string {
+  const folder =
+    typeof vaultFolder === "string" && vaultFolder.trim() ? vaultFolder.trim() : ".mnemonic";
+  const raw = `${projectSlug}::${folder}`;
+  // Simple hash to create a stable ID
+  let hash = 0;
+  for (let i = 0; i < raw.length; i++) {
+    const char = raw.charCodeAt(i);
+    hash = (hash << 5) - hash + char;
+    hash = hash & hash; // Convert to 32bit integer
+  }
+  const hashStr = Math.abs(hash).toString(36).padStart(6, "0");
+  return `legacy-${hashStr}`;
+}
+
+/**
+ * Normalize a document root path: must be relative POSIX, reject absolute and parent traversal.
+ */
+function normalizeDocumentRoot(root: string): string {
+  if (root.startsWith("/") || root.startsWith("..") || root.includes("..")) {
+    return ".";
+  }
+  return root;
 }
 
 function normalizeMaxAttachments(value: unknown): number {

@@ -23,7 +23,9 @@ export interface AttachmentRef {
   pushBranch?: string;
 }
 
-export interface ProjectAttachmentConfig {
+export interface MnemonicVaultAttachmentConfig {
+  kind: "mnemonic-vault";
+  attachmentId: string;
   projectSlug: AttachmentSlug;
   projectName: string;
   localPath: string;
@@ -36,6 +38,29 @@ export interface ProjectAttachmentConfig {
   writable?: boolean;
   pushBranch?: string;
 }
+
+export interface DocumentSourceAttachmentConfig {
+  kind: "document-source";
+  attachmentId: string;
+  projectSlug: AttachmentSlug;
+  projectName: string;
+  localPath: string;
+  enabled: boolean;
+  addedAt: string;
+  updatedAt: string;
+  /** Repository-relative POSIX path for document root. Default ".". */
+  root: string;
+  /** Glob patterns relative to root for files to include. Default ["**\/*.md"]. */
+  include: string[];
+  /** Glob patterns relative to root for files to exclude. */
+  exclude: string[];
+  /** Canonical lower-case IANA base media types. Default ["text/markdown"]. */
+  acceptedMediaTypes: string[];
+}
+
+export type ProjectAttachmentConfig =
+  | MnemonicVaultAttachmentConfig
+  | DocumentSourceAttachmentConfig;
 
 export interface Vault {
   storage: NoteStorage;
@@ -261,6 +286,11 @@ export class VaultManager {
     const enabledConfigs = configs.filter((c) => c.enabled);
 
     const vaultPromises = enabledConfigs.map(async (config) => {
+      // Only mnemonic-vault attachments create vault objects
+      if (config.kind !== "mnemonic-vault") {
+        return null;
+      }
+
       const resolvedLocalPath = path.resolve(expandHomePath(config.localPath));
       if (!(await pathExists(resolvedLocalPath))) {
         debugLog(

@@ -4,3 +4,4 @@ build/
 *.d.ts.map
 .DS_Store
 .opencode/package-lock.json
+.pi-subagents/
