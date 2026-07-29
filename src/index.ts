@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { McpServer, type RegisteredTool } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 import { toJsonSchemaCompat } from "@modelcontextprotocol/sdk/server/zod-json-schema-compat.js";
 import { normalizeObjectSchema } from "@modelcontextprotocol/sdk/server/zod-compat.js";
@@ -56,11 +56,12 @@ const EMPTY_OBJECT_JSON_SCHEMA = {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const internalServer = (server as any).server;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const registeredTools = (server as any)._registeredTools;
+// _registeredTools is internal SDK state; casting is required because it is private.
+type InternalRegisteredTools = { _registeredTools: Record<string, RegisteredTool> };
+const registeredTools = (server as unknown as InternalRegisteredTools)._registeredTools;
 
 internalServer.setRequestHandler(ListToolsRequestSchema, () => ({
-  tools: (Object.entries(registeredTools) as Array<[string, { enabled: boolean }]>)
+  tools: Object.entries(registeredTools)
     .filter(([, tool]) => tool.enabled)
     .map(([name, tool]) => {
       const toolDefinition: Record<string, unknown> = {
