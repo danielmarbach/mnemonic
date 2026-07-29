@@ -9,7 +9,7 @@ tags:
   - retrieval
 lifecycle: temporary
 createdAt: '2026-07-29T13:56:55.798Z'
-updatedAt: '2026-07-29T21:44:18.255Z'
+updatedAt: '2026-07-29T21:44:43.345Z'
 role: review
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -51,7 +51,7 @@ All 6 stages of the plan were implemented using parallel subagents (deepseek-v4-
 
 **Low (deferred):**
 
-- PDF/HTML extractors, MCP resources for binary delivery, document browsing via list/recent_memories
+- PDF/HTML extractors, MCP resources for binary delivery, document browsing via list/recent\_memories
 
 ### Design constraint compliance
 
@@ -86,5 +86,9 @@ All 6 stages of the plan were implemented using parallel subagents (deepseek-v4-
 
 - 10 new source files (1,079 lines): retrieval-document.ts, document-extractor.ts, markdown-extractor.ts, markdown-chunker.ts, document-entity-ref.ts, document-source-index.ts, document-recall.ts, document-sync.ts, generation-storage.ts, mutation-guard.ts
 - 8 new test files (133 tests)
-- ~20 modified files
+- \~20 modified files
 - 5 documentation files updated
+
+## Post-merge dogfood (Pack D)
+
+Subsequent dogfooding against the local build (`scripts/dogfood-document-source.mjs`) found five defects in the shipped implementation that this review's unit tests missed: (1) the include-glob parser corrupted directory-prefixed globs and silently indexed zero files; (2) recall aborted when the query embedding failed, blocking the lexical-only document chunks; (3) the get/forget/update/move-memory schemas rejected doc:/chunk: handles at the Zod layer, so Stage 3 and Stage 4 were unreachable via MCP; (4) the chunk entity-ref parser kept the chunk: prefix and truncated documentId; (5) recall returned early before collecting document chunks when memory recall was empty. All five are fixed with unit and integration tests; Pack D is 12/12 green and the full suite is 1305 green. See `document-source-attachment-five-bugs-found-and-fixed-via-pac-24bedd4b`. Lesson: the review's 'all checked constraints passing' was unit-test-scoped; the missing E2E (sync to generation to get to recall) integration test let these through.
