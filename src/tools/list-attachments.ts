@@ -3,6 +3,7 @@ import path from "path";
 import fs from "fs/promises";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ServerContext } from "../server-context.js";
+import type { MnemonicVaultAttachmentConfig, DocumentSourceAttachmentConfig } from "../vault.js";
 import { resolveProject as resolveProjectFromModule } from "../helpers/project.js";
 import { projectNotFoundResponse } from "../helpers/vault.js";
 import { ListAttachmentsResultSchema, type ListAttachmentsResult } from "../structured-content.js";
@@ -20,7 +21,7 @@ export function registerListAttachmentsTool(server: McpServer, ctx: ServerContex
         "- You need to check the status of attachment vaults\n\n" +
         "Do not use this when:\n" +
         "- You want to add or remove an attachment (use `add_attachment` or `remove_attachment`)\n\n" +
-        "Returns: list of attachments with their status, branch, and path information.\n\n" +
+        "Returns: list of attachments with their kind (mnemonic-vault or document-source), attachmentId, status, branch, and path information.\n\n" +
         "Typical next step:\n" +
         "- Use `set_attachment_enabled` to toggle an attachment, or `recall` to search across attached vaults.",
       annotations: {
@@ -66,7 +67,7 @@ export function registerListAttachmentsTool(server: McpServer, ctx: ServerContex
         const pathExists = pathCheck.ok;
 
         let noteCount = 0;
-        if (pathExists && att.enabled) {
+        if (pathExists && att.enabled && att.kind === "mnemonic-vault") {
           const noteCountResult = await attempt("list-attachments:count-notes", async () => {
             const attachedVaults = ctx.vaultManager.getAttachmentsForProject(project.id);
             const matchingVault = attachedVaults.find(
@@ -84,27 +85,54 @@ export function registerListAttachmentsTool(server: McpServer, ctx: ServerContex
         }
 
         const status = att.enabled ? (pathExists ? "active" : "path-missing") : "disabled";
-        const branchDisplay = att.branch || "(working-tree)";
 
-        attachmentEntries.push({
-          projectSlug: att.projectSlug,
-          projectName: att.projectName,
-          localPath: resolvedLocalPath,
-          vaultFolder: att.vaultFolder,
-          enabled: att.enabled,
-          branch: att.branch,
-          branchTipHash: att.branchTipHash,
-          pathExists,
-          noteCount,
-          writable: att.writable,
-          pushBranch: att.pushBranch,
-        });
+        if (att.kind === "mnemonic-vault") {
+          const vaultAtt = att as MnemonicVaultAttachmentConfig;
+          const branchDisplay = vaultAtt.branch || "(working-tree)";
+          const writableStr = vaultAtt.writable ? "writable" : "read-only";
+          const pushStr = vaultAtt.pushBranch
+            ? `pushBranch=${vaultAtt.pushBranch}`
+            : "push=default";
 
-        const writableStr = att.writable ? "writable" : "read-only";
-        const pushStr = att.pushBranch ? `pushBranch=${att.pushBranch}` : "push=default";
-        lines.push(
-          `  - ${att.projectName} (${att.projectSlug}): ${status}, ${writableStr}, ${pushStr}, branch=${branchDisplay}, notes=${noteCount}, path=${resolvedLocalPath}`,
-        );
+          attachmentEntries.push({
+            kind: "mnemonic-vault",
+            attachmentId: vaultAtt.attachmentId,
+            projectSlug: vaultAtt.projectSlug,
+            projectName: vaultAtt.projectName,
+            localPath: resolvedLocalPath,
+            enabled: vaultAtt.enabled,
+            vaultFolder: vaultAtt.vaultFolder,
+            branch: vaultAtt.branch,
+            branchTipHash: vaultAtt.branchTipHash,
+            pathExists,
+            noteCount,
+            writable: vaultAtt.writable,
+            pushBranch: vaultAtt.pushBranch,
+          });
+
+          lines.push(
+            `  - [vault] ${vaultAtt.projectName} (${vaultAtt.projectSlug}): ${status}, ${writableStr}, ${pushStr}, branch=${branchDisplay}, notes=${noteCount}, id=${vaultAtt.attachmentId}, path=${resolvedLocalPath}`,
+          );
+        } else {
+          const docAtt = att as DocumentSourceAttachmentConfig;
+
+          attachmentEntries.push({
+            kind: "document-source",
+            attachmentId: docAtt.attachmentId,
+            projectSlug: docAtt.projectSlug,
+            projectName: docAtt.projectName,
+            localPath: resolvedLocalPath,
+            enabled: docAtt.enabled,
+            root: docAtt.root,
+            include: docAtt.include,
+            exclude: docAtt.exclude,
+            acceptedMediaTypes: docAtt.acceptedMediaTypes,
+          });
+
+          lines.push(
+            `  - [doc] ${docAtt.projectName} (${docAtt.projectSlug}): ${status}, root=${docAtt.root}, include=${docAtt.include.join(",")}, id=${docAtt.attachmentId}, path=${resolvedLocalPath}`,
+          );
+        }
       }
 
       const structuredContent: ListAttachmentsResult = {

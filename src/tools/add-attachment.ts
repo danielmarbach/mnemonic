@@ -1,10 +1,15 @@
 import { z } from "zod";
 import fs from "fs/promises";
 import path from "path";
+import crypto from "crypto";
 import { simpleGit } from "simple-git";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ServerContext } from "../server-context.js";
-import type { ProjectAttachmentConfig } from "../vault.js";
+import type {
+  ProjectAttachmentConfig,
+  MnemonicVaultAttachmentConfig,
+  DocumentSourceAttachmentConfig,
+} from "../vault.js";
 import { detectDefaultBranch } from "../attached-storage.js";
 import { attachmentSlug, type AttachmentSlug } from "../brands.js";
 import { resolveProject as resolveProjectFromModule } from "../helpers/project.js";
@@ -19,6 +24,10 @@ import { AddAttachmentResultSchema, type AddAttachmentResult } from "../structur
 import { invalidateActiveProjectCache } from "../cache.js";
 import { attempt } from "../error-utils.js";
 import { expandHomePath, collapseHomePath } from "../paths.js";
+
+function generateAttachmentId(): string {
+  return crypto.randomUUID();
+}
 
 function normalizeRemote(remote: string): AttachmentSlug {
   let s = remote.trim().toLowerCase();
@@ -35,6 +44,18 @@ function extractRepoName(remote: string): string {
   return match?.[1] ?? path.basename(remote);
 }
 
+const VALID_MEDIA_TYPE_PATTERN = /^[a-z][a-z0-9.!#$&'*+\-.^_|~]+\/[a-z][a-z0-9.!#$&'*+\-.^_|~]+$/;
+
+const DEFAULT_DOCUMENT_EXCLUDE = [
+  "node_modules",
+  ".git",
+  "dist",
+  "build",
+  ".next",
+  ".cache",
+  "coverage",
+];
+
 export function registerAddAttachmentTool(server: McpServer, ctx: ServerContext): void {
   server.registerTool(
     "add_attachment",
@@ -43,11 +64,12 @@ export function registerAddAttachmentTool(server: McpServer, ctx: ServerContext)
       description:
         "Use this when:\n" +
         "- You want to attach an external repository's mnemonic vault to the current project\n" +
-        "- You need read-only or write-through access to another project's memories\n\n" +
+        "- You need read-only or write-through access to another project's memories\n" +
+        "- You want to attach a document source (e.g., markdown files) for read-only retrieval\n\n" +
         "Do not use this when:\n" +
         "- You want to modify memories in another project without enabling write-through (set writable=false)\n" +
         "- You want to move memories between vaults (use `move_memory`)\n\n" +
-        "Returns: the new attachment config and activation status.\n\n" +
+        "Returns: the new attachment config and activation status. Includes kind (mnemonic-vault or document-source), attachmentId (persistent opaque identifier), and for document-source attachments: root, include/exclude globs, and acceptedMediaTypes.\n\n" +
         "[mutating: writes config, git commits, may push]\n\n" +
         "Typical next step:\n" +
         "- Use `list_attachments` to verify the attachment was added.\n" +
@@ -65,31 +87,81 @@ export function registerAddAttachmentTool(server: McpServer, ctx: ServerContext)
             "Absolute path of the project working directory. Required for project-scoped routing, vault selection, and search boosting.",
           ),
         localPath: z.string().describe("Absolute path to the external repository to attach."),
+        kind: z
+          .enum(["mnemonic-vault", "document-source"])
+          .optional()
+          .default("mnemonic-vault")
+          .describe(
+            "Attachment kind: 'mnemonic-vault' for managed Mnemonic notes, 'document-source' for immutable repository documents.",
+          ),
+        // mnemonic-vault fields
         vaultFolder: z
           .string()
           .optional()
-          .describe("Vault folder name within the attached repo (default: .mnemonic)"),
+          .describe(
+            "Vault folder name within the attached repo (default: .mnemonic). Only for mnemonic-vault attachments.",
+          ),
         branch: z
           .string()
           .optional()
-          .describe("Git branch to read notes from in the attached repo (default: auto-detected)"),
+          .describe(
+            "Git branch to read notes from in the attached repo (default: auto-detected). Only for mnemonic-vault attachments.",
+          ),
         writable: z
           .boolean()
           .optional()
           .default(false)
           .describe(
-            "Whether this attachment supports write operations (default: false). When true, remember/update/forget/relate/unrelate can modify notes in this attached vault.",
+            "Whether this attachment supports write operations (default: false). Only for mnemonic-vault attachments.",
           ),
         pushBranch: z
           .string()
           .optional()
           .describe(
-            "Git branch to push mutations to when writable. Defaults to the read branch. If empty, commits locally without push.",
+            "Git branch to push mutations to when writable. Only for mnemonic-vault attachments.",
+          ),
+        // document-source fields
+        root: z
+          .string()
+          .optional()
+          .describe(
+            "Repository-relative POSIX path for document root (default: '.'). Only for document-source attachments.",
+          ),
+        include: z
+          .array(z.string())
+          .optional()
+          .describe(
+            "Glob patterns relative to root for files to include (default: ['**/*.md']). Only for document-source attachments.",
+          ),
+        exclude: z
+          .array(z.string())
+          .optional()
+          .describe(
+            "Glob patterns relative to root for files to exclude. Only for document-source attachments.",
+          ),
+        acceptedMediaTypes: z
+          .array(z.string())
+          .optional()
+          .describe(
+            "Canonical lower-case IANA base media types (default: ['text/markdown']). Only for document-source attachments.",
           ),
       }),
       outputSchema: AddAttachmentResultSchema,
     },
-    async ({ cwd, localPath, vaultFolder, branch, writable, pushBranch }) => {
+    async ({
+      cwd,
+      localPath,
+      kind,
+      vaultFolder,
+      branch,
+      writable,
+      pushBranch,
+      root,
+      include,
+      exclude,
+      acceptedMediaTypes,
+    }) => {
+      const effectiveKind = kind ?? "mnemonic-vault";
       const expandedPath = expandHomePath(localPath);
       const resolvedPath = path.resolve(expandedPath);
       if (!resolvedPath.startsWith("/")) {
@@ -100,18 +172,7 @@ export function registerAddAttachmentTool(server: McpServer, ctx: ServerContext)
           isError: true,
         };
       }
-      const folder = vaultFolder?.trim() || ".mnemonic";
-      if (folder.includes("..") || !folder.startsWith(".mnemonic")) {
-        return {
-          content: [
-            {
-              type: "text",
-              text: `Invalid vault folder: ${folder}. Must start with .mnemonic and not contain ..`,
-            },
-          ],
-          isError: true,
-        };
-      }
+
       const pathCheck = await attempt("add-attachment:check-path", async () => {
         const stat = await fs.stat(resolvedPath);
         if (!stat.isDirectory()) {
@@ -127,22 +188,6 @@ export function registerAddAttachmentTool(server: McpServer, ctx: ServerContext)
               text: pathCheck.ok
                 ? pathCheck.value.reason
                 : `Invalid path: ${localPath}. Path does not exist.`,
-            },
-          ],
-          isError: true,
-        };
-      }
-
-      const notesDir = path.join(resolvedPath, folder, "notes");
-      const accessCheck = await attempt("add-attachment:check-notes-dir", () =>
-        fs.access(notesDir),
-      );
-      if (!accessCheck.ok) {
-        return {
-          content: [
-            {
-              type: "text",
-              text: `Cannot attach: no notes directory found at ${notesDir}. Ensure the repository has a ${folder}/notes/ directory.`,
             },
           ],
           isError: true,
@@ -187,33 +232,132 @@ export function registerAddAttachmentTool(server: McpServer, ctx: ServerContext)
         };
       }
 
-      let effectiveBranch: string;
-      if (branch !== undefined && branch.trim() !== "") {
-        effectiveBranch = branch.trim();
-      } else {
-        effectiveBranch = await detectDefaultBranch(resolvedPath);
-      }
-
-      let branchTipHash = "";
-      if (effectiveBranch) {
-        const hashResult = await git.raw(["rev-parse", effectiveBranch]).catch(() => null);
-        branchTipHash = hashResult?.trim() ?? "";
-      }
-
       const now = new Date().toISOString();
-      const config: ProjectAttachmentConfig = {
-        projectSlug: slug,
-        projectName: name,
-        localPath: collapseHomePath(resolvedPath),
-        vaultFolder: folder,
-        enabled: true,
-        branch: effectiveBranch,
-        addedAt: existingIndex !== -1 ? (currentAttachments[existingIndex]?.addedAt ?? now) : now,
-        updatedAt: now,
-        branchTipHash,
-        writable: writable ?? false,
-        pushBranch: pushBranch ?? undefined,
-      };
+      const attachmentId = generateAttachmentId();
+
+      let config: ProjectAttachmentConfig;
+
+      if (effectiveKind === "document-source") {
+        // Validate document-source fields
+        const effectiveRoot = root?.trim() || ".";
+        if (
+          effectiveRoot.startsWith("/") ||
+          effectiveRoot.startsWith("..") ||
+          effectiveRoot.includes("..")
+        ) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: `Invalid root: ${effectiveRoot}. Must be a repository-relative POSIX path.`,
+              },
+            ],
+            isError: true,
+          };
+        }
+
+        const effectiveInclude =
+          include && include.length > 0
+            ? include.filter((p) => p.trim().length > 0).map((p) => p.trim())
+            : ["**/*.md"];
+
+        const effectiveExclude = exclude ?? DEFAULT_DOCUMENT_EXCLUDE;
+
+        const effectiveMediaTypes =
+          acceptedMediaTypes && acceptedMediaTypes.length > 0
+            ? acceptedMediaTypes
+                .filter((mt) => VALID_MEDIA_TYPE_PATTERN.test(mt.trim().toLowerCase()))
+                .map((mt) => mt.trim().toLowerCase())
+            : ["text/markdown"];
+
+        if (effectiveMediaTypes.length === 0) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: "No valid accepted media types provided. At least one valid IANA media type is required.",
+              },
+            ],
+            isError: true,
+          };
+        }
+
+        const docConfig: DocumentSourceAttachmentConfig = {
+          kind: "document-source",
+          attachmentId,
+          projectSlug: slug,
+          projectName: name,
+          localPath: collapseHomePath(resolvedPath),
+          enabled: true,
+          addedAt: existingIndex !== -1 ? (currentAttachments[existingIndex]?.addedAt ?? now) : now,
+          updatedAt: now,
+          root: effectiveRoot,
+          include: effectiveInclude,
+          exclude: effectiveExclude,
+          acceptedMediaTypes: effectiveMediaTypes,
+        };
+        config = docConfig;
+      } else {
+        // mnemonic-vault validation
+        const folder = vaultFolder?.trim() || ".mnemonic";
+        if (folder.includes("..") || !folder.startsWith(".mnemonic")) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: `Invalid vault folder: ${folder}. Must start with .mnemonic and not contain ..`,
+              },
+            ],
+            isError: true,
+          };
+        }
+
+        const notesDir = path.join(resolvedPath, folder, "notes");
+        const accessCheck = await attempt("add-attachment:check-notes-dir", () =>
+          fs.access(notesDir),
+        );
+        if (!accessCheck.ok) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: `Cannot attach: no notes directory found at ${notesDir}. Ensure the repository has a ${folder}/notes/ directory.`,
+              },
+            ],
+            isError: true,
+          };
+        }
+
+        let effectiveBranch: string;
+        if (branch !== undefined && branch.trim() !== "") {
+          effectiveBranch = branch.trim();
+        } else {
+          effectiveBranch = await detectDefaultBranch(resolvedPath);
+        }
+
+        let branchTipHash = "";
+        if (effectiveBranch) {
+          const hashResult = await git.raw(["rev-parse", effectiveBranch]).catch(() => null);
+          branchTipHash = hashResult?.trim() ?? "";
+        }
+
+        const vaultConfig: MnemonicVaultAttachmentConfig = {
+          kind: "mnemonic-vault",
+          attachmentId,
+          projectSlug: slug,
+          projectName: name,
+          localPath: collapseHomePath(resolvedPath),
+          vaultFolder: folder,
+          enabled: true,
+          branch: effectiveBranch,
+          addedAt: existingIndex !== -1 ? (currentAttachments[existingIndex]?.addedAt ?? now) : now,
+          updatedAt: now,
+          branchTipHash,
+          writable: writable ?? false,
+          pushBranch: pushBranch ?? undefined,
+        };
+        config = vaultConfig;
+      }
 
       let updatedAttachments: ProjectAttachmentConfig[];
       if (existingIndex !== -1) {
@@ -231,7 +375,7 @@ export function registerAddAttachmentTool(server: McpServer, ctx: ServerContext)
 
       const commitBody = formatCommitBody({
         projectName: project.name,
-        description: `Attached repository: ${name} (${slug})\nPath: ${resolvedPath}\nBranch: ${effectiveBranch || "(working-tree)"}`,
+        description: `Attached repository: ${name} (${slug})\nPath: ${resolvedPath}\nKind: ${effectiveKind}`,
       });
       const commitMessage = `attachment: add ${name} to ${project.name}`;
       const commitFiles = ["config.json"];
@@ -255,39 +399,43 @@ export function registerAddAttachmentTool(server: McpServer, ctx: ServerContext)
       });
 
       const warnings: string[] = [];
-      if (!effectiveBranch) {
-        warnings.push(
-          "Branch is empty — attached vault will read from working tree (not recommended for production).",
-        );
-      }
 
       const structuredContent: AddAttachmentResult = {
         action: "attachment_added",
         project: { id: project.id, name: project.name },
         attachment: {
+          kind: effectiveKind,
+          attachmentId,
           projectSlug: slug,
           projectName: name,
           localPath: resolvedPath,
-          vaultFolder: folder,
           enabled: true,
-          branch: effectiveBranch,
-          branchTipHash,
-          writable: writable ?? false,
-          pushBranch: pushBranch ?? undefined,
+          ...(effectiveKind === "mnemonic-vault"
+            ? {
+                vaultFolder: (config as MnemonicVaultAttachmentConfig).vaultFolder,
+                branch: (config as MnemonicVaultAttachmentConfig).branch,
+                branchTipHash: (config as MnemonicVaultAttachmentConfig).branchTipHash,
+                writable: (config as MnemonicVaultAttachmentConfig).writable,
+                pushBranch: (config as MnemonicVaultAttachmentConfig).pushBranch,
+              }
+            : {
+                root: (config as DocumentSourceAttachmentConfig).root,
+                include: (config as DocumentSourceAttachmentConfig).include,
+                exclude: (config as DocumentSourceAttachmentConfig).exclude,
+                acceptedMediaTypes: (config as DocumentSourceAttachmentConfig).acceptedMediaTypes,
+              }),
         },
         warnings: warnings.length > 0 ? warnings : undefined,
         retry,
       };
 
-      const branchDisplay = effectiveBranch || "(working-tree)";
-      const writableStr = writable ? "writable" : "read-only";
-      const pushStr = pushBranch ? `pushBranch=${pushBranch}` : "";
+      const kindDisplay = effectiveKind === "mnemonic-vault" ? "vault" : "document-source";
       return {
         content: [
           {
             type: "text",
             text:
-              `Attachment added to ${project.name}: ${name} (${slug}) at ${resolvedPath}, branch=${branchDisplay}, ${writableStr}${pushStr ? `, ${pushStr}` : ""}` +
+              `${kindDisplay} attachment added to ${project.name}: ${name} (${slug}) at ${resolvedPath}` +
               (warnings.length > 0 ? `\nWarnings: ${warnings.join("; ")}` : "") +
               (commitStatus.status === "failed"
                 ? `\n${formatRetrySummary(retry) ?? `Commit failed. Push status: ${pushStatus.status}.`}`

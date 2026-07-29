@@ -20,6 +20,17 @@ import { storageLabel } from "../helpers/vault.js";
 import { formatRelationshipPreview } from "../helpers/index.js";
 import { getSessionCachedNote, setSessionCachedNote, recordSessionNoteAccess } from "../cache.js";
 import { getRelationshipPreview } from "../relationships.js";
+import {
+  isDocumentEntityRef,
+  parseEntityRef as parseDocumentEntityRef,
+} from "../document-entity-ref.js";
+import { getCurrentGeneration } from "../generation-storage.js";
+
+// Extract attachment ID from a document ID (format: attachmentId::normalizedPath)
+function extractAttachmentId(documentId: string): string {
+  const sepIndex = documentId.indexOf("::");
+  return sepIndex === -1 ? documentId : documentId.slice(0, sepIndex);
+}
 
 export function registerGetTool(server: McpServer, ctx: ServerContext): void {
   server.registerTool(
@@ -30,11 +41,15 @@ export function registerGetTool(server: McpServer, ctx: ServerContext): void {
         "Use after `recall`, `list`, or `recent_memories` when you need the full note content.\n\n" +
         "Use this when:\n" +
         "- You already know the memory id and need the full note content\n" +
-        "- A previous tool returned ids that you now want to inspect exactly\n\n" +
+        "- A previous tool returned ids that you now want to inspect exactly\n" +
+        "- You have a document or chunk retrieval handle (doc: or chunk: prefix) and need the full content\n\n" +
         "Do not use this when:\n" +
         "- You are still searching by topic; use `recall`\n" +
         "- You want to browse many notes; use `list`\n\n" +
         "Returns: full note content, metadata, storage label. With includeRelationships: bounded 1-hop previews.\n\n" +
+        "Document-source entities (doc:/chunk: IDs) return source text with media type info. " +
+        "Returns documents (source text, media type, attachment info), items (ordered discriminated notes + documents), and itemErrors (per-item errors for stale/evicted/oversized/unknown references). " +
+        "Mutation follow-ups (update, forget, etc.) apply only to memory results.\n\n" +
         "Typical next step:\n" +
         "- Use `update`, `forget`, `move_memory`, or `relate` after inspection.",
       annotations: {
@@ -60,10 +75,110 @@ export function registerGetTool(server: McpServer, ctx: ServerContext): void {
 
       const project = await resolveProject(ctx, cwd);
       const found: GetResult["notes"] = [];
+      const documents: NonNullable<GetResult["documents"]> = [];
+      const items: NonNullable<GetResult["items"]> = [];
+      const itemErrors: NonNullable<GetResult["itemErrors"]> = [];
       const notFound: string[] = [];
 
       for (const id of ids) {
-        // Check session cache before hitting storage
+        // Check if this is a document/chunk entity reference
+        if (isDocumentEntityRef(id)) {
+          const parsed = parseDocumentEntityRef(id);
+          if (parsed.kind === "unknown") {
+            itemErrors.push({
+              id,
+              error: "Invalid document/chunk reference format",
+              code: "unknown-document",
+            });
+            continue;
+          }
+
+          if (parsed.kind === "document") {
+            // Look up document in current generation
+            const attachmentId = extractAttachmentId(parsed.documentId);
+            const generation = getCurrentGeneration(attachmentId);
+            if (!generation) {
+              itemErrors.push({
+                id,
+                error: "Document not found in current generation",
+                code: "index-unavailable",
+              });
+              continue;
+            }
+
+            const doc = generation.documents.get(parsed.documentId);
+            if (!doc) {
+              itemErrors.push({
+                id,
+                error: "Document not found in generation",
+                code: "unknown-document",
+              });
+              continue;
+            }
+
+            const content = generation.extractedText.get(parsed.documentId);
+            if (!content) {
+              itemErrors.push({
+                id,
+                error: "Document content not available",
+                code: "index-unavailable",
+              });
+              continue;
+            }
+
+            const docResult = {
+              documentId: doc.documentId as unknown as string,
+              sourcePath: doc.sourcePath,
+              sourceMediaType: doc.sourceMediaType,
+              content,
+              contentMediaType: doc.extractedContentMediaType,
+              attachmentId: generation.manifest.attachmentId,
+              generationId: generation.manifest.generationId as unknown as string,
+              indexedCommit: generation.manifest.indexedCommit,
+            };
+            documents.push(docResult);
+            items.push({ kind: "document" as const, ...docResult });
+          } else if (parsed.kind === "chunk" && parsed.chunkId) {
+            // Chunk reference
+            const attachmentId = extractAttachmentId(parsed.documentId);
+            const generation = getCurrentGeneration(attachmentId);
+            if (!generation) {
+              itemErrors.push({
+                id,
+                error: "Chunk not found in current generation",
+                code: "index-unavailable",
+              });
+              continue;
+            }
+
+            const chunk = generation.chunks.get(parsed.chunkId);
+            if (!chunk) {
+              itemErrors.push({
+                id,
+                error: "Chunk not found in generation",
+                code: "unknown-document",
+              });
+              continue;
+            }
+
+            const doc = generation.documents.get(parsed.documentId);
+            const docResult = {
+              documentId: chunk.documentId as unknown as string,
+              sourcePath: doc?.sourcePath ?? "",
+              sourceMediaType: doc?.sourceMediaType ?? "text/markdown",
+              content: chunk.content,
+              contentMediaType: chunk.contentMediaType,
+              attachmentId: generation.manifest.attachmentId,
+              generationId: generation.manifest.generationId as unknown as string,
+              indexedCommit: generation.manifest.indexedCommit,
+            };
+            documents.push(docResult);
+            items.push({ kind: "document" as const, ...docResult });
+          }
+          continue;
+        }
+
+        // Memory ID — existing behavior
         let result: { note: Note; vault: Vault } | null = null;
         if (project) {
           for (const vault of ctx.vaultManager.allKnownVaults(project.id)) {
@@ -96,7 +211,7 @@ export function registerGetTool(server: McpServer, ctx: ServerContext): void {
           );
         }
 
-        found.push({
+        const noteResult = {
           id: note.id,
           title: note.title,
           content: note.content,
@@ -110,7 +225,9 @@ export function registerGetTool(server: McpServer, ctx: ServerContext): void {
           updatedAt: note.updatedAt,
           vault: storageLabel(vault),
           relationships,
-        });
+        };
+        found.push(noteResult);
+        items.push({ kind: "note" as const, ...noteResult });
 
         if (project) {
           setSessionCachedNote(project.id, vault.storage.vaultPath, note);
@@ -133,15 +250,32 @@ export function registerGetTool(server: McpServer, ctx: ServerContext): void {
         }
         lines.push("");
       }
+      for (const doc of documents) {
+        lines.push(`## Document: ${doc.sourcePath} (${doc.documentId})`);
+        lines.push(
+          `sourceMediaType: ${doc.sourceMediaType} | contentMediaType: ${doc.contentMediaType} | attachment: ${doc.attachmentId} | generation: ${doc.generationId}`,
+        );
+        lines.push("");
+        lines.push(doc.content);
+        lines.push("");
+      }
+      if (itemErrors.length > 0) {
+        for (const err of itemErrors) {
+          lines.push(`Error: ${err.id} — ${err.error} (${err.code})`);
+        }
+      }
       if (notFound.length > 0) {
         lines.push(`Not found: ${notFound.join(", ")}`);
       }
 
       const structuredContent: GetResult = {
         action: "got",
-        count: found.length,
+        count: found.length + documents.length,
         notes: found,
         notFound,
+        documents: documents.length > 0 ? documents : undefined,
+        items: items.length > 0 ? items : undefined,
+        itemErrors: itemErrors.length > 0 ? itemErrors : undefined,
       };
 
       console.error(`[get:timing] ${(performance.now() - t0Get).toFixed(1)}ms`);

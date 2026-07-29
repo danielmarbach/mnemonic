@@ -9,6 +9,7 @@ import { formatPersistenceSummary } from "../helpers/persistence.js";
 import { moveNoteBetweenVaults, projectNotFoundResponse, storageLabel } from "../helpers/vault.js";
 import { attempt, getErrorMessage } from "../error-utils.js";
 import { invalidateActiveProjectCache } from "../cache.js";
+import { guardAgainstDocumentSourceMutation } from "../mutation-guard.js";
 
 export function registerMoveMemoryTool(server: McpServer, ctx: ServerContext): void {
   server.registerTool(
@@ -65,6 +66,7 @@ export function registerMoveMemoryTool(server: McpServer, ctx: ServerContext): v
     },
     async ({ id, target, vaultFolder, cwd, allowProtectedBranch = false }) => {
       await ensureBranchSynced(ctx, cwd);
+      guardAgainstDocumentSourceMutation(id, "move");
 
       const found = await ctx.vaultManager.findNote(id, cwd, { mutable: true });
       if (!found) {

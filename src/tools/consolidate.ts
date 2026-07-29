@@ -6,6 +6,7 @@ import { projectParam, resolveProject, ensureBranchSynced } from "../helpers/pro
 import { collectVisibleNotes, projectNotFoundResponse } from "../helpers/vault.js";
 import { CONSOLIDATION_MODES, resolveConsolidationMode } from "../project-memory-policy.js";
 import { invalidateActiveProjectCache } from "../cache.js";
+import { guardIdsAgainstDocumentSourceMutation } from "../mutation-guard.js";
 import {
   detectDuplicates,
   findClusters,
@@ -130,6 +131,11 @@ export function registerConsolidateTool(server: McpServer, ctx: ServerContext): 
       allowProtectedBranch = false,
     }) => {
       await ensureBranchSynced(ctx, cwd);
+
+      // Guard against document-source mutations
+      if (mergePlan?.sourceIds) {
+        guardIdsAgainstDocumentSourceMutation(mergePlan.sourceIds, "consolidate");
+      }
 
       const project = await resolveProject(ctx, cwd);
       if (!project && cwd) {

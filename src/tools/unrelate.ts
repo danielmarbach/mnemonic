@@ -21,6 +21,7 @@ import {
   pushAfterMutation,
 } from "../helpers/persistence.js";
 import { invalidateActiveProjectCache } from "../cache.js";
+import { guardIdsAgainstDocumentSourceMutation } from "../mutation-guard.js";
 import path from "path";
 
 export function registerUnrelateTool(server: McpServer, ctx: ServerContext): void {
@@ -60,6 +61,7 @@ export function registerUnrelateTool(server: McpServer, ctx: ServerContext): voi
     },
     async ({ fromId, toId, bidirectional, cwd }) => {
       await ensureBranchSynced(ctx, cwd);
+      guardIdsAgainstDocumentSourceMutation([fromId, toId], "unrelate");
       const project = await resolveProject(ctx, cwd);
       const projectId = project?.id;
       if (projectId) await ensureAttachmentsLoaded(ctx, projectId);

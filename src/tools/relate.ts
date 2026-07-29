@@ -23,6 +23,7 @@ import {
   pushAfterMutation,
 } from "../helpers/persistence.js";
 import { invalidateActiveProjectCache } from "../cache.js";
+import { guardIdsAgainstDocumentSourceMutation } from "../mutation-guard.js";
 
 export function registerRelateTool(server: McpServer, ctx: ServerContext): void {
   server.registerTool(
@@ -68,6 +69,7 @@ export function registerRelateTool(server: McpServer, ctx: ServerContext): void 
     },
     async ({ fromId, toId, type, bidirectional, cwd }) => {
       await ensureBranchSynced(ctx, cwd);
+      guardIdsAgainstDocumentSourceMutation([fromId, toId], "relate");
       const project = await resolveProject(ctx, cwd);
       const projectId = project?.id;
       if (projectId) await ensureAttachmentsLoaded(ctx, projectId);

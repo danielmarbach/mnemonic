@@ -3,6 +3,7 @@ import path from "path";
 import { simpleGit } from "simple-git";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ServerContext } from "../server-context.js";
+import type { MnemonicVaultAttachmentConfig } from "../vault.js";
 import { resolveProject as resolveProjectFromModule } from "../helpers/project.js";
 import { projectNotFoundResponse } from "../helpers/vault.js";
 import { formatCommitBody } from "../helpers/git-commit.js";
@@ -38,8 +39,9 @@ export function registerSetAttachmentBranchTool(server: McpServer, ctx: ServerCo
         "- You need to update the branch after the attached repo changed its default branch\n\n" +
         "Do not use this when:\n" +
         "- You want to enable/disable an attachment (use `set_attachment_enabled`)\n" +
-        "- You want to remove an attachment (use `remove_attachment`)\n\n" +
-        "Returns: the updated attachment config with new branch and tip hash.\n\n" +
+        "- You want to remove an attachment (use `remove_attachment`)\n" +
+        "- The attachment is a document-source (document sources have no branch concept)\n\n" +
+        "Returns: the updated attachment config with attachmentId, new branch, and tip hash.\n\n" +
         "[mutating: writes config, git commits, may push]\n\n" +
         "Typical next step:\n" +
         "- Use `list_attachments` to verify the branch change.",
@@ -55,7 +57,11 @@ export function registerSetAttachmentBranchTool(server: McpServer, ctx: ServerCo
           .describe(
             "Absolute path of the project working directory. Required for project-scoped routing, vault selection, and search boosting.",
           ),
-        projectSlug: z.string().describe("The attached repository's project slug"),
+        projectSlug: z
+          .string()
+          .optional()
+          .describe("The attached repository's project slug. Deprecated: prefer attachmentId."),
+        attachmentId: z.string().optional().describe("The persistent attachment identifier."),
         branch: z
           .string()
           .describe(
@@ -64,20 +70,61 @@ export function registerSetAttachmentBranchTool(server: McpServer, ctx: ServerCo
       }),
       outputSchema: SetAttachmentBranchResultSchema,
     },
-    async ({ cwd, projectSlug, branch }) => {
+    async ({ cwd, projectSlug, attachmentId, branch }) => {
       const project = await resolveProjectFromModule(ctx, cwd);
       if (!project) {
         return projectNotFoundResponse(cwd);
       }
 
       const currentAttachments = await ctx.configStore.getProjectAttachments(project.id);
-      const attachmentIndex = currentAttachments.findIndex((a) => a.projectSlug === projectSlug);
-      if (attachmentIndex === -1) {
+
+      // Resolve by attachmentId first, then by projectSlug
+      let attachmentIndex = -1;
+      if (attachmentId) {
+        attachmentIndex = currentAttachments.findIndex((a) => a.attachmentId === attachmentId);
+        if (attachmentIndex === -1) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: `No attachment found with id '${attachmentId}' for project ${project.name}.`,
+              },
+            ],
+            isError: true,
+          };
+        }
+      } else if (projectSlug) {
+        const matching = currentAttachments.filter((a) => a.projectSlug === projectSlug);
+        if (matching.length === 0) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: `No attachment found with slug '${projectSlug}' for project ${project.name}.`,
+              },
+            ],
+            isError: true,
+          };
+        }
+        if (matching.length > 1) {
+          const ids = matching.map((a) => a.attachmentId).join(", ");
+          return {
+            content: [
+              {
+                type: "text",
+                text: `Multiple attachments found with slug '${projectSlug}'. Use attachmentId instead: ${ids}`,
+              },
+            ],
+            isError: true,
+          };
+        }
+        attachmentIndex = currentAttachments.findIndex((a) => a.projectSlug === projectSlug);
+      } else {
         return {
           content: [
             {
               type: "text",
-              text: `No attachment found with slug '${projectSlug}' for project ${project.name}.`,
+              text: "Either projectSlug or attachmentId is required.",
             },
           ],
           isError: true,
@@ -93,12 +140,27 @@ export function registerSetAttachmentBranchTool(server: McpServer, ctx: ServerCo
           isError: true,
         };
       }
+
+      // Reject document-source attachments
+      if (att.kind === "document-source") {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Cannot set branch on document-source attachment '${att.projectName}'. Document sources have no branch concept.`,
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      const vaultAtt = att as MnemonicVaultAttachmentConfig;
       const effectiveBranch = branch.trim();
       validateBranch(effectiveBranch);
 
       let branchTipHash = "";
       if (effectiveBranch) {
-        const resolvedLocalPath = path.resolve(expandHomePath(att.localPath));
+        const resolvedLocalPath = path.resolve(expandHomePath(vaultAtt.localPath));
         const git = simpleGit(resolvedLocalPath);
         const hashResult = await git.raw(["rev-parse", effectiveBranch]).catch(() => null);
         branchTipHash = hashResult?.trim() ?? "";
@@ -119,9 +181,9 @@ export function registerSetAttachmentBranchTool(server: McpServer, ctx: ServerCo
 
       const commitBody = formatCommitBody({
         projectName: project.name,
-        description: `Attachment ${projectSlug}: branch=${effectiveBranch || "(working-tree)"}, tipHash=${branchTipHash || "none"}`,
+        description: `Attachment ${vaultAtt.projectSlug}: branch=${effectiveBranch || "(working-tree)"}, tipHash=${branchTipHash || "none"}`,
       });
-      const commitMessage = `attachment: set branch ${effectiveBranch || "(working-tree)"} for ${projectSlug} on ${project.name}`;
+      const commitMessage = `attachment: set branch ${effectiveBranch || "(working-tree)"} for ${vaultAtt.projectSlug} on ${project.name}`;
       const commitFiles = ["config.json"];
       const commitStatus = await ctx.vaultManager.main.git.commitWithStatus(
         commitMessage,
@@ -142,7 +204,9 @@ export function registerSetAttachmentBranchTool(server: McpServer, ctx: ServerCo
         mutationApplied: true,
       });
 
-      const updated = updatedAttachments[attachmentIndex];
+      const updated = updatedAttachments[attachmentIndex] as
+        | MnemonicVaultAttachmentConfig
+        | undefined;
       if (!updated) {
         return {
           content: [
@@ -165,6 +229,8 @@ export function registerSetAttachmentBranchTool(server: McpServer, ctx: ServerCo
         action: "attachment_branch_set",
         project: { id: project.id, name: project.name },
         attachment: {
+          kind: "mnemonic-vault",
+          attachmentId: updated.attachmentId,
           projectSlug: updated.projectSlug,
           projectName: updated.projectName,
           localPath: updated.localPath,
@@ -178,12 +244,18 @@ export function registerSetAttachmentBranchTool(server: McpServer, ctx: ServerCo
       };
 
       const branchDisplay = effectiveBranch || "(working-tree)";
+      const deprecationHint =
+        projectSlug && !attachmentId
+          ? `\nNote: projectSlug is deprecated. Use attachmentId '${updated.attachmentId}' for future operations.`
+          : "";
+
       return {
         content: [
           {
             type: "text",
             text:
-              `Attachment ${updated.projectName} (${projectSlug}) for ${project.name}: branch=${branchDisplay}` +
+              `Attachment ${updated.projectName} (${updated.projectSlug}) for ${project.name}: branch=${branchDisplay}` +
+              deprecationHint +
               (warnings.length > 0 ? `\nWarnings: ${warnings.join("; ")}` : "") +
               (commitStatus.status === "failed"
                 ? `\n${formatRetrySummary(retry) ?? `Commit failed. Push status: ${pushStatus.status}.`}`

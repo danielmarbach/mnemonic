@@ -27,7 +27,7 @@ export function registerSetAttachmentEnabledTool(server: McpServer, ctx: ServerC
         "Do not use this when:\n" +
         "- You want to permanently remove an attachment (use `remove_attachment`)\n" +
         "- You want to change the branch an attachment reads from (use `set_attachment_branch`)\n\n" +
-        "Returns: the updated attachment config.\n\n" +
+        "Returns: the updated attachment config including attachmentId.\n\n" +
         "[mutating: writes config, git commits, may push]\n\n" +
         "Typical next step:\n" +
         "- Use `list_attachments` to verify the change.",
@@ -43,25 +43,70 @@ export function registerSetAttachmentEnabledTool(server: McpServer, ctx: ServerC
           .describe(
             "Absolute path of the project working directory. Required for project-scoped routing, vault selection, and search boosting.",
           ),
-        projectSlug: z.string().describe("The attached repository's project slug"),
+        projectSlug: z
+          .string()
+          .optional()
+          .describe("The attached repository's project slug. Deprecated: prefer attachmentId."),
+        attachmentId: z.string().optional().describe("The persistent attachment identifier."),
         enabled: z.boolean().describe("Whether the attachment should be enabled"),
       }),
       outputSchema: SetAttachmentEnabledResultSchema,
     },
-    async ({ cwd, projectSlug, enabled }) => {
+    async ({ cwd, projectSlug, attachmentId, enabled }) => {
       const project = await resolveProjectFromModule(ctx, cwd);
       if (!project) {
         return projectNotFoundResponse(cwd);
       }
 
       const currentAttachments = await ctx.configStore.getProjectAttachments(project.id);
-      const attachmentIndex = currentAttachments.findIndex((a) => a.projectSlug === projectSlug);
-      if (attachmentIndex === -1) {
+
+      // Resolve by attachmentId first, then by projectSlug
+      let attachmentIndex = -1;
+      if (attachmentId) {
+        attachmentIndex = currentAttachments.findIndex((a) => a.attachmentId === attachmentId);
+        if (attachmentIndex === -1) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: `No attachment found with id '${attachmentId}' for project ${project.name}.`,
+              },
+            ],
+            isError: true,
+          };
+        }
+      } else if (projectSlug) {
+        const matching = currentAttachments.filter((a) => a.projectSlug === projectSlug);
+        if (matching.length === 0) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: `No attachment found with slug '${projectSlug}' for project ${project.name}.`,
+              },
+            ],
+            isError: true,
+          };
+        }
+        if (matching.length > 1) {
+          const ids = matching.map((a) => a.attachmentId).join(", ");
+          return {
+            content: [
+              {
+                type: "text",
+                text: `Multiple attachments found with slug '${projectSlug}'. Use attachmentId instead: ${ids}`,
+              },
+            ],
+            isError: true,
+          };
+        }
+        attachmentIndex = currentAttachments.findIndex((a) => a.projectSlug === projectSlug);
+      } else {
         return {
           content: [
             {
               type: "text",
-              text: `No attachment found with slug '${projectSlug}' for project ${project.name}.`,
+              text: "Either projectSlug or attachmentId is required.",
             },
           ],
           isError: true,
@@ -80,9 +125,9 @@ export function registerSetAttachmentEnabledTool(server: McpServer, ctx: ServerC
 
       const commitBody = formatCommitBody({
         projectName: project.name,
-        description: `Attachment ${projectSlug}: enabled=${enabled}`,
+        description: `Attachment ${currentAttachments[attachmentIndex]?.projectSlug}: enabled=${enabled}`,
       });
-      const commitMessage = `attachment: ${enabled ? "enable" : "disable"} ${projectSlug} for ${project.name}`;
+      const commitMessage = `attachment: ${enabled ? "enable" : "disable"} ${currentAttachments[attachmentIndex]?.projectSlug} for ${project.name}`;
       const commitFiles = ["config.json"];
       const commitStatus = await ctx.vaultManager.main.git.commitWithStatus(
         commitMessage,
@@ -115,24 +160,36 @@ export function registerSetAttachmentEnabledTool(server: McpServer, ctx: ServerC
           isError: true,
         };
       }
+
       const structuredContent: SetAttachmentEnabledResult = {
         action: "attachment_enabled_set",
         project: { id: project.id, name: project.name },
         attachment: {
+          kind: updated.kind,
+          attachmentId: updated.attachmentId,
           projectSlug: updated.projectSlug,
           projectName: updated.projectName,
           enabled: updated.enabled,
-          branch: updated.branch,
+          branch:
+            updated.kind === "mnemonic-vault"
+              ? (updated as { kind: "mnemonic-vault"; branch?: string }).branch
+              : undefined,
         },
         retry,
       };
+
+      const deprecationHint =
+        projectSlug && !attachmentId
+          ? `\nNote: projectSlug is deprecated. Use attachmentId '${updated.attachmentId}' for future operations.`
+          : "";
 
       return {
         content: [
           {
             type: "text",
             text:
-              `Attachment ${updated.projectName} (${projectSlug}) for ${project.name}: ${enabled ? "enabled" : "disabled"}` +
+              `Attachment ${updated.projectName} (${updated.projectSlug}) for ${project.name}: ${enabled ? "enabled" : "disabled"}` +
+              deprecationHint +
               (commitStatus.status === "failed"
                 ? `\n${formatRetrySummary(retry) ?? `Commit failed. Push status: ${pushStatus.status}.`}`
                 : ""),

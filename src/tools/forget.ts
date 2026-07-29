@@ -32,6 +32,7 @@ import {
   ensureAttachmentsLoaded,
 } from "../helpers/vault.js";
 import { invalidateActiveProjectCache } from "../cache.js";
+import { guardAgainstDocumentSourceMutation } from "../mutation-guard.js";
 
 export function registerForgetTool(server: McpServer, ctx: ServerContext): void {
   server.registerTool(
@@ -74,6 +75,7 @@ export function registerForgetTool(server: McpServer, ctx: ServerContext): void 
     },
     async ({ id, cwd, allowProtectedBranch = false }) => {
       await ensureBranchSynced(ctx, cwd);
+      guardAgainstDocumentSourceMutation(id, "forget");
       const project = await resolveProject(ctx, cwd);
       const projectId = project?.id;
       if (projectId) await ensureAttachmentsLoaded(ctx, projectId);

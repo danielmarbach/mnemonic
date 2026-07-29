@@ -7,12 +7,15 @@ import {
   SyncResultSchema,
   type SyncResult as StructuredSyncResult,
 } from "../structured-content.js";
+import type { MnemonicVaultAttachmentConfig } from "../vault.js";
 import type { SyncResult } from "../git.js";
 import { projectParam, resolveProject as resolveProjectFromModule } from "../helpers/project.js";
 import { invalidateActiveProjectCache } from "../cache.js";
 import { backfillEmbeddingsAfterSync, removeStaleEmbeddings } from "../helpers/embed.js";
 import { attempt, getErrorMessage } from "../error-utils.js";
 import { expandHomePath } from "../paths.js";
+import { syncDocumentSource } from "../document-sync.js";
+import type { DocumentSourceAttachmentConfig } from "../vault.js";
 
 function formatSyncResult(result: SyncResult, label: string, vaultPath?: string): string[] {
   if (!result.hasRemote) return [`${label}: no remote configured — git sync skipped.`];
@@ -152,7 +155,12 @@ export function registerSyncTool(server: McpServer, ctx: ServerContext): void {
         const project = await resolveProjectFromModule(ctx, cwd);
         if (project) {
           const attachmentConfigs = await ctx.configStore.getProjectAttachments(project.id);
-          const enabledAttachments = attachmentConfigs.filter((a) => a.enabled && a.branch);
+          const enabledAttachments = attachmentConfigs.filter(
+            (a): a is MnemonicVaultAttachmentConfig =>
+              a.enabled &&
+              a.kind === "mnemonic-vault" &&
+              !!(a as MnemonicVaultAttachmentConfig).branch,
+          );
           for (const attConfig of enabledAttachments) {
             const label = `attached:${attConfig.projectSlug}`;
             const resolvedLocalPath = path.resolve(expandHomePath(attConfig.localPath));
@@ -210,6 +218,33 @@ export function registerSyncTool(server: McpServer, ctx: ServerContext): void {
             );
           } else if (attachmentConfigs.length === 0) {
             lines.push("attached vaults: none configured — skipped.");
+          }
+
+          // Sync document-source attachments
+          const documentSourceAttachments = attachmentConfigs.filter(
+            (a): a is DocumentSourceAttachmentConfig => a.enabled && a.kind === "document-source",
+          );
+          for (const docConfig of documentSourceAttachments) {
+            const label = `doc-source:${docConfig.projectSlug}`;
+            const result = await syncDocumentSource(docConfig);
+            if (result.status === "indexed") {
+              lines.push(`${label}: ${result.message}`);
+              if (result.skippedFiles.length > 0) {
+                lines.push(
+                  `${label}: skipped ${result.skippedFiles.length} file(s) (${result.skippedFiles.map((s) => s.reason).join(", ")})`,
+                );
+              }
+              if (result.errors.length > 0) {
+                lines.push(`${label}: errors: ${result.errors.join("; ")}`);
+              }
+            } else if (result.status === "unchanged") {
+              lines.push(`${label}: ${result.message}`);
+            } else {
+              lines.push(`${label}: ✗ ${result.message}`);
+            }
+          }
+          if (documentSourceAttachments.length === 0) {
+            // Already reported above
           }
         }
       }

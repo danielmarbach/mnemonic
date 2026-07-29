@@ -167,6 +167,23 @@ export interface RecallResult extends Record<string, unknown> {
     relationships?: RelationshipPreview;
     retrievalEvidence?: RetrievalEvidence;
   }>;
+  /** Document-chunk results from document-source attachments */
+  documentChunks?: Array<{
+    kind: "document-chunk";
+    chunkId: string;
+    documentId: string;
+    score: number;
+    boosted: number;
+    sourcePath: string;
+    headingAncestry: Array<{ depth: number; text: string }>;
+    excerpt: string;
+    attachmentId: string;
+    sourceMediaType: string;
+    extractionMetadata?: Record<string, unknown>;
+    indexedCommit: string;
+    generationId: string;
+    retrievalHandle: string;
+  }>;
 }
 
 export interface RecallDiversity {
@@ -183,7 +200,12 @@ export interface RecallRetrievalCoverage {
 }
 
 export type RetrievalEvidenceChannel =
-  "semantic" | "lexical" | "graph-rank" | "temporal-boost" | "canonical" | "rescue";
+  | "semantic"
+  | "lexical"
+  | "graph-rank"
+  | "temporal-boost"
+  | "canonical"
+  | "rescue";
 export type RetrievalEvidenceRankBand = "top3" | "top10" | "lower";
 export type RetrievalEvidenceFreshness = "today" | "thisWeek" | "thisMonth" | "older";
 
@@ -256,6 +278,51 @@ export interface GetResult extends Record<string, unknown> {
     relationships?: RelationshipPreview;
   }>;
   notFound: string[];
+  /** Document results from document-source attachments (read-only) */
+  documents?: Array<{
+    documentId: string;
+    sourcePath: string;
+    sourceMediaType: string;
+    content: string;
+    contentMediaType: string;
+    attachmentId: string;
+    generationId: string;
+    indexedCommit: string;
+  }>;
+  /** Ordered discriminated items combining notes and documents */
+  items?: Array<
+    | {
+        kind: "note";
+        id: string;
+        title: string;
+        content: string;
+        project?: ProjectRef;
+        tags: string[];
+        lifecycle: NoteLifecycle;
+        role?: NoteRole;
+        vault: string;
+        createdAt: string;
+        updatedAt: string;
+        relationships?: RelationshipPreview;
+      }
+    | {
+        kind: "document";
+        documentId: string;
+        sourcePath: string;
+        sourceMediaType: string;
+        content: string;
+        contentMediaType: string;
+        attachmentId: string;
+        generationId: string;
+        indexedCommit: string;
+      }
+  >;
+  /** Per-item errors for stale, evicted, oversized, or unavailable references */
+  itemErrors?: Array<{
+    id: string;
+    error: string;
+    code: "snapshot-evicted" | "content-too-large" | "index-unavailable" | "unknown-document";
+  }>;
 }
 
 export interface RelateResult extends Record<string, unknown> {
@@ -328,15 +395,23 @@ export interface AddAttachmentResult extends Record<string, unknown> {
   action: "attachment_added";
   project: { id: string; name: string };
   attachment: {
+    kind: "mnemonic-vault" | "document-source";
+    attachmentId: string;
     projectSlug: string;
     projectName: string;
     localPath: string;
-    vaultFolder: string;
     enabled: boolean;
-    branch: string;
-    branchTipHash: string;
+    // mnemonic-vault fields
+    vaultFolder?: string;
+    branch?: string;
+    branchTipHash?: string;
     writable?: boolean;
     pushBranch?: string;
+    // document-source fields
+    root?: string;
+    include?: string[];
+    exclude?: string[];
+    acceptedMediaTypes?: string[];
   };
   warnings?: string[];
   retry?: MutationRetryContract;
@@ -346,11 +421,13 @@ export interface RemoveAttachmentResult extends Record<string, unknown> {
   action: "attachment_removed";
   project: { id: string; name: string };
   removedAttachment: {
+    kind: "mnemonic-vault" | "document-source";
+    attachmentId: string;
     projectSlug: string;
     projectName: string;
     localPath: string;
-    vaultFolder: string;
-    branch: string;
+    vaultFolder?: string;
+    branch?: string;
   };
   retry?: MutationRetryContract;
 }
@@ -359,17 +436,25 @@ export interface ListAttachmentsResult extends Record<string, unknown> {
   action: "attachments_listed";
   project: { id: string; name: string };
   attachments: Array<{
+    kind: "mnemonic-vault" | "document-source";
+    attachmentId: string;
     projectSlug: string;
     projectName: string;
     localPath: string;
-    vaultFolder: string;
     enabled: boolean;
-    branch: string;
-    branchTipHash: string;
-    pathExists: boolean;
-    noteCount: number;
+    // mnemonic-vault fields
+    vaultFolder?: string;
+    branch?: string;
+    branchTipHash?: string;
+    pathExists?: boolean;
+    noteCount?: number;
     writable?: boolean;
     pushBranch?: string;
+    // document-source fields
+    root?: string;
+    include?: string[];
+    exclude?: string[];
+    acceptedMediaTypes?: string[];
   }>;
   maxAttachmentsPerProject: number;
 }
@@ -378,10 +463,12 @@ export interface SetAttachmentEnabledResult extends Record<string, unknown> {
   action: "attachment_enabled_set";
   project: { id: string; name: string };
   attachment: {
+    kind: "mnemonic-vault" | "document-source";
+    attachmentId: string;
     projectSlug: string;
     projectName: string;
     enabled: boolean;
-    branch: string;
+    branch?: string;
   };
   retry?: MutationRetryContract;
 }
@@ -390,6 +477,8 @@ export interface SetAttachmentBranchResult extends Record<string, unknown> {
   action: "attachment_branch_set";
   project: { id: string; name: string };
   attachment: {
+    kind: "mnemonic-vault" | "document-source";
+    attachmentId: string;
     projectSlug: string;
     projectName: string;
     localPath: string;
@@ -1064,6 +1153,39 @@ export const RecallResultSchema = z.object({
         .optional(),
     }),
   ),
+  documentChunks: z
+    .array(
+      z.object({
+        kind: z.literal("document-chunk").describe("Result kind discriminator"),
+        chunkId: z.string().describe("Stable chunk identifier"),
+        documentId: z.string().describe("Stable document identifier"),
+        score: z.number().describe("Composite relevance score"),
+        boosted: z.number().describe("Score after policy boosts"),
+        sourcePath: z.string().describe("Repository-relative source path"),
+        headingAncestry: z
+          .array(
+            z.object({
+              depth: z.number().int().describe("Heading depth (1-6)"),
+              text: z.string().describe("Heading text"),
+            }),
+          )
+          .describe("Heading ancestry for context"),
+        excerpt: z.string().describe("Short content preview"),
+        attachmentId: z.string().describe("Attachment identifier"),
+        sourceMediaType: z.string().describe("Source media type (e.g., text/markdown)"),
+        extractionMetadata: z
+          .record(z.string(), z.unknown())
+          .optional()
+          .describe("Extraction metadata"),
+        indexedCommit: z.string().describe("Git commit hash at index time"),
+        generationId: z.string().describe("Generation identifier"),
+        retrievalHandle: z
+          .string()
+          .describe("Revision-qualified handle for exact retrieval via get"),
+      }),
+    )
+    .optional()
+    .describe("Document-chunk results from document-source attachments"),
 });
 
 export const ListResultSchema = z.object({
@@ -1464,6 +1586,67 @@ export const GetResultSchema = z.object({
     }),
   ),
   notFound: z.array(z.string()),
+  documents: z
+    .array(
+      z.object({
+        documentId: z.string().describe("Stable document identifier"),
+        sourcePath: z.string().describe("Repository-relative source path"),
+        sourceMediaType: z.string().describe("Source media type (e.g., text/markdown)"),
+        content: z.string().describe("Full document content"),
+        contentMediaType: z.string().describe("Content media type"),
+        attachmentId: z.string().describe("Attachment identifier"),
+        generationId: z.string().describe("Generation identifier"),
+        indexedCommit: z.string().describe("Git commit hash at index time"),
+      }),
+    )
+    .optional()
+    .describe("Document results from document-source attachments (read-only)"),
+  items: z
+    .array(
+      z.discriminatedUnion("kind", [
+        z.object({
+          kind: z.literal("note"),
+          id: z.string(),
+          title: z.string(),
+          content: z.string(),
+          project: ProjectRefSchema.optional(),
+          tags: z.array(z.string()),
+          lifecycle: _NoteLifecycle,
+          role: _NoteRole.optional(),
+          vault: _VaultLabel,
+          createdAt: z.string(),
+          updatedAt: z.string(),
+          relationships: RelationshipPreviewSchema.optional(),
+        }),
+        z.object({
+          kind: z.literal("document").describe("Result kind discriminator"),
+          documentId: z.string().describe("Stable document identifier"),
+          sourcePath: z.string().describe("Repository-relative source path"),
+          sourceMediaType: z.string().describe("Source media type (e.g., text/markdown)"),
+          content: z.string().describe("Full document content"),
+          contentMediaType: z.string().describe("Content media type"),
+          attachmentId: z.string().describe("Attachment identifier"),
+          generationId: z.string().describe("Generation identifier"),
+          indexedCommit: z.string().describe("Git commit hash at index time"),
+        }),
+      ]),
+    )
+    .optional()
+    .describe("Ordered discriminated items combining notes and documents"),
+  itemErrors: z
+    .array(
+      z.object({
+        id: z.string().describe("Entity identifier that caused the error"),
+        error: z.string().describe("Human-readable error description"),
+        code: z
+          .enum(["snapshot-evicted", "content-too-large", "index-unavailable", "unknown-document"])
+          .describe(
+            "Error code: snapshot-evicted (generation evicted), content-too-large (exceeds size limit), index-unavailable (no generation), unknown-document (not found)",
+          ),
+      }),
+    )
+    .optional()
+    .describe("Per-item errors for stale, evicted, oversized, or unavailable references"),
 });
 
 export const WhereIsResultSchema = z.object({
@@ -1667,15 +1850,36 @@ export const AddAttachmentResultSchema = z.object({
   action: z.literal("attachment_added"),
   project: z.object({ id: z.string(), name: z.string() }),
   attachment: z.object({
+    kind: z.enum(["mnemonic-vault", "document-source"]).describe("Attachment kind discriminator"),
+    attachmentId: z.string().describe("Persistent opaque attachment identifier"),
     projectSlug: z.string(),
     projectName: z.string(),
     localPath: z.string(),
-    vaultFolder: z.string(),
     enabled: z.boolean(),
-    branch: z.string(),
-    branchTipHash: z.string(),
+    vaultFolder: z
+      .string()
+      .optional()
+      .describe("Vault folder name, present for mnemonic-vault attachments"),
+    branch: z.string().optional().describe("Git branch, present for mnemonic-vault attachments"),
+    branchTipHash: z.string().optional(),
     writable: z.boolean().optional(),
     pushBranch: z.string().optional(),
+    root: z
+      .string()
+      .optional()
+      .describe("Repository-relative document root, present for document-source attachments"),
+    include: z
+      .array(z.string())
+      .optional()
+      .describe("Glob patterns for files to include, present for document-source attachments"),
+    exclude: z
+      .array(z.string())
+      .optional()
+      .describe("Glob patterns for files to exclude, present for document-source attachments"),
+    acceptedMediaTypes: z
+      .array(z.string())
+      .optional()
+      .describe("Accepted media types, present for document-source attachments"),
   }),
   warnings: z.array(z.string()).optional(),
   retry: PersistenceStatusSchema.shape.retry,
@@ -1685,11 +1889,16 @@ export const RemoveAttachmentResultSchema = z.object({
   action: z.literal("attachment_removed"),
   project: z.object({ id: z.string(), name: z.string() }),
   removedAttachment: z.object({
+    kind: z.enum(["mnemonic-vault", "document-source"]).describe("Attachment kind discriminator"),
+    attachmentId: z.string().describe("Persistent opaque attachment identifier"),
     projectSlug: z.string(),
     projectName: z.string(),
     localPath: z.string(),
-    vaultFolder: z.string(),
-    branch: z.string(),
+    vaultFolder: z
+      .string()
+      .optional()
+      .describe("Vault folder name, present for mnemonic-vault attachments"),
+    branch: z.string().optional().describe("Git branch, present for mnemonic-vault attachments"),
   }),
   retry: PersistenceStatusSchema.shape.retry,
 });
@@ -1699,17 +1908,38 @@ export const ListAttachmentsResultSchema = z.object({
   project: z.object({ id: z.string(), name: z.string() }),
   attachments: z.array(
     z.object({
+      kind: z.enum(["mnemonic-vault", "document-source"]).describe("Attachment kind discriminator"),
+      attachmentId: z.string().describe("Persistent opaque attachment identifier"),
       projectSlug: z.string(),
       projectName: z.string(),
       localPath: z.string(),
-      vaultFolder: z.string(),
       enabled: z.boolean(),
-      branch: z.string(),
-      branchTipHash: z.string(),
-      pathExists: z.boolean(),
-      noteCount: z.number(),
+      vaultFolder: z
+        .string()
+        .optional()
+        .describe("Vault folder name, present for mnemonic-vault attachments"),
+      branch: z.string().optional().describe("Git branch, present for mnemonic-vault attachments"),
+      branchTipHash: z.string().optional(),
+      pathExists: z.boolean().optional(),
+      noteCount: z.number().optional(),
       writable: z.boolean().optional(),
       pushBranch: z.string().optional(),
+      root: z
+        .string()
+        .optional()
+        .describe("Repository-relative document root, present for document-source attachments"),
+      include: z
+        .array(z.string())
+        .optional()
+        .describe("Glob patterns for files to include, present for document-source attachments"),
+      exclude: z
+        .array(z.string())
+        .optional()
+        .describe("Glob patterns for files to exclude, present for document-source attachments"),
+      acceptedMediaTypes: z
+        .array(z.string())
+        .optional()
+        .describe("Accepted media types, present for document-source attachments"),
     }),
   ),
   maxAttachmentsPerProject: z.number(),
@@ -1719,10 +1949,12 @@ export const SetAttachmentEnabledResultSchema = z.object({
   action: z.literal("attachment_enabled_set"),
   project: z.object({ id: z.string(), name: z.string() }),
   attachment: z.object({
+    kind: z.enum(["mnemonic-vault", "document-source"]).describe("Attachment kind discriminator"),
+    attachmentId: z.string().describe("Persistent opaque attachment identifier"),
     projectSlug: z.string(),
     projectName: z.string(),
     enabled: z.boolean(),
-    branch: z.string(),
+    branch: z.string().optional().describe("Git branch, present for mnemonic-vault attachments"),
   }),
   retry: PersistenceStatusSchema.shape.retry,
 });
@@ -1731,6 +1963,8 @@ export const SetAttachmentBranchResultSchema = z.object({
   action: z.literal("attachment_branch_set"),
   project: z.object({ id: z.string(), name: z.string() }),
   attachment: z.object({
+    kind: z.enum(["mnemonic-vault", "document-source"]).describe("Attachment kind discriminator"),
+    attachmentId: z.string().describe("Persistent opaque attachment identifier"),
     projectSlug: z.string(),
     projectName: z.string(),
     localPath: z.string(),

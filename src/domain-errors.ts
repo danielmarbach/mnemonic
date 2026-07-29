@@ -156,3 +156,16 @@ export class AttachedVaultReadOnlyError extends Error {
     this.name = "AttachedVaultReadOnlyError";
   }
 }
+
+/**
+ * Error thrown when attempting to mutate a document-source entity (doc:/chunk: IDs).
+ * Document-source entities are read-only and cannot be updated, forgotten, moved, or related.
+ */
+export class ImmutableDocumentSourceError extends Error {
+  constructor(id: string, operation: string) {
+    super(
+      `Cannot ${operation} document-source entity '${id}'. Document-source entities are read-only and cannot be modified through Mnemonic.`,
+    );
+    this.name = "ImmutableDocumentSourceError";
+  }
+}

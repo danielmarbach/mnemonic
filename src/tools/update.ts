@@ -33,6 +33,7 @@ import {
   getRecentSessionAccessNote,
 } from "../cache.js";
 import { NOTE_LIFECYCLES, NOTE_ROLES, type Note } from "../storage.js";
+import { guardIdsAgainstDocumentSourceMutation } from "../mutation-guard.js";
 import { ensureAttachmentsLoaded, attachedVaultErrorMessage } from "../helpers/vault.js";
 import {
   type UpdateResult,
@@ -205,6 +206,7 @@ export function registerUpdateTool(server: McpServer, ctx: ServerContext): void 
       allowProtectedBranch = false,
     }) => {
       await ensureBranchSynced(ctx, cwd);
+      guardIdsAgainstDocumentSourceMutation([id], "update");
       const noteId = memoryId(id);
       const project = await resolveProject(ctx, cwd);
       const projectId = project?.id;
