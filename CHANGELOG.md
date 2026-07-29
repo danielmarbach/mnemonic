@@ -4,6 +4,22 @@ All notable changes to `mnemonic` will be documented in this file.
 
 The format is loosely based on Keep a Changelog and uses semver-style version headings.
 
+## [0.38.0] - 2026-07-28
+
+### Added
+
+- Document-source attachments: link external repositories as read-only document retrieval sources. Markdown files in the attached repo are indexed during sync and their content becomes searchable through recall.
+- `add_attachment` now accepts `kind: "document-source"` with `root`, `include`, `exclude`, and `acceptedMediaTypes` parameters for scoped document retrieval.
+- `recall` returns `documentChunks` results alongside memory results for project and all scope queries.
+- `get` resolves `doc:` and `chunk:` retrieval handles for exact document content from indexed sources.
+- All mutation tools reject document-source entities with a clear read-only error.
+- `sync` indexes document-source attachments from a pinned git revision, building a coherent generation of documents and chunks.
+- Config schema bumped to 1.4 with migration for persistent attachment IDs.
+
+### Changed
+
+- `attachmentId` is now the primary attachment identifier; `projectSlug` is deprecated in favor of `attachmentId` for attachment management tools.
+
 ## [0.37.1] - 2026-07-25
 
 ### Fixed

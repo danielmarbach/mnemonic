@@ -12,6 +12,7 @@ For the high-level system map, see [`ARCHITECTURE.md`](ARCHITECTURE.md). For rel
 - 🎯 Project-scoped recall favors the right repo context while keeping stronger global matches accessible.
 - 🔎 Hybrid recall finds conceptual matches plus exact names, identifiers, phrases, error codes, and versions.
 - 🤝 Shared `.mnemonic/` notes travel with the repository, so project knowledge isn't trapped in one person's chat history.
+- 📚 Document-source attachments let you link external repos as read-only knowledge sources — their markdown docs are indexed and searchable through recall alongside your memories.
 - 🔒 Embeddings stay local and gitignored — semantic retrieval without committing generated vector data.
 - 📝 Every `remember`, `update`, and `consolidate` creates a semantic git commit — decision log and plans travel with the code in the same history.
 - 🔓 Designed for removability — though we're quietly confident you won't use that exit. Every note is plain markdown with YAML frontmatter; the knowledge you gather is independent of mnemonic and always yours.
@@ -543,13 +544,13 @@ Imported notes are written to the main vault with `lifecycle: permanent` and `sc
 
 | Tool                        | Description                                                                                                                                         |
 | --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `add_attachment`            | Add an external repository as a federated knowledge source; requires `localPath`, optional `branch`, `vaultFolder`, `writable`, and `pushBranch`    |
+| `add_attachment`            | Add an external repository as a federated knowledge source; requires `localPath`, optional `branch`, `vaultFolder`, `writable`, and `pushBranch`. Use `kind: "document-source"` to index markdown files as read-only document retrieval sources with `root`, `include`, `exclude`, and `acceptedMediaTypes`.    |
 | `consolidate`               | Merge and analyze overlapping notes; evidence defaults `true` for analysis strategies and execute-merge (lifecycle, risk, classification, warnings) |
 | `detect_project`            | Resolve `cwd` to stable project id via git remote URL                                                                                               |
 | `discover_tags`             | Suggest canonical tags for a note using title/content/query context; `mode: "browse"` opts into broader inventory output                            |
 | `execute_migration`         | Execute a named migration (supports dry-run)                                                                                                        |
 | `forget`                    | Delete note + embedding, git commit + push, cleanup relationships                                                                                   |
-| `get`                       | Fetch one or more notes by exact id; `includeRelationships: true` adds bounded 1-hop previews                                                       |
+| `get`                       | Fetch one or more notes by exact id; `includeRelationships: true` adds bounded 1-hop previews. Also resolves `doc:` and `chunk:` retrieval handles for exact document content from indexed document-source attachments.                                                       |
 | `get_project_identity`      | Show effective project identity and remote override                                                                                                 |
 | `get_project_memory_policy` | Show saved write scope, consolidation mode, protected-branch settings, and `maxAttachmentsPerProject`                                               |
 | `list`                      | List notes filtered by scope/tags/storage; `storedIn: "attached"` filters to attached-repo notes                                                    |
@@ -558,7 +559,7 @@ Imported notes are written to the main vault with `lifecycle: permanent` and `sc
 | `memory_graph`              | Show compact adjacency list of relationships                                                                                                        |
 | `move_memory`               | Move note between vaults without changing id                                                                                                        |
 | `project_memory_summary`    | Session-start entrypoint: themes, anchors, orientation, maintenance warnings, and working-state recovery hints                                      |
-| `recall`                    | Hybrid semantic, exact-wording, and relationship search with temporal/workflow modes and optional `evidence: "compact"` rationale                   |
+| `recall`                    | Hybrid semantic, exact-wording, and relationship search with temporal/workflow modes and optional `evidence: "compact"` rationale. Returns `documentChunks` from document-source attachments alongside memory results.                   |
 | `recent_memories`           | Show most recently updated notes for scope                                                                                                          |
 | `remember`                  | Write note + embedding; `cwd` sets context, `scope` picks storage, `lifecycle` picks temporary vs permanent                                         |
 | `relate`                    | Create typed relationship between notes (bidirectional)                                                                                             |
@@ -567,7 +568,7 @@ Imported notes are written to the main vault with `lifecycle: permanent` and `sc
 | `set_attachment_enabled`    | Enable or disable an attached repository; requires `projectSlug` and `enabled`                                                                      |
 | `set_project_identity`      | Save which git remote defines project identity                                                                                                      |
 | `set_project_memory_policy` | Save project policy defaults (scope, consolidation mode, protected-branch behavior/patterns, `maxAttachmentsPerProject`)                            |
-| `sync`                      | Git sync + embedding backfill + attached repo reconciliation; `force: true` rebuilds all embeddings                                                 |
+| `sync`                      | Git sync + embedding backfill + attached repo reconciliation; indexes document-source attachments from a pinned git revision; `force: true` rebuilds all embeddings                                                 |
 | `unrelate`                  | Remove relationship between notes                                                                                                                   |
 | `update`                    | Update note content/title/tags/lifecycle; re-embeds when content changes                                                                            |
 | `where_is_memory`           | Show note's project association and storage location                                                                                                |
@@ -615,7 +616,8 @@ Multi-repo attachment support lets you link external repositories as **federated
 
 Key concepts:
 
-- `add_attachment` links a repo by its absolute `localPath` (supports `~` expansion); optional `branch`, `vaultFolder`, `writable`, and `pushBranch` select branch, sub-vault, write access, and push target.
+- `add_attachment` links a repo by its absolute `localPath` (supports `~` expansion); optional `branch`, `vaultFolder`, `writable`, and `pushBranch` select branch, sub-vault, write access, and push target. Use `kind: "document-source"` to index markdown files as read-only document retrieval sources.
+- **Document-source attachments**: when `kind: "document-source"`, the attachment indexes markdown files from a pinned git revision. Documents are extracted, heading-aware chunked, and made searchable through recall. The `get` tool resolves `doc:` and `chunk:` handles for exact content. Mutation tools reject document-source entities. Configuration accepts `root`, `include`, `exclude`, and `acceptedMediaTypes` parameters.
 - `remove_attachment` removes by `projectSlug`; `list_attachments` shows all attachments with status.
 - `set_attachment_enabled` toggles an attachment on/off without removing config; `set_attachment_branch` changes the branch.
 - Max 5 attachments per project (configurable via `maxAttachmentsPerProject` in project memory policy).

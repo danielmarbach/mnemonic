@@ -1297,7 +1297,7 @@
       <div class="feature-card fade-up">
         <span class="feature-icon">&#x1F517;</span>
         <h3>Federated knowledge</h3>
-        <p>Link other repositories as read-only knowledge sources so relevant context from adjacent projects surfaces automatically in recall and summaries. Mark an attachment writable and mnemonic can remember, update, and relate notes across repository boundaries while keeping each project's decision log in its own git history.</p>
+        <p>Link other repositories as read-only knowledge sources so relevant context from adjacent projects surfaces automatically in recall and summaries. Mark an attachment writable and mnemonic can remember, update, and relate notes across repository boundaries while keeping each project's decision log in its own git history. Use document-source attachments to index external markdown documentation as searchable content alongside your memories.</p>
       </div>
     </div>
   </div>
@@ -1548,7 +1548,7 @@
             <div class="tool-card-name">remember</div>
             <div class="tool-card-purpose">Save something worth keeping</div>
           </div>
-          <div class="tool-card" data-tip="Finds the most relevant notes for any question. Automatically surfaces project-specific memories first, then broader personal context. Each result carries signalStrength, confidence, and diversity metrics so agents can gauge what to trust. Temporal mode shows how a note changed over time, and optional recall evidence gives a short plain-language reason for why each result appeared.">
+          <div class="tool-card" data-tip="Finds the most relevant notes for any question. Automatically surfaces project-specific memories first, then broader personal context. Each result carries signalStrength, confidence, and diversity metrics so agents can gauge what to trust. Temporal mode shows how a note changed over time, and optional recall evidence gives a short plain-language reason for why each result appeared. Document-source attachments contribute documentChunks alongside memory results.">
             <div class="tool-card-name">recall</div>
             <div class="tool-card-purpose">Ask what you've previously learned - or how it evolved</div>
           </div>
@@ -1560,7 +1560,7 @@
             <div class="tool-card-name">forget</div>
             <div class="tool-card-purpose">Remove something no longer useful</div>
           </div>
-          <div class="tool-card" data-tip="Retrieve a note directly by its ID — useful when you already know exactly which note you need, no searching required.">
+          <div class="tool-card" data-tip="Retrieve a note directly by its ID — useful when you already know exactly which note you need, no searching required. Also resolves doc: and chunk: handles for exact document content from indexed document-source attachments.">
             <div class="tool-card-name">get</div>
             <div class="tool-card-purpose">Pull up a specific note</div>
           </div>
@@ -1645,7 +1645,7 @@
       <div>
         <div class="tool-category-header">Attachments</div>
         <div class="tool-category-grid">
-          <div class="tool-card" data-tip="Link an external repository as a read-only or writable knowledge source. Supports branch pinning, sub-vault selection, and write-through for cross-repo memory.">
+          <div class="tool-card" data-tip="Link an external repository as a read-only or writable knowledge source. Supports branch pinning, sub-vault selection, and write-through for cross-repo memory. Use kind: document-source to index markdown files as read-only document retrieval sources.">
             <div class="tool-card-name">add_attachment</div>
             <div class="tool-card-purpose">Add a federated knowledge source</div>
           </div>
@@ -1672,7 +1672,7 @@
       <div>
         <div class="tool-category-header">Vault Operations</div>
         <div class="tool-category-grid">
-          <div class="tool-card" data-tip="Keeps one machine from feeling behind another. It pulls in shared notes, sends up your changes, and refreshes search if this machine is missing pieces. Use force if search feels out of date after a bigger change.">
+          <div class="tool-card" data-tip="Keeps one machine from feeling behind another. It pulls in shared notes, sends up your changes, and refreshes search if this machine is missing pieces. Also indexes document-source attachments from a pinned git revision. Use force if search feels out of date after a bigger change.">
             <div class="tool-card-name">sync</div>
             <div class="tool-card-purpose">Keep memories in sync across machines</div>
           </div>

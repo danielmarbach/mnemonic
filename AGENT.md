@@ -222,6 +222,7 @@ When `recall` called with `cwd`, project notes get a small **tiebreaker boost** 
 
 ### Attachment architecture
 - Attached repos default to **read-only**; set `writable: true` on `add_attachment` to enable write-through
+- **Document-source attachments**: use `kind: "document-source"` on `add_attachment` to index external repository markdown files as read-only document retrieval sources. These do not create a vault, do not require `.mnemonic/notes`, and never write to the source repository. Documents are extracted, chunked, and indexed into atomic generations during sync. Document chunks appear in recall results alongside memory results. All mutation tools reject document-source entity references.
 - **Writable attached vaults**: when an attachment is marked writable, `remember`, `update`, `forget`, `relate`, `unrelate`, `consolidate`, `move_memory` can modify notes in the attached vault; commits push to the branch specified by `pushBranch` (or the attachment's `branch` if `pushBranch` is omitted); protected-branch policy from the consuming project applies
 - **Cross-vault relationships**: notes in different vaults can be related; the `Relationship` type includes a `vaultPath` field indicating which vault the related note lives in
 - `add_attachment` links an external repo by `localPath` (supports `~` expansion); optional `branch`, `vaultFolder`, `writable`, and `pushBranch` select branch, sub-vault, write access, and push target
@@ -319,13 +320,13 @@ Skills are loaded via the `skill` tool and extend agent capabilities with specia
 
 | Tool | Description |
 |------|-------------|
-| `add_attachment` | Add an external repository as a federated knowledge source; requires `localPath` (absolute path to repo), optional `branch`, `vaultFolder`, `writable`, and `pushBranch` |
+| `add_attachment` | Add an external repository as a federated knowledge source; requires `localPath`, optional `branch`, `vaultFolder`, `writable`, and `pushBranch`. Use `kind: "document-source"` to index markdown files as read-only document retrieval sources with `root`, `include`, `exclude`, and `acceptedMediaTypes`. |
 | `consolidate` | Merge and analyze overlapping notes; classification (lineage/duplicate-pressure/unique-evidence-risk/supersession-pressure) and maintenance warnings |
 | `detect_project` | Resolve `cwd` to stable project id via git remote URL |
 | `discover_tags` | Suggest canonical tags for a note; `mode: "browse"` opts into broader inventory output |
 | `execute_migration` | Execute a named migration (supports dry-run) |
 | `forget` | Delete note + embedding, git commit + push, cleanup relationships |
-| `get` | Fetch one or more notes by exact id; `includeRelationships: true` adds bounded 1-hop previews |
+| `get` | Fetch one or more notes by exact id; `includeRelationships: true` adds bounded 1-hop previews. Also resolves `doc:` and `chunk:` retrieval handles for exact document content from indexed document-source attachments. |
 | `get_project_identity` | Show effective project identity and remote override |
 | `get_project_memory_policy` | Show saved write scope, consolidation mode, protected-branch settings, and `maxAttachmentsPerProject` |
 | `list` | List notes filtered by scope/tags/storage; `storedIn: "attached"` filters to attached-repo notes only, `storedIn: "any"` includes attachments |
@@ -334,7 +335,7 @@ Skills are loaded via the `skill` tool and extend agent capabilities with specia
 | `memory_graph` | Show compact adjacency list of relationships |
 | `move_memory` | Move note between vaults without changing id |
 | `project_memory_summary` | Session-start entrypoint: themes, anchors, orientation, maintenance warnings, and working-state recovery hints |
-| `recall` | Semantic search with optional project boost plus `temporal` and `workflow` modes; `storedIn: "attached"` filters to attached-repo notes |
+| `recall` | Semantic search with optional project boost plus `temporal` and `workflow` modes; `storedIn: "attached"` filters to attached-repo notes. Returns `documentChunks` from document-source attachments alongside memory results for project and all scope. |
 | `recent_memories` | Show most recently updated notes for scope |
 | `remember` | Write note + embedding; `cwd` sets context, `scope` picks storage, `lifecycle` picks temporary vs permanent |
 | `relate` | Create typed relationship between notes (bidirectional) |
@@ -343,7 +344,7 @@ Skills are loaded via the `skill` tool and extend agent capabilities with specia
 | `set_attachment_enabled` | Enable or disable an attached repository without removing config; requires `projectSlug` and `enabled` |
 | `set_project_identity` | Save which git remote defines project identity |
 | `set_project_memory_policy` | Save project policy defaults (scope, consolidation mode, protected-branch behavior/patterns, `maxAttachmentsPerProject`) |
-| `sync` | MCP tool for git sync when remote exists plus embedding backfill always; also fetches attached repo branches and reconciles embeddings; `force: true` rebuilds all embeddings |
+| `sync` | MCP tool for git sync when remote exists plus embedding backfill always; also fetches attached repo branches and reconciles embeddings; indexes document-source attachments from a pinned git revision; `force: true` rebuilds all embeddings |
 | `unrelate` | Remove relationship between notes |
 | `update` | Update note content/title/tags/lifecycle; re-embeds when content changes |
 | `where_is_memory` | Show note's project association and storage location; `storedIn: "attached"` for attached-repo notes |

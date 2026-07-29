@@ -165,6 +165,16 @@ flowchart TD
 | `src/structured-content.ts`    | MCP structured output schemas, including recall/consolidate evidence shapes                   |
 | `src/relationships.ts`         | Bounded 1-hop relationship expansion: scoring, preview construction, and fail-soft enrichment |
 | `src/config.ts`                | Main-vault runtime config and per-project policy storage                                      |
+| `src/retrieval-document.ts`    | Document and chunk types for document-source attachments                                     |
+| `src/document-entity-ref.ts`   | Entity resolver for `doc:` and `chunk:` namespace references                                  |
+| `src/document-extractor.ts`    | Extractor registry for document-source media types                                            |
+| `src/markdown-extractor.ts`    | Markdown extractor for document-source attachments (uses MDAST)                               |
+| `src/markdown-chunker.ts`      | Heading-aware chunker that splits markdown into retrievable chunks                            |
+| `src/document-source-index.ts` | Document source index builder: enumerates blobs, extracts, chunks, publishes generations     |
+| `src/document-recall.ts`       | Collects document-chunk candidates for recall ranking pipeline                                 |
+| `src/document-sync.ts`         | Syncs document-source attachments: fetches commit, enumerates blobs, builds generation        |
+| `src/generation-storage.ts`    | Atomic generation storage with pointer-swap publication for document sources                  |
+| `src/mutation-guard.ts`        | Guards mutation tools against document-source entity references                               |
 | `tests/`                       | Vitest unit and integration coverage, including MCP smoke tests                               |
 
 ## Data model
@@ -201,7 +211,69 @@ Main-vault `config.json` stores machine-local operational settings rather than m
 - **Migrations are explicit**: schema changes should go through `src/migration.ts`, tests, and dry-run-first workflows.
 - **Temporary-only consolidation defaults to cleanup**: when every source note is `temporary`, consolidation prefers `delete`, and the merged note becomes `permanent`.
 
-## Operational and testing conventions
+## Document-source attachments
+
+Document-source attachments extend the attachment system to support read-only retrieval of external repository documents. Unlike `mnemonic-vault` attachments, document-source attachments do not create a `Vault` or `AttachedStorage` instance, do not require `.mnemonic/notes`, and never write to the source repository.
+
+### Document model
+
+- **RetrievalDocument**: represents a single file from a document-source attachment. Contains source path, blob OID, byte size, source media type, extraction metadata, and the extracted text content.
+- **RetrievalChunk**: a bounded segment of a document produced by a chunker. Contains heading ancestry, excerpt, and a stable chunk ID derived from the document ID and heading path.
+- **DocumentGeneration**: an atomic snapshot of all documents and chunks from one sync operation. Stored under per-attachment generation directories with a pointer-swap publication mechanism.
+
+### Entity namespaces
+
+Document and chunk identifiers use reserved namespaces that cannot collide with Memory IDs:
+- `doc:<documentId>` — references a document by its stable logical ID
+- `chunk:<chunkId>` — references a chunk by its stable logical ID
+
+The entity resolver in `src/document-entity-ref.ts` classifies references and routes them to the correct handler, preventing document-source entities from being treated as managed memories.
+
+### Extraction and chunking
+
+- **Markdown extractor** (`src/markdown-extractor.ts`): parses markdown using the existing MDAST stack, validates against `acceptedMediaTypes`, and returns extracted text content.
+- **Markdown chunker** (`src/markdown-chunker.ts`): splits extracted content into chunks with heading ancestry tracking. Produces an introduction chunk for content before the first heading, then one chunk per heading section. Oversized sections are split by paragraph with deterministic bounds.
+- **Extractor registry** (`src/document-extractor.ts`): dispatches source blobs to registered extractors by media type. The registry is extensible for future formats such as PDF.
+
+### Generation-based indexing
+
+Document-source attachments are indexed into atomic generations during sync:
+1. `sync` fetches the exact remote-tracking commit for the attachment's configured branch.
+2. Blobs matching the `include`/`exclude` glob patterns are enumerated from that commit.
+3. Each blob is extracted and chunked; fingerprints are compared against the current generation to skip unchanged content.
+4. A new generation is built in a temporary directory, validated, and atomically published by replacing a small pointer file.
+5. Readers capture one generation at request start and use it for the entire request.
+
+### Recall integration
+
+Document chunks participate in the recall ranking pipeline alongside memory results:
+- Chunks enter the common semantic and lexical candidate pools before dense rank assignment.
+- A per-document chunk cap prevents one document from consuming the candidate pool.
+- After final scoring, result diversity is enforced by scanning farther down the ranked list to refill the requested limit.
+- Document chunks are excluded from graph, canonical-memory, role, lifecycle, relationship, confidence, and temporal contributions.
+- Results carry `kind: "document-chunk"` with source path, heading ancestry, excerpt, attachment identity, and a revision-qualified retrieval handle.
+
+### Mutation rejection
+
+All mutation tools (`update`, `forget`, `move_memory`, `relate`, `unrelate`, `consolidate`) route inputs through the entity resolver before vault lookup. Document and chunk references are rejected with an `ImmutableDocumentSourceError`, ensuring document-source entities are never modified through Mnemonic.
+
+### Configuration
+
+Document-source attachments use a discriminated union in attachment configuration:
+- `kind: "mnemonic-vault"` — legacy writable vault attachments (default for existing configs)
+- `kind: "document-source"` — read-only document retrieval attachments
+
+Document-source attachments accept:
+- `root`: normalized repository-relative path (default `.`)
+- `include`: glob patterns relative to root (default `**/*.md`)
+- `exclude`: glob patterns to exclude (deterministic defaults for generated/vendor paths)
+- `acceptedMediaTypes`: array of IANA media types (initially `["text/markdown"]`)
+
+`vaultFolder`, `writable`, and `pushBranch` are forbidden on document-source attachments.
+
+### Attachment identity
+
+Every attachment now has a persisted opaque `attachmentId`, separate from repository identity. Legacy attachments receive a deterministic ID during migration. New attachments receive a generated persistent ID that survives path, branch, or configuration changes. `projectSlug` is deprecated in favor of `attachmentId` for attachment management tools.
 
 - Local dogfooding should use `scripts/mcp-local.sh` so the built server matches the current source tree.
 - CI-safe MCP integration tests use the real local entrypoint with `DISABLE_GIT=true`, a temp `VAULT_PATH`, and a fake `OLLAMA_URL` endpoint.
