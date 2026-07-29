@@ -11,7 +11,7 @@ tags:
   - markdown
 lifecycle: permanent
 createdAt: '2026-07-29T21:44:18.324Z'
-updatedAt: '2026-07-29T21:44:30.910Z'
+updatedAt: '2026-07-29T21:44:43.374Z'
 role: reference
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -19,6 +19,8 @@ projectName: mnemonic
 relatedTo:
   - id: document-source-attachment-five-bugs-found-and-fixed-via-pac-24bedd4b
     type: related-to
+  - id: dogfooding-test-suite-reusable-prompt-for-phases-1-8-validat-c7c702d8
+    type: derives-from
 memoryVersion: 1
 ---
 # Pack D: document-source attachment dogfood pack and A/B/C consolidation hardening
