@@ -9,11 +9,14 @@ tags:
   - retrieval
 lifecycle: temporary
 createdAt: '2026-07-29T13:56:55.798Z'
-updatedAt: '2026-07-29T13:56:55.798Z'
+updatedAt: '2026-07-29T13:57:43.041Z'
 role: review
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: plan-read-only-markdown-attachment-retrieval-f4619b6e
+    type: derives-from
 memoryVersion: 1
 ---
 # Review: read-only markdown attachment retrieval — all 6 stages implemented

@@ -9,7 +9,7 @@ tags:
   - retrieval
 lifecycle: temporary
 createdAt: '2026-07-28T08:08:25.305Z'
-updatedAt: '2026-07-28T08:51:58.890Z'
+updatedAt: '2026-07-29T13:57:43.041Z'
 role: plan
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -20,6 +20,8 @@ relatedTo:
   - id: review-narrow-markdown-attachments-to-read-only-retrieval-9655b010
     type: derives-from
   - id: review-document-source-attachment-plan-needs-revision-c113a0d5
+    type: derives-from
+  - id: review-read-only-markdown-attachment-retrieval-all-6-stages--e6d2d533
     type: derives-from
 memoryVersion: 1
 ---
