@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ServerContext } from "../server-context.js";
 import {
-  NoteIdSchema,
+  EntityRefSchema,
   ForgetResultSchema,
   type ForgetResult,
   type MutationRetryContract,
@@ -59,8 +59,8 @@ export function registerForgetTool(server: McpServer, ctx: ServerContext): void 
         openWorldHint: false,
       },
       inputSchema: z.object({
-        id: NoteIdSchema.describe(
-          "Exact memory id. Use an id returned by `recall`, `list`, `recent_memories`, or `where_is`.",
+        id: EntityRefSchema.describe(
+          "Exact memory id, or a document/chunk handle (doc:... / chunk:...). Document entities are read-only and rejected. Use an id returned by `recall`, `list`, `recent_memories`, or `where_is`.",
         ),
         cwd: projectParam,
         allowProtectedBranch: z

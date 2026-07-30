@@ -39,7 +39,7 @@ import {
   type UpdateResult,
   UpdateToolResultSchema,
   type UpdateLintErrorResult,
-  NoteIdSchema,
+  EntityRefSchema,
   type PersistenceStatus,
 } from "../structured-content.js";
 
@@ -77,8 +77,8 @@ export function registerUpdateTool(server: McpServer, ctx: ServerContext): void 
         openWorldHint: true,
       },
       inputSchema: z.object({
-        id: NoteIdSchema.describe(
-          "Exact memory id. Use an id returned by `recall`, `list`, `recent_memories`, or `where_is`.",
+        id: EntityRefSchema.describe(
+          "Exact memory id, or a document/chunk handle (doc:... / chunk:...). Document entities are read-only and rejected. Use an id returned by `recall`, `list`, `recent_memories`, or `where_is`.",
         ),
         semanticPatch: z
           .preprocess(

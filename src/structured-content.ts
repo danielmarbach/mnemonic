@@ -770,6 +770,18 @@ export interface ProjectSummaryResult extends Record<string, unknown> {
 // ── Zod output schemas ────────────────────────────────────────────────────────
 
 export const NoteIdSchema = z.string().regex(/^[a-zA-Z0-9_-]+$/, "Invalid note ID format");
+
+/**
+ * Accepts a managed memory id OR a read-only document/chunk retrieval handle
+ * (`doc:...` / `chunk:...`). Mutation tools route these through the central
+ * entity resolver and reject them with ImmutableDocumentSourceError; `get`
+ * resolves them to document source text. See document-entity-ref.ts.
+ */
+export const EntityRefSchema = z
+  .string()
+  .min(1)
+  .regex(/^([a-zA-Z0-9_-]+|(doc|chunk):.+)$/, "Invalid entity reference")
+  .describe("A memory id, or a document/chunk retrieval handle (doc:... or chunk:...).");
 export const RemoteNameSchema = z.string().regex(/^[a-zA-Z0-9_.-]+$/, "Invalid remote name format");
 const _NoteLifecycle = z.enum(["temporary", "permanent"]);
 const _NoteRole = z.enum(NOTE_ROLES);

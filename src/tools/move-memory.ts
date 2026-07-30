@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ServerContext } from "../server-context.js";
 import type { Vault } from "../vault.js";
-import { NoteIdSchema, MoveResultSchema, type MoveResult } from "../structured-content.js";
+import { EntityRefSchema, MoveResultSchema, type MoveResult } from "../structured-content.js";
 import { projectParam, resolveProject, ensureBranchSynced } from "../helpers/project.js";
 import { memoryId, isoDateString } from "../brands.js";
 import { formatPersistenceSummary } from "../helpers/persistence.js";
@@ -38,8 +38,8 @@ export function registerMoveMemoryTool(server: McpServer, ctx: ServerContext): v
         openWorldHint: false,
       },
       inputSchema: z.object({
-        id: NoteIdSchema.describe(
-          "Exact memory id. Use an id returned by `recall`, `list`, `recent_memories`, or `where_is`.",
+        id: EntityRefSchema.describe(
+          "Exact memory id, or a document/chunk handle (doc:... / chunk:...). Document entities are read-only and rejected. Use an id returned by `recall`, `list`, `recent_memories`, or `where_is`.",
         ),
         target: z
           .enum(["main-vault", "project-vault"])

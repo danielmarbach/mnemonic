@@ -60,9 +60,10 @@ describe("parseEntityRef", () => {
     const result = parseEntityRef("chunk:att-1::docs-readme-md::Introduction::0::0");
     expect(result.kind).toBe("chunk");
     if (result.kind === "chunk") {
-      // documentId is the first segment before :: in the rest after chunk:
-      expect(result.documentId).toBe("att-1");
-      expect(result.chunkId).toBe("chunk:att-1::docs-readme-md::Introduction::0::0");
+      // documentId = attachmentId::normalizedPath (first two :: segments); chunkId
+      // is the chunkId WITHOUT the chunk: prefix (as stored in generation.chunks).
+      expect(result.documentId).toBe("att-1::docs-readme-md");
+      expect(result.chunkId).toBe("att-1::docs-readme-md::Introduction::0::0");
       expect(result.raw).toBe("chunk:att-1::docs-readme-md::Introduction::0::0");
     }
   });
@@ -71,8 +72,9 @@ describe("parseEntityRef", () => {
     const result = parseEntityRef("chunk:att-1::docs-readme-md::::0::0");
     expect(result.kind).toBe("chunk");
     if (result.kind === "chunk") {
-      // documentId is the first segment before :: in the rest after chunk:
-      expect(result.documentId).toBe("att-1");
+      // documentId is the first two :: segments (attachmentId::normalizedPath)
+      expect(result.documentId).toBe("att-1::docs-readme-md");
+      expect(result.chunkId).toBe("att-1::docs-readme-md::::0::0");
     }
   });
 

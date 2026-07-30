@@ -18,7 +18,7 @@ Do not use this when:
 - You want to modify memories in another project without enabling write-through (set writable=false)
 - You want to move memories between vaults (use \`move_memory\`)
 
-Returns: the new attachment config and activation status.
+Returns: the new attachment config and activation status. Includes kind (mnemonic-vault or document-source), attachmentId (persistent opaque identifier), and for document-source attachments: root, include/exclude globs, and acceptedMediaTypes.
 
 [mutating: writes config, git commits, may push]
 
@@ -2114,8 +2114,9 @@ Typical next step:
           "type": "string",
         },
         "id": {
-          "description": "Exact memory id. Use an id returned by \`recall\`, \`list\`, \`recent_memories\`, or \`where_is\`.",
-          "pattern": "^[a-zA-Z0-9_-]+$",
+          "description": "Exact memory id, or a document/chunk handle (doc:... / chunk:...). Document entities are read-only and rejected. Use an id returned by \`recall\`, \`list\`, \`recent_memories\`, or \`where_is\`.",
+          "minLength": 1,
+          "pattern": "^([a-zA-Z0-9_-]+|(doc|chunk):.+)$",
           "type": "string",
         },
       },
@@ -2333,7 +2334,7 @@ Do not use this when:
 
 Returns: full note content, metadata, storage label. With includeRelationships: bounded 1-hop previews.
 
-Document-source entities (doc:/chunk: IDs) return source text with media type info. Mutation follow-ups (update, forget, etc.) apply only to memory results.
+Document-source entities (doc:/chunk: IDs) return source text with media type info. Returns documents (source text, media type, attachment info), items (ordered discriminated notes + documents), and itemErrors (per-item errors for stale/evicted/oversized/unknown references). Mutation follow-ups (update, forget, etc.) apply only to memory results.
 
 Typical next step:
 - Use \`update\`, \`forget\`, \`move_memory\`, or \`relate\` after inspection.",
@@ -2345,9 +2346,11 @@ Typical next step:
           "type": "string",
         },
         "ids": {
-          "description": "One or more memory ids to fetch",
+          "description": "One or more memory ids, or document/chunk retrieval handles (doc:... / chunk:...), to fetch",
           "items": {
-            "pattern": "^[a-zA-Z0-9_-]+$",
+            "description": "A memory id, or a document/chunk retrieval handle (doc:... or chunk:...).",
+            "minLength": 1,
+            "pattern": "^([a-zA-Z0-9_-]+|(doc|chunk):.+)$",
             "type": "string",
           },
           "minItems": 1,
@@ -2434,6 +2437,7 @@ Typical next step:
             "additionalProperties": false,
             "properties": {
               "code": {
+                "description": "Error code: snapshot-evicted (generation evicted), content-too-large (exceeds size limit), index-unavailable (no generation), unknown-document (not found)",
                 "enum": [
                   "snapshot-evicted",
                   "content-too-large",
@@ -2443,9 +2447,11 @@ Typical next step:
                 "type": "string",
               },
               "error": {
+                "description": "Human-readable error description",
                 "type": "string",
               },
               "id": {
+                "description": "Entity identifier that caused the error",
                 "type": "string",
               },
             },
@@ -2616,31 +2622,40 @@ Typical next step:
                 "additionalProperties": false,
                 "properties": {
                   "attachmentId": {
+                    "description": "Attachment identifier",
                     "type": "string",
                   },
                   "content": {
+                    "description": "Full document content",
                     "type": "string",
                   },
                   "contentMediaType": {
+                    "description": "Content media type",
                     "type": "string",
                   },
                   "documentId": {
+                    "description": "Stable document identifier",
                     "type": "string",
                   },
                   "generationId": {
+                    "description": "Generation identifier",
                     "type": "string",
                   },
                   "indexedCommit": {
+                    "description": "Git commit hash at index time",
                     "type": "string",
                   },
                   "kind": {
                     "const": "document",
+                    "description": "Result kind discriminator",
                     "type": "string",
                   },
                   "sourceMediaType": {
+                    "description": "Source media type (e.g., text/markdown)",
                     "type": "string",
                   },
                   "sourcePath": {
+                    "description": "Repository-relative source path",
                     "type": "string",
                   },
                 },
@@ -3574,7 +3589,7 @@ Typical next step:
 Do not use this when:
 - You want to add or remove an attachment (use \`add_attachment\` or \`remove_attachment\`)
 
-Returns: list of attachments with their status, branch, and path information.
+Returns: list of attachments with their kind (mnemonic-vault or document-source), attachmentId, status, branch, and path information.
 
 Typical next step:
 - Use \`set_attachment_enabled\` to toggle an attachment, or \`recall\` to search across attached vaults.",
@@ -3998,8 +4013,9 @@ Typical next step:
           "type": "string",
         },
         "id": {
-          "description": "Exact memory id. Use an id returned by \`recall\`, \`list\`, \`recent_memories\`, or \`where_is\`.",
-          "pattern": "^[a-zA-Z0-9_-]+$",
+          "description": "Exact memory id, or a document/chunk handle (doc:... / chunk:...). Document entities are read-only and rejected. Use an id returned by \`recall\`, \`list\`, \`recent_memories\`, or \`where_is\`.",
+          "minLength": 1,
+          "pattern": "^([a-zA-Z0-9_-]+|(doc|chunk):.+)$",
           "type": "string",
         },
         "target": {
@@ -4967,6 +4983,7 @@ Do not use this when:
 - You just want to browse by tags or scope; use \`list\`
 
 Returns: ranked matches (id, title, score, vault, tags, lifecycle, updatedAt), 1-hop relationship previews on top results, temporal history (mode: temporal), retrieval evidence (evidence: compact), including optional score decomposition, diagnostics: recallScopeNoteCount, diversity, retrievalCoverage, signalStrength.
+Document-source attachments return documentChunks (kind, chunkId, documentId, score, sourcePath, headingAncestry, excerpt, attachmentId, retrievalHandle).
 
 Typical next step:
 - Use \`get\`, \`update\`, \`relate\`, or \`consolidate\` based on the results.",
@@ -6551,7 +6568,7 @@ Typical next step:
 Do not use this when:
 - You want to disable an attachment temporarily (use \`set_attachment_enabled\`)
 
-Returns: confirmation of the removed attachment.
+Returns: confirmation of the removed attachment including its attachmentId.
 
 [mutating: writes config, git commits, may push]
 
@@ -6808,7 +6825,7 @@ Do not use this when:
 - You want to remove an attachment (use \`remove_attachment\`)
 - The attachment is a document-source (document sources have no branch concept)
 
-Returns: the updated attachment config with new branch and tip hash.
+Returns: the updated attachment config with attachmentId, new branch, and tip hash.
 
 [mutating: writes config, git commits, may push]
 
@@ -7083,7 +7100,7 @@ Do not use this when:
 - You want to permanently remove an attachment (use \`remove_attachment\`)
 - You want to change the branch an attachment reads from (use \`set_attachment_branch\`)
 
-Returns: the updated attachment config.
+Returns: the updated attachment config including attachmentId.
 
 [mutating: writes config, git commits, may push]
 
@@ -8287,8 +8304,9 @@ Use \`semanticPatch\` for targeted edits (more token-efficient). Use \`content\`
           "type": "string",
         },
         "id": {
-          "description": "Exact memory id. Use an id returned by \`recall\`, \`list\`, \`recent_memories\`, or \`where_is\`.",
-          "pattern": "^[a-zA-Z0-9_-]+$",
+          "description": "Exact memory id, or a document/chunk handle (doc:... / chunk:...). Document entities are read-only and rejected. Use an id returned by \`recall\`, \`list\`, \`recent_memories\`, or \`where_is\`.",
+          "minLength": 1,
+          "pattern": "^([a-zA-Z0-9_-]+|(doc|chunk):.+)$",
           "type": "string",
         },
         "lifecycle": {

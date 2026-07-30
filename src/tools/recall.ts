@@ -184,7 +184,12 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
       await ensureBranchSynced(ctx, cwd);
 
       const project = await resolveProject(ctx, cwd);
-      const queryVec = await embed(query);
+      // Fail-soft: if the query embedding cannot be generated (Ollama down, model
+      // not pulled, quota exceeded), skip semantic memory scoring but keep the
+      // lexical projection channel and document-source chunks (which are lexical
+      // only). Consistent with the embedMissingNotes fail-soft below.
+      const queryEmbed = await attempt("recall:embed-query", () => embed(query));
+      const queryVec: number[] | null = queryEmbed.ok ? queryEmbed.value : null;
       const vaults = await ctx.vaultManager.searchOrder(cwd, project?.id);
 
       let effectiveLimit = limit;
@@ -247,6 +252,7 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
         : undefined;
 
       for (const vault of vaults) {
+        if (!queryVec) continue; // embedding unavailable -> lexical + document channels still run
         const embeddings = project
           ? ((await getOrBuildVaultEmbeddings(project.id, vault)) ??
             (await vault.storage.listEmbeddings()))
@@ -482,7 +488,50 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
           ? selectWorkflowResults(promoted, effectiveLimit, scope)
           : selectRecallResults(promoted, effectiveLimit, scope);
 
-      if (top.length === 0) {
+      // Collect document chunks from document-source attachments BEFORE the
+      // empty-memory early return. External documents are the primary fallback
+      // when no managed memory matches, so they must be collected regardless of
+      // whether `top` has memory candidates. Excluded from temporal/workflow
+      // mode and tag/lifecycle filters (plan Stage 6).
+      const documentChunks: NonNullable<RecallResult["documentChunks"]> = [];
+      const hasTagFilter = tags && tags.length > 0;
+      const hasLifecycleFilter = lifecycle !== undefined;
+      const isDefaultMode = mode === undefined || mode === "default";
+      if (
+        project &&
+        (scope === "all" || scope === "project") &&
+        isDefaultMode &&
+        !hasTagFilter &&
+        !hasLifecycleFilter
+      ) {
+        const attachmentConfigs = await ctx.configStore.getProjectAttachments(project.id);
+        const docSourceAttachmentIds = getDocumentSourceAttachmentIds(attachmentConfigs);
+        if (docSourceAttachmentIds.length > 0) {
+          const candidates = collectDocumentChunkCandidates(docSourceAttachmentIds, query, limit);
+          for (const candidate of candidates) {
+            const generation = getCurrentGeneration(candidate.attachmentId);
+            const doc = generation?.documents.get(candidate.documentId);
+            documentChunks.push({
+              kind: "document-chunk",
+              chunkId: candidate.chunkId,
+              documentId: candidate.documentId,
+              score: candidate.score,
+              boosted: candidate.score,
+              sourcePath: doc?.sourcePath ?? candidate.sourcePath,
+              headingAncestry: candidate.headingAncestry,
+              excerpt: candidate.excerpt,
+              attachmentId: candidate.attachmentId,
+              sourceMediaType: doc?.sourceMediaType ?? "text/markdown",
+              extractionMetadata: doc?.extractionMetadata,
+              indexedCommit: candidate.indexedCommit,
+              generationId: candidate.generationId,
+              retrievalHandle: `chunk:${candidate.chunkId}`,
+            });
+          }
+        }
+      }
+
+      if (top.length === 0 && documentChunks.length === 0) {
         const structuredContent: RecallResult = {
           action: "recalled",
           query,
@@ -723,46 +772,6 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
                 isCurrentProject: note.project === project.id,
               }),
             );
-          }
-        }
-      }
-
-      // Collect document chunks from document-source attachments
-      // Exclude from temporal mode, workflow mode, and when tag/lifecycle filters are active (plan Stage 6)
-      const documentChunks: NonNullable<RecallResult["documentChunks"]> = [];
-      const hasTagFilter = tags && tags.length > 0;
-      const hasLifecycleFilter = lifecycle !== undefined;
-      const isDefaultMode = mode === undefined || mode === "default";
-      if (
-        project &&
-        (scope === "all" || scope === "project") &&
-        isDefaultMode &&
-        !hasTagFilter &&
-        !hasLifecycleFilter
-      ) {
-        const attachmentConfigs = await ctx.configStore.getProjectAttachments(project.id);
-        const docSourceAttachmentIds = getDocumentSourceAttachmentIds(attachmentConfigs);
-        if (docSourceAttachmentIds.length > 0) {
-          const candidates = collectDocumentChunkCandidates(docSourceAttachmentIds, query, limit);
-          for (const candidate of candidates) {
-            const generation = getCurrentGeneration(candidate.attachmentId);
-            const doc = generation?.documents.get(candidate.documentId);
-            documentChunks.push({
-              kind: "document-chunk",
-              chunkId: candidate.chunkId,
-              documentId: candidate.documentId,
-              score: candidate.score,
-              boosted: candidate.score,
-              sourcePath: doc?.sourcePath ?? candidate.sourcePath,
-              headingAncestry: candidate.headingAncestry,
-              excerpt: candidate.excerpt,
-              attachmentId: candidate.attachmentId,
-              sourceMediaType: doc?.sourceMediaType ?? "text/markdown",
-              extractionMetadata: doc?.extractionMetadata,
-              indexedCommit: candidate.indexedCommit,
-              generationId: candidate.generationId,
-              retrievalHandle: `chunk:${candidate.chunkId}`,
-            });
           }
         }
       }

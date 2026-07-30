@@ -47,17 +47,20 @@ export function isChunkEntityRef(id: string): boolean {
  */
 export function parseEntityRef(id: string): EntityRef {
   if (id.startsWith(CHUNK_PREFIX)) {
-    const rest = id.slice(CHUNK_PREFIX.length);
-    // chunk:documentId::heading::occurrence::ordinal
-    const docIdEnd = rest.indexOf("::");
-    if (docIdEnd === -1) {
+    // Handle format: chunk:<chunkId>, where the chunkId itself does NOT carry the
+    // prefix. chunkId = <documentId>::<headingAncestry>::<occurrence>::<ordinal>,
+    // and documentId = <attachmentId>::<normalizedPath> (exactly one "::").
+    // The documentId is therefore the first two "::"-delimited segments.
+    const chunkId = id.slice(CHUNK_PREFIX.length);
+    const parts = chunkId.split("::");
+    if (parts.length < 2) {
       return { kind: "unknown", raw: id };
     }
-    const documentId = rest.slice(0, docIdEnd) as DocumentId;
+    const documentId = `${parts[0]}::${parts[1]}` as DocumentId;
     return {
       kind: "chunk",
       documentId,
-      chunkId: id as ChunkId,
+      chunkId: chunkId as ChunkId,
       raw: id,
     };
   }

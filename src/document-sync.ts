@@ -5,6 +5,7 @@ import { getExtractor } from "./document-extractor.js";
 import { markdownChunker } from "./markdown-chunker.js";
 import { buildGenerationFromFiles } from "./document-source-index.js";
 import { getCurrentGeneration } from "./generation-storage.js";
+import { matchAnyGlob } from "./glob-match.js";
 import type { DocumentSourceAttachmentConfig } from "./vault.js";
 import { attempt, getErrorMessage } from "./error-utils.js";
 
@@ -93,32 +94,17 @@ export async function syncDocumentSource(
     const lsTreeResult = await git.raw(["ls-tree", "-r", "--name-only", indexedCommit]);
     const allFiles = lsTreeResult.trim().split("\n").filter(Boolean);
 
-    // Apply include/exclude patterns
+    // Apply include/exclude patterns (path-aware globs relative to root)
     const root = config.root || ".";
     const includePatterns = config.include.length > 0 ? config.include : ["**/*.md"];
     const excludePatterns = config.exclude || [];
+    const rootPrefix = root === "." ? "" : root + "/";
 
-    // Simple glob matching: filter by extension for now
     const matchedFiles = allFiles.filter((file) => {
-      // Check if file is under root
-      if (!file.startsWith(root === "." ? "" : root + "/")) return false;
-
-      // Check include patterns
-      const matchesInclude = includePatterns.some((pattern: string) => {
-        const ext = pattern.replace("**/*.", "").replace("*.", "");
-        if (ext && ext !== "*") return file.endsWith("." + ext);
-        return true;
-      });
-      if (!matchesInclude) return false;
-
-      // Check exclude patterns
-      const matchesExclude = excludePatterns.some((pattern: string) => {
-        if (pattern.startsWith("**/")) return file.includes(pattern.slice(3));
-        if (pattern.endsWith("/**")) return file.startsWith(pattern.slice(0, -3));
-        return file === pattern;
-      });
-      if (matchesExclude) return false;
-
+      if (rootPrefix && !file.startsWith(rootPrefix)) return false;
+      const rel = rootPrefix ? file.slice(rootPrefix.length) : file;
+      if (!matchAnyGlob(includePatterns, rel)) return false;
+      if (matchAnyGlob(excludePatterns, rel)) return false;
       return true;
     });
 

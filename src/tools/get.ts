@@ -6,7 +6,7 @@ import type { Note } from "../storage.js";
 import type { Vault } from "../vault.js";
 import {
   GetResultSchema,
-  NoteIdSchema,
+  EntityRefSchema,
   type GetResult,
   type RelationshipPreview,
 } from "../structured-content.js";
@@ -59,7 +59,12 @@ export function registerGetTool(server: McpServer, ctx: ServerContext): void {
         openWorldHint: false,
       },
       inputSchema: z.object({
-        ids: z.array(NoteIdSchema).min(1).describe("One or more memory ids to fetch"),
+        ids: z
+          .array(EntityRefSchema)
+          .min(1)
+          .describe(
+            "One or more memory ids, or document/chunk retrieval handles (doc:... / chunk:...), to fetch",
+          ),
         cwd: projectParam,
         includeRelationships: z
           .boolean()
