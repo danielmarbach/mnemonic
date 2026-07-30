@@ -15,6 +15,7 @@ When working on mnemonic itself:
 - For reproducible dogfooding, prefer the isolated dogfood runner (`scripts/run-dogfood-packs.mjs --isolated`) over the live project vault — it copies notes into a temporary workspace and cleans up afterward
 - To dogfood packs against an uninstalled build, set `MNEMONIC_ENTRYPOINT=build/index.js` (the spawn function resolves it relative to `process.cwd()`). Without it, the runner spawns the globally installed `mnemonic` binary.
 - Standalone dogfood scripts at `tests/dogfood-semantic-patch.mjs` exercise specific features directly against `build/index.js`.
+- `scripts/dogfood-document-source.mjs` (Pack D) dogfoods the read-only document-source attachment feature end-to-end (add -> sync -> recall -> get -> mutation rejection) against the local build in an isolated temp environment. Run with `node scripts/dogfood-document-source.mjs` (12 checks; exits non-zero on failure).
 - When spawning the local build directly via stdio, do NOT set `DISABLE_GIT` if working with a project vault — git is required for project identity resolution. Pass `VAULT_PATH=<cwd>` or omit it to auto-discover.
 
 ### Session start
