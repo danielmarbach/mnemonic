@@ -90,12 +90,14 @@ export async function initTestRepo(repoDir: string, branch = "feature/test"): Pr
   await execFileAsync("git", ["checkout", "-B", branch], { cwd: repoDir });
   await execFileAsync("git", ["config", "user.name", "Test User"], { cwd: repoDir });
   await execFileAsync("git", ["config", "user.email", "test@example.com"], { cwd: repoDir });
+  await execFileAsync("git", ["config", "commit.gpgsign", "false"], { cwd: repoDir });
 }
 
 export async function initTestVaultRepo(vaultDir: string): Promise<void> {
   await execFileAsync("git", ["init"], { cwd: vaultDir });
   await execFileAsync("git", ["config", "user.name", "Test User"], { cwd: vaultDir });
   await execFileAsync("git", ["config", "user.email", "test@example.com"], { cwd: vaultDir });
+  await execFileAsync("git", ["config", "commit.gpgsign", "false"], { cwd: vaultDir });
 }
 
 afterEach(async () => {

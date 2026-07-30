@@ -29,6 +29,7 @@ async function setupWritableAttachedVaultFixture() {
   await execFileAsync("git", ["init", "-b", "main"], { cwd: attachedDir });
   await execFileAsync("git", ["config", "user.name", "Test User"], { cwd: attachedDir });
   await execFileAsync("git", ["config", "user.email", "test@example.com"], { cwd: attachedDir });
+  await execFileAsync("git", ["config", "commit.gpgsign", "false"], { cwd: attachedDir });
 
   const notesDir = path.join(attachedDir, ".mnemonic", "notes");
   await mkdir(notesDir, { recursive: true });
