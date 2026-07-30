@@ -86,8 +86,15 @@ function parseId(text) {
 }
 
 async function upsertNote({ title, content, tags }) {
-  const recall = await callTool("recall", { query: title, cwd, limit: 5, scope: "all" });
-  const existing = (recall.structured?.results ?? []).find((r) => r.title === title) ?? null;
+  // Match prior result notes by a stable prefix (strip trailing date/isolated
+  // parentheticals) so re-runs UPDATE existing notes instead of creating
+  // duplicates after consolidation renames or re-dates them.
+  const stablePrefix = title.replace(/\s*\([^)]*\)\s*$/g, "").trim();
+  const recall = await callTool("recall", { query: stablePrefix, cwd, limit: 20, scope: "all" });
+  const existing =
+    (recall.structured?.results ?? []).find(
+      (r) => r.title === title || (stablePrefix && r.title.startsWith(stablePrefix)),
+    ) ?? null;
   if (existing) {
     await callTool("get", { ids: [existing.id], cwd, includeRelationships: false });
     const updated = await callTool("update", {
@@ -153,8 +160,16 @@ async function main() {
 
   const recentNotes = getRecentMemoryNotes(recentTemporary.structured);
   const recentWithRelationships = [];
-  for (const recentNote of recent.slice(0, 3)) {
-    const got = await callTool("get", { ids: [recentNote.id], cwd, includeRelationships: true });
+  // Seed navigation from the summary's orientation anchor (stable id, survives
+  // consolidation) in addition to the most recent notes, so the check measures
+  // graph reachability rather than fragility of the recent→architecture path.
+  const anchorId = summary1.structured?.orientation?.primaryEntry?.id;
+  const navSeedIds = [
+    ...(anchorId ? [anchorId] : []),
+    ...recent.slice(0, 3).map((n) => n.id),
+  ];
+  for (const seedId of navSeedIds) {
+    const got = await callTool("get", { ids: [seedId], cwd, includeRelationships: true });
     const note = got.structured?.notes?.[0];
     if (note) recentWithRelationships.push(note);
   }
@@ -191,8 +206,13 @@ async function main() {
 
   const embeddingResults = recallEmbeddings.structured?.results ?? [];
   const b1Top = embeddingResults[0];
+  // Match the canonical design note by its stable id (derived from the summary
+  // orientation anchor, falling back to the known anchor id), not by exact
+  // title — consolidation can rename/merge the anchor and would otherwise cause
+  // a false advisory finding even though recall still surfaces the note.
+  const canonicalId = anchorId ?? "mnemonic-key-design-decisions-3f2a6273";
   const canonicalDesignInTopEmbeddings = embeddingResults.some(
-    (result) => result.title === "mnemonic — key design decisions"
+    (result) => result.id === canonicalId || result.title === "mnemonic — key design decisions",
   );
   const b2Top = recallTemporal.structured?.results?.[0];
   const b3Top = recallTemporalVerbose.structured?.results?.[0];
