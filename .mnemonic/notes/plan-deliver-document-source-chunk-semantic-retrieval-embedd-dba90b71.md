@@ -11,11 +11,14 @@ tags:
   - architecture
 lifecycle: permanent
 createdAt: '2026-08-01T20:43:19.999Z'
-updatedAt: '2026-08-01T20:43:19.999Z'
+updatedAt: '2026-08-01T20:43:23.909Z'
 role: plan
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: document-source-chunk-embeddings-specified-but-never-deliver-6e867617
+    type: derives-from
 memoryVersion: 1
 ---
 Plan to deliver the document-source chunk semantic retrieval that the canonical design note (`document-source-attachments-design-delivery-and-verification-1517e52b`) specified but never shipped (see `document-source-chunk-embeddings-specified-but-never-deliver-6e867617`). Today document chunks are lexical-only and render in a trailing `## Document Results` section never fused into the note RRF ranking. This plan makes embeddings the primary channel with lexical as the fail-soft fallback (the spec's line-41 contract), fuses chunks into the unified ranking below notes, and persists chunk embeddings to disk for cheap re-syncs.

@@ -9,7 +9,7 @@ tags:
   - decision
 lifecycle: permanent
 createdAt: '2026-08-01T09:26:59.248Z'
-updatedAt: '2026-08-01T20:35:22.138Z'
+updatedAt: '2026-08-01T20:43:23.908Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
@@ -21,6 +21,8 @@ relatedTo:
     type: related-to
   - id: document-source-chunk-embeddings-specified-but-never-deliver-6e867617
     type: explains
+  - id: plan-deliver-document-source-chunk-semantic-retrieval-embedd-dba90b71
+    type: follows
 memoryVersion: 1
 ---
 Consolidates the completed document-source attachment workflow (request, research, two design reviews, six-stage plan, stage review) into one permanent canonical note. Source notes are deleted; durable detail remains in the related permanent notes.
