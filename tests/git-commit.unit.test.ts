@@ -94,6 +94,36 @@ describe("commitVaultWithProtection", () => {
     expect(getCurrentGitBranchMock).toHaveBeenCalledWith("/project");
   });
 
+  it("includes branch, patterns and behavior in the blocked message", async () => {
+    const vault = makeFakeVault("project-local", {
+      storage: { vaultPath: "/project/.mnemonic" } as unknown as Vault["storage"],
+    });
+    getCurrentGitBranchMock.mockResolvedValue("release/1.0");
+    const policy = {
+      protectedBranchBehavior: "block",
+      protectedBranchPatterns: ["release*"],
+      projectId: "pid",
+      projectName: "PName",
+      defaultScope: "project",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    };
+    const ctx = fakeCtx(policy);
+
+    const result = await commitVaultWithProtection({
+      ctx,
+      vault,
+      commitMessage: "test commit",
+      files: ["notes/test.md"],
+      allowProtectedBranch: false,
+      toolName: "test-tool",
+      noteProjectId: "pid",
+    });
+
+    expect(result.status).toBe("failed");
+    expect((result as any).error).toContain("`release/1.0`");
+    expect((result as any).error).toContain("release*");
+  });
+
   it("succeeds with override when allowProtectedBranch is true", async () => {
     const vault = makeFakeVault("project-local", {
       storage: { vaultPath: "/project/.mnemonic" } as unknown as Vault["storage"],

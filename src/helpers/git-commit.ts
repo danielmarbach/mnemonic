@@ -3,6 +3,7 @@ import {
   isProtectedBranch,
   resolveProtectedBranchBehavior,
   resolveProtectedBranchPatterns,
+  type ProtectedBranchBehavior,
   type WriteScope,
   type ProjectMemoryPolicy,
 } from "../project-memory-policy.js";
@@ -149,6 +150,17 @@ export function formatProtectedBranchBlocked(
   ].join("\n");
 }
 
+export interface ProtectedBranchBlocked {
+  blocked: true;
+  message: string;
+  projectLabel: string;
+  branch: string;
+  patterns: string[];
+  behavior: ProtectedBranchBehavior;
+}
+
+export type ProtectedBranchCheck = { blocked: false } | ProtectedBranchBlocked;
+
 export async function shouldBlockProtectedBranchCommit(options: {
   ctx: ServerContext;
   cwd?: string;
@@ -158,7 +170,7 @@ export async function shouldBlockProtectedBranchCommit(options: {
   policy: ProjectMemoryPolicy | undefined;
   allowProtectedBranch: boolean;
   toolName: string;
-}): Promise<{ blocked: boolean; message?: string }> {
+}): Promise<ProtectedBranchCheck> {
   const { cwd, writeScope, automaticCommit, projectLabel, policy, allowProtectedBranch, toolName } =
     options;
   if (!cwd || writeScope !== "project" || !automaticCommit) {
@@ -184,7 +196,7 @@ export async function shouldBlockProtectedBranchCommit(options: {
     behavior === "block"
       ? formatProtectedBranchBlocked(projectLabel, branch, patterns, toolName)
       : formatAskForProtectedBranch(projectLabel, branch, patterns, toolName);
-  return { blocked: true, message };
+  return { blocked: true, message, projectLabel, branch, patterns, behavior };
 }
 
 export async function wouldRelationshipCleanupTouchProjectVault(
@@ -273,7 +285,7 @@ export async function commitVaultWithProtection(options: {
       return {
         status: "failed",
         reason: "error",
-        error: protectedBranchCheck.message ?? "Protected branch policy blocked this commit.",
+        error: protectedBranchCheck.message,
       };
     }
   }
@@ -287,7 +299,7 @@ export async function checkVaultProtectedBranch(options: {
   allowProtectedBranch: boolean;
   toolName: string;
   noteProjectId?: string;
-}): Promise<{ blocked: boolean; message?: string }> {
+}): Promise<ProtectedBranchCheck> {
   const { ctx, vault, allowProtectedBranch, toolName, noteProjectId } = options;
 
   if (!vault.writable || vault.provenance === "main") {
