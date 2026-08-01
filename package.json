@@ -45,7 +45,7 @@
     "prepare": "node scripts/prepare.mjs"
   },
   "simple-git-hooks": {
-    "pre-commit": "npx lint-staged"
+    "pre-commit": "node scripts/pre-commit.mjs"
   },
   "lint-staged": {
     "*.{ts,tsx}": [
