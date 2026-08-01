@@ -1983,6 +1983,60 @@ VAULT_PATH = <span class="str">"/Users/you/mnemonic-vault"</span></pre>
 }</pre>
     </div>
 
+    <div class="agent-snippet fade-up" style="margin-top:24px">
+      <h3>Search another repository's docs without copying them</h3>
+      <p>Attach an external repo and its markdown documentation becomes searchable right alongside your memories — mnemonic reads the files, finds the right page for any question, and can hand back the exact section when you need the source text. Nothing is ever written back to that repository.</p>
+      <p>Give mnemonic the local path to the repo, then narrow which files count as documentation when the defaults aren't right for you:</p>
+    </div>
+    <div class="code-block fade-up" style="margin-top:16px">
+      <div class="code-block-header">
+        <span class="code-label">attach a documentation source</span>
+        <button class="copy-btn" onclick="copyCode(this)">copy</button>
+      </div>
+      <pre>{
+  <span class="key">"cwd"</span>: <span class="str">"/path/to/your/project"</span>,
+  <span class="key">"localPath"</span>: <span class="str">"/path/to/external/repo"</span>,
+  <span class="key">"kind"</span>: <span class="str">"document-source"</span>,
+  <span class="key">"root"</span>: <span class="str">"docs"</span>,
+  <span class="key">"include"</span>: [<span class="str">"**/*.md"</span>],
+  <span class="key">"exclude"</span>: [<span class="str">"**/CHANGELOG.md"</span>]
+}</pre>
+    </div>
+    <div class="config-table-wrap fade-up" style="margin-top:16px">
+      <table class="config-table">
+        <thead>
+          <tr>
+            <th>Option</th>
+            <th>Default</th>
+            <th>Meaning</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>root</code></td>
+            <td class="default">the whole repo</td>
+            <td>Which folder inside the repo to index</td>
+          </tr>
+          <tr>
+            <td><code>include</code></td>
+            <td class="default">all markdown</td>
+            <td>Which files count as documentation</td>
+          </tr>
+          <tr>
+            <td><code>exclude</code></td>
+            <td class="default">generated &amp; vendor files</td>
+            <td>Files to skip — <code>node_modules</code>, build output, caches, and the like</td>
+          </tr>
+          <tr>
+            <td><code>acceptedMediaTypes</code></td>
+            <td class="default">markdown</td>
+            <td>File types accepted as documentation</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p style="font-size:0.875rem;color:var(--text-dim);margin:14px 0 0">After attaching, run a quick <code style="font-family:JetBrains Mono,monospace;font-size:0.85em;color:var(--cyan-lt)">sync</code> to index the current revision. The same attachment also works with another repository's mnemonic notes — keep them read-only by default, or mark them writable so memories can flow both ways. The README covers every option for both kinds.</p>
+
     <div class="agent-snippet fade-up">
       <h3>No system prompt required</h3>
       <p>Mnemonic's tools are self-describing — each includes "use when" / "do not use when" guidance, behavioral annotations, and typed schemas. Most models will use them correctly from tool metadata alone.</p>

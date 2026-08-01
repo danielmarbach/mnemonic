@@ -544,7 +544,7 @@ Imported notes are written to the main vault with `lifecycle: permanent` and `sc
 
 | Tool                        | Description                                                                                                                                         |
 | --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `add_attachment`            | Add an external repository as a federated knowledge source; requires `localPath`, optional `branch`, `vaultFolder`, `writable`, and `pushBranch`. Use `kind: "document-source"` to index markdown files as read-only document retrieval sources with `root`, `include`, `exclude`, and `acceptedMediaTypes`.    |
+| `add_attachment`            | Add an external repository as a federated knowledge source. `kind: "mnemonic-vault"` (default) attaches another repo's notes; `kind: "document-source"` indexes its markdown read-only. See [Configuring attachments](#configuring-attachments) for worked examples.                                  |
 | `consolidate`               | Merge and analyze overlapping notes; evidence defaults `true` for analysis strategies and execute-merge (lifecycle, risk, classification, warnings) |
 | `detect_project`            | Resolve `cwd` to stable project id via git remote URL                                                                                               |
 | `discover_tags`             | Suggest canonical tags for a note using title/content/query context; `mode: "browse"` opts into broader inventory output                            |
@@ -617,7 +617,7 @@ Multi-repo attachment support lets you link external repositories as **federated
 Key concepts:
 
 - `add_attachment` links a repo by its absolute `localPath` (supports `~` expansion); optional `branch`, `vaultFolder`, `writable`, and `pushBranch` select branch, sub-vault, write access, and push target. Use `kind: "document-source"` to index markdown files as read-only document retrieval sources.
-- **Document-source attachments**: when `kind: "document-source"`, the attachment indexes markdown files from a pinned git revision. Documents are extracted, heading-aware chunked, and made searchable through recall. The `get` tool resolves `doc:` and `chunk:` handles for exact content. Mutation tools reject document-source entities. Configuration accepts `root`, `include`, `exclude`, and `acceptedMediaTypes` parameters.
+- **Document-source attachments**: when `kind: "document-source"`, the attachment indexes markdown files from a pinned git revision. Documents are extracted, heading-aware chunked, and made searchable through recall; `get` resolves `doc:` and `chunk:` handles for exact content. Mutation tools reject document-source entities — the source repository is never written to. Configuration accepts `root` (default `.`), `include` (default `["**/*.md"]`), `exclude` (defaults to generated/vendor paths), and `acceptedMediaTypes` (default `["text/markdown"]`); see [Configuring attachments](#configuring-attachments) for worked examples.
 - `remove_attachment` removes by `projectSlug`; `list_attachments` shows all attachments with status.
 - `set_attachment_enabled` toggles an attachment on/off without removing config; `set_attachment_branch` changes the branch.
 - Max 5 attachments per project (configurable via `maxAttachmentsPerProject` in project memory policy).
@@ -627,6 +627,58 @@ Key concepts:
 - **Writable attached vaults**: when `writable: true`, `remember`, `update`, `forget`, `relate`, `unrelate`, `consolidate`, and `move_memory` can modify notes in the attached vault; commits push to `pushBranch` (or the attachment's `branch` if omitted).
 - **Cross-vault relationships**: notes in different vaults can be related; the `Relationship` type includes a `vaultPath` field for cross-vault traversal.
 - If an attached repo or branch is unavailable, reads fail-soft and the rest of the session continues unaffected.
+
+#### Configuring attachments
+
+Attachments are configured through the `add_attachment` tool, which writes the config and activates the attachment. `cwd` and `localPath` are required; everything else is optional. Fields that do not apply to the chosen `kind` are ignored.
+
+**Document-source** — index an external repository's markdown as read-only, searchable content:
+
+```json
+{
+  "cwd": "/path/to/your/project",
+  "localPath": "/path/to/external/repo",
+  "kind": "document-source",
+  "root": "docs",
+  "include": ["**/*.md"],
+  "exclude": ["**/CHANGELOG.md"]
+}
+```
+
+| Parameter            | Default                                                              | Meaning                                                                        |
+| -------------------- | -------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| `kind`               | `"mnemonic-vault"`                                                  | `"document-source"` indexes repository markdown as read-only retrieval content |
+| `root`               | `"."`                                                               | Repository-relative POSIX path to search; absolute paths and `..` are rejected  |
+| `include`            | `["**/*.md"]`                                                       | Glob patterns relative to `root` for files to index                             |
+| `exclude`            | `["node_modules", ".git", "dist", "build", ".next", ".cache", "coverage"]` | Glob patterns relative to `root` to skip; defaults cover generated/vendor paths |
+| `acceptedMediaTypes` | `["text/markdown"]`                                                 | Canonical lower-case IANA base media types accepted as indexable sources        |
+
+Only tracked Git blobs at the pinned revision are indexed — symlinks, submodules, and untracked working-tree files are skipped. Matching is case-sensitive on Git tree paths: `**` crosses directories, `*` matches within a segment, and a bare name like `node_modules` matches any segment.
+
+**Mnemonic-vault** — attach another repository's notes as a federated vault, optionally writable:
+
+```json
+{
+  "cwd": "/path/to/your/project",
+  "localPath": "/path/to/external/repo",
+  "kind": "mnemonic-vault",
+  "branch": "main",
+  "writable": true,
+  "pushBranch": "main"
+}
+```
+
+| Parameter     | Default                | Meaning                                                                                                      |
+| ------------- | ---------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `kind`        | `"mnemonic-vault"`    | Managed mnemonic notes in the attached repository                                                             |
+| `vaultFolder` | `".mnemonic"`         | Sub-folder holding the attached repo's notes                                                                  |
+| `branch`      | auto-detected          | Branch to read notes from                                                                                     |
+| `writable`    | `false`                | Allow `remember`, `update`, `forget`, `relate`, `unrelate`, `consolidate`, and `move_memory` in the attached vault |
+| `pushBranch`  | attachment's `branch`  | Branch pushed to when `writable`                                                                              |
+
+`root`, `include`, `exclude`, and `acceptedMediaTypes` apply only to `document-source`; `vaultFolder`, `writable`, and `pushBranch` apply only to `mnemonic-vault`.
+
+**After attaching a document source**, call `sync` to pin the remote-tracking commit and build the index. Documents then surface in `recall` as `documentChunks` (project/all scope), and `get` resolves `doc:` / `chunk:` handles to exact content. Document-source entities are immutable: `update`, `forget`, `move_memory`, `relate`, `unrelate`, and `consolidate` return an immutable-document error.
 
 See `AGENT.md` for the full tool descriptions and attachment architecture details.
 
