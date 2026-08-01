@@ -6,6 +6,12 @@ The format is loosely based on Keep a Changelog and uses semver-style version he
 
 ## [Unreleased]
 
+### Added
+
+- Protected-branch commits now ask for one-time confirmation through the client UI on supported clients (`remember`, `update`, `forget`, `relate`, `unrelate`, `consolidate`, `move_memory`); other clients keep the previous error message.
+- `remember` asks through the client UI where to store a memory (project vs global) when no scope is configured.
+- `remember` can store memories in writable attached vaults, asking which vault to use when several write targets exist.
+
 ### Changed
 
 - Migrated to `@modelcontextprotocol/server` v2.0.0 (MCP 2026-07-28 spec). The server now uses `serveStdio()` for era-negotiating stdio transport.
