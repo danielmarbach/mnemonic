@@ -362,7 +362,7 @@ Use `set_project_memory_policy` to save per-project defaults:
 - protected-branch behavior for project-vault writes (`ask`, `block`, `allow`)
 - protected-branch patterns (glob strings; defaults are `main`, `master`, `release*`)
 
-When write scope policy is `ask`, `remember` returns a clear storage choice instead of guessing. When protected-branch behavior is `ask`, mutating tools that would commit to the project vault return a one-time override option (`allowProtectedBranch: true`) plus instructions to persist `block`/`allow`.
+When write scope policy is `ask`, `remember` returns a clear storage choice instead of guessing — on supported MCP clients it asks project vs global through the client UI. When protected-branch behavior is `ask`, mutating tools that would commit to the project vault ask for one-time confirmation through the client UI (or return the `allowProtectedBranch: true` override option plus instructions to persist `block`/`allow` on clients without support).
 
 ### Project identity
 
