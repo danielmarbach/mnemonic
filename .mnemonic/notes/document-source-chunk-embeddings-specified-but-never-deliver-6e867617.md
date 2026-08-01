@@ -11,10 +11,13 @@ tags:
   - bug
 lifecycle: permanent
 createdAt: '2026-08-01T20:35:12.274Z'
-updatedAt: '2026-08-01T20:35:12.274Z'
+updatedAt: '2026-08-01T20:35:22.137Z'
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: document-source-attachment-five-bugs-found-and-fixed-via-pac-24bedd4b
+    type: related-to
 memoryVersion: 1
 ---
 The canonical design note `document-source-attachments-design-delivery-and-verification-1517e52b` explicitly specified that document-source chunks be embedded, with lexical-only as the fail-soft fallback. Line 41: "embedding failures publish with lexical-only coverage" — a contract that only makes sense if embeddings are the primary path. Line 42 lists `embeddingCompatibilityIdentity` as part of the generation manifest, implying embeddings are produced and need a compatibility fingerprint for invalidation. Line 43 frames document chunks as full participants in recall ranking ("result diversity enforced after final scoring"), consistent with semantic+lexical hybrid fusion.
