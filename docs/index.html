@@ -451,6 +451,7 @@
 
     .vault-pill.main    { background: rgba(74,222,128,0.12); color: var(--primary-lt); }
     .vault-pill.project { background: rgba(6,182,212,0.12);  color: var(--cyan-lt); }
+    .vault-pill.source  { background: rgba(251,191,36,0.14); color: #fbbf24; }
 
     .vault-card h3 {
       font-size: 1rem;
@@ -1410,7 +1411,7 @@
   <div class="container">
     <div class="section-label">How it works</div>
     <h2 class="section-title">Two vaults, one mental model.</h2>
-    <p class="section-desc">mnemonic routes memories between a private main vault and a shareable project vault based on where you are and what you're storing.</p>
+    <p class="section-desc">mnemonic routes memories between a private main vault and a shareable project vault based on where you are and what you're storing, and pulls read-only knowledge from external repositories you attach.</p>
 
     <div class="how-grid">
       <div class="vault-card fade-up">
@@ -1448,6 +1449,22 @@
 <span class="dir">    projections/</span>
 <span class="gray">      *.json  ← gitignored</span>
         </div>
+      </div>
+    </div>
+
+    <div class="vault-card fade-up" style="margin-top:32px;">
+      <div class="vault-card-header">
+        <div class="vault-pill source">document sources</div>
+      </div>
+      <p>Read-only knowledge from other repositories you point at, with no copying and nothing written back. Attach a repo and its markdown documentation becomes searchable alongside your memories, so context from adjacent projects, frameworks, or runbooks surfaces when it matters. <code style="font-family:JetBrains Mono,monospace;font-size:0.8em;color:var(--cyan-lt)">sync</code> pulls a pinned revision and indexes it; the index lives next to your project vault and is rebuilt on demand.</p>
+      <div class="file-tree">
+<span class="dir">external-repo/</span>
+<span class="gray">  docs/                   ← attached, read-only</span>
+<span class="note">    api.md</span>
+<span class="note">    getting-started.md</span>
+<span class="dir">your-project/.mnemonic/</span>
+<span class="dir">  embeddings/doc-source/</span>
+<span class="gray">    *.json  ← gitignored, rebuilt on sync</span>
       </div>
     </div>
 
