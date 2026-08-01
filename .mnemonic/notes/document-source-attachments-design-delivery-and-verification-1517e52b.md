@@ -9,13 +9,15 @@ tags:
   - decision
 lifecycle: permanent
 createdAt: '2026-08-01T09:26:59.248Z'
-updatedAt: '2026-08-01T09:26:59.248Z'
+updatedAt: '2026-08-01T09:27:10.056Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
   - id: document-source-attachment-five-bugs-found-and-fixed-via-pac-24bedd4b
     type: follows
   - id: docs-gap-fixed-attachment-configuration-documented-in-readme-93c55f0d
+    type: related-to
+  - id: pack-d-document-source-attachment-dogfood-pack-and-a-b-c-con-4f75a70c
     type: related-to
 memoryVersion: 1
 ---

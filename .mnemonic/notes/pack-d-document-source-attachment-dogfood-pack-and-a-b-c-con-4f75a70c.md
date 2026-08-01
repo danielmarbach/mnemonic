@@ -11,7 +11,7 @@ tags:
   - markdown
 lifecycle: permanent
 createdAt: '2026-07-29T21:44:18.324Z'
-updatedAt: '2026-07-29T21:44:43.374Z'
+updatedAt: '2026-08-01T09:27:10.056Z'
 role: reference
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -21,6 +21,8 @@ relatedTo:
     type: related-to
   - id: dogfooding-test-suite-reusable-prompt-for-phases-1-8-validat-c7c702d8
     type: derives-from
+  - id: document-source-attachments-design-delivery-and-verification-1517e52b
+    type: related-to
 memoryVersion: 1
 ---
 # Pack D: document-source attachment dogfood pack and A/B/C consolidation hardening
