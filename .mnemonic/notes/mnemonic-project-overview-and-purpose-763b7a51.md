@@ -7,7 +7,7 @@ tags:
   - typescript
 lifecycle: permanent
 createdAt: '2026-03-07T17:58:49.005Z'
-updatedAt: '2026-05-09T21:16:14.012Z'
+updatedAt: '2026-08-01T10:55:12.757Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
@@ -29,12 +29,14 @@ A personal MCP memory server backed by plain markdown + JSON files, synced via g
 
 **Embedding transport:** `src/embeddings.ts` uses Ollama's `/api/embed` endpoint with truncation enabled so longer notes still embed safely with the v2 model.
 
-**Stack:** TypeScript, Node.js, `@modelcontextprotocol/sdk`, `simple-git`, `gray-matter`, `zod`, Ollama (external HTTP).
+**Stack:** TypeScript, Node.js, `@modelcontextprotocol/server` v2 (MCP 2026-07-28 spec), `simple-git`, `gray-matter`, `zod`, Ollama (external HTTP).
 
 **Vault location:** `~/mnemonic-vault` by default (env: `VAULT_PATH`). One `.md` file per note, embeddings in `embeddings/` (gitignored — local only).
 
 **Repository layout:** runtime code lives in `src/`, compiled output goes to `build/`.
 
 **Entry point:** `build/index.js` (compiled from `src/index.ts`). Run via `node build/index.js`.
+
+**MCP transport:** `serveStdio()` from `@modelcontextprotocol/server/stdio` — era-negotiating stdio transport supporting both legacy and 2026-era clients.
 
 **Inspired by:** petabridge/memorizer but without Postgres/pgvector.
