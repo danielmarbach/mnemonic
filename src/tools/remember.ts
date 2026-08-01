@@ -1,7 +1,13 @@
 import { z } from "zod";
-import type { McpServer } from "@modelcontextprotocol/server";
+import type {
+  CallToolResult,
+  InputRequiredResult,
+  McpServer,
+  ServerContext as SdkServerContext,
+} from "@modelcontextprotocol/server";
 import type { ServerContext } from "../server-context.js";
 import { NOTE_LIFECYCLES, NOTE_ROLES, type Note } from "../storage.js";
+import type { Vault } from "../vault.js";
 import { isoDateString } from "../brands.js";
 import { getErrorMessage, attempt } from "../error-utils.js";
 import { embed, embeddingMetadata } from "../embeddings.js";
@@ -13,19 +19,25 @@ import {
 } from "../cache.js";
 import { suggestAutoRelationships } from "../auto-relate.js";
 import { MarkdownLintError, cleanMarkdown } from "../markdown.js";
-import { resolveWriteScope, WRITE_SCOPES } from "../project-memory-policy.js";
-import {
-  resolveProject,
-  resolveWriteVault,
-  ensureBranchSynced,
-  describeProject,
-} from "../helpers/project.js";
+import { resolveWriteScope, WRITE_SCOPES, type WriteScope } from "../project-memory-policy.js";
+import { resolveProject, ensureBranchSynced, describeProject } from "../helpers/project.js";
 import {
   extractSummary,
   formatCommitBody,
   formatAskForWriteScope,
+  checkVaultProtectedBranch,
   commitVaultWithProtection,
 } from "../helpers/git-commit.js";
+import {
+  isMrtrSupported,
+  protectedBranchDecision,
+  readProtectedBranchConsentState,
+  readVaultChoice,
+  readWriteScopeChoice,
+  scopeSelectionDecision,
+  vaultSelectionDecision,
+  type VaultChoiceOption,
+} from "../helpers/mrtr.js";
 import { embedTextForNote } from "../helpers/embed.js";
 import {
   buildPersistenceStatus,
@@ -33,13 +45,96 @@ import {
   buildMutationRetryContract,
   pushAfterMutation,
 } from "../helpers/persistence.js";
-import { storageLabel, ROLE_LIFECYCLE_DEFAULTS } from "../helpers/vault.js";
+import {
+  storageLabel,
+  ROLE_LIFECYCLE_DEFAULTS,
+  ensureAttachmentsLoaded,
+} from "../helpers/vault.js";
 import { makeId } from "../helpers/index.js";
 import {
   type RememberResult,
   RememberToolResultSchema,
   type RememberLintErrorResult,
 } from "../structured-content.js";
+
+type WriteVaultResolution =
+  | { kind: "vault"; vault: Vault }
+  | { kind: "decision"; result: CallToolResult | InputRequiredResult };
+
+interface RememberVaultCandidate extends VaultChoiceOption {
+  vault: Vault;
+}
+
+/**
+ * Resolves the vault a `remember` write targets.
+ *
+ * Writes to the main vault for global scope. For project scope, the primary
+ * project vault is the default; when writable attached vaults also exist for
+ * the project, an MRTR elicitation lets the user pick the target on
+ * modern clients. Legacy clients and explicit declines fall back to the
+ * primary project vault (the pre-existing behavior). A retry that names a
+ * vault outside the offered candidate list re-elicits rather than writing to
+ * an unoffered vault.
+ */
+export async function resolveWriteVaultForRemember(
+  ctx: ServerContext,
+  cwd: string | undefined,
+  writeScope: WriteScope,
+  project: Awaited<ReturnType<typeof resolveProject>> | undefined,
+  requestCtx: SdkServerContext,
+): Promise<WriteVaultResolution> {
+  if (writeScope === "global") {
+    return { kind: "vault", vault: ctx.vaultManager.main };
+  }
+
+  const projectVault = cwd ? await ctx.vaultManager.getOrCreateProjectVault(cwd) : null;
+  if (!projectVault) {
+    return { kind: "vault", vault: ctx.vaultManager.main };
+  }
+
+  const candidates: RememberVaultCandidate[] = [
+    {
+      key: "project",
+      label: `${project?.name ?? "this project"} project vault`,
+      vault: projectVault,
+    },
+  ];
+
+  if (project) {
+    await ensureAttachmentsLoaded(ctx, project.id);
+    for (const attached of ctx.vaultManager.getAttachmentsForProject(project.id)) {
+      if (!attached.writable) {
+        continue;
+      }
+      const ref = attached.attachmentRef;
+      candidates.push({
+        key: ref?.projectSlug ? `attached:${ref.projectSlug}` : storageLabel(attached),
+        label: ref?.projectName
+          ? `${ref.projectName} (${ref.projectSlug})`
+          : storageLabel(attached),
+        vault: attached,
+      });
+    }
+  }
+
+  if (candidates.length === 1) {
+    return { kind: "vault", vault: projectVault };
+  }
+
+  const vaultChoice = readVaultChoice(requestCtx);
+  if (vaultChoice?.kind === "accepted") {
+    const chosen = candidates.find((candidate) => candidate.key === vaultChoice.value.vault);
+    if (chosen) {
+      return { kind: "vault", vault: chosen.vault };
+    }
+  }
+
+  if (vaultChoice?.kind === "declined" || !isMrtrSupported(requestCtx)) {
+    return { kind: "vault", vault: projectVault };
+  }
+
+  return { kind: "decision", result: vaultSelectionDecision(requestCtx, candidates) };
+}
 
 export function registerRememberTool(server: McpServer, ctx: ServerContext): void {
   server.registerTool(
@@ -128,7 +223,7 @@ export function registerRememberTool(server: McpServer, ctx: ServerContext): voi
           .describe(
             "Where to store: 'project' writes to the shared project vault visible to all contributors; " +
               "'global' writes to the private main vault visible only on this machine. " +
-              "Attached vaults are read-only and cannot be written to. " +
+              "When writable attached vaults exist for the project, you may be asked to pick the write target. " +
               "When omitted, uses the project's saved policy or defaults to 'project'.",
           ),
         allowProtectedBranch: z
@@ -147,21 +242,31 @@ export function registerRememberTool(server: McpServer, ctx: ServerContext): voi
       }),
       outputSchema: RememberToolResultSchema,
     },
-    async ({
-      title,
-      content,
-      tags,
-      lifecycle,
-      role,
-      summary,
-      alwaysLoad,
-      cwd,
-      scope,
-      allowProtectedBranch = false,
-    }) => {
+    async (
+      {
+        title,
+        content,
+        tags,
+        lifecycle,
+        role,
+        summary,
+        alwaysLoad,
+        cwd,
+        scope,
+        allowProtectedBranch: allowProtectedBranchArg = false,
+      },
+      requestCtx,
+    ) => {
+      const branchConsent = readProtectedBranchConsentState(requestCtx);
+      const allowProtectedBranch = allowProtectedBranchArg || branchConsent === "granted";
+
       await ensureBranchSynced(ctx, cwd);
 
       const project = await resolveProject(ctx, cwd);
+
+      // A retried MRTR round carries the protected-branch consent, the write
+      // scope choice, and the vault choice as input responses; fold them into
+      // the effective arguments before reaching any decision point.
 
       const cleanResult = await attempt("remember:clean-markdown", async () =>
         cleanMarkdown(content),
@@ -188,21 +293,55 @@ export function registerRememberTool(server: McpServer, ctx: ServerContext): voi
       const projectVaultExists = cwd
         ? Boolean(await ctx.vaultManager.getProjectVaultIfExists(cwd))
         : true;
-      const writeScope = resolveWriteScope(
-        scope,
-        policyScope,
-        Boolean(project),
-        projectVaultExists,
-      );
+      let writeScope = resolveWriteScope(scope, policyScope, Boolean(project), projectVaultExists);
       if (writeScope === "ask") {
         const unadopted = !projectVaultExists && !policyScope;
-        return {
-          content: [{ type: "text", text: formatAskForWriteScope(project, unadopted) }],
-          isError: true,
-        };
+        const scopeChoice = readWriteScopeChoice(requestCtx);
+        if (scopeChoice?.kind === "accepted") {
+          writeScope = scopeChoice.value.scope;
+        } else if (scopeChoice?.kind === "declined" || !isMrtrSupported(requestCtx)) {
+          return {
+            content: [{ type: "text", text: formatAskForWriteScope(project, unadopted) }],
+            isError: true,
+          };
+        } else {
+          const header = formatAskForWriteScope(project, unadopted).split("\n")[0] ?? "";
+          const message =
+            `${header} Where should this memory be stored? ` +
+            `"project" stores in the shared project vault for all contributors; ` +
+            `"global" stores in the private main vault for this machine only.`;
+          return scopeSelectionDecision(requestCtx, message);
+        }
       }
 
-      const vault = await resolveWriteVault(ctx, cwd, writeScope);
+      const vaultResolution = await resolveWriteVaultForRemember(
+        ctx,
+        cwd,
+        writeScope,
+        project,
+        requestCtx,
+      );
+      if (vaultResolution.kind === "decision") {
+        return vaultResolution.result;
+      }
+      const vault = vaultResolution.vault;
+
+      const protectedBranchCheck = await checkVaultProtectedBranch({
+        ctx,
+        vault,
+        allowProtectedBranch,
+        toolName: "remember",
+        noteProjectId: project?.id,
+      });
+      if (protectedBranchCheck.blocked) {
+        if (branchConsent === "denied") {
+          return {
+            content: [{ type: "text", text: protectedBranchCheck.message }],
+            isError: true,
+          };
+        }
+        return protectedBranchDecision(requestCtx, protectedBranchCheck);
+      }
 
       const id = makeId(title);
       const now = isoDateString(new Date().toISOString());

@@ -8,8 +8,7 @@ import {
 } from "../project.js";
 import type { ServerContext } from "../server-context.js";
 import type { ProjectRef } from "../structured-content.js";
-import type { Vault, MnemonicVaultAttachmentConfig } from "../vault.js";
-import type { WriteScope } from "../project-memory-policy.js";
+import type { MnemonicVaultAttachmentConfig } from "../vault.js";
 import { invalidateActiveProjectCache } from "../cache.js";
 import { checkBranchChange } from "../branch-tracker.js";
 import { backfillEmbeddingsAfterSync, removeStaleEmbeddings } from "./embed.js";
@@ -61,20 +60,6 @@ export async function resolveProjectIdentityForCwd(
       ctx.configStore.getProjectIdentityOverride(projectId),
   });
   return identity ?? undefined;
-}
-
-export async function resolveWriteVault(
-  ctx: ServerContext,
-  cwd: string | undefined,
-  scope: WriteScope,
-): Promise<Vault> {
-  if (scope === "project") {
-    return cwd
-      ? ((await ctx.vaultManager.getOrCreateProjectVault(cwd)) ?? ctx.vaultManager.main)
-      : ctx.vaultManager.main;
-  }
-
-  return ctx.vaultManager.main;
 }
 
 export function describeProject(project: Awaited<ReturnType<typeof resolveProject>>): string {
