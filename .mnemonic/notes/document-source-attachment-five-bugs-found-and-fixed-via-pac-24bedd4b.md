@@ -8,13 +8,15 @@ tags:
   - fixed
 lifecycle: permanent
 createdAt: '2026-07-29T21:44:03.817Z'
-updatedAt: '2026-07-29T21:44:30.910Z'
+updatedAt: '2026-08-01T20:35:22.137Z'
 role: review
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
   - id: pack-d-document-source-attachment-dogfood-pack-and-a-b-c-con-4f75a70c
+    type: related-to
+  - id: document-source-chunk-embeddings-specified-but-never-deliver-6e867617
     type: related-to
 memoryVersion: 1
 ---
