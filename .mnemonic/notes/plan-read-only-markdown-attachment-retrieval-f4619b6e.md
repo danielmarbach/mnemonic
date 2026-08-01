@@ -9,7 +9,7 @@ tags:
   - retrieval
 lifecycle: temporary
 createdAt: '2026-07-28T08:08:25.305Z'
-updatedAt: '2026-07-29T21:44:18.255Z'
+updatedAt: '2026-08-01T09:25:44.019Z'
 role: plan
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -25,6 +25,8 @@ relatedTo:
     type: derives-from
   - id: document-source-attachment-five-bugs-found-and-fixed-via-pac-24bedd4b
     type: follows
+  - id: docs-gap-fixed-attachment-configuration-documented-in-readme-93c55f0d
+    type: related-to
 memoryVersion: 1
 ---
 Implement repository-backed, read-only document retrieval as a staged extension of attachments. The MVP supports `text/markdown`, while the contracts remain extensible to formats such as PDF without treating external documents as Mnemonic notes.

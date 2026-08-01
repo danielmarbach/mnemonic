@@ -8,13 +8,15 @@ tags:
   - homepage
 lifecycle: permanent
 createdAt: '2026-08-01T09:25:34.726Z'
-updatedAt: '2026-08-01T09:25:34.726Z'
+updatedAt: '2026-08-01T09:25:44.019Z'
 role: summary
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
   - id: docs-index-html-homepage-design-principles-and-ux-lessons-6bed8673
+    type: related-to
+  - id: plan-read-only-markdown-attachment-retrieval-f4619b6e
     type: related-to
 memoryVersion: 1
 ---
