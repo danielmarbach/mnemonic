@@ -4,6 +4,36 @@ import type { ProjectAttachmentConfig } from "./vault.js";
 
 import { computeLexicalScore } from "./lexical.js";
 
+// Heading ancestry and the source path are high-signal retrieval cues (they are
+// where API terms like `MarkAsCompleted` most reliably appear) but they are
+// stored separately from chunk content and were previously never scored. We
+// score each surface independently and combine with weights that keep content
+// as the primary signal while letting navigation-style queries (matching
+// headings/paths rather than body prose) surface relevant chunks.
+const CONTENT_SCORE_WEIGHT = 0.5;
+const HEADING_SCORE_WEIGHT = 0.35;
+const PATH_SCORE_WEIGHT = 0.15;
+
+function joinHeadingAncestry(headingAncestry: Array<{ depth: number; text: string }>): string {
+  return headingAncestry.map((h) => h.text).join(" / ");
+}
+
+/**
+ * Composite lexical score over a chunk's content, heading ancestry, and source
+ * path. Each surface is scored with `computeLexicalScore` and combined with
+ * fixed weights so a match in any surface can promote the chunk.
+ */
+function scoreDocumentChunk(query: string, chunk: RetrievalChunk, sourcePath: string): number {
+  const contentScore = computeLexicalScore(query, chunk.content);
+  const headingScore = computeLexicalScore(query, joinHeadingAncestry(chunk.headingAncestry));
+  const pathScore = computeLexicalScore(query, sourcePath);
+  return (
+    CONTENT_SCORE_WEIGHT * contentScore +
+    HEADING_SCORE_WEIGHT * headingScore +
+    PATH_SCORE_WEIGHT * pathScore
+  );
+}
+
 // Helper to get all chunks from a generation
 function getAllChunks(attachmentId: string): RetrievalChunk[] {
   const generation = getCurrentGeneration(attachmentId);
@@ -50,17 +80,19 @@ export function collectDocumentChunkCandidates(
 
     const chunks = getAllChunks(attachmentId);
     for (const chunk of chunks) {
-      // Score using lexical matching before applying the per-document cap. A
-      // document's early chunks may have weak bigram-only matches that should
-      // not hide a later chunk with a much stronger exact match.
-      const score = computeLexicalScore(query, chunk.content);
+      // Score using composite lexical matching over content, heading ancestry,
+      // and source path before applying the per-document cap. A document's
+      // early chunks may have weak bigram-only matches that should not hide a
+      // later chunk with a much stronger exact match.
+      const sourcePath = generation.documents.get(chunk.documentId)?.sourcePath ?? chunk.documentId;
+      const score = scoreDocumentChunk(query, chunk, sourcePath);
       if (score <= 0) continue;
 
       candidates.push({
         kind: "document-chunk",
         chunkId: chunk.chunkId,
         documentId: chunk.documentId,
-        sourcePath: generation.documents.get(chunk.documentId)?.sourcePath ?? chunk.documentId,
+        sourcePath,
         headingAncestry: chunk.headingAncestry,
         excerpt: chunk.excerpt,
         contentMediaType: chunk.contentMediaType,

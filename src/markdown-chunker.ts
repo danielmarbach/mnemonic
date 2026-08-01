@@ -1,7 +1,7 @@
 import type { DocumentChunker, RetrievalChunk, DocumentId } from "./retrieval-document.js";
 import { deriveChunkId } from "./retrieval-document.js";
 import { parseBody, serializeBody } from "./markdown-ast.js";
-import type { Root, Heading, Content } from "mdast";
+import type { Root, Heading, Content, PhrasingContent } from "mdast";
 
 const MAX_CHUNK_CHARS = 4000;
 const MIN_CHUNK_CHARS = 50;
@@ -12,11 +12,42 @@ interface HeadingContext {
   occurrence: number;
 }
 
+// Extract readable text from any mdast phrasing content node.
+// Headings in API docs frequently wrap key terms in `inlineCode` (e.g.
+// `### \`MarkAsCompleted()\``), `strong`, `emphasis`, or `link` nodes. Dropping
+// those nodes left heading ancestry (and therefore chunk IDs and heading-based
+// retrieval) empty or garbled (e.g. " and ", ": Polling-Based Completion").
+function phrasingNodeText(node: PhrasingContent): string {
+  switch (node.type) {
+    case "text":
+    case "inlineCode":
+    case "html":
+      return node.value;
+    case "strong":
+    case "emphasis":
+    case "delete":
+    case "link":
+    case "linkReference":
+      return node.children.map((child) => phrasingNodeText(child)).join("");
+    case "image":
+    case "imageReference":
+      return node.alt ?? "";
+    case "footnoteReference":
+      return node.label ?? node.identifier ?? "";
+    case "break":
+      return " ";
+    default: {
+      // Exhaustiveness guard: if a future mdast release (or a remark plugin)
+      // adds a new PhrasingContent member, this assignment fails to compile,
+      // forcing a decision here rather than silently yielding empty headings.
+      const exhaustive: never = node;
+      return exhaustive;
+    }
+  }
+}
+
 function getHeadingText(node: Heading): string {
-  return node.children
-    .filter((c): c is { type: "text"; value: string } => c.type === "text")
-    .map((c) => c.value)
-    .join("");
+  return node.children.map((child) => phrasingNodeText(child)).join("");
 }
 
 function isHeadingNode(node: unknown): node is Heading {
@@ -89,7 +120,7 @@ function splitOversizedContent(
 
 export const markdownChunker: DocumentChunker = {
   chunkerId: "markdown-heading",
-  chunkerVersion: "1",
+  chunkerVersion: "2",
   chunkContentMediaType: "text/markdown",
 
   chunk(documentId: DocumentId, content: string): RetrievalChunk[] {

@@ -23,6 +23,37 @@ export interface DocumentSyncResult {
 }
 
 /**
+ * Decide whether an existing generation can be reused for the given commit
+ * against the currently registered extractor/chunker. A version bump (e.g. a
+ * fix to heading-text extraction) must re-index even when the pinned commit has
+ * not changed, otherwise stale derived state hides the fix.
+ */
+export function isGenerationCurrent(
+  generation:
+    | {
+        manifest: {
+          indexedCommit: string;
+          extractorVersion: string;
+          chunkerVersion: string;
+          embeddingCompatibilityIdentity: string;
+        };
+      }
+    | undefined,
+  indexedCommit: string,
+  extractor: { extractorVersion: string; extractorId: string },
+  chunker: { chunkerId: string; chunkerVersion: string },
+): generation is NonNullable<typeof generation> {
+  if (!generation) return false;
+  const expectedCompatibilityIdentity = `${extractor.extractorId}::${extractor.extractorVersion}::${chunker.chunkerId}::${chunker.chunkerVersion}`;
+  return (
+    generation.manifest.indexedCommit === indexedCommit &&
+    generation.manifest.extractorVersion === extractor.extractorVersion &&
+    generation.manifest.chunkerVersion === chunker.chunkerVersion &&
+    generation.manifest.embeddingCompatibilityIdentity === expectedCompatibilityIdentity
+  );
+}
+
+/**
  * Sync a document-source attachment: fetch the remote commit, enumerate blobs,
  * build a generation, and publish it.
  */
@@ -70,9 +101,28 @@ export async function syncDocumentSource(
     };
   }
 
-  // Check if we already have a generation for this commit
-  const currentGen = getCurrentGeneration(config.attachmentId);
-  if (currentGen && currentGen.manifest.indexedCommit === indexedCommit) {
+  // Check if we already have a generation for this commit that is still
+  // compatible with the currently registered extractor/chunker. A version bump
+  // (e.g. a fix to heading-text extraction) must re-index even when the pinned
+  // commit has not changed, otherwise stale derived state hides the fix.
+  const mediaType = config.acceptedMediaTypes[0] || "text/markdown";
+  const extractor = getExtractor(mediaType);
+  if (!extractor) {
+    return {
+      attachmentId: config.attachmentId,
+      projectSlug: config.projectSlug,
+      indexedCommit,
+      generationId: "",
+      documentCount: 0,
+      chunkCount: 0,
+      skippedFiles: [],
+      errors: [`no-extractor-for-media-type: ${mediaType}`],
+      status: "failed",
+      message: `No extractor registered for media type '${mediaType}'`,
+    };
+  }
+  const currentGen = getCurrentGeneration(config.attachmentId) ?? undefined;
+  if (isGenerationCurrent(currentGen, indexedCommit, extractor, markdownChunker)) {
     return {
       attachmentId: config.attachmentId,
       projectSlug: config.projectSlug,
@@ -135,24 +185,6 @@ export async function syncDocumentSource(
   }
 
   const files = enumerateResult.value;
-
-  // Get the extractor for the first accepted media type
-  const mediaType = config.acceptedMediaTypes[0] || "text/markdown";
-  const extractor = getExtractor(mediaType);
-  if (!extractor) {
-    return {
-      attachmentId: config.attachmentId,
-      projectSlug: config.projectSlug,
-      indexedCommit,
-      generationId: "",
-      documentCount: 0,
-      chunkCount: 0,
-      skippedFiles: [],
-      errors: [`no-extractor-for-media-type: ${mediaType}`],
-      status: "failed",
-      message: `No extractor registered for media type '${mediaType}'`,
-    };
-  }
 
   // Build the generation
   const buildResult = buildGenerationFromFiles(

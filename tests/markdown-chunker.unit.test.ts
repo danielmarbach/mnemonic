@@ -10,7 +10,7 @@ describe("markdownChunker", () => {
     });
 
     it("has chunkerVersion", () => {
-      expect(markdownChunker.chunkerVersion).toBe("1");
+      expect(markdownChunker.chunkerVersion).toBe("2");
     });
 
     it("has chunkContentMediaType equal to 'text/markdown'", () => {
@@ -160,6 +160,45 @@ describe("markdownChunker", () => {
       const ids = chunks.map((c) => c.chunkId);
       const uniqueIds = new Set(ids);
       expect(uniqueIds.size).toBe(ids.length);
+    });
+  });
+
+  describe("heading text extraction", () => {
+    it("includes inline-code spans in heading ancestry (not just plain text)", () => {
+      // API docs wrap key terms in backticks. Dropping inlineCode nodes left
+      // ancestry empty or garbled (e.g. "", " and ", ": Polling-Based Completion").
+      const md =
+        "# Top\n\n## `MarkAsCompleted()`\n\nCall it.\n\n### `MarkAsFailed()` and `MarkAsCancelled()`\n\nFailure methods.\n\n#### `.Done()`: Polling-Based Completion\n\nPolling alternative.";
+      const chunks = markdownChunker.chunk(DOC_ID, md);
+
+      const completed = chunks.find((c) => c.headingAncestry.at(-1)?.text === "MarkAsCompleted()");
+      expect(completed, "expected a chunk under `MarkAsCompleted()`").toBeDefined();
+
+      const failed = chunks.find(
+        (c) => c.headingAncestry.at(-1)?.text === "MarkAsFailed() and MarkAsCancelled()",
+      );
+      expect(failed, "expected a chunk under `MarkAsFailed() and MarkAsCancelled()`").toBeDefined();
+
+      const done = chunks.find(
+        (c) => c.headingAncestry.at(-1)?.text === ".Done(): Polling-Based Completion",
+      );
+      expect(done, "expected a chunk under `.Done(): Polling-Based Completion`").toBeDefined();
+    });
+
+    it("extracts text from nested emphasis/strong/link phrasing", () => {
+      const md = "# Top\n\n## **Bold** _and_ [linked](url) term\n\nBody text here.";
+      const chunks = markdownChunker.chunk(DOC_ID, md);
+      const chunk = chunks.find((c) => c.headingAncestry.at(-1)?.text === "Bold and linked term");
+      expect(chunk).toBeDefined();
+    });
+
+    it("extracts footnote reference labels in heading ancestry", () => {
+      // A footnote reference needs a matching definition to be recognized as a
+      // FootnoteReference node rather than literal text.
+      const md = "# Top\n\n## Cited notes[^1]\n\n[^1]: Definition.\n\nBody text here.";
+      const chunks = markdownChunker.chunk(DOC_ID, md);
+      const chunk = chunks.find((c) => c.headingAncestry.at(-1)?.text === "Cited notes1");
+      expect(chunk).toBeDefined();
     });
   });
 
