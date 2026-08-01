@@ -7,7 +7,7 @@ tags:
   - mcp-2026-07-28
 lifecycle: temporary
 createdAt: '2026-08-01T10:44:02.956Z'
-updatedAt: '2026-08-01T10:44:02.956Z'
+updatedAt: '2026-08-01T10:44:10.184Z'
 role: plan
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -17,6 +17,8 @@ relatedTo:
     type: related-to
   - id: mnemonic-project-overview-and-purpose-763b7a51
     type: related-to
+  - id: research-mcp-2026-07-28-spec-changes-and-typescript-sdk-v2-m-57bad211
+    type: derives-from
 memoryVersion: 1
 ---
 # Plan: MCP 2026-07-28 + TypeScript SDK v2 Migration

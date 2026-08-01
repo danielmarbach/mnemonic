@@ -8,13 +8,15 @@ tags:
   - request
 lifecycle: temporary
 createdAt: '2026-08-01T10:39:47.907Z'
-updatedAt: '2026-08-01T10:39:54.858Z'
+updatedAt: '2026-08-01T10:44:10.183Z'
 role: context
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
   - id: research-mcp-2026-07-28-spec-changes-and-typescript-sdk-v2-m-57bad211
+    type: related-to
+  - id: plan-migrate-mnemonic-to-mcp-2026-07-28-spec-and-typescript--072d79cd
     type: related-to
 memoryVersion: 1
 ---
