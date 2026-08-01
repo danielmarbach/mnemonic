@@ -105,6 +105,8 @@ When `cwd` is present, recall searches the project vault first and then widens t
 
 The ranking pipeline is bounded and fail-soft. Semantic embeddings, an always-on lexical channel over compact projections, and semantic-conditioned graph expansion each produce channel ranks. RRF fuses those ranks, then applies bounded semantic-confidence, project, metadata, temporal, and canonical adjustments. Explicit high-confidence temporal windows still filter candidates before ranking. Lexical candidate generation reuses the existing session projection/token cache and TF-IDF machinery, without introducing a database or synced index.
 
+Document-source attachments feed document chunks into the same unified ranking. Each chunk is scored semantically (cosine against the query vector, when a persisted chunk embedding exists) and lexically (content + heading ancestry + source path), fused via RRF on the note-ranking scale, and given a bounded prior smaller than the attachment boost so memories outrank chunks by default. Chunks render inline in the ranked list rather than in a separate section.
+
 ```mermaid
 flowchart TD
     Query[recall query] --> Embed[Embed query text]
@@ -173,10 +175,11 @@ flowchart TD
 | `src/document-extractor.ts`    | Extractor registry for document-source media types                                            |
 | `src/markdown-extractor.ts`    | Markdown extractor for document-source attachments (uses MDAST)                               |
 | `src/markdown-chunker.ts`      | Heading-aware chunker that splits markdown into retrievable chunks                            |
-| `src/document-source-index.ts` | Document source index builder: enumerates blobs, extracts, chunks, publishes generations     |
-| `src/document-recall.ts`       | Collects document-chunk candidates for recall ranking pipeline                                 |
-| `src/document-sync.ts`         | Syncs document-source attachments: fetches commit, enumerates blobs, builds generation        |
-| `src/generation-storage.ts`    | Atomic generation storage with pointer-swap publication for document sources                  |
+| `src/document-source-index.ts` | Builds a document-source generation from extracted/chunked files and publishes it            |
+| `src/document-recall.ts`       | Collects and ranks document-chunk candidates via semantic+lexical RRF fusion                 |
+| `src/document-sync.ts`         | Syncs document-source attachments: fetch, enumerate, build generation, embed chunks (fail-soft)|
+| `src/chunk-embedding-storage.ts`| Persists per-attachment chunk embeddings to disk, keyed by chunk ID with content-hash reuse   |
+| `src/generation-storage.ts`    | Atomic in-memory generation storage with pointer-swap publication for document sources       |
 | `src/mutation-guard.ts`        | Guards mutation tools against document-source entity references                               |
 | `tests/`                       | Vitest unit and integration coverage, including MCP smoke tests                               |
 
@@ -222,7 +225,7 @@ Document-source attachments extend the attachment system to support read-only re
 
 - **RetrievalDocument**: represents a single file from a document-source attachment. Contains source path, blob OID, byte size, source media type, extraction metadata, and the extracted text content.
 - **RetrievalChunk**: a bounded segment of a document produced by a chunker. Contains heading ancestry, excerpt, and a stable chunk ID derived from the document ID and heading path.
-- **DocumentGeneration**: an atomic snapshot of all documents and chunks from one sync operation. Stored under per-attachment generation directories with a pointer-swap publication mechanism.
+- **DocumentGeneration**: an atomic snapshot of all documents, chunks, and chunk embeddings from one sync operation. Held in memory with an atomic pointer-swap publication mechanism; chunk embeddings persist separately to disk under `.mnemonic/embeddings/doc-source/<attachmentId>/`.
 
 ### Entity namespaces
 
@@ -243,18 +246,20 @@ The entity resolver in `src/document-entity-ref.ts` classifies references and ro
 Document-source attachments are indexed into atomic generations during sync:
 1. `sync` fetches the exact remote-tracking commit for the attachment's configured branch.
 2. Blobs matching the `include`/`exclude` glob patterns are enumerated from that commit.
-3. Each blob is extracted and chunked; fingerprints are compared against the current generation to skip unchanged content.
-4. A new generation is built in a temporary directory, validated, and atomically published by replacing a small pointer file.
-5. Readers capture one generation at request start and use it for the entire request.
+3. Each blob is extracted and chunked into a `DocumentGeneration` held in memory.
+4. Chunk vectors are embedded (fail-soft: if the embedding provider is unavailable, the generation still publishes with lexical-only coverage) and persisted to `.mnemonic/embeddings/doc-source/<attachmentId>/`, keyed by chunk ID with a content hash so unchanged chunks reuse their existing vector across syncs. A per-sync cap bounds embedding work; the most-recently-modified chunks are embedded first.
+5. The generation is atomically published via an in-memory pointer swap in `generation-storage.ts`; a provider/model/version change invalidates it and forces a full re-embed on the next sync.
+6. Readers capture one generation at request start and use it for the entire request.
 
 ### Recall integration
 
 Document chunks participate in the recall ranking pipeline alongside memory results:
-- Chunks enter the common semantic and lexical candidate pools before dense rank assignment.
+- Each chunk is scored semantically (cosine against the query vector, when an embedding exists) and lexically (content + heading ancestry + source path), then the two channels are fused via reciprocal-rank-fusion on the same scale as the note ranking.
+- Only positively-correlated chunks receive a semantic rank; anti-correlated or zero-cosine chunks contribute lexical evidence alone.
 - A per-document chunk cap prevents one document from consuming the candidate pool.
-- After final scoring, result diversity is enforced by scanning farther down the ranked list to refill the requested limit.
+- Document chunks are fused into the unified ranked list with a bounded prior smaller than the attachment boost, so memories outrank them by default while a dramatically stronger chunk can still rise; chunks render inline rather than in a separate section.
 - Document chunks are excluded from graph, canonical-memory, role, lifecycle, relationship, confidence, and temporal contributions.
-- Results carry `kind: "document-chunk"` with source path, heading ancestry, excerpt, attachment identity, and a revision-qualified retrieval handle.
+- Results carry `kind: "document-chunk"` with source path, heading ancestry, excerpt, attachment identity, a revision-qualified retrieval handle, and optional `semanticScore`/`lexicalScore` diagnostics.
 
 ### Mutation rejection
 

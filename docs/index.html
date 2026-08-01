@@ -1945,7 +1945,7 @@ VAULT_PATH = <span class="str">"/Users/you/mnemonic-vault"</span></pre>
         </tbody>
       </table>
     </div>
-    <p>Provider configuration is read from the process environment only. API keys are never stored in notes, embedding records, vault config, or git. Ollama keeps projection text local; OpenAI-compatible cloud proxies, native OpenAI, and Gemini send projection text to the configured external endpoint.</p>
+    <p>Provider configuration is read from the process environment only. API keys are never stored in notes, embedding records, vault config, or git. Ollama keeps projection text local; OpenAI-compatible cloud proxies, native OpenAI, and Gemini send projection text to the configured external endpoint. Document-source attachments send each chunk's text (content plus heading ancestry and source path) to the configured embedding provider.</p>
     <p>After changing <code>EMBED_PROVIDER</code>, <code>EMBED_MODEL</code>, <code>EMBED_DIMENSIONS</code>, or endpoint semantics behind the same model alias, call the <code>sync</code> MCP tool with <code>force: true</code>. Incompatible embeddings are skipped rather than compared across vector spaces.</p>
     <p>The main vault's <code>~/mnemonic-vault/config.json</code> holds machine-local settings you can edit by hand. Two fields are user-tunable:</p>
     <div class="config-table-wrap fade-up" style="margin-top:16px">
@@ -1985,7 +1985,7 @@ VAULT_PATH = <span class="str">"/Users/you/mnemonic-vault"</span></pre>
 
     <div class="agent-snippet fade-up" style="margin-top:24px">
       <h3>Search another repository's docs without copying them</h3>
-      <p>Attach an external repo and its markdown documentation becomes searchable alongside your memories. mnemonic reads the files, finds the right page for your question, and can return the exact section when you need the source text. Nothing is written back to that repository.</p>
+      <p>Attach an external repo and its markdown documentation becomes searchable alongside your memories. mnemonic reads the files, finds the right page for your question, and can return the exact section when you need the source text. It matches by meaning, not just by the words the docs use, so a question phrased differently from the documentation still lands on the right section. Nothing is written back to that repository.</p>
       <p>Give mnemonic the local path to the repo, then narrow which files count as documentation when the defaults aren't right for you:</p>
     </div>
     <div class="code-block fade-up" style="margin-top:16px">

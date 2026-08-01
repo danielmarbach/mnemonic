@@ -289,7 +289,7 @@ Provider configuration is read from the process environment at startup. Only non
 
 After changing `EMBED_PROVIDER`, `EMBED_MODEL`, `EMBED_DIMENSIONS`, or endpoint semantics behind the same model alias, call the `sync` MCP tool with `{ "force": true }` to rebuild local embeddings. Until rebuilt, incompatible embeddings are skipped rather than compared across vector spaces, so semantic recall may return fewer results.
 
-Privacy note: Ollama keeps projection text local. OpenAI-compatible cloud proxies, native OpenAI, and Gemini send the note projection text used for embeddings to the configured external endpoint.
+Privacy note: Ollama keeps projection text local. OpenAI-compatible cloud proxies, native OpenAI, and Gemini send the note projection text used for embeddings to the configured external endpoint. Document-source attachments send each chunk's text (content plus heading ancestry and source path) to the configured embedding provider — use a local provider or do not attach a repository whose content is restricted.
 
 ### config.json
 

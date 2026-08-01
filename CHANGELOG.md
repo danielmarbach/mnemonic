@@ -6,13 +6,21 @@ The format is loosely based on Keep a Changelog and uses semver-style version he
 
 ## [Unreleased]
 
+## [0.40.0] - 2026-08-01
+
+### Added
+
+- Document-source chunks are now retrieved by meaning as well as keyword matching, so a section answers your question even when it uses different words. Chunks appear inline in recall results, ranked just below your memories by default.
+- Document-source chunk embeddings persist locally and are reused across syncs, so re-syncing an unchanged attachment skips re-embedding and finishes fast.
+- Document-source attachment content is sent to the configured embedding provider to build chunk vectors; use a local provider (or don't attach) for restricted content.
+
 ### Fixed
 
 - Document-source chunk heading ancestry now retains text from `inlineCode`, `strong`, `emphasis`, `link`, and `footnoteReference` nodes. Previously `getHeadingText` only kept plain `text` children, so headings like `### \`MarkAsCompleted()\`` were stored empty or garbled (e.g. `" and "`, `": Polling-Based Completion"`), corrupting both display and chunk IDs. `markdownChunker.chunkerVersion` bumped `"1"` → `"2"`.
 - `sync` now re-indexes a document-source attachment when the extractor/chunker version or embedding-compatibility identity changes, even if the pinned commit is unchanged. Previously the reuse check compared only `indexedCommit`, so a chunker fix would not take effect for already-attached repos until the source commit changed.
 - Document-source chunk scoring now includes heading ancestry and source path alongside content (weighted 0.5 / 0.35 / 0.15), so navigation-style queries matching headings or paths surface relevant chunks instead of relying on body prose alone.
 
-## [0.39.1] - 2026-08-02
+## [0.39.1] - 2026-08-01
 
 ### Fixed
 
