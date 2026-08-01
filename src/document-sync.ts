@@ -86,7 +86,7 @@ export function isGenerationCurrent(
     generation.manifest.indexedCommit === indexedCommit &&
     generation.manifest.extractorVersion === extractor.extractorVersion &&
     generation.manifest.chunkerVersion === chunker.chunkerVersion &&
-    generation.manifest.indexSchemaVersion === "2" &&
+    generation.manifest.indexSchemaVersion === "3" &&
     generation.manifest.embeddingCompatibilityIdentity === expectedCompatibilityIdentity
   );
 }
@@ -234,19 +234,20 @@ export async function embedGenerationChunks(
 }
 
 /**
- * Delete on-disk chunk embeddings whose chunkId no longer exists in the current
- * generation (mirrors `removeStaleEmbeddings` for note embeddings).
+ * Reconcile on-disk chunk embeddings against the current generation. Stale
+ * removal (chunkId no longer present) runs every sync; rename removal is
+ * opt-in via `removeNonCanonical` — the caller enables it only when the naming
+ * scheme changed (e.g. an `indexSchemaVersion` bump), so legacy-named files
+ * get cleaned up exactly once instead of re-checking every sync. Delegates to
+ * `ChunkEmbeddingStorage.reconcile`, which unlinks by the actual on-disk path
+ * in a single pass (mirrors `removeStaleEmbeddings` for note embeddings).
  */
 export async function sweepStaleChunkEmbeddings(
   storage: ChunkEmbeddingStorage,
   currentChunkIds: Set<string>,
+  removeNonCanonical = false,
 ): Promise<void> {
-  const onDisk = await storage.list();
-  for (const record of onDisk) {
-    if (!currentChunkIds.has(record.chunkId)) {
-      await storage.remove(record.chunkId);
-    }
-  }
+  await storage.reconcile(currentChunkIds, removeNonCanonical);
 }
 
 function buildEmbeddingSummary(embedded: number, failed: number): string {
@@ -327,6 +328,11 @@ export async function syncDocumentSource(
     };
   }
   const currentGen = getCurrentGeneration(config.attachmentId) ?? undefined;
+  // Capture the pre-rebuild schema version before the `isGenerationCurrent`
+  // type guard narrows `currentGen`. Used later to decide whether the on-disk
+  // embedding naming scheme might have changed (and thus whether the more
+  // expensive rename-cleanup pass should run). `currentGen` is never reassigned.
+  const previousSchemaVersion = currentGen?.manifest.indexSchemaVersion;
   if (isGenerationCurrent(currentGen, indexedCommit, extractor, markdownChunker)) {
     return {
       attachmentId: config.attachmentId,
@@ -419,6 +425,7 @@ export async function syncDocumentSource(
   if (generation && projectEmbeddingsDir) {
     const chunkStorage = new ChunkEmbeddingStorage(
       path.join(projectEmbeddingsDir, "doc-source", config.attachmentId),
+      config.attachmentId,
     );
     const embedStep = await attempt("sync:doc-source-embed", async () => {
       await chunkStorage.init();
@@ -435,7 +442,15 @@ export async function syncDocumentSource(
         chunkStorage,
         lastModByPath,
       );
-      await sweepStaleChunkEmbeddings(chunkStorage, new Set(generation.chunks.keys()));
+      // Only pay for rename-cleanup when the on-disk naming scheme actually
+      // changed (previous manifest's schema version differs from this one);
+      // stale-chunkId removal still runs every sync.
+      const schemaChanged = previousSchemaVersion !== generation.manifest.indexSchemaVersion;
+      await sweepStaleChunkEmbeddings(
+        chunkStorage,
+        new Set(generation.chunks.keys()),
+        schemaChanged,
+      );
     });
     if (!embedStep.ok) {
       generation.manifest.embeddingFailures = [

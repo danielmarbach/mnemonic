@@ -15,7 +15,6 @@ import {
   embeddingProviderId,
   isoDateString,
 } from "../src/brands.js";
-import { normalizePathToSlug } from "../src/retrieval-document.js";
 
 const tempDirs: string[] = [];
 
@@ -27,7 +26,7 @@ async function makeStorage(): Promise<{ dir: string; storage: ChunkEmbeddingStor
   const base = await fs.mkdtemp(path.join(os.tmpdir(), "mnemonic-chunk-embedding-"));
   tempDirs.push(base);
   const dir = path.join(base, "att-1");
-  const storage = new ChunkEmbeddingStorage(dir);
+  const storage = new ChunkEmbeddingStorage(dir, "att-1");
   await storage.init();
   return { dir, storage };
 }
@@ -76,11 +75,7 @@ describe("ChunkEmbeddingStorage", () => {
   it("returns null for corrupt JSON and skips it in list", async () => {
     const { dir, storage } = await makeStorage();
     const chunkId = "att-1::docs/corrupt.md::Intro::0::0";
-    await fs.writeFile(
-      path.join(dir, `${normalizePathToSlug(chunkId)}.json`),
-      "{ not valid json",
-      "utf-8",
-    );
+    await fs.writeFile(storage.pathFor(chunkId), "{ not valid json", "utf-8");
 
     await expect(storage.read(chunkId)).resolves.toBeNull();
     await expect(storage.list()).resolves.toEqual([]);
@@ -90,7 +85,7 @@ describe("ChunkEmbeddingStorage", () => {
     const { dir, storage } = await makeStorage();
     const chunkId = "att-1::docs/shape.md::Intro::0::0";
     await fs.writeFile(
-      path.join(dir, `${normalizePathToSlug(chunkId)}.json`),
+      storage.pathFor(chunkId),
       JSON.stringify({ chunkId, embedding: "not-an-array" }),
       "utf-8",
     );
@@ -104,11 +99,7 @@ describe("ChunkEmbeddingStorage", () => {
     const valid = makeRecord();
     const corruptId = "att-1::docs/corrupt.md::Intro::0::0";
     await storage.write(valid);
-    await fs.writeFile(
-      path.join(dir, `${normalizePathToSlug(corruptId)}.json`),
-      "garbage",
-      "utf-8",
-    );
+    await fs.writeFile(storage.pathFor(corruptId), "garbage", "utf-8");
 
     const listed = await storage.list();
 
@@ -137,17 +128,62 @@ describe("ChunkEmbeddingStorage", () => {
     await expect(storage.removeAll()).resolves.toBeUndefined();
   });
 
-  it("names files by the slugified chunk id", async () => {
+  it("names files by the slugified, lowercased chunk-id suffix (attachment id stripped)", async () => {
     const { dir, storage } = await makeStorage();
     const chunkId = "att-1::docs/Guide.md::Setup & Config::0::0";
     await storage.write(makeRecord({ chunkId }));
 
-    const expectedFile = path.join(dir, `${normalizePathToSlug(chunkId)}.json`);
+    // The attachment-id prefix is dropped (the directory already scopes by it)
+    // and the remaining suffix is slugified + lowercased for cross-filesystem
+    // safety. The shared `normalizePathToSlug` stays case-preserving; only the
+    // file-name path lowercases.
+    const expectedFile = path.join(dir, "docs-guide-md-setup-config-0-0.json");
     await expect(fs.access(expectedFile)).resolves.toBeUndefined();
-    expect(normalizePathToSlug(chunkId)).toBe("att-1-docs-Guide-md-Setup-Config-0-0");
-    // The non-slugified chunkId must not be used verbatim as a file name.
-    const literalFile = path.join(dir, `${chunkId}.json`);
-    await expect(fs.access(literalFile)).rejects.toThrow();
+
+    // The authoritative chunkId round-trips intact from the JSON payload.
+    const readBack = await storage.read(chunkId);
+    expect(readBack?.chunkId).toBe(chunkId);
+
+    // Neither the verbatim chunkId nor an attachment-id-prefixed name is used.
+    await expect(fs.access(path.join(dir, `${chunkId}.json`))).rejects.toThrow();
+    await expect(
+      fs.access(path.join(dir, "att-1-docs-guide-md-setup-config-0-0.json")),
+    ).rejects.toThrow();
+  });
+
+  it("reconcile removes stale chunks every call but legacy-named files only when opted in", async () => {
+    const { dir, storage } = await makeStorage();
+    const currentId = "att-1::docs/keep.md::Intro::0::0";
+    const staleId = "att-1::docs/gone.md::Intro::0::0";
+    await storage.write(makeRecord({ chunkId: currentId }));
+    await storage.write(makeRecord({ chunkId: staleId }));
+
+    // Simulate a pre-rename legacy file: same chunkId as `currentId` but stored
+    // at the OLD naming scheme (attachment-id prefix, mixed case). This file is
+    // invisible to `list()`/`remove()` (which target the canonical name) yet
+    // still carries a valid chunkId, so plain sweep would spare it.
+    const legacyPath = path.join(dir, "att-1-docs-keep-md-Intro-0-0.json");
+    await fs.writeFile(
+      legacyPath,
+      JSON.stringify(makeRecord({ chunkId: currentId }), null, 2),
+      "utf-8",
+    );
+
+    // Default pass: stale removal only; the legacy file is left in place so the
+    // per-sync path skips the basename comparison when nothing changed.
+    const defaultResult = await storage.reconcile(new Set([currentId]));
+    expect(defaultResult.stale).toBe(1);
+    expect(defaultResult.nonCanonical).toBe(0);
+    await expect(fs.access(legacyPath)).resolves.toBeUndefined();
+
+    // Opt-in pass (schema-version change): now the legacy file is removed too.
+    const optInResult = await storage.reconcile(new Set([currentId]), true);
+    expect(optInResult.stale).toBe(0);
+    expect(optInResult.nonCanonical).toBe(1);
+    // The canonical current file survives; the legacy file is gone.
+    expect(await storage.list()).toHaveLength(1);
+    expect(await storage.read(currentId)).not.toBeNull();
+    await expect(fs.access(legacyPath)).rejects.toThrow();
   });
 });
 

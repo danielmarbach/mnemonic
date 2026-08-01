@@ -118,7 +118,7 @@ async function makeStorage(): Promise<{ dir: string; storage: ChunkEmbeddingStor
   const base = await fs.mkdtemp(path.join(os.tmpdir(), "mnemonic-sync-embedding-"));
   tempDirs.push(base);
   const dir = path.join(base, "doc-source", "att-1");
-  const storage = new ChunkEmbeddingStorage(dir);
+  const storage = new ChunkEmbeddingStorage(dir, "att-1");
   await storage.init();
   return { dir, storage };
 }
@@ -288,7 +288,7 @@ describe("isGenerationCurrent with a different embedding identity", () => {
         indexedCommit: "abc123",
         extractorVersion: extractor.extractorVersion,
         chunkerVersion: chunker.chunkerVersion,
-        indexSchemaVersion: "2",
+        indexSchemaVersion: "3",
         embeddingCompatibilityIdentity: currentIdentity,
       },
     };
@@ -299,7 +299,7 @@ describe("isGenerationCurrent with a different embedding identity", () => {
         indexedCommit: "abc123",
         extractorVersion: extractor.extractorVersion,
         chunkerVersion: chunker.chunkerVersion,
-        indexSchemaVersion: "2",
+        indexSchemaVersion: "3",
         embeddingCompatibilityIdentity: expectedIdentityFor("other-model"),
       },
     };

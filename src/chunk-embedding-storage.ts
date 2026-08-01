@@ -43,17 +43,29 @@ export interface ChunkEmbeddingRecord {
  *
  * Owns a single directory (the per-attachment directory resolved by the caller,
  * e.g. `.mnemonic/embeddings/doc-source/<attachmentId>/`). Files are named by
- * the slugified chunk ID: `<slug(chunkId)>.json`.
+ * the slugified, lowercased chunk-id *suffix* — the leading `<attachmentId>::`
+ * prefix is stripped because the directory already scopes by attachment id, so
+ * the prefix would be redundant on every file: `<slug(suffix)>.json`.
+ *
+ * Lowercasing is applied here ONLY (not in the shared `normalizePathToSlug`,
+ * which stays case-preserving so the `::`-separated chunkId stored in JSON is
+ * never altered). This keeps file names deterministic across case-insensitive
+ * filesystems (macOS APFS, Windows NTFS) without touching the id contract.
  */
 export class ChunkEmbeddingStorage {
-  constructor(private readonly dir: string) {}
+  constructor(
+    private readonly dir: string,
+    private readonly attachmentId: string,
+  ) {}
 
   async init(): Promise<void> {
     await fs.mkdir(this.dir, { recursive: true });
   }
 
-  private pathFor(chunkId: string): string {
-    return path.join(this.dir, normalizePathToSlug(chunkId) + ".json");
+  pathFor(chunkId: string): string {
+    const prefix = `${this.attachmentId}::`;
+    const suffix = chunkId.startsWith(prefix) ? chunkId.slice(prefix.length) : chunkId;
+    return path.join(this.dir, normalizePathToSlug(suffix).toLowerCase() + ".json");
   }
 
   async read(chunkId: string): Promise<ChunkEmbeddingRecord | null> {
@@ -93,6 +105,60 @@ export class ChunkEmbeddingStorage {
     await attempt("chunk-embedding:removeAll", () =>
       fs.rm(this.dir, { recursive: true, force: true }),
     );
+  }
+
+  /**
+   * Reconcile on-disk files against the current generation in a single pass,
+   * unlinking by the ACTUAL on-disk path.
+   *
+   * Stale removal runs every call: a file whose `chunkId` is no longer in
+   * `currentChunkIds` is deleted. Rename removal is opt-in via
+   * `removeNonCanonical` — pass it only when the caller knows the on-disk
+   * naming scheme changed (e.g. an `indexSchemaVersion` bump that dropped the
+   * attachment-id prefix or lowercased the slug), so the normal per-sync pass
+   * skips the basename comparison when there is nothing to migrate.
+   *
+   * The rename case is unreachable for `remove()`/`list()` alone: `remove`
+   * targets the canonical name, and `list()` discards the real filename — so a
+   * legacy-named file whose chunkId is still current is invisible to a plain
+   * stale sweep and would accumulate as dead weight after a rename. Fail-soft:
+   * unreadable or corrupt files are left in place, mirroring `list()`. Returns
+   * the counts removed by reason.
+   */
+  async reconcile(
+    currentChunkIds: Set<string>,
+    removeNonCanonical = false,
+  ): Promise<{ stale: number; nonCanonical: number }> {
+    const filesResult = await attempt(
+      "chunk-embedding:reconcile",
+      () => fs.readdir(this.dir),
+      [] as string[],
+    );
+    const files = filesResult.ok ? filesResult.value : [];
+    let stale = 0;
+    let nonCanonical = 0;
+    for (const file of files) {
+      if (!file.endsWith(".json")) continue;
+      const filePath = path.join(this.dir, file);
+      const raw = await attempt("chunk-embedding:reconcile", () => fs.readFile(filePath, "utf-8"));
+      if (!raw.ok) continue;
+      const parsed = await attempt("chunk-embedding:reconcile", (): unknown =>
+        JSON.parse(raw.value),
+      );
+      if (!parsed.ok) continue;
+      const record = validateChunkEmbeddingRecord(parsed.value);
+      if (!record) continue;
+      if (!currentChunkIds.has(record.chunkId)) {
+        const r = await attempt("chunk-embedding:reconcile", () => fs.unlink(filePath));
+        if (r.ok) stale++;
+        continue;
+      }
+      if (removeNonCanonical && path.basename(this.pathFor(record.chunkId)) !== file) {
+        const r = await attempt("chunk-embedding:reconcile", () => fs.unlink(filePath));
+        if (r.ok) nonCanonical++;
+      }
+    }
+    return { stale, nonCanonical };
   }
 }
 

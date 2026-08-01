@@ -40,7 +40,7 @@ function makeGeneration(
       indexedCommit: overrides.indexedCommit ?? "commit-1",
       extractorVersion: overrides.extractorVersion ?? extractor.extractorVersion,
       chunkerVersion: overrides.chunkerVersion ?? chunker.chunkerVersion,
-      indexSchemaVersion: overrides.indexSchemaVersion ?? "2",
+      indexSchemaVersion: overrides.indexSchemaVersion ?? "3",
       embeddingCompatibilityIdentity:
         overrides.embeddingCompatibilityIdentity ?? expectedEmbeddingCompatibilityIdentity,
     },

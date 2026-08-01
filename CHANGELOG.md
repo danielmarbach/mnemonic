@@ -6,6 +6,10 @@ The format is loosely based on Keep a Changelog and uses semver-style version he
 
 ## [Unreleased]
 
+### Changed
+
+- Document-source chunk embedding cache files no longer duplicate the attachment id in their file name (the per-attachment folder already scopes by it) and are now lowercased for consistent behavior across macOS, Windows, and Linux filesystems. The first `sync` after upgrade rebuilds and re-embeds affected attachments once, then removes the old cache files automatically.
+
 ## [0.40.0] - 2026-08-01
 
 ### Added

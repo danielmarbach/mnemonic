@@ -106,7 +106,7 @@ export function buildGenerationFromFiles(
     chunkerVersion: chunker.chunkerVersion,
     chunkerOptionsHash: "default",
     projectionSchemaVersion: "1",
-    indexSchemaVersion: "2",
+    indexSchemaVersion: "3",
     embeddingCompatibilityIdentity: `${extractor.extractorId}::${extractor.extractorVersion}::${chunker.chunkerId}::${chunker.chunkerVersion}`,
     sourceMediaTypeCounts: { [extractor.sourceMediaType]: documents.size },
     documentCount: documents.size,
