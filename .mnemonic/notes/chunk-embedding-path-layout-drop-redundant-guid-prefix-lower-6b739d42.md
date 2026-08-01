@@ -9,11 +9,14 @@ tags:
   - embeddings
 lifecycle: permanent
 createdAt: '2026-08-01T22:39:23.145Z'
-updatedAt: '2026-08-01T22:39:23.145Z'
+updatedAt: '2026-08-01T22:39:42.026Z'
 role: decision
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: plan-deliver-document-source-chunk-semantic-retrieval-embedd-dba90b71
+    type: derives-from
 memoryVersion: 1
 ---
 # Chunk embedding path layout: drop redundant guid prefix, lowercase filenames, reconcile on schema change

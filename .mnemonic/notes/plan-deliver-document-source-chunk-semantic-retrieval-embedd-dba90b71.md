@@ -11,13 +11,15 @@ tags:
   - architecture
 lifecycle: permanent
 createdAt: '2026-08-01T20:43:19.999Z'
-updatedAt: '2026-08-01T20:43:23.909Z'
+updatedAt: '2026-08-01T22:39:42.026Z'
 role: plan
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
   - id: document-source-chunk-embeddings-specified-but-never-deliver-6e867617
+    type: derives-from
+  - id: chunk-embedding-path-layout-drop-redundant-guid-prefix-lower-6b739d42
     type: derives-from
 memoryVersion: 1
 ---
