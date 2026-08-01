@@ -12,6 +12,7 @@ import {
   commitVaultWithProtection,
   checkVaultProtectedBranch,
 } from "../helpers/git-commit.js";
+import { protectedBranchDecision, readProtectedBranchConsentState } from "../helpers/mrtr.js";
 import {
   buildPersistenceStatus,
   buildMutationRetryContract,
@@ -192,19 +193,24 @@ export function registerUpdateTool(server: McpServer, ctx: ServerContext): void 
       }),
       outputSchema: UpdateToolResultSchema,
     },
-    async ({
-      id,
-      content,
-      semanticPatch,
-      title,
-      tags,
-      lifecycle,
-      role,
-      summary,
-      alwaysLoad,
-      cwd,
-      allowProtectedBranch = false,
-    }) => {
+    async (
+      {
+        id,
+        content,
+        semanticPatch,
+        title,
+        tags,
+        lifecycle,
+        role,
+        summary,
+        alwaysLoad,
+        cwd,
+        allowProtectedBranch: allowProtectedBranchArg = false,
+      },
+      requestCtx,
+    ) => {
+      const branchConsent = readProtectedBranchConsentState(requestCtx);
+      const allowProtectedBranch = allowProtectedBranchArg || branchConsent === "granted";
       await ensureBranchSynced(ctx, cwd);
       guardIdsAgainstDocumentSourceMutation([id], "update");
       const noteId = memoryId(id);
@@ -438,15 +444,13 @@ export function registerUpdateTool(server: McpServer, ctx: ServerContext): void 
         noteProjectId: note.project ?? undefined,
       });
       if (protectedBranchCheck.blocked) {
-        return {
-          content: [
-            {
-              type: "text",
-              text: protectedBranchCheck.message ?? "Protected branch policy blocked this commit.",
-            },
-          ],
-          isError: true,
-        };
+        if (branchConsent === "denied") {
+          return {
+            content: [{ type: "text", text: protectedBranchCheck.message }],
+            isError: true,
+          };
+        }
+        return protectedBranchDecision(requestCtx, protectedBranchCheck);
       }
 
       await vault.storage.writeNote(updated);

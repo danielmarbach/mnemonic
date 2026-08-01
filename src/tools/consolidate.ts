@@ -5,6 +5,7 @@ import { ConsolidateResultSchema } from "../structured-content.js";
 import { projectParam, resolveProject, ensureBranchSynced } from "../helpers/project.js";
 import { collectVisibleNotes, projectNotFoundResponse } from "../helpers/vault.js";
 import { CONSOLIDATION_MODES, resolveConsolidationMode } from "../project-memory-policy.js";
+import { readProtectedBranchConsentState } from "../helpers/mrtr.js";
 import { invalidateActiveProjectCache } from "../cache.js";
 import { guardIdsAgainstDocumentSourceMutation } from "../mutation-guard.js";
 import {
@@ -121,15 +122,20 @@ export function registerConsolidateTool(server: McpServer, ctx: ServerContext): 
       }),
       outputSchema: ConsolidateResultSchema,
     },
-    async ({
-      cwd,
-      strategy,
-      mode,
-      threshold,
-      evidence = true,
-      mergePlan,
-      allowProtectedBranch = false,
-    }) => {
+    async (
+      {
+        cwd,
+        strategy,
+        mode,
+        threshold,
+        evidence = true,
+        mergePlan,
+        allowProtectedBranch: allowProtectedBranchArg = false,
+      },
+      requestCtx,
+    ) => {
+      const branchConsent = readProtectedBranchConsentState(requestCtx);
+      const allowProtectedBranch = allowProtectedBranchArg || branchConsent === "granted";
       await ensureBranchSynced(ctx, cwd);
 
       // Guard against document-source mutations
@@ -200,6 +206,7 @@ export function registerConsolidateTool(server: McpServer, ctx: ServerContext): 
             policy,
             allowProtectedBranch,
             evidence,
+            requestCtx,
           );
           invalidateActiveProjectCache();
           return mergeResult;
@@ -214,6 +221,7 @@ export function registerConsolidateTool(server: McpServer, ctx: ServerContext): 
             cwd,
             policy,
             allowProtectedBranch,
+            requestCtx,
           );
           invalidateActiveProjectCache();
           return pruneResult;

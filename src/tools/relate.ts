@@ -17,6 +17,7 @@ import {
   commitVaultWithProtection,
   checkVaultProtectedBranch,
 } from "../helpers/git-commit.js";
+import { protectedBranchDecision, readProtectedBranchConsentState } from "../helpers/mrtr.js";
 import {
   buildMutationRetryContract,
   formatRetrySummary,
@@ -67,7 +68,9 @@ export function registerRelateTool(server: McpServer, ctx: ServerContext): void 
       }),
       outputSchema: RelateResultSchema,
     },
-    async ({ fromId, toId, type, bidirectional, cwd }) => {
+    async ({ fromId, toId, type, bidirectional, cwd }, requestCtx) => {
+      const branchConsent = readProtectedBranchConsentState(requestCtx);
+      const allowProtectedBranch = branchConsent === "granted";
       await ensureBranchSynced(ctx, cwd);
       guardIdsAgainstDocumentSourceMutation([fromId, toId], "relate");
       const project = await resolveProject(ctx, cwd);
@@ -127,7 +130,7 @@ export function registerRelateTool(server: McpServer, ctx: ServerContext): void 
           checkVaultProtectedBranch({
             ctx,
             vault,
-            allowProtectedBranch: false,
+            allowProtectedBranch,
             toolName: "relate",
             noteProjectId:
               vault === fromVault ? (fromNote.project ?? undefined) : (toNote.project ?? undefined),
@@ -136,15 +139,13 @@ export function registerRelateTool(server: McpServer, ctx: ServerContext): void 
       );
       for (const check of preChecks) {
         if (check.blocked) {
-          return {
-            content: [
-              {
-                type: "text",
-                text: check.message ?? "Protected branch policy blocked this commit.",
-              },
-            ],
-            isError: true,
-          };
+          if (branchConsent === "denied") {
+            return {
+              content: [{ type: "text", text: check.message }],
+              isError: true,
+            };
+          }
+          return protectedBranchDecision(requestCtx, check);
         }
       }
 
@@ -219,7 +220,7 @@ export function registerRelateTool(server: McpServer, ctx: ServerContext): void 
               commitMessage,
               files: pendingFiles,
               commitBody,
-              allowProtectedBranch: false,
+              allowProtectedBranch,
               toolName: "relate",
             });
 
@@ -292,7 +293,7 @@ export function registerRelateTool(server: McpServer, ctx: ServerContext): void 
           commitMessage,
           files,
           commitBody,
-          allowProtectedBranch: false,
+          allowProtectedBranch,
           toolName: "relate",
         });
         if (!retry) {

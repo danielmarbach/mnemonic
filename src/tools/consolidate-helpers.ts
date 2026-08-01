@@ -1,4 +1,14 @@
 import type { ServerContext } from "../server-context.js";
+import type {
+  CallToolResult,
+  InputRequiredResult,
+  ServerContext as SdkServerContext,
+} from "@modelcontextprotocol/server";
+import {
+  isMrtrSupported,
+  protectedBranchDecision,
+  readProtectedBranchConsentState,
+} from "../helpers/mrtr.js";
 import type { ProjectInfo } from "../project.js";
 import {
   aggregateMergeRisk,
@@ -431,10 +441,8 @@ export async function executeMerge(
   policy?: ProjectMemoryPolicy,
   allowProtectedBranch: boolean = false,
   evidence: boolean = true,
-): Promise<{
-  content: Array<{ type: "text"; text: string }>;
-  structuredContent: ConsolidateResult;
-}> {
+  requestCtx?: SdkServerContext,
+): Promise<CallToolResult | InputRequiredResult> {
   const { vaultManager } = ctx;
   const sourceIds = normalizeMergePlanSourceIds(mergePlan.sourceIds);
   const targetTitle = mergePlan.targetTitle.trim();
@@ -492,6 +500,8 @@ export async function executeMerge(
   };
 
   // Pre-check protected branches for vaults we are about to modify
+  const declinedBranchConsent =
+    requestCtx !== undefined && readProtectedBranchConsentState(requestCtx) === "denied";
   const vaultsToCheck = new Set<Vault>([targetVault, ...sourceEntries.map((e) => e.vault)]);
   for (const vault of vaultsToCheck) {
     const protectedBranchCheck = await checkVaultProtectedBranch({
@@ -508,19 +518,15 @@ export async function executeMerge(
         project: toProjectRef(project),
         notesProcessed: entries.length,
         notesModified: 0,
-        warnings: [
-          protectedBranchCheck.message ?? "Protected branch policy blocked this operation.",
-        ],
+        warnings: [protectedBranchCheck.message],
       };
-      return {
-        content: [
-          {
-            type: "text",
-            text: protectedBranchCheck.message ?? "Protected branch policy blocked this operation.",
-          },
-        ],
-        structuredContent,
-      };
+      if (declinedBranchConsent || requestCtx === undefined || !isMrtrSupported(requestCtx)) {
+        return {
+          content: [{ type: "text", text: protectedBranchCheck.message }],
+          structuredContent,
+        };
+      }
+      return protectedBranchDecision(requestCtx, protectedBranchCheck);
     }
   }
 
@@ -540,14 +546,15 @@ export async function executeMerge(
         project: toProjectRef(project),
         notesProcessed: entries.length,
         notesModified: 0,
-        warnings: [check.message ?? "Protected branch policy blocked this commit."],
+        warnings: [check.message],
       };
-      return {
-        content: [
-          { type: "text", text: check.message ?? "Protected branch policy blocked this commit." },
-        ],
-        structuredContent,
-      };
+      if (declinedBranchConsent || requestCtx === undefined || !isMrtrSupported(requestCtx)) {
+        return {
+          content: [{ type: "text", text: check.message }],
+          structuredContent,
+        };
+      }
+      return protectedBranchDecision(requestCtx, check);
     }
   }
 
@@ -1207,11 +1214,11 @@ export async function pruneSuperseded(
   cwd?: string,
   policy?: ProjectMemoryPolicy,
   allowProtectedBranch: boolean = false,
-): Promise<{
-  content: Array<{ type: "text"; text: string }>;
-  structuredContent: ConsolidateResult;
-}> {
+  requestCtx?: SdkServerContext,
+): Promise<CallToolResult | InputRequiredResult> {
   const { vaultManager } = ctx;
+  const declinedBranchConsent =
+    requestCtx !== undefined && readProtectedBranchConsentState(requestCtx) === "denied";
 
   if (consolidationMode !== "delete") {
     const structuredContent: ConsolidateResult = {
@@ -1282,14 +1289,15 @@ export async function pruneSuperseded(
         project: toProjectRef(project),
         notesProcessed: entries.length,
         notesModified: 0,
-        warnings: [check.message ?? "Protected branch policy blocked this commit."],
+        warnings: [check.message],
       };
-      return {
-        content: [
-          { type: "text", text: check.message ?? "Protected branch policy blocked this commit." },
-        ],
-        structuredContent,
-      };
+      if (declinedBranchConsent || requestCtx === undefined || !isMrtrSupported(requestCtx)) {
+        return {
+          content: [{ type: "text", text: check.message }],
+          structuredContent,
+        };
+      }
+      return protectedBranchDecision(requestCtx, check);
     }
   }
 

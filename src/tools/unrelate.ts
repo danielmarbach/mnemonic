@@ -15,6 +15,7 @@ import {
   commitVaultWithProtection,
   checkVaultProtectedBranch,
 } from "../helpers/git-commit.js";
+import { protectedBranchDecision, readProtectedBranchConsentState } from "../helpers/mrtr.js";
 import {
   buildMutationRetryContract,
   formatRetrySummary,
@@ -59,7 +60,9 @@ export function registerUnrelateTool(server: McpServer, ctx: ServerContext): voi
       }),
       outputSchema: RelateResultSchema,
     },
-    async ({ fromId, toId, bidirectional, cwd }) => {
+    async ({ fromId, toId, bidirectional, cwd }, requestCtx) => {
+      const branchConsent = readProtectedBranchConsentState(requestCtx);
+      const allowProtectedBranch = branchConsent === "granted";
       await ensureBranchSynced(ctx, cwd);
       guardIdsAgainstDocumentSourceMutation([fromId, toId], "unrelate");
       const project = await resolveProject(ctx, cwd);
@@ -104,7 +107,7 @@ export function registerUnrelateTool(server: McpServer, ctx: ServerContext): voi
           checkVaultProtectedBranch({
             ctx,
             vault,
-            allowProtectedBranch: false,
+            allowProtectedBranch,
             toolName: "unrelate",
             noteProjectId:
               vault === foundFrom?.vault
@@ -115,15 +118,13 @@ export function registerUnrelateTool(server: McpServer, ctx: ServerContext): voi
       );
       for (const check of preChecks) {
         if (check.blocked) {
-          return {
-            content: [
-              {
-                type: "text",
-                text: check.message ?? "Protected branch policy blocked this commit.",
-              },
-            ],
-            isError: true,
-          };
+          if (branchConsent === "denied") {
+            return {
+              content: [{ type: "text", text: check.message }],
+              isError: true,
+            };
+          }
+          return protectedBranchDecision(requestCtx, check);
         }
       }
 
@@ -182,7 +183,7 @@ export function registerUnrelateTool(server: McpServer, ctx: ServerContext): voi
               commitMessage,
               files: pendingFiles,
               commitBody,
-              allowProtectedBranch: false,
+              allowProtectedBranch,
               toolName: "unrelate",
             });
 
@@ -249,7 +250,7 @@ export function registerUnrelateTool(server: McpServer, ctx: ServerContext): voi
           commitMessage,
           files,
           commitBody,
-          allowProtectedBranch: false,
+          allowProtectedBranch,
           toolName: "unrelate",
         });
         if (!retry) {

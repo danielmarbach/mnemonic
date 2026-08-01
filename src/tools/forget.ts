@@ -19,6 +19,7 @@ import {
   commitVaultWithProtection,
   checkVaultProtectedBranch,
 } from "../helpers/git-commit.js";
+import { protectedBranchDecision, readProtectedBranchConsentState } from "../helpers/mrtr.js";
 import {
   buildMutationRetryContract,
   formatRetrySummary,
@@ -73,7 +74,9 @@ export function registerForgetTool(server: McpServer, ctx: ServerContext): void 
       }),
       outputSchema: ForgetResultSchema,
     },
-    async ({ id, cwd, allowProtectedBranch = false }) => {
+    async ({ id, cwd, allowProtectedBranch: allowProtectedBranchArg = false }, requestCtx) => {
+      const branchConsent = readProtectedBranchConsentState(requestCtx);
+      const allowProtectedBranch = allowProtectedBranchArg || branchConsent === "granted";
       await ensureBranchSynced(ctx, cwd);
       guardAgainstDocumentSourceMutation(id, "forget");
       const project = await resolveProject(ctx, cwd);
@@ -105,15 +108,13 @@ export function registerForgetTool(server: McpServer, ctx: ServerContext): void 
         noteProjectId: note.project ?? undefined,
       });
       if (protectedBranchCheck.blocked) {
-        return {
-          content: [
-            {
-              type: "text",
-              text: protectedBranchCheck.message ?? "Protected branch policy blocked this commit.",
-            },
-          ],
-          isError: true,
-        };
+        if (branchConsent === "denied") {
+          return {
+            content: [{ type: "text", text: protectedBranchCheck.message }],
+            isError: true,
+          };
+        }
+        return protectedBranchDecision(requestCtx, protectedBranchCheck);
       }
 
       const deleted = await noteVault.storage.deleteNote(memoryId(id));

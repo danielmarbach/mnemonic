@@ -7,6 +7,8 @@ import { projectParam, resolveProject, ensureBranchSynced } from "../helpers/pro
 import { memoryId, isoDateString } from "../brands.js";
 import { formatPersistenceSummary } from "../helpers/persistence.js";
 import { moveNoteBetweenVaults, projectNotFoundResponse, storageLabel } from "../helpers/vault.js";
+import { checkVaultProtectedBranch } from "../helpers/git-commit.js";
+import { protectedBranchDecision, readProtectedBranchConsentState } from "../helpers/mrtr.js";
 import { attempt, getErrorMessage } from "../error-utils.js";
 import { invalidateActiveProjectCache } from "../cache.js";
 import { guardAgainstDocumentSourceMutation } from "../mutation-guard.js";
@@ -64,7 +66,12 @@ export function registerMoveMemoryTool(server: McpServer, ctx: ServerContext): v
       }),
       outputSchema: MoveResultSchema,
     },
-    async ({ id, target, vaultFolder, cwd, allowProtectedBranch = false }) => {
+    async (
+      { id, target, vaultFolder, cwd, allowProtectedBranch: allowProtectedBranchArg = false },
+      requestCtx,
+    ) => {
+      const branchConsent = readProtectedBranchConsentState(requestCtx);
+      const allowProtectedBranch = allowProtectedBranchArg || branchConsent === "granted";
       await ensureBranchSynced(ctx, cwd);
       guardAgainstDocumentSourceMutation(id, "move");
 
@@ -189,6 +196,36 @@ export function registerMoveMemoryTool(server: McpServer, ctx: ServerContext): v
           projectName: rewrittenProjectName,
           updatedAt: isoDateString(new Date().toISOString()),
         };
+      }
+
+      // Pre-check protected branches for both source and target vaults before
+      // mutating anything, so an MRTR consent round happens before any write.
+      const movePreChecks = await Promise.all([
+        checkVaultProtectedBranch({
+          ctx,
+          vault: found.vault,
+          allowProtectedBranch,
+          toolName: "move_memory",
+          noteProjectId: found.note.project ?? undefined,
+        }),
+        checkVaultProtectedBranch({
+          ctx,
+          vault: targetVault,
+          allowProtectedBranch,
+          toolName: "move_memory",
+          noteProjectId: targetProject?.id,
+        }),
+      ]);
+      for (const check of movePreChecks) {
+        if (check.blocked) {
+          if (branchConsent === "denied") {
+            return {
+              content: [{ type: "text", text: check.message }],
+              isError: true,
+            };
+          }
+          return protectedBranchDecision(requestCtx, check);
+        }
       }
 
       const moveAttempt = await attempt("move:between-vaults", () =>
