@@ -43,6 +43,18 @@ describe("mcp schema-driven contract integration", () => {
       const results = recallResponse.structuredContent?.["results"] as
         Array<Record<string, unknown>> | undefined;
       expect(results?.some((result) => result["id"] === rememberedId)).toBe(true);
+
+      // Regression: the real `get` handler emits note items with alwaysLoad +
+      // relatedTo; the declared output schema must accept them. Handler/schema
+      // drift here previously caused an MCP -32602 structured-content error when
+      // fetching a plain memory by id.
+      const getResponse = await client.callTool("get", { ids: [rememberedId] });
+      expect(getResponse.structuredContent).toBeDefined();
+      const { GetResultSchema } = await import("../src/structured-content.js");
+      const parsedGet = GetResultSchema.parse(getResponse.structuredContent);
+      expect(
+        parsedGet.items?.some((item) => item.kind === "note" && item.id === rememberedId),
+      ).toBe(true);
     } finally {
       await client.close();
       await embeddingServer.close();
@@ -114,6 +126,20 @@ describe("mcp schema-driven contract integration", () => {
       ],
       items: [
         {
+          kind: "note" as const,
+          id: "test-note-abc",
+          title: "Test note",
+          content: "Body of the test note.",
+          tags: ["testing"],
+          lifecycle: "permanent" as const,
+          role: "decision" as const,
+          alwaysLoad: true,
+          relatedTo: [{ id: "other-note", type: "related-to" as const }],
+          vault: "main-vault",
+          createdAt: "2026-01-01T00:00:00Z",
+          updatedAt: "2026-01-01T00:00:00Z",
+        },
+        {
           kind: "document" as const,
           documentId: "doc:test-doc.md",
           sourcePath: "test-doc.md",
@@ -137,8 +163,9 @@ describe("mcp schema-driven contract integration", () => {
     expect(parsedGet.documents).toBeDefined();
     expect(parsedGet.documents).toHaveLength(1);
     expect(parsedGet.items).toBeDefined();
-    expect(parsedGet.items).toHaveLength(1);
-    expect(parsedGet.items![0].kind).toBe("document");
+    expect(parsedGet.items).toHaveLength(2);
+    expect(parsedGet.items![0].kind).toBe("note");
+    expect(parsedGet.items![1].kind).toBe("document");
     expect(parsedGet.itemErrors).toBeDefined();
     expect(parsedGet.itemErrors).toHaveLength(1);
     expect(parsedGet.itemErrors![0].code).toBe("unknown-document");

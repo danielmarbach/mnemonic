@@ -297,6 +297,8 @@ export interface GetResult extends Record<string, unknown> {
         tags: string[];
         lifecycle: NoteLifecycle;
         role?: NoteRole;
+        alwaysLoad?: boolean;
+        relatedTo?: Array<{ id: string; type: RelationshipType }>;
         vault: string;
         createdAt: string;
         updatedAt: string;
@@ -1624,6 +1626,8 @@ export const GetResultSchema = z.object({
           tags: z.array(z.string()),
           lifecycle: _NoteLifecycle,
           role: _NoteRole.optional(),
+          alwaysLoad: z.boolean().optional(),
+          relatedTo: z.array(z.object({ id: z.string(), type: _RelationshipType })).optional(),
           vault: _VaultLabel,
           createdAt: z.string(),
           updatedAt: z.string(),

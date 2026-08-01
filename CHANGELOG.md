@@ -19,6 +19,7 @@ The format is loosely based on Keep a Changelog and uses semver-style version he
 - Document-source chunk heading ancestry now retains text from `inlineCode`, `strong`, `emphasis`, `link`, and `footnoteReference` nodes. Previously `getHeadingText` only kept plain `text` children, so headings like `### \`MarkAsCompleted()\`` were stored empty or garbled (e.g. `" and "`, `": Polling-Based Completion"`), corrupting both display and chunk IDs. `markdownChunker.chunkerVersion` bumped `"1"` → `"2"`.
 - `sync` now re-indexes a document-source attachment when the extractor/chunker version or embedding-compatibility identity changes, even if the pinned commit is unchanged. Previously the reuse check compared only `indexedCommit`, so a chunker fix would not take effect for already-attached repos until the source commit changed.
 - Document-source chunk scoring now includes heading ancestry and source path alongside content (weighted 0.5 / 0.35 / 0.15), so navigation-style queries matching headings or paths surface relevant chunks instead of relying on body prose alone.
+- `get` no longer fails with a structured-content schema error when fetching a plain memory by id. The ordered `items` note branch now admits `alwaysLoad` and `relatedTo`, matching the `notes` array and what the handler emits.
 
 ## [0.39.1] - 2026-08-01
 

@@ -2471,6 +2471,9 @@ Typical next step:
               {
                 "additionalProperties": false,
                 "properties": {
+                  "alwaysLoad": {
+                    "type": "boolean",
+                  },
                   "content": {
                     "type": "string",
                   },
@@ -2506,6 +2509,33 @@ Typical next step:
                       "name",
                     ],
                     "type": "object",
+                  },
+                  "relatedTo": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                        },
+                        "type": {
+                          "enum": [
+                            "related-to",
+                            "explains",
+                            "example-of",
+                            "supersedes",
+                            "derives-from",
+                            "follows",
+                          ],
+                          "type": "string",
+                        },
+                      },
+                      "required": [
+                        "id",
+                        "type",
+                      ],
+                      "type": "object",
+                    },
+                    "type": "array",
                   },
                   "relationships": {
                     "additionalProperties": false,
