@@ -1,4 +1,5 @@
 import type { DocumentId, ChunkId } from "./retrieval-document.js";
+import { normalizePathToSlug } from "./retrieval-document.js";
 
 // Namespace delimiters for entity references
 const DOC_PREFIX = "doc:";
@@ -104,7 +105,7 @@ export function classifyEntityRef(id: string): "document" | "chunk" | "memory" |
  * Build a document entity reference string from an attachment ID and path.
  */
 export function buildDocumentRef(attachmentId: string, rootRelativePath: string): string {
-  const normalized = rootRelativePath.replace(/[^a-zA-Z0-9_-]+/g, "-").replace(/^-+|-+$/g, "");
+  const normalized = normalizePathToSlug(rootRelativePath);
   return `${DOC_PREFIX}${attachmentId}::${normalized}`;
 }
 

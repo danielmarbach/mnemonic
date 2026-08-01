@@ -31,7 +31,6 @@ describe("buildGenerationFromFiles", () => {
 
     expect(result.documentCount).toBe(1);
     expect(result.chunkCount).toBeGreaterThanOrEqual(1);
-    expect(result.errors).toEqual([]);
     expect(result.skippedFiles).toEqual([]);
     expect(result.generationId).toContain("att-1::gen::");
   });
@@ -128,7 +127,6 @@ describe("buildGenerationFromFiles", () => {
 
     expect(result.documentCount).toBe(1);
     expect(result.chunkCount).toBeGreaterThanOrEqual(1);
-    expect(result.errors).toEqual([]);
   });
 
   it("handles multiple markdown files", () => {
@@ -148,7 +146,6 @@ describe("buildGenerationFromFiles", () => {
 
     expect(result.documentCount).toBe(3);
     expect(result.chunkCount).toBeGreaterThanOrEqual(3);
-    expect(result.errors).toEqual([]);
   });
 
   it("generates a manifest with correct counts", () => {
@@ -184,7 +181,6 @@ describe("buildGenerationFromFiles", () => {
 
     expect(result.documentCount).toBe(0);
     expect(result.chunkCount).toBe(0);
-    expect(result.errors).toEqual([]);
   });
 });
 

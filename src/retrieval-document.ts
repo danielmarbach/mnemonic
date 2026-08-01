@@ -78,7 +78,7 @@ export interface DocumentChunker {
   readonly chunkerId: string;
   readonly chunkerVersion: string;
   readonly chunkContentMediaType: string;
-  chunk(documentId: string, content: string): RetrievalChunk[];
+  chunk(documentId: DocumentId, content: string): RetrievalChunk[];
 }
 
 // Limits (configurable constants with sensible defaults)
@@ -91,21 +91,25 @@ export const DOCUMENT_SOURCE_LIMITS = {
   maxEmbeddingWork: 10000, // max chunks to embed per sync
 } as const;
 
+// Helper: normalize a path or heading text into a slug-safe form.
+// Shared by deriveDocumentId, deriveChunkId, and buildDocumentRef.
+export function normalizePathToSlug(value: string): string {
+  return value.replace(/[^a-zA-Z0-9_-]+/g, "-").replace(/^-+|-+$/g, "");
+}
+
 // Helper: derive document ID from attachment ID + normalized path
 export function deriveDocumentId(attachmentId: string, rootRelativePath: string): DocumentId {
-  const normalized = rootRelativePath.replace(/[^a-zA-Z0-9_-]+/g, "-").replace(/^-+|-+$/g, "");
+  const normalized = normalizePathToSlug(rootRelativePath);
   return `${attachmentId}::${normalized}` as DocumentId;
 }
 
 // Helper: derive chunk ID from document ID + heading ancestry + split ordinal
 export function deriveChunkId(
-  documentId: string,
+  documentId: DocumentId,
   headingAncestry: Array<{ depth: number; text: string }>,
   duplicateHeadingOccurrence: number,
   splitOrdinal: number,
 ): ChunkId {
-  const headingPart = headingAncestry
-    .map((h) => h.text.replace(/[^a-zA-Z0-9_-]+/g, "-").replace(/^-+|-+$/g, ""))
-    .join("::");
+  const headingPart = headingAncestry.map((h) => normalizePathToSlug(h.text)).join("::");
   return `${documentId}::${headingPart}::${duplicateHeadingOccurrence}::${splitOrdinal}` as ChunkId;
 }

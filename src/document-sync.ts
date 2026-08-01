@@ -172,7 +172,7 @@ export async function syncDocumentSource(
     documentCount: buildResult.documentCount,
     chunkCount: buildResult.chunkCount,
     skippedFiles: buildResult.skippedFiles,
-    errors: buildResult.errors,
+    errors: [],
     status: "indexed",
     message: `Indexed ${buildResult.documentCount} documents, ${buildResult.chunkCount} chunks from ${indexedCommit.substring(0, 8)}.`,
   };

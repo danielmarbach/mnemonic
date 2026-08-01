@@ -17,7 +17,6 @@ export interface SimpleBuildResult {
   documentCount: number;
   chunkCount: number;
   skippedFiles: Array<{ path: string; reason: string }>;
-  errors: string[];
 }
 
 /**
@@ -31,7 +30,6 @@ export function buildGenerationFromFiles(
   chunker: DocumentChunker,
   indexedCommit: string,
 ): SimpleBuildResult {
-  const errors: string[] = [];
   const skipped: Array<{ path: string; reason: string }> = [];
   const documents = new Map<string, RetrievalDocument>();
   const chunks: RetrievalChunk[] = [];
@@ -132,7 +130,6 @@ export function buildGenerationFromFiles(
     documentCount: documents.size,
     chunkCount: chunkMap.size,
     skippedFiles: skipped,
-    errors,
   };
 }
 

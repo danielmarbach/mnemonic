@@ -33,7 +33,7 @@ export function publishGeneration(attachmentId: string, generation: DocumentGene
 
   // Store the generation
   const genId = generation.manifest.generationId;
-  state.generations.set(genId as unknown as string, generation);
+  state.generations.set(genId, generation);
 
   // Atomic publish: swap pointer
   state.previous = state.current;
@@ -41,8 +41,8 @@ export function publishGeneration(attachmentId: string, generation: DocumentGene
 
   // Evict old generations (keep current, previous, and pinned)
   const keepIds = new Set<string>();
-  if (state.current) keepIds.add(state.current.manifest.generationId as unknown as string);
-  if (state.previous) keepIds.add(state.previous.manifest.generationId as unknown as string);
+  if (state.current) keepIds.add(state.current.manifest.generationId);
+  if (state.previous) keepIds.add(state.previous.manifest.generationId);
   for (const pinnedId of state.pinned) keepIds.add(pinnedId);
 
   for (const [id] of state.generations) {

@@ -29,7 +29,7 @@ function buildAncestry(stack: HeadingContext[]): Array<{ depth: number; text: st
 
 function splitOversizedContent(
   content: string,
-  documentId: string,
+  documentId: DocumentId,
   headingAncestry: Array<{ depth: number; text: string }>,
   duplicateHeadingOccurrence: number,
 ): RetrievalChunk[] {
@@ -38,7 +38,7 @@ function splitOversizedContent(
     const excerpt = content.slice(0, 200).trim();
     chunks.push({
       chunkId: deriveChunkId(documentId, headingAncestry, duplicateHeadingOccurrence, 0),
-      documentId: documentId as DocumentId,
+      documentId,
       headingAncestry,
       content,
       splitOrdinal: 0,
@@ -58,7 +58,7 @@ function splitOversizedContent(
       const chunkText = currentChunk.trim();
       chunks.push({
         chunkId: deriveChunkId(documentId, headingAncestry, duplicateHeadingOccurrence, ordinal),
-        documentId: documentId as DocumentId,
+        documentId,
         headingAncestry,
         content: chunkText,
         splitOrdinal: ordinal,
@@ -75,7 +75,7 @@ function splitOversizedContent(
   if (currentChunk.trim().length > 0) {
     chunks.push({
       chunkId: deriveChunkId(documentId, headingAncestry, duplicateHeadingOccurrence, ordinal),
-      documentId: documentId as DocumentId,
+      documentId,
       headingAncestry,
       content: currentChunk.trim(),
       splitOrdinal: ordinal,
@@ -92,7 +92,7 @@ export const markdownChunker: DocumentChunker = {
   chunkerVersion: "1",
   chunkContentMediaType: "text/markdown",
 
-  chunk(documentId: string, content: string): RetrievalChunk[] {
+  chunk(documentId: DocumentId, content: string): RetrievalChunk[] {
     const tree: Root = parseBody(content);
     const chunks: RetrievalChunk[] = [];
     const headingStack: HeadingContext[] = [];
@@ -122,7 +122,7 @@ export const markdownChunker: DocumentChunker = {
           if (introText.length >= MIN_CHUNK_CHARS) {
             chunks.push({
               chunkId: deriveChunkId(documentId, [], 0, 0),
-              documentId: documentId as DocumentId,
+              documentId,
               headingAncestry: [],
               content: introText,
               splitOrdinal: 0,
