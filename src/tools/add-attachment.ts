@@ -3,7 +3,7 @@ import fs from "fs/promises";
 import path from "path";
 import crypto from "crypto";
 import { simpleGit } from "simple-git";
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { McpServer } from "@modelcontextprotocol/server";
 import type { ServerContext } from "../server-context.js";
 import type {
   ProjectAttachmentConfig,

@@ -34,9 +34,11 @@
 
 ### MCP-first operations
 
-- `src/index.ts` registers the MCP tools and is the orchestration layer.
+- `src/index.ts` registers the MCP tools and is the orchestration layer. Uses `@modelcontextprotocol/server` v2 (MCP 2026-07-28 spec).
+- The server entry point uses `serveStdio()` from `@modelcontextprotocol/server/stdio` which auto-negotiates protocol era with clients.
 - Most user-visible behavior is exposed through tools like `remember`, `recall`, `update`, `forget`, `sync`, `consolidate`, and migration commands.
 - The local helper `scripts/mcp-local.sh` rebuilds and launches the current server for dogfooding and CI-safe integration tests.
+- `tools/list` responses carry cache hints (`ttlMs`, `cacheScope`) to reduce redundant tool catalog re-fetches by clients.
 
 ## Runtime topology
 
@@ -149,7 +151,8 @@ flowchart TD
 
 | Path                           | Responsibility                                                                                |
 | ------------------------------ | --------------------------------------------------------------------------------------------- |
-| `src/index.ts`                 | MCP server entry point, tool registration, orchestration, CLI migration command               |
+| `src/index.ts`                 | MCP server entry point, tool registration, orchestration, CLI migration command, cache hints for tools/list |
+| `src/startup.ts`               | Server startup via `serveStdio()` from `@modelcontextprotocol/server/stdio`, migration warnings            |
 | `src/storage.ts`               | Markdown note persistence, embedding JSON persistence, core types                             |
 | `src/vault.ts`                 | Main/project vault lifecycle, search order, vault routing                                     |
 | `src/project.ts`               | Stable project detection from git metadata                                                    |

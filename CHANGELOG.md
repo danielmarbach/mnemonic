@@ -4,6 +4,14 @@ All notable changes to `mnemonic` will be documented in this file.
 
 The format is loosely based on Keep a Changelog and uses semver-style version headings.
 
+## [Unreleased]
+
+### Changed
+
+- Migrated to `@modelcontextprotocol/server` v2.0.0 (MCP 2026-07-28 spec). The server now uses `serveStdio()` for era-negotiating stdio transport.
+- Removed the `tools/list` JSON Schema 2020-12 override — v2 SDK defaults to 2020-12 natively.
+- `tools/list` responses now carry cache hints (1-hour TTL) to reduce redundant re-fetches.
+
 ## [0.38.0] - 2026-07-28
 
 ### Added

@@ -1,7 +1,7 @@
 import { z } from "zod";
 import path from "path";
 import fs from "fs/promises";
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { McpServer } from "@modelcontextprotocol/server";
 import type { ServerContext } from "../server-context.js";
 import type { MnemonicVaultAttachmentConfig, DocumentSourceAttachmentConfig } from "../vault.js";
 import { resolveProject as resolveProjectFromModule } from "../helpers/project.js";

@@ -54,7 +54,7 @@
     ]
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.10.1",
+    "@modelcontextprotocol/server": "^2.0.0",
     "gray-matter": "^4.0.3",
     "markdownlint": "^0.41.0",
     "remark-gfm": "^4.0.1",

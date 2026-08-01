@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { McpServer } from "@modelcontextprotocol/server";
 import type { ServerContext } from "../server-context.js";
 import { NOTE_LIFECYCLES, type NoteLifecycle } from "../storage.js";
 import { DiscoverTagsResultSchema, type DiscoverTagsResult } from "../structured-content.js";

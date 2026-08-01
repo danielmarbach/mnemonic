@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { performance } from "perf_hooks";
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { McpServer } from "@modelcontextprotocol/server";
 import type { ServerContext } from "../server-context.js";
 import type { Note } from "../storage.js";
 import type { Vault } from "../vault.js";

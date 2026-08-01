@@ -1,7 +1,7 @@
 import { readVaultSchemaVersion } from "./config.js";
 import type { ServerContext } from "./server-context.js";
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { serveStdio } from "@modelcontextprotocol/server/stdio";
+import type { McpServer } from "@modelcontextprotocol/server";
 
 export async function warnAboutPendingMigrationsOnStartup(ctx: ServerContext): Promise<void> {
   let totalPending = 0;
@@ -35,18 +35,9 @@ export async function warnAboutPendingMigrationsOnStartup(ctx: ServerContext): P
 
 export async function startServer(server: McpServer, ctx: ServerContext): Promise<void> {
   await warnAboutPendingMigrationsOnStartup(ctx);
-  const transport = new StdioServerTransport();
 
-  async function shutdown() {
-    await server.close();
-    process.exit(0);
-  }
-  process.on("SIGINT", shutdown);
-  process.on("SIGTERM", shutdown);
-  transport.onclose = async () => {
-    await server.close();
-  };
-
-  await server.connect(transport);
+  await serveStdio(() => server, {
+    onerror: (error) => console.error(`[mnemonic] stdio error:`, error),
+  });
   console.error(`[mnemonic] Started. Main vault: ${ctx.vaultPath}`);
 }
