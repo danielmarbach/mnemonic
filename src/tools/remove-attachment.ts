@@ -147,6 +147,19 @@ export function registerRemoveAttachmentTool(server: McpServer, ctx: ServerConte
         );
       }
 
+      // Clean up per-attachment chunk embeddings for document-source attachments
+      // (<gitRoot>/.mnemonic/embeddings/doc-source/<attachmentId>/).
+      if (removed.kind === "document-source") {
+        const projectVault = cwd ? await ctx.vaultManager.getProjectVaultIfExists(cwd) : null;
+        const embeddingsDir = projectVault?.storage.embeddingsDir;
+        if (embeddingsDir) {
+          const dir = path.join(embeddingsDir, "doc-source", removed.attachmentId);
+          await attempt("remove-attachment:clean-chunk-embeddings", () =>
+            fs.rm(dir, { recursive: true, force: true }),
+          );
+        }
+      }
+
       const updatedAttachments = currentAttachments.filter((_, i) => i !== attachmentIndex);
       await ctx.configStore.setProjectAttachments(project.id, updatedAttachments);
       ctx.vaultManager.removeAttachment(project.id, removed.projectSlug);

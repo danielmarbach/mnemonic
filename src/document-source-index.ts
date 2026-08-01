@@ -106,12 +106,14 @@ export function buildGenerationFromFiles(
     chunkerVersion: chunker.chunkerVersion,
     chunkerOptionsHash: "default",
     projectionSchemaVersion: "1",
-    indexSchemaVersion: "1",
+    indexSchemaVersion: "2",
     embeddingCompatibilityIdentity: `${extractor.extractorId}::${extractor.extractorVersion}::${chunker.chunkerId}::${chunker.chunkerVersion}`,
     sourceMediaTypeCounts: { [extractor.sourceMediaType]: documents.size },
     documentCount: documents.size,
     chunkCount: chunkMap.size,
+    embeddedChunkCount: 0,
     skippedFiles: skipped.map((s) => ({ path: s.path, reason: s.reason })),
+    embeddingFailures: [],
     builtAt: new Date().toISOString(),
   };
 
@@ -119,6 +121,7 @@ export function buildGenerationFromFiles(
     manifest,
     documents,
     chunks: chunkMap,
+    chunkEmbeddings: new Map(),
     sourceBytes,
     extractedText,
   };

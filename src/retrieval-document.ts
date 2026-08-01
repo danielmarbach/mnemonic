@@ -1,4 +1,5 @@
 import type { Brand } from "./brands.js";
+import type { ChunkEmbeddingRecord } from "./chunk-embedding-storage.js";
 
 // Branded types for document and chunk IDs
 export type DocumentId = Brand<string, "DocumentId">;
@@ -46,7 +47,9 @@ export interface GenerationManifest {
   sourceMediaTypeCounts: Record<string, number>;
   documentCount: number;
   chunkCount: number;
+  embeddedChunkCount: number;
   skippedFiles: Array<{ path: string; reason: string }>;
+  embeddingFailures: Array<{ chunkId: string; reason: string }>;
   builtAt: string; // ISO 8601
 }
 
@@ -55,6 +58,7 @@ export interface DocumentGeneration {
   manifest: GenerationManifest;
   documents: Map<string, RetrievalDocument>; // documentId -> document
   chunks: Map<string, RetrievalChunk>; // chunkId -> chunk
+  chunkEmbeddings: Map<string, ChunkEmbeddingRecord>; // chunkId -> chunk embedding record
   sourceBytes: Map<string, Uint8Array>; // documentId -> raw source bytes
   extractedText: Map<string, string>; // documentId -> extracted text
 }

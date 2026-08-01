@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { isGenerationCurrent } from "../src/document-sync.js";
 import { markdownExtractor } from "../src/markdown-extractor.js";
 import { markdownChunker } from "../src/markdown-chunker.js";
+import { currentEmbeddingIdentity } from "../src/embeddings.js";
 
 const extractor = {
   extractorId: markdownExtractor.extractorId,
@@ -12,11 +13,25 @@ const chunker = {
   chunkerVersion: markdownChunker.chunkerVersion,
 };
 
+// Must mirror the production 8-part embedding-compatibility identity
+// (src/document-sync.ts buildEmbeddingCompatibilityIdentity).
+const expectedEmbeddingCompatibilityIdentity = [
+  extractor.extractorId,
+  extractor.extractorVersion,
+  chunker.chunkerId,
+  chunker.chunkerVersion,
+  currentEmbeddingIdentity.provider,
+  currentEmbeddingIdentity.model,
+  currentEmbeddingIdentity.dimensions ?? "",
+  currentEmbeddingIdentity.metric,
+].join("::");
+
 function makeGeneration(
   overrides: Partial<{
     indexedCommit: string;
     extractorVersion: string;
     chunkerVersion: string;
+    indexSchemaVersion: string;
     embeddingCompatibilityIdentity: string;
   }> = {},
 ) {
@@ -25,9 +40,9 @@ function makeGeneration(
       indexedCommit: overrides.indexedCommit ?? "commit-1",
       extractorVersion: overrides.extractorVersion ?? extractor.extractorVersion,
       chunkerVersion: overrides.chunkerVersion ?? chunker.chunkerVersion,
+      indexSchemaVersion: overrides.indexSchemaVersion ?? "2",
       embeddingCompatibilityIdentity:
-        overrides.embeddingCompatibilityIdentity ??
-        `${extractor.extractorId}::${extractor.extractorVersion}::${chunker.chunkerId}::${chunker.chunkerVersion}`,
+        overrides.embeddingCompatibilityIdentity ?? expectedEmbeddingCompatibilityIdentity,
     },
   };
 }

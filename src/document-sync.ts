@@ -1,13 +1,26 @@
 import { simpleGit } from "simple-git";
 import path from "path";
+import { createHash } from "node:crypto";
 import { expandHomePath } from "./paths.js";
 import { getExtractor } from "./document-extractor.js";
 import { markdownChunker } from "./markdown-chunker.js";
 import { buildGenerationFromFiles } from "./document-source-index.js";
 import { getCurrentGeneration } from "./generation-storage.js";
 import { matchAnyGlob } from "./glob-match.js";
-import type { DocumentSourceAttachmentConfig } from "./vault.js";
+import { DOCUMENT_SOURCE_LIMITS } from "./retrieval-document.js";
+import type { DocumentGeneration, RetrievalChunk } from "./retrieval-document.js";
+import { ChunkEmbeddingStorage } from "./chunk-embedding-storage.js";
+import type { ChunkEmbeddingRecord } from "./chunk-embedding-storage.js";
 import { attempt, getErrorMessage } from "./error-utils.js";
+import {
+  checkEmbeddingCompatibility,
+  currentEmbeddingIdentity,
+  embed,
+  embeddingMetadata,
+} from "./embeddings.js";
+import { isoDateString } from "./brands.js";
+import type { DocumentSourceAttachmentConfig } from "./vault.js";
+import type { ServerContext } from "./server-context.js";
 
 export interface DocumentSyncResult {
   attachmentId: string;
@@ -23,10 +36,33 @@ export interface DocumentSyncResult {
 }
 
 /**
+ * Full embedding-compatibility identity: extractor + chunker + the current
+ * embedding identity (provider + model + dimensions + metric). A change to any
+ * component (e.g. a different embedding model) invalidates the generation and
+ * forces a full re-index/re-embed on the next sync.
+ */
+function buildEmbeddingCompatibilityIdentity(
+  extractor: { extractorId: string; extractorVersion: string },
+  chunker: { chunkerId: string; chunkerVersion: string },
+): string {
+  return [
+    extractor.extractorId,
+    extractor.extractorVersion,
+    chunker.chunkerId,
+    chunker.chunkerVersion,
+    currentEmbeddingIdentity.provider,
+    currentEmbeddingIdentity.model,
+    currentEmbeddingIdentity.dimensions ?? "",
+    currentEmbeddingIdentity.metric,
+  ].join("::");
+}
+
+/**
  * Decide whether an existing generation can be reused for the given commit
  * against the currently registered extractor/chunker. A version bump (e.g. a
- * fix to heading-text extraction) must re-index even when the pinned commit has
- * not changed, otherwise stale derived state hides the fix.
+ * fix to heading-text extraction) or an embedding-model change must re-index
+ * even when the pinned commit has not changed, otherwise stale derived state
+ * hides the fix.
  */
 export function isGenerationCurrent(
   generation:
@@ -35,6 +71,7 @@ export function isGenerationCurrent(
           indexedCommit: string;
           extractorVersion: string;
           chunkerVersion: string;
+          indexSchemaVersion: string;
           embeddingCompatibilityIdentity: string;
         };
       }
@@ -44,21 +81,189 @@ export function isGenerationCurrent(
   chunker: { chunkerId: string; chunkerVersion: string },
 ): generation is NonNullable<typeof generation> {
   if (!generation) return false;
-  const expectedCompatibilityIdentity = `${extractor.extractorId}::${extractor.extractorVersion}::${chunker.chunkerId}::${chunker.chunkerVersion}`;
+  const expectedCompatibilityIdentity = buildEmbeddingCompatibilityIdentity(extractor, chunker);
   return (
     generation.manifest.indexedCommit === indexedCommit &&
     generation.manifest.extractorVersion === extractor.extractorVersion &&
     generation.manifest.chunkerVersion === chunker.chunkerVersion &&
+    generation.manifest.indexSchemaVersion === "2" &&
     generation.manifest.embeddingCompatibilityIdentity === expectedCompatibilityIdentity
   );
 }
 
+function joinHeadingAncestry(headingAncestry: Array<{ depth: number; text: string }>): string {
+  return headingAncestry.map((h) => h.text).join(" / ");
+}
+
+interface ChunkEmbeddingWorkItem {
+  chunk: RetrievalChunk;
+  projectionText: string;
+  contentHash: string;
+  sourcePath: string;
+}
+
+/** Safety bound for the recency git-log walk so huge histories cannot stall a sync. */
+const RECENCY_LOG_LINE_BUDGET = 200_000;
+
+/**
+ * Compute the newest commit date for each source path with a single `git log`
+ * walk (newest-first). Used to prioritize which still-un-embedded chunks to
+ * embed first when the per-sync embedding work cap bites. Fail-soft: any git
+ * failure returns an empty map and callers fall back to source-path ordering.
+ */
+async function computePerPathLastMod(
+  resolvedLocalPath: string,
+  indexedCommit: string,
+  paths: string[],
+): Promise<Map<string, string>> {
+  const targetPaths = new Set(paths);
+  if (targetPaths.size === 0) return new Map();
+
+  const result = await attempt("sync:doc-source-recency", async () => {
+    const git = simpleGit(resolvedLocalPath);
+    const logOutput = await git.raw(["log", "--name-only", "--format=%cI", indexedCommit]);
+    const lastModByPath = new Map<string, string>();
+    let currentDate = "";
+    let lineCount = 0;
+    for (const line of logOutput.split("\n")) {
+      lineCount++;
+      if (lineCount > RECENCY_LOG_LINE_BUDGET) break;
+      if (line.length === 0) continue;
+      if (/^\d{4}-\d{2}-\d{2}T/.test(line)) {
+        currentDate = line;
+        continue;
+      }
+      if (currentDate === "") continue;
+      if (targetPaths.has(line) && !lastModByPath.has(line)) {
+        lastModByPath.set(line, currentDate);
+        if (lastModByPath.size === targetPaths.size) break;
+      }
+    }
+    return lastModByPath;
+  });
+
+  return result.ok ? result.value : new Map();
+}
+
+/**
+ * Embed generation chunks with fail-soft semantics (the spec's line-41
+ * contract): per-chunk embed failures are recorded in the manifest and never
+ * fail the sync. Reuses on-disk embeddings whose content hash + embedding
+ * identity match the current projection text. When the per-sync embedding work
+ * cap bites, the most-recently-modified chunks are embedded first; the rest
+ * remain lexical-only.
+ */
+export async function embedGenerationChunks(
+  gen: DocumentGeneration,
+  ctx: ServerContext,
+  attachmentId: string,
+  storage: ChunkEmbeddingStorage,
+  lastModByPath: Map<string, string>,
+  maxEmbeddingWork: number = DOCUMENT_SOURCE_LIMITS.maxEmbeddingWork,
+): Promise<void> {
+  const toEmbed: ChunkEmbeddingWorkItem[] = [];
+
+  for (const chunk of gen.chunks.values()) {
+    const sourcePath = gen.documents.get(chunk.documentId)?.sourcePath ?? chunk.documentId;
+    const projectionText = `${chunk.content}\n${joinHeadingAncestry(chunk.headingAncestry)}\n${sourcePath}`;
+    const contentHash = createHash("sha256").update(projectionText, "utf-8").digest("hex");
+
+    const existing = await storage.read(chunk.chunkId);
+    if (
+      existing &&
+      existing.contentHash === contentHash &&
+      checkEmbeddingCompatibility(existing, currentEmbeddingIdentity).status === "compatible"
+    ) {
+      gen.chunkEmbeddings.set(chunk.chunkId, existing);
+      continue;
+    }
+
+    toEmbed.push({ chunk, projectionText, contentHash, sourcePath });
+  }
+
+  // Recency-priority ordering: newest last-modified first, tie-break by source
+  // path for determinism. ISO dates compare lexicographically = chronologically.
+  toEmbed.sort((a, b) => {
+    const aLastMod = lastModByPath.get(a.sourcePath) ?? "";
+    const bLastMod = lastModByPath.get(b.sourcePath) ?? "";
+    if (aLastMod !== bLastMod) {
+      return aLastMod < bLastMod ? 1 : -1;
+    }
+    return a.sourcePath.localeCompare(b.sourcePath);
+  });
+
+  const capped = toEmbed.slice(0, maxEmbeddingWork);
+
+  const embeddingFailures: Array<{ chunkId: string; reason: string }> = [];
+  let index = 0;
+
+  const workerCount = Math.min(ctx.config.reindexEmbedConcurrency, Math.max(capped.length, 1));
+  const workers = Array.from({ length: workerCount }, async () => {
+    while (true) {
+      const item = capped[index++];
+      if (!item) return;
+
+      const embedResult = await attempt(`embed:chunk:${attachmentId}`, async () => {
+        const vector = await embed(item.projectionText);
+        const meta = embeddingMetadata(vector);
+        const record: ChunkEmbeddingRecord = {
+          chunkId: item.chunk.chunkId,
+          contentHash: item.contentHash,
+          ...meta,
+          embedding: vector,
+          updatedAt: isoDateString(new Date().toISOString()),
+        };
+        await storage.write(record);
+        gen.chunkEmbeddings.set(item.chunk.chunkId, record);
+      });
+      if (!embedResult.ok) {
+        embeddingFailures.push({
+          chunkId: item.chunk.chunkId,
+          reason: getErrorMessage(embedResult.error),
+        });
+      }
+    }
+  });
+
+  await Promise.all(workers);
+
+  embeddingFailures.sort((a, b) => a.chunkId.localeCompare(b.chunkId));
+
+  gen.manifest.embeddedChunkCount = gen.chunkEmbeddings.size;
+  gen.manifest.embeddingFailures = embeddingFailures;
+}
+
+/**
+ * Delete on-disk chunk embeddings whose chunkId no longer exists in the current
+ * generation (mirrors `removeStaleEmbeddings` for note embeddings).
+ */
+export async function sweepStaleChunkEmbeddings(
+  storage: ChunkEmbeddingStorage,
+  currentChunkIds: Set<string>,
+): Promise<void> {
+  const onDisk = await storage.list();
+  for (const record of onDisk) {
+    if (!currentChunkIds.has(record.chunkId)) {
+      await storage.remove(record.chunkId);
+    }
+  }
+}
+
+function buildEmbeddingSummary(embedded: number, failed: number): string {
+  const parts: string[] = [];
+  if (embedded > 0) parts.push(`embedded ${embedded} chunk(s)`);
+  if (failed > 0) parts.push(`${failed} embedding failure(s)`);
+  return parts.length > 0 ? `, ${parts.join(", ")}` : "";
+}
+
 /**
  * Sync a document-source attachment: fetch the remote commit, enumerate blobs,
- * build a generation, and publish it.
+ * build a generation, embed chunk vectors (fail-soft), and publish it.
  */
 export async function syncDocumentSource(
   config: DocumentSourceAttachmentConfig,
+  ctx: ServerContext,
+  projectEmbeddingsDir: string | undefined,
 ): Promise<DocumentSyncResult> {
   const resolvedLocalPath = path.resolve(expandHomePath(config.localPath));
 
@@ -196,6 +401,56 @@ export async function syncDocumentSource(
     indexedCommit,
   );
 
+  // Override the embedding-compatibility identity so embedding-model changes
+  // invalidate the generation. `buildGenerationFromFiles` stays pure (it cannot
+  // import the embedding provider), so this happens here, before the generation
+  // is consumed.
+  const generation = getCurrentGeneration(config.attachmentId);
+  if (generation) {
+    generation.manifest.embeddingCompatibilityIdentity = buildEmbeddingCompatibilityIdentity(
+      extractor,
+      markdownChunker,
+    );
+  }
+
+  // Embed chunk vectors (fail-soft). When the embedding provider is unavailable
+  // or the project embeddings directory cannot be resolved, the generation
+  // still publishes with lexical-only coverage — the spec's line-41 contract.
+  if (generation && projectEmbeddingsDir) {
+    const chunkStorage = new ChunkEmbeddingStorage(
+      path.join(projectEmbeddingsDir, "doc-source", config.attachmentId),
+    );
+    const embedStep = await attempt("sync:doc-source-embed", async () => {
+      await chunkStorage.init();
+      const sourcePaths = Array.from(generation.documents.values(), (d) => d.sourcePath);
+      const lastModByPath = await computePerPathLastMod(
+        resolvedLocalPath,
+        indexedCommit,
+        sourcePaths,
+      );
+      await embedGenerationChunks(
+        generation,
+        ctx,
+        config.attachmentId,
+        chunkStorage,
+        lastModByPath,
+      );
+      await sweepStaleChunkEmbeddings(chunkStorage, new Set(generation.chunks.keys()));
+    });
+    if (!embedStep.ok) {
+      generation.manifest.embeddingFailures = [
+        { chunkId: "", reason: `embed-step-failed: ${getErrorMessage(embedStep.error)}` },
+      ];
+    }
+  }
+
+  const embeddingSummary = generation
+    ? buildEmbeddingSummary(
+        generation.manifest.embeddedChunkCount,
+        generation.manifest.embeddingFailures.length,
+      )
+    : "";
+
   return {
     attachmentId: config.attachmentId,
     projectSlug: config.projectSlug,
@@ -206,6 +461,6 @@ export async function syncDocumentSource(
     skippedFiles: buildResult.skippedFiles,
     errors: [],
     status: "indexed",
-    message: `Indexed ${buildResult.documentCount} documents, ${buildResult.chunkCount} chunks from ${indexedCommit.substring(0, 8)}.`,
+    message: `Indexed ${buildResult.documentCount} documents, ${buildResult.chunkCount} chunks from ${indexedCommit.substring(0, 8)}${embeddingSummary}.`,
   };
 }
