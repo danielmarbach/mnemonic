@@ -6,27 +6,27 @@ For the high-level system map, see [`ARCHITECTURE.md`](ARCHITECTURE.md). For rel
 
 ## Why mnemonic
 
-- 🧠 Your MCP client remembers decisions, fixes, and context across sessions — no re-explaining the same project.
-- 📁 Memories are plain markdown with YAML frontmatter: readable, diffable, mergeable, and easy to back up.
-- 🚫 No database or always-on service: just files, git, and a local Node process.
-- 🎯 Project-scoped recall favors the right repo context while keeping stronger global matches accessible.
-- 🔎 Hybrid recall finds conceptual matches plus exact names, identifiers, phrases, error codes, and versions.
-- 🤝 Shared `.mnemonic/` notes travel with the repository, so project knowledge isn't trapped in one person's chat history.
-- 📚 Document-source attachments let you link external repos as read-only knowledge sources — their markdown docs are indexed and searchable through recall alongside your memories.
-- 🔒 Embeddings stay local and gitignored — semantic retrieval without committing generated vector data.
-- 📝 Every `remember`, `update`, and `consolidate` creates a semantic git commit — decision log and plans travel with the code in the same history.
-- 🔓 Designed for removability — though we're quietly confident you won't use that exit. Every note is plain markdown with YAML frontmatter; the knowledge you gather is independent of mnemonic and always yours.
+- Your MCP client can carry decisions, fixes, and context across sessions, so you do not have to re-explain the same project.
+- Memories are plain markdown with YAML frontmatter. They are readable, diffable, mergeable, and easy to back up.
+- No database or always-on service is required. mnemonic uses files, git, and a local Node process.
+- Project-scoped recall favors the right repo context while keeping stronger global matches accessible.
+- Hybrid recall finds conceptual matches as well as exact names, identifiers, phrases, error codes, and versions.
+- Shared `.mnemonic/` notes travel with the repository, so project knowledge is not trapped in one person's chat history.
+- Document-source attachments let you link external repos as read-only knowledge sources. Their markdown docs are indexed and searchable through recall alongside your memories.
+- Embeddings stay local and gitignored. You get semantic retrieval without committing generated vector data.
+- Every `remember`, `update`, and `consolidate` creates a semantic git commit. Your decision log and plans travel with the code in the same history.
+- If you stop using mnemonic, your notes remain plain markdown with YAML frontmatter. The knowledge you gather stays independent and remains yours.
 
 ## Stability
 
 The storage format is stable with migration support for any future changes. Keep an eye on the changelog; `list_migrations` shows pending work per vault after each update.
 
-**Scale:** Designed for simplicity and portability — not large-scale knowledge bases.
+**Scale:** mnemonic favors simplicity and portability over large-scale knowledge bases.
 
-- Hundreds to low thousands of notes: excellent fit.
+- Hundreds to low thousands of notes: a good fit.
 - Several thousand: often fine, depending on note size, machine speed, and embedding throughput.
-- Within a session, notes and embeddings are cached after first access — repeated `recall`, `get`, and `project_memory_summary` calls skip storage reads regardless of vault size.
-- Very large collections: expect pain points around reindex time, recall latency, and git churn.
+- Within a session, notes and embeddings are cached after first access. Repeated `recall`, `get`, and `project_memory_summary` calls skip storage reads regardless of vault size.
+- Very large collections: expect longer reindexing, higher recall latency, and more git churn.
 - Many concurrent writers or massive scale: consider a dedicated database and indexing layer instead.
 
 ## Prerequisites
@@ -43,7 +43,7 @@ ollama pull nomic-embed-text-v2-moe
 ollama pull qwen3-embedding:0.6b
 ```
 
-No code changes required — set `EMBED_MODEL=qwen3-embedding:0.6b` in your environment or MCP config.
+To use it, set `EMBED_MODEL=qwen3-embedding:0.6b` in your environment or MCP config.
 
 Advanced users can use OpenAI-compatible endpoints, native OpenAI, or Gemini instead. Provider settings are environment-only; mnemonic never writes API keys to notes, embedding files, vault config, or git.
 
@@ -293,19 +293,19 @@ Privacy note: Ollama keeps projection text local. OpenAI-compatible cloud proxie
 
 ### config.json
 
-The main vault's `~/mnemonic-vault/config.json` holds machine-local settings that survive across sessions. You can edit it by hand — unknown fields are ignored and invalid values fall back to defaults.
+The main vault's `~/mnemonic-vault/config.json` holds machine-local settings that survive across sessions. You can edit it by hand. Unknown fields are ignored, and invalid values fall back to defaults.
 
 User-tunable fields:
 
 | Field                     | Default       | Description                                                          |
 | ------------------------- | ------------- | -------------------------------------------------------------------- |
-| `reindexEmbedConcurrency` | `4`           | Parallel embedding requests during `sync` (capped 1–16)              |
+| `reindexEmbedConcurrency` | `4`           | Parallel embedding requests during `sync` (capped from 1 to 16)     |
 | `mutationPushMode`        | `"main-only"` | When to auto-push after a write: `"all"`, `"main-only"`, or `"none"` |
 
-`projectMemoryPolicies` and `projectIdentityOverrides` are written automatically by `set_project_memory_policy` and `set_project_identity` — no need to edit them by hand.
+`projectMemoryPolicies` and `projectIdentityOverrides` are written automatically by `set_project_memory_policy` and `set_project_identity`. You do not need to edit them by hand.
 Project memory policies can include protected-branch settings (`protectedBranchBehavior`, `protectedBranchPatterns`) used by mutating tools when they commit to project vaults (`remember`, `update`, `forget`, `move_memory`, and mutating `consolidate` strategies).
 
-Example — raise concurrency on a fast machine and disable auto-push everywhere:
+For example, raise concurrency on a fast machine and disable auto-push everywhere:
 
 ```json
 {
@@ -320,7 +320,7 @@ Example — raise concurrency on a fast machine and disable auto-push everywhere
 
 Two vault types store notes:
 
-**Main vault** — private global memories at `~/mnemonic-vault` (its own git repo):
+**Main vault:** private global memories at `~/mnemonic-vault` (its own git repo):
 
 ```
 ~/mnemonic-vault/
@@ -333,7 +333,7 @@ Two vault types store notes:
     setup-notes-a1b2c3.json
 ```
 
-**Project vault** — project-specific memories committed into the project repo:
+**Project vault:** project-specific memories committed into the project repo:
 
 ```
 <git-root>/
@@ -362,7 +362,7 @@ Use `set_project_memory_policy` to save per-project defaults:
 - protected-branch behavior for project-vault writes (`ask`, `block`, `allow`)
 - protected-branch patterns (glob strings; defaults are `main`, `master`, `release*`)
 
-When write scope policy is `ask`, `remember` returns a clear storage choice instead of guessing — on supported MCP clients it asks project vs global through the client UI. When protected-branch behavior is `ask`, mutating tools that would commit to the project vault ask for one-time confirmation through the client UI (or return the `allowProtectedBranch: true` override option plus instructions to persist `block`/`allow` on clients without support).
+When write scope policy is `ask`, `remember` returns a clear storage choice instead of guessing. On supported MCP clients, it asks you to choose project or global storage through the client UI. When protected-branch behavior is `ask`, mutating tools that would commit to the project vault ask for one-time confirmation through the client UI. Clients without that support return the `allowProtectedBranch: true` override option and instructions for persisting `block` or `allow`.
 
 ### Project identity
 
@@ -370,14 +370,14 @@ Project identity derives from the **git remote URL**, normalized to a stable slu
 
 ### Recall
 
-`recall` with `cwd` searches both vaults. Project notes get a **small tiebreaker boost** — a soft signal, not a hard filter — so global memories remain accessible while project context floats to the top.
+`recall` with `cwd` searches both vaults. Project notes get a **small tiebreaker boost**. It is a soft signal, not a hard filter, so global memories remain accessible while project context floats to the top.
 
 Every result carries structured quality signals to help agents decide what to trust:
 
-- **`signalStrength`** — a composite score (0.00-0.50) from role, graph centrality, lifecycle, and recency. Higher values mean more structural support behind the note.
-- **`confidence`** — high/medium/low tier derived from `signalStrength`, replacing a single coarse heuristic.
-- **`diversity`** — theme count, role mix, and lifecycle mix across selected results.
-- **`retrievalCoverage`** — fraction of high-priority anchors (alwaysLoad and summary notes) represented in results.
+- **`signalStrength`:** a composite score (0.00-0.50) from role, graph centrality, lifecycle, and recency. Higher values mean more structural support behind the note.
+- **`confidence`:** a high, medium, or low tier derived from `signalStrength`, replacing a single coarse heuristic.
+- **`diversity`:** the theme count, role mix, and lifecycle mix across selected results.
+- **`retrievalCoverage`:** the fraction of high-priority anchors (alwaysLoad and summary notes) represented in results.
 
 **Hybrid recall** combines semantic similarity, exact wording, and relationship context on every query. It can now find exact names, identifiers, phrases, error codes, and version strings even when they are not semantically similar, while still favoring conceptually relevant and well-connected notes. The ranking remains bounded and fail-soft, uses compact projections without new infrastructure, and preserves canonical explanation promotion and temporal recency hints.
 
@@ -401,28 +401,28 @@ Recall evidence:
 
 **How it works:**
 
-mnemonic interprets change semantically using structural and statistical signals (size ratios, heading changes, section movements) rather than language-dependent analysis. Raw diffs are intentionally NOT part of default temporal output—you get interpretive summaries that explain what kind of change happened, not patch noise.
+mnemonic interprets change semantically using structural and statistical signals (size ratios, heading changes, and section movements) rather than language-dependent analysis. Raw diffs are intentionally NOT part of default temporal output. You get interpretive summaries that explain what kind of change happened, not patch noise.
 
 Use `verbose: true` together with temporal mode when you want richer change stats such as additions, deletions, files changed, and change classification. Those stats describe the whole commit that touched the note, not a raw diff excerpt, so recall stays bounded and does not return full diffs.
 
 The `scope` parameter on `recall` narrows results:
 
-- `"all"` _(default)_ — project memories boosted, then global
-- `"project"` — only memories for the detected project
-- `"global"` — only memories with no project association
+- `"all"` (default): project memories boosted, then global
+- `"project"`: only memories for the detected project
+- `"global"`: only memories with no project association
 
 ### Note lifecycle
 
 Each note carries a `lifecycle`:
 
-- `"permanent"` _(default)_ — durable knowledge for future sessions
-- `"temporary"` — working-state scaffolding (plans, WIP checkpoints) that can be cleaned up once consolidated
+- `"permanent"` (default): durable knowledge for future sessions
+- `"temporary"`: working-state scaffolding (plans, WIP checkpoints) that can be cleaned up once consolidated
 
 Store what should help future work: decisions, outcomes, corrections, constraints, and lessons learned. Leave routine chatter out. Cleanup stays explicit through lifecycle and consolidation choices; mnemonic does not auto-expire notes.
 
 ### Roles and lifecycle
 
-Roles are optional prioritization hints, not required schema. mnemonic infers a `role` and `importance` from structural signals (heading count, bullet density, inbound references, relationship types) — inference is language-independent and never overwrites explicit frontmatter. Valid roles: `summary`, `decision`, `plan`, `context`, `reference`, `research`, `review`. Valid importance values: `high`, `normal`, `low`.
+Roles are optional prioritization hints, not required schema. mnemonic infers a `role` and `importance` from structural signals (heading count, bullet density, inbound references, and relationship types). Inference is language-independent and never overwrites explicit frontmatter. Valid roles: `summary`, `decision`, `plan`, `context`, `reference`, `research`, `review`. Valid importance values: `high`, `normal`, `low`.
 
 Set `alwaysLoad: true` in a note's frontmatter to mark it as an explicit session anchor; it receives the highest recall and relationship-expansion priority regardless of inferred role.
 
@@ -465,12 +465,12 @@ Embedding records include non-secret compatibility metadata so mnemonic can avoi
 
 **Projections** improve embedding quality by extracting structured representations instead of embedding raw markdown. Each note has a projection stored in `projections/<noteId>.json` (also gitignored) containing:
 
-- `projectionText`: compact embedding input (max 1200 chars) with title, lifecycle, tags, summary, and h1–h3 headings
+- `projectionText`: compact embedding input (max 1200 chars) with title, lifecycle, tags, summary, and h1 through h3 headings
 - `summary`: extracted from the first non-heading paragraph, first bullet list, or first 200 chars of body
-- `headings`: up to 8 deduplicated h1–h3 headings (plain text, in order)
+- `headings`: up to 8 deduplicated h1 through h3 headings (plain text, in order)
 - `updatedAt`: staleness anchor matching the note's updatedAt timestamp
 
-Projections are built lazily on first embed and rebuilt when `note.updatedAt !== projection.updatedAt`. No global rebuild needed — staleness is timestamp-based. If projection generation fails, the system falls back to raw `title + content` so embeds never block.
+Projections are built lazily on first embed and rebuilt when `note.updatedAt !== projection.updatedAt`. No global rebuild is needed because staleness is timestamp-based. If projection generation fails, the system falls back to raw `title + content`, so embeds never block.
 
 ### Migrations
 
@@ -577,9 +577,9 @@ Imported notes are written to the main vault with `lifecycle: permanent` and `sc
 
 `project_memory_summary` categorizes notes by theme. Themes **emerge automatically** from your notes:
 
-- **Tag-based classification** — notes with matching tags (e.g., `["decisions"]`, `["bugs"]`) are grouped immediately
-- **Keyword graduation** — keywords that appear across multiple notes become named themes over time
-- **"other" bucket** — notes that don't match any theme are grouped here; this shrinks as themes emerge
+- **Tag-based classification:** notes with matching tags (for example, `["decisions"]` or `["bugs"]`) are grouped immediately.
+- **Keyword graduation:** keywords that appear across multiple notes become named themes over time.
+- **"other" bucket:** notes that do not match a theme are grouped here. This bucket shrinks as themes emerge.
 
 No predefined schema required. The system adapts to your project's vocabulary.
 
@@ -617,7 +617,7 @@ Multi-repo attachment support lets you link external repositories as **federated
 Key concepts:
 
 - `add_attachment` links a repo by its absolute `localPath` (supports `~` expansion); optional `branch`, `vaultFolder`, `writable`, and `pushBranch` select branch, sub-vault, write access, and push target. Use `kind: "document-source"` to index markdown files as read-only document retrieval sources.
-- **Document-source attachments**: when `kind: "document-source"`, the attachment indexes markdown files from a pinned git revision. Documents are extracted, heading-aware chunked, and made searchable through recall; `get` resolves `doc:` and `chunk:` handles for exact content. Mutation tools reject document-source entities — the source repository is never written to. Configuration accepts `root` (default `.`), `include` (default `["**/*.md"]`), `exclude` (defaults to generated/vendor paths), and `acceptedMediaTypes` (default `["text/markdown"]`); see [Configuring attachments](#configuring-attachments) for worked examples.
+- **Document-source attachments:** when `kind: "document-source"`, the attachment indexes markdown files from a pinned git revision. Documents are extracted, split by heading, and made searchable through recall. `get` resolves `doc:` and `chunk:` handles for exact content. Mutation tools reject document-source entities, so the source repository is never written to. Configuration accepts `root` (default `.`), `include` (default `["**/*.md"]`), `exclude` (defaults to generated/vendor paths), and `acceptedMediaTypes` (default `["text/markdown"]`). See [Configuring attachments](#configuring-attachments) for worked examples.
 - `remove_attachment` removes by `projectSlug`; `list_attachments` shows all attachments with status.
 - `set_attachment_enabled` toggles an attachment on/off without removing config; `set_attachment_branch` changes the branch.
 - Max 5 attachments per project (configurable via `maxAttachmentsPerProject` in project memory policy).
@@ -632,7 +632,7 @@ Key concepts:
 
 Attachments are configured through the `add_attachment` tool, which writes the config and activates the attachment. `cwd` and `localPath` are required; everything else is optional. Fields that do not apply to the chosen `kind` are ignored.
 
-**Document-source** — index an external repository's markdown as read-only, searchable content:
+**Document-source:** index an external repository's markdown as read-only, searchable content:
 
 ```json
 {
@@ -653,9 +653,9 @@ Attachments are configured through the `add_attachment` tool, which writes the c
 | `exclude`            | `["node_modules", ".git", "dist", "build", ".next", ".cache", "coverage"]` | Glob patterns relative to `root` to skip; defaults cover generated/vendor paths |
 | `acceptedMediaTypes` | `["text/markdown"]`                                                 | Canonical lower-case IANA base media types accepted as indexable sources        |
 
-Only tracked Git blobs at the pinned revision are indexed — symlinks, submodules, and untracked working-tree files are skipped. Matching is case-sensitive on Git tree paths: `**` crosses directories, `*` matches within a segment, and a bare name like `node_modules` matches any segment.
+Only tracked Git blobs at the pinned revision are indexed. Symlinks, submodules, and untracked working-tree files are skipped. Matching is case-sensitive on Git tree paths: `**` crosses directories, `*` matches within a segment, and a bare name like `node_modules` matches any segment.
 
-**Mnemonic-vault** — attach another repository's notes as a federated vault, optionally writable:
+**Mnemonic-vault:** attach another repository's notes as a federated vault, optionally writable:
 
 ```json
 {
@@ -708,11 +708,11 @@ After the first sync, call the `sync` MCP tool (with `cwd` for project vaults) w
 
 Easier search is part of it, but three things work together:
 
-- **Semantic search over vector embeddings.** Each note is indexed through your configured embedding provider so `recall` finds the right note even when you don't remember the exact words — searching "JWT expiry bug" can surface a note titled "RS256 migration rationale". `grep` only matches strings you already know.
+- **Semantic search over vector embeddings.** Each note is indexed through your configured embedding provider, so `recall` can find the right note even when you do not remember the exact words. For example, searching "JWT expiry bug" can surface a note titled "RS256 migration rationale". `grep` only matches strings you already know.
 - **A connected knowledge graph.** Notes link to each other with typed relationships (`explains`, `supersedes`, `example-of`). Related context surfaces together automatically; `memory_graph` shows the full web. A folder of markdown files has no edges between them.
-- **Decision history travels with the code.** Every `remember`, `update`, and `consolidate` creates a descriptive git commit, so your decision log and implementation plans evolve alongside the code they describe — attributed and timestamped in `git log`.
+- **Decision history travels with the code.** Every `remember`, `update`, and `consolidate` creates a descriptive git commit. Your decision log and implementation plans evolve alongside the code they describe, with attribution and timestamps in `git log`.
 
-mnemonic is designed to be removable — so give it a try with confidence. We think once you do, you'll stay. But if you ever leave, all the knowledge you've gathered is independent: plain markdown with standard YAML frontmatter, readable in any editor, searchable with `grep`, committable to git. No rescue operation required.
+mnemonic is designed to be removable. If you stop using it, your notes remain plain markdown with standard YAML frontmatter. You can read them in any editor, search them with `grep`, and commit them to git.
 
 **Are mnemonic's embeddings the same as what Claude uses?**
 
@@ -747,11 +747,11 @@ This keeps early ideation reusable as personal/global knowledge while moving con
 
 **How does mnemonic differ from Beads?**
 
-mnemonic and Beads address complementary concerns. mnemonic is a **knowledge graph**: it stores notes, relationships between them, and lets agents retrieve relevant context through semantic search. [Beads](https://github.com/steveyegge/beads) is a **task and dependency tracker**: it models work items and their dependencies so agents can determine what is ready to execute next. Both tools can coexist in the same workflow — mnemonic stores knowledge and reasoning while Beads manages execution.
+mnemonic and Beads address complementary concerns. mnemonic is a **knowledge graph**: it stores notes, relationships between them, and lets agents retrieve relevant context through semantic search. [Beads](https://github.com/steveyegge/beads) is a **task and dependency tracker**: it models work items and their dependencies so agents can determine what is ready to execute next. Both tools can coexist in the same workflow. mnemonic stores knowledge and reasoning while Beads manages execution.
 
 **How does mnemonic differ from Memory Bank MCP?**
 
-mnemonic and Memory Bank MCP both provide persistent memory for agents, but differ in hosting and scope. Memory Bank MCP is a **centralized service** — your memory lives in a remote MCP service and is accessed across projects through that single endpoint. mnemonic is **local-first** — your memories live as plain markdown files on your machine: project-scoped notes in `.mnemonic/` within each repo, and personal notes in a global vault under your home directory. There is no always-on server to configure or depend on; the MCP server spawns on demand per session.
+mnemonic and Memory Bank MCP both provide persistent memory for agents, but differ in hosting and scope. Memory Bank MCP is a **centralized service**. Your memory lives in a remote MCP service and is accessed across projects through that endpoint. mnemonic is **local-first**. Your memories live as plain markdown files on your machine: project-scoped notes in `.mnemonic/` within each repo, and personal notes in a global vault under your home directory. There is no always-on server to configure or depend on. The MCP server spawns on demand per session.
 
 **How does mnemonic differ from Basic Memory?**
 

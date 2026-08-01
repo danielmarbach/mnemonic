@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>mnemonic — AI memory that lives in your repo</title>
+  <title>mnemonic: AI memory that lives in your repo</title>
   <meta name="description" content="A local MCP memory server backed by plain markdown, synced via git. Project-scoped hybrid recall finds concepts, exact identifiers, and connected context. No database required." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -1166,7 +1166,7 @@
 
     <h1>
       Your AI assistant<br />
-      <span class="brand">remembers</span>, project by project.
+      <span class="brand">remembers</span> your projects.
     </h1>
 
     <p class="hero-sub">
@@ -1241,13 +1241,13 @@
   <div class="container">
     <div class="section-label">Why mnemonic</div>
     <h2 class="section-title">Stop re-explaining your codebase.</h2>
-    <p class="section-desc">Your AI assistant forgets everything between sessions. mnemonic fixes that — without a database or a SaaS subscription.</p>
+    <p class="section-desc">Your AI assistant forgets everything between sessions. mnemonic carries that context forward without a database or SaaS subscription.</p>
 
     <div class="features-grid">
       <div class="feature-card fade-up">
         <span class="feature-icon">&#x1F4C4;</span>
         <h3>Plain markdown, always</h3>
-        <p>Every memory is a markdown file with YAML frontmatter — designed for removability from day one. Give it a try; we think you'll like it enough to stay. And if you ever do leave, all the knowledge you've gathered is yours: plain markdown, independent of mnemonic, no strings attached.</p>
+        <p>Every memory is a markdown file with YAML frontmatter. If you stop using mnemonic, you can still read, search, and commit those notes because they remain independent of the tool.</p>
       </div>
       <div class="feature-card fade-up">
         <span class="feature-icon">&#x1F3AF;</span>
@@ -1257,7 +1257,7 @@
       <div class="feature-card fade-up">
         <span class="feature-icon">&#x1F33F;</span>
         <h3>Git is the database</h3>
-        <p>No Postgres to babysit. Every <code style="font-family:JetBrains Mono,monospace;font-size:0.8em;color:var(--primary-lt)">remember</code>, <code style="font-family:JetBrains Mono,monospace;font-size:0.8em;color:var(--primary-lt)">update</code>, and <code style="font-family:JetBrains Mono,monospace;font-size:0.8em;color:var(--primary-lt)">consolidate</code> creates a semantic git commit — your decision log and implementation plans travel with the code in the same history. Pushes are controlled so project-vault writes do not fail on unpublished branches by default. History is inspectable, conflicts are isolated to individual files, and sync works across machines.</p>
+        <p>No Postgres to babysit. Every <code style="font-family:JetBrains Mono,monospace;font-size:0.8em;color:var(--primary-lt)">remember</code>, <code style="font-family:JetBrains Mono,monospace;font-size:0.8em;color:var(--primary-lt)">update</code>, and <code style="font-family:JetBrains Mono,monospace;font-size:0.8em;color:var(--primary-lt)">consolidate</code> creates a semantic git commit. Your decision log and implementation plans travel with the code in the same history. Pushes are controlled so project-vault writes do not fail on unpublished branches by default. History is inspectable, conflicts are isolated to individual files, and sync works across machines.</p>
       </div>
       <div class="feature-card fade-up">
         <span class="feature-icon">&#x1F50D;</span>
@@ -1282,17 +1282,17 @@
       <div class="feature-card fade-up">
         <span class="feature-icon">&#x1F4CC;</span>
         <h3>Notes surface smarter over time</h3>
-        <p>Mark notes <code style="font-family:JetBrains Mono,monospace;font-size:0.8em;color:var(--cyan-lt)">temporary</code> for plans and WIP, <code style="font-family:JetBrains Mono,monospace;font-size:0.8em;color:var(--cyan-lt)">permanent</code> for decisions worth keeping. Capture what future work will need — decisions, outcomes, corrections, and constraints — and leave routine chatter out. Pin any note as a session anchor to always bring it to the top.</p>
+        <p>Mark notes <code style="font-family:JetBrains Mono,monospace;font-size:0.8em;color:var(--cyan-lt)">temporary</code> for plans and WIP, and <code style="font-family:JetBrains Mono,monospace;font-size:0.8em;color:var(--cyan-lt)">permanent</code> for decisions worth keeping. Capture what future work will need: decisions, outcomes, corrections, and constraints. Leave routine chatter out. Pin any note as a session anchor to always bring it to the top.</p>
       </div>
       <div class="feature-card fade-up">
         <span class="feature-icon">&#x1F4DC;</span>
         <h3>Understand how decisions evolved</h3>
-        <p>Opt-in temporal mode adds compact git-backed history to <code style="font-family:JetBrains Mono,monospace;font-size:0.8em;color:var(--primary-lt)">recall</code> results. Each change is described in plain language — "Expanded the note with additional detail", "Connected this note to related work" — and the overall arc is summarised: "The core decision remained stable while rationale expanded." See how a decision formed without wading through raw diffs.</p>
+        <p>Opt-in temporal mode adds compact git-backed history to <code style="font-family:JetBrains Mono,monospace;font-size:0.8em;color:var(--primary-lt)">recall</code> results. Each change is described in plain language, such as "Expanded the note with additional detail" or "Connected this note to related work". The overall arc is summarised too: "The core decision remained stable while rationale expanded." See how a decision formed without wading through raw diffs.</p>
       </div>
       <div class="feature-card fade-up">
         <span class="feature-icon">&#x1F4CA;</span>
         <h3>Agents know what to trust</h3>
-        <p>Every <code style="font-family:JetBrains Mono,monospace;font-size:0.8em;color:var(--primary-lt)">recall</code> result carries structured quality signals: <code style="font-family:JetBrains Mono,monospace;font-size:0.8em;color:var(--cyan-lt)">signalStrength</code> rates each note on role, centrality, and recency; <code style="font-family:JetBrains Mono,monospace;font-size:0.8em;color:var(--cyan-lt)">retrievalCoverage</code> shows how many of your most important notes made it in; <code style="font-family:JetBrains Mono,monospace;font-size:0.8em;color:var(--cyan-lt)">diversity</code> reveals how many perspectives the result set spans. Agents don't just see ranked notes — they see why each note is worth paying attention to.</p>
+        <p>Every <code style="font-family:JetBrains Mono,monospace;font-size:0.8em;color:var(--primary-lt)">recall</code> result carries structured quality signals: <code style="font-family:JetBrains Mono,monospace;font-size:0.8em;color:var(--cyan-lt)">signalStrength</code> rates each note on role, centrality, and recency; <code style="font-family:JetBrains Mono,monospace;font-size:0.8em;color:var(--cyan-lt)">retrievalCoverage</code> shows how many of your most important notes made it in; <code style="font-family:JetBrains Mono,monospace;font-size:0.8em;color:var(--cyan-lt)">diversity</code> reveals how many perspectives the result set spans. Agents see ranked notes and the signals behind each result.
       </div>
       <div class="feature-card fade-up">
         <span class="feature-icon">&#x1F517;</span>
@@ -1417,7 +1417,7 @@
         <div class="vault-card-header">
           <div class="vault-pill main">main vault</div>
         </div>
-        <p>Private global memories stored in <code style="font-family:JetBrains Mono,monospace;font-size:0.8em;color:var(--primary-lt)">~/mnemonic-vault</code> — its own git repo. Cross-project knowledge, user preferences, early brainstorming before a repo exists, and anything you don't want committed to a project repo.</p>
+        <p>Private global memories stored in <code style="font-family:JetBrains Mono,monospace;font-size:0.8em;color:var(--primary-lt)">~/mnemonic-vault</code>, its own git repo. Use it for cross-project knowledge, user preferences, early brainstorming before a repo exists, and anything you do not want committed to a project repo.</p>
         <div class="file-tree">
 <span class="dir">~/mnemonic-vault/</span>
 <span class="file">  .gitignore</span>
@@ -1535,8 +1535,8 @@
   </svg>
   <div class="container">
     <div class="section-label">MCP tools</div>
-    <h2 class="section-title">Everything you need, nothing you don't.</h2>
-    <p class="section-desc">All tools are text-first and optimized for LLM consumption — compact, semantically explicit, no unnecessary structure. On protected branches, write actions pause and ask before committing unless you choose a different policy.</p>
+    <h2 class="section-title">Tools for capture, recall, and maintenance.</h2>
+    <p class="section-desc">All tools are text-first and optimized for LLM consumption. They stay compact and semantically explicit without unnecessary structure. On protected branches, write actions pause and ask before committing unless you choose a different policy.</p>
 
     <div class="tools-categories">
 
@@ -1544,31 +1544,31 @@
       <div>
         <div class="tool-category-header">Capture &amp; Retrieve</div>
         <div class="tool-category-grid">
-          <div class="tool-card" data-tip="Tell the AI what to remember — a decision, a pattern, a gotcha. Stores it in your project or personal vault and links it to the current context.">
+          <div class="tool-card" data-tip="Tell the AI what to remember: a decision, a pattern, or a gotcha. Stores it in your project or personal vault and links it to the current context.">
             <div class="tool-card-name">remember</div>
             <div class="tool-card-purpose">Save something worth keeping</div>
           </div>
-          <div class="tool-card" data-tip="Finds the most relevant notes for any question. Automatically surfaces project-specific memories first, then broader personal context. Each result carries signalStrength, confidence, and diversity metrics so agents can gauge what to trust. Temporal mode shows how a note changed over time, and optional recall evidence gives a short plain-language reason for why each result appeared. Document-source attachments contribute documentChunks alongside memory results.">
+          <div class="tool-card" data-tip="Finds the most relevant notes for any question. It surfaces project-specific memories first, then broader personal context. Each result carries signalStrength, confidence, and diversity metrics so agents can gauge what to trust. Temporal mode shows how a note changed over time, and optional recall evidence gives a short plain-language reason for each result. Document-source attachments contribute documentChunks alongside memory results.">
             <div class="tool-card-name">recall</div>
             <div class="tool-card-purpose">Ask what you've previously learned - or how it evolved</div>
           </div>
-          <div class="tool-card" data-tip="Edit an existing note's content, title, or tags. Keeps your memory base tidy instead of letting outdated notes pile up alongside fresh ones.">
+          <div class="tool-card" data-tip="Edit an existing note's content, title, or tags. Keep your memory base current instead of letting outdated notes pile up alongside fresh ones.">
             <div class="tool-card-name">update</div>
             <div class="tool-card-purpose">Correct or expand a memory</div>
           </div>
-          <div class="tool-card" data-tip="Permanently deletes a note and tidies up any connections to it. Can't be undone — but nothing important is ever truly lost if it was worth remembering.">
+          <div class="tool-card" data-tip="Permanently deletes a note and removes its connections. This cannot be undone, so use it for notes you no longer need.">
             <div class="tool-card-name">forget</div>
             <div class="tool-card-purpose">Remove something no longer useful</div>
           </div>
-          <div class="tool-card" data-tip="Retrieve a note directly by its ID — useful when you already know exactly which note you need, no searching required. Also resolves doc: and chunk: handles for exact document content from indexed document-source attachments.">
+          <div class="tool-card" data-tip="Retrieve a note directly by its ID when you already know which note you need. It also resolves doc: and chunk: handles for exact document content from indexed document-source attachments.">
             <div class="tool-card-name">get</div>
             <div class="tool-card-purpose">Pull up a specific note</div>
           </div>
-          <div class="tool-card" data-tip="Browse what's stored — filter by project, tag, or location. Great for a quick inventory before starting work on something familiar.">
+          <div class="tool-card" data-tip="Browse what's stored. Filter by project, tag, or location to take inventory before starting work.">
             <div class="tool-card-name">list</div>
             <div class="tool-card-purpose">See all memories for a project or tag</div>
           </div>
-          <div class="tool-card" data-tip="Shows the most recently touched notes. Handy at the start of a session to restore context without needing to remember what you were doing.">
+          <div class="tool-card" data-tip="Shows the most recently touched notes. Use it at the start of a session to restore context without remembering what you were doing.">
             <div class="tool-card-name">recent_memories</div>
             <div class="tool-card-purpose">Pick up where you left off</div>
           </div>
@@ -1583,7 +1583,7 @@
       <div>
         <div class="tool-category-header">Knowledge Graph</div>
         <div class="tool-category-grid">
-          <div class="tool-card" data-tip="Mark how two notes relate — one explains another, one is an example of another, or one supersedes another. Builds a navigable web of knowledge over time.">
+          <div class="tool-card" data-tip="Mark how two notes relate: one may explain another, provide an example, or supersede it. The relationships form a navigable knowledge graph.">
             <div class="tool-card-name">relate</div>
             <div class="tool-card-purpose">Connect two memories</div>
           </div>
@@ -1606,15 +1606,15 @@
       <div>
         <div class="tool-category-header">Project Context</div>
         <div class="tool-category-grid">
-          <div class="tool-card" data-tip="Uses the git remote URL to give every project a stable identity — the same across your laptop, a colleague's machine, and CI.">
+          <div class="tool-card" data-tip="Uses the git remote URL to give every project a stable identity across your laptop, a colleague's machine, and CI.">
             <div class="tool-card-name">detect_project</div>
             <div class="tool-card-purpose">Check which project this folder belongs to</div>
           </div>
-          <div class="tool-card" data-tip="Get a quick orientation: themes, anchor notes, maintenance warnings for stale temporaries or superseded cleanup, and explicit guidance on which notes to read first — perfect for starting a session.">
+          <div class="tool-card" data-tip="Get a quick orientation with themes, anchor notes, maintenance warnings, and guidance on which notes to read first.">
             <div class="tool-card-name">project_memory_summary</div>
             <div class="tool-card-purpose">What does mnemonic know about this project?</div>
           </div>
-          <div class="tool-card" data-tip="Tells you whether a note lives in your personal vault or alongside the project's code — and exactly where on disk.">
+          <div class="tool-card" data-tip="Tells you whether a note lives in your personal vault or alongside the project's code, and shows exactly where it is on disk.">
             <div class="tool-card-name">where_is_memory</div>
             <div class="tool-card-purpose">Find where a specific note lives</div>
           </div>
@@ -1622,7 +1622,7 @@
             <div class="tool-card-name">move_memory</div>
             <div class="tool-card-purpose">Move a note from personal to project (or back)</div>
           </div>
-          <div class="tool-card" data-tip="Shows which git remote is used to identify the project, and whether you've overridden it — for example, to point at an upstream fork instead of your copy.">
+          <div class="tool-card" data-tip="Shows which git remote identifies the project and whether you have overridden it, for example to point at an upstream fork instead of your copy.">
             <div class="tool-card-name">get_project_identity</div>
             <div class="tool-card-purpose">See this project's identity</div>
           </div>
@@ -1961,17 +1961,17 @@ VAULT_PATH = <span class="str">"/Users/you/mnemonic-vault"</span></pre>
           <tr>
             <td><code>reindexEmbedConcurrency</code></td>
             <td class="default">4</td>
-            <td>Parallel embedding requests during <code>sync</code> (capped 1–16)</td>
+            <td>Parallel embedding requests during <code>sync</code> (capped from 1 to 16)</td>
           </tr>
           <tr>
             <td><code>mutationPushMode</code></td>
             <td class="default">main-only</td>
-            <td><code>all</code>, <code>main-only</code>, or <code>none</code> — controls when writes auto-push to git</td>
+            <td><code>all</code>, <code>main-only</code>, or <code>none</code>. Controls when writes auto-push to git.</td>
           </tr>
         </tbody>
       </table>
     </div>
-    <p style="margin-top:16px"><code>projectMemoryPolicies</code> and <code>projectIdentityOverrides</code> are written automatically by MCP tools — no need to edit them by hand.</p>
+    <p style="margin-top:16px"><code>projectMemoryPolicies</code> and <code>projectIdentityOverrides</code> are written automatically by MCP tools. You do not need to edit them by hand.</p>
     <div class="code-block fade-up" style="margin-top:16px">
       <div class="code-block-header">
         <span class="code-label">~/mnemonic-vault/config.json</span>
@@ -1985,7 +1985,7 @@ VAULT_PATH = <span class="str">"/Users/you/mnemonic-vault"</span></pre>
 
     <div class="agent-snippet fade-up" style="margin-top:24px">
       <h3>Search another repository's docs without copying them</h3>
-      <p>Attach an external repo and its markdown documentation becomes searchable right alongside your memories — mnemonic reads the files, finds the right page for any question, and can hand back the exact section when you need the source text. Nothing is ever written back to that repository.</p>
+      <p>Attach an external repo and its markdown documentation becomes searchable alongside your memories. mnemonic reads the files, finds the right page for your question, and can return the exact section when you need the source text. Nothing is written back to that repository.</p>
       <p>Give mnemonic the local path to the repo, then narrow which files count as documentation when the defaults aren't right for you:</p>
     </div>
     <div class="code-block fade-up" style="margin-top:16px">
@@ -2025,7 +2025,7 @@ VAULT_PATH = <span class="str">"/Users/you/mnemonic-vault"</span></pre>
           <tr>
             <td><code>exclude</code></td>
             <td class="default">generated &amp; vendor files</td>
-            <td>Files to skip — <code>node_modules</code>, build output, caches, and the like</td>
+            <td>Files to skip, such as <code>node_modules</code>, build output, and caches</td>
           </tr>
           <tr>
             <td><code>acceptedMediaTypes</code></td>
@@ -2035,11 +2035,11 @@ VAULT_PATH = <span class="str">"/Users/you/mnemonic-vault"</span></pre>
         </tbody>
       </table>
     </div>
-    <p style="font-size:0.875rem;color:var(--text-dim);margin:14px 0 0">After attaching, run a quick <code style="font-family:JetBrains Mono,monospace;font-size:0.85em;color:var(--cyan-lt)">sync</code> to index the current revision. The same attachment also works with another repository's mnemonic notes — keep them read-only by default, or mark them writable so memories can flow both ways. The README covers every option for both kinds.</p>
+    <p style="font-size:0.875rem;color:var(--text-dim);margin:14px 0 0">After attaching, run a quick <code style="font-family:JetBrains Mono,monospace;font-size:0.85em;color:var(--cyan-lt)">sync</code> to index the current revision. The same attachment also works with another repository's mnemonic notes. Keep them read-only by default, or mark them writable so memories can flow both ways. The README covers every option for both kinds.</p>
 
     <div class="agent-snippet fade-up">
       <h3>No system prompt required</h3>
-      <p>Mnemonic's tools are self-describing — each includes "use when" / "do not use when" guidance, behavioral annotations, and typed schemas. Most models will use them correctly from tool metadata alone.</p>
+      <p>Mnemonic's tools are self-describing. Each includes "use when" and "do not use when" guidance, behavioral annotations, and typed schemas. Most models can use them correctly from tool metadata alone.</p>
       <p>For memory-tool protocol guidance, use <code style="font-family:JetBrains Mono,monospace;font-size:0.85em;color:var(--cyan-lt)">mnemonic-workflow-hint</code>. For structured task execution guidance, use <code style="font-family:JetBrains Mono,monospace;font-size:0.85em;color:var(--cyan-lt)">mnemonic-rpi-workflow</code>.</p>
     </div>
 
@@ -2119,7 +2119,7 @@ VAULT_PATH = <span class="str">"/Users/you/mnemonic-vault"</span></pre>
 
       <div class="qs-col">
         <h3>mnemonic migrate</h3>
-        <p style="color:var(--text-dim);font-size:0.9rem;margin-bottom:16px">Apply pending schema migrations to your vaults. Always preview with <code>--dry-run</code> first — failed runs roll staged writes back automatically.</p>
+        <p style="color:var(--text-dim);font-size:0.9rem;margin-bottom:16px">Apply pending schema migrations to your vaults. Always preview with <code>--dry-run</code> first. Failed runs roll staged writes back automatically.</p>
         <div class="code-block">
           <div class="code-block-header">
             <span class="code-label">bash</span>
@@ -2141,7 +2141,7 @@ VAULT_PATH = <span class="str">"/Users/you/mnemonic-vault"</span></pre>
 
       <div class="qs-col">
         <h3>mnemonic import-claude-memory</h3>
-        <p style="color:var(--text-dim);font-size:0.9rem;margin-bottom:16px">Import <a href="https://docs.anthropic.com/en/docs/claude-code/memory" style="color:var(--cyan-lt);text-decoration:none" target="_blank" rel="noopener">Claude Code auto-memory</a> into your vault. Each <code>##</code> heading in <code>~/.claude/projects/&lt;project&gt;/memory/*.md</code> becomes a separate mnemonic note — independently searchable via <code>recall</code>. Duplicate titles are skipped, so it's safe to re-run.</p>
+        <p style="color:var(--text-dim);font-size:0.9rem;margin-bottom:16px">Import <a href="https://docs.anthropic.com/en/docs/claude-code/memory" style="color:var(--cyan-lt);text-decoration:none" target="_blank" rel="noopener">Claude Code auto-memory</a> into your vault. Each <code>##</code> heading in <code>~/.claude/projects/&lt;project&gt;/memory/*.md</code> becomes a separate mnemonic note that you can search with <code>recall</code>. Duplicate titles are skipped, so it is safe to re-run.</p>
         <div class="code-block">
           <div class="code-block-header">
             <span class="code-label">bash</span>
@@ -2284,7 +2284,7 @@ VAULT_PATH = <span class="str">"/Users/you/mnemonic-vault"</span></pre>
         </div>
         <h3 class="dogfood-title">Temporal Interpretation Strategy</h3>
         <div class="dogfood-body">
-          <p>Temporal mode now explains <em>what kind</em> of change happened, not just that one occurred. Each history entry is classified into one of eight semantic categories — create, refine, expand, clarify, connect, restructure, reverse, unknown — using structural signals: additions/deletions ratio, churn, relationship changes, and commit message prefixes.</p>
+          <p>Temporal mode now explains <em>what kind</em> of change happened, not just that one occurred. Each history entry is classified into one of eight semantic categories: create, refine, expand, clarify, connect, restructure, reverse, or unknown. It uses structural signals such as the additions/deletions ratio, churn, relationship changes, and commit message prefixes.</p>
           <p>Classification is language-independent. Conservative thresholds prefer <code>unknown</code> over misclassification. Raw diffs are intentionally excluded from default output.</p>
         </div>
         <div class="dogfood-footer">
@@ -2296,7 +2296,7 @@ VAULT_PATH = <span class="str">"/Users/you/mnemonic-vault"</span></pre>
     </div>
 
     <div class="dogfood-cta fade-up">
-      <p>Every architectural call, trade-off, and lesson — committed to the repo inside <code>.mnemonic/notes/</code> as plain markdown. Human-readable. Open the folder and read them directly.</p>
+      <p>Every architectural call, trade-off, and lesson is committed to the repo inside <code>.mnemonic/notes/</code> as plain markdown. Open the folder and read the notes directly.</p>
       <a href="https://github.com/danielmarbach/mnemonic/tree/main/.mnemonic/notes" class="btn btn-ghost" target="_blank" rel="noopener" style="margin-top:16px;display:inline-flex">
         Browse the decision log on GitHub
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-left:4px"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
@@ -2311,7 +2311,7 @@ VAULT_PATH = <span class="str">"/Users/you/mnemonic-vault"</span></pre>
   <div class="container">
     <div class="footer-inner">
       <div class="footer-brand">
-        <strong>mnemonic</strong> &mdash; MIT License &mdash; by danielmarbach
+        <strong>mnemonic</strong>, MIT License, by danielmarbach
       </div>
       <ul class="footer-links">
         <li><a href="https://github.com/danielmarbach/mnemonic" target="_blank" rel="noopener">GitHub</a></li>

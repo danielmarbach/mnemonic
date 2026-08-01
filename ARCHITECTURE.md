@@ -1,14 +1,14 @@
 # Architecture
 
-`mnemonic` is a file-first MCP memory server. It stores notes as markdown, keeps embeddings as local JSON, routes reads and writes across a main vault and optional project vaults, and uses git as the synchronization and audit layer instead of a database.
+`mnemonic` is an MCP memory server built around files. It stores notes as markdown, keeps embeddings as local JSON, routes reads and writes across a main vault and optional project vaults, and uses git for synchronization and audit instead of a database.
 
 ## System goals
 
 - Keep memory durable, inspectable, and portable by storing source data as normal files.
-- Make project context first-class without losing access to global memory.
-- Let MCP clients spawn the server on demand over stdio instead of depending on an always-on service.
+- Keep project context available without losing access to global memory.
+- Let MCP clients spawn the server on demand over stdio instead of requiring an always-on service.
 - Treat embeddings as derived data that can be rebuilt locally.
-- Keep the architecture simple enough to evolve through notes, tests, and migrations rather than heavyweight infrastructure.
+- Keep the architecture simple enough to evolve through notes, tests, and migrations instead of heavyweight infrastructure.
 
 ## Core concepts
 
@@ -23,7 +23,7 @@
 - Notes live in `notes/<id>.md` with YAML frontmatter and markdown body.
 - Embeddings live in `embeddings/<id>.json` and are gitignored.
 - A note can be global or project-associated, and can hold typed relationships to other notes.
-- Metadata-only note changes such as lifecycle migrations do not require re-embedding; embeddings are refreshed when title/content changes or during sync backfill.
+- Metadata-only note changes such as lifecycle migrations do not require re-embedding. Embeddings are refreshed when title or content changes, or during sync backfill.
 
 ### Project identity
 
@@ -34,7 +34,7 @@
 
 ### MCP-first operations
 
-- `src/index.ts` registers the MCP tools and is the orchestration layer. Uses `@modelcontextprotocol/server` v2 (MCP 2026-07-28 spec).
+- `src/index.ts` registers the MCP tools and coordinates requests. It uses `@modelcontextprotocol/server` v2 (MCP 2026-07-28 spec).
 - The server entry point uses `serveStdio()` from `@modelcontextprotocol/server/stdio` which auto-negotiates protocol era with clients.
 - Most user-visible behavior is exposed through tools like `remember`, `recall`, `update`, `forget`, `sync`, `consolidate`, and migration commands.
 - The local helper `scripts/mcp-local.sh` rebuilds and launches the current server for dogfooding and CI-safe integration tests.
@@ -71,7 +71,7 @@ flowchart LR
 
 ### Write flow
 
-For commands like `remember` and `update`, the server resolves project context, chooses the target vault, writes the note, attempts to refresh embeddings, commits the changed files, and then only auto-pushes when the main-vault `config.json` `mutationPushMode` allows it.
+For commands like `remember` and `update`, the server resolves project context, chooses the target vault, writes the note, refreshes embeddings when possible, commits the changed files, and auto-pushes only when `mutationPushMode` in the main-vault `config.json` allows it.
 
 ```mermaid
 sequenceDiagram
@@ -101,9 +101,9 @@ sequenceDiagram
 
 ### Recall flow
 
-Recall searches embeddings from the project vault first when `cwd` is present, then widens to the main vault. Current-project matches receive a bounded policy prior (+0.005); selection remains score-ordered so project affinity cannot hard-select over strong global retrieval.
+When `cwd` is present, recall searches the project vault first and then widens to the main vault. Current-project matches receive a bounded policy prior (+0.005). Results remain score-ordered, so project affinity cannot displace a strong global match.
 
-The ranking pipeline is bounded and fail-soft: semantic embeddings, an always-on lexical channel over compact projections, and semantic-conditioned graph expansion each produce channel ranks; RRF fuses those ranks, followed by bounded semantic-confidence, project, metadata, temporal, and canonical adjustments. Explicit high-confidence temporal windows still filter candidates before ranking. Lexical candidate generation reuses the existing session projection/token cache and TF-IDF machinery, without introducing a database or synced index.
+The ranking pipeline is bounded and fail-soft. Semantic embeddings, an always-on lexical channel over compact projections, and semantic-conditioned graph expansion each produce channel ranks. RRF fuses those ranks, then applies bounded semantic-confidence, project, metadata, temporal, and canonical adjustments. Explicit high-confidence temporal windows still filter candidates before ranking. Lexical candidate generation reuses the existing session projection/token cache and TF-IDF machinery, without introducing a database or synced index.
 
 ```mermaid
 flowchart TD
@@ -227,8 +227,8 @@ Document-source attachments extend the attachment system to support read-only re
 ### Entity namespaces
 
 Document and chunk identifiers use reserved namespaces that cannot collide with Memory IDs:
-- `doc:<documentId>` — references a document by its stable logical ID
-- `chunk:<chunkId>` — references a chunk by its stable logical ID
+- `doc:<documentId>`: references a document by its stable logical ID
+- `chunk:<chunkId>`: references a chunk by its stable logical ID
 
 The entity resolver in `src/document-entity-ref.ts` classifies references and routes them to the correct handler, preventing document-source entities from being treated as managed memories.
 
@@ -236,7 +236,7 @@ The entity resolver in `src/document-entity-ref.ts` classifies references and ro
 
 - **Markdown extractor** (`src/markdown-extractor.ts`): parses markdown using the existing MDAST stack, validates against `acceptedMediaTypes`, and returns extracted text content.
 - **Markdown chunker** (`src/markdown-chunker.ts`): splits extracted content into chunks with heading ancestry tracking. Produces an introduction chunk for content before the first heading, then one chunk per heading section. Oversized sections are split by paragraph with deterministic bounds.
-- **Extractor registry** (`src/document-extractor.ts`): dispatches source blobs to registered extractors by media type. The registry is extensible for future formats such as PDF.
+- **Extractor registry** (`src/document-extractor.ts`): dispatches source blobs to registered extractors by media type. The registry can support formats such as PDF in the future.
 
 ### Generation-based indexing
 
@@ -258,13 +258,13 @@ Document chunks participate in the recall ranking pipeline alongside memory resu
 
 ### Mutation rejection
 
-All mutation tools (`update`, `forget`, `move_memory`, `relate`, `unrelate`, `consolidate`) route inputs through the entity resolver before vault lookup. Document and chunk references are rejected with an `ImmutableDocumentSourceError`, ensuring document-source entities are never modified through Mnemonic.
+All mutation tools (`update`, `forget`, `move_memory`, `relate`, `unrelate`, `consolidate`) route inputs through the entity resolver before vault lookup. Document and chunk references are rejected with an `ImmutableDocumentSourceError`, so document-source entities cannot be modified through Mnemonic.
 
 ### Configuration
 
 Document-source attachments use a discriminated union in attachment configuration:
-- `kind: "mnemonic-vault"` — legacy writable vault attachments (default for existing configs)
-- `kind: "document-source"` — read-only document retrieval attachments
+- `kind: "mnemonic-vault"`: legacy writable vault attachments (default for existing configs)
+- `kind: "document-source"`: read-only document retrieval attachments
 
 Document-source attachments accept:
 - `root`: normalized repository-relative path (default `.`)
@@ -282,7 +282,7 @@ Every attachment now has a persisted opaque `attachmentId`, separate from reposi
 - CI-safe MCP integration tests use the real local entrypoint with `DISABLE_GIT=true`, a temp `VAULT_PATH`, and a fake `OLLAMA_URL` endpoint.
 - CI failure learnings are artifact-first and promoted manually into memory through MCP rather than auto-written on every failed run.
 
-## Future pressure points
+## Areas to watch
 
 - Recall latency as memory volume grows.
 - More sophisticated clustering or consolidation strategies.
