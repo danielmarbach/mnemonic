@@ -16,8 +16,6 @@ projectName: mnemonic
 relatedTo:
   - id: docs-index-html-homepage-design-principles-and-ux-lessons-6bed8673
     type: related-to
-  - id: plan-read-only-markdown-attachment-retrieval-f4619b6e
-    type: related-to
 memoryVersion: 1
 ---
 The document-source attachment feature (PR #292) shipped but README.md and docs/index.html only mentioned it — neither explained how to configure it. Follow-up docs pass closed the gap: both surfaces now carry concrete configuration guidance.

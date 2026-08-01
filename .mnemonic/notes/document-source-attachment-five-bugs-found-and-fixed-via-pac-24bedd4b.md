@@ -14,8 +14,6 @@ alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
-  - id: review-read-only-markdown-attachment-retrieval-all-6-stages--e6d2d533
-    type: follows
   - id: pack-d-document-source-attachment-dogfood-pack-and-a-b-c-con-4f75a70c
     type: related-to
 memoryVersion: 1
