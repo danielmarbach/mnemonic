@@ -11,11 +11,14 @@ tags:
   - timeout
 lifecycle: permanent
 createdAt: '2026-08-01T23:01:10.246Z'
-updatedAt: '2026-08-01T23:01:10.246Z'
+updatedAt: '2026-08-01T23:01:24.303Z'
 role: decision
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: sync-redesign-decouple-embedding-from-git-force-flag-remove--6f2c1517
+    type: related-to
 memoryVersion: 1
 ---
 # Document-source embedding backlog does not resume on re-sync (timeout gap + proposed gate fix)

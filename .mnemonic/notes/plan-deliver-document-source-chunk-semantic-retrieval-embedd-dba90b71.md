@@ -11,7 +11,7 @@ tags:
   - architecture
 lifecycle: permanent
 createdAt: '2026-08-01T20:43:19.999Z'
-updatedAt: '2026-08-01T22:39:42.026Z'
+updatedAt: '2026-08-01T23:01:24.304Z'
 role: plan
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -20,6 +20,8 @@ relatedTo:
   - id: document-source-chunk-embeddings-specified-but-never-deliver-6e867617
     type: derives-from
   - id: chunk-embedding-path-layout-drop-redundant-guid-prefix-lower-6b739d42
+    type: derives-from
+  - id: document-source-embedding-backlog-does-not-resume-on-re-sync-a2a7a069
     type: derives-from
 memoryVersion: 1
 ---
