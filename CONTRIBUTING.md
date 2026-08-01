@@ -35,7 +35,7 @@ npm test        # run the full test suite
 
 `npm run build` already runs `typecheck`, but running it explicitly first (`npm run typecheck`) gives a faster failure loop when iterating.
 
-**Pre-commit checks:** `npm install` installs a `pre-commit` hook (`simple-git-hooks` via the `prepare` script) that enforces the same gates as CI locally: it auto-fixes staged files with `lint-staged`, then runs `typecheck`, `lint`, and `format:check`. A commit is blocked until all three pass, so CI never fails on checks that could have run locally. If you already had the repo installed before this hook was added, re-run `npm install` (or `npx simple-git-hooks`) to pick it up. To skip for a one-off, use `git commit --no-verify`.
+**Pre-commit checks:** `npm install` installs a `pre-commit` hook (`simple-git-hooks` via the `prepare` script) that enforces the same gates as CI locally: it auto-fixes staged files with `lint-staged`, then runs `typecheck`, `lint`, and `format:check`. A commit is blocked until all three pass, so CI never fails on checks that could have run locally. Commits that only touch files outside those gates — markdown/docs, including the `.mnemonic/` memory vault that mnemonic commits continuously — skip the checks entirely, since none of the gates read those files. If you already had the repo installed before this hook was added, re-run `npm install` (or `npx simple-git-hooks`) to pick it up. To skip for a one-off, use `git commit --no-verify`.
 
 **Run the local MCP server for dogfooding:**
 
