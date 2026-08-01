@@ -4,6 +4,12 @@ All notable changes to `mnemonic` will be documented in this file.
 
 The format is loosely based on Keep a Changelog and uses semver-style version headings.
 
+## [0.39.1] - 2026-08-02
+
+### Fixed
+
+- `recall` now returns highly relevant document chunks even when earlier chunks in the same document have weaker lexical matches.
+
 ## [0.39.0] - 2026-08-01
 
 ### Added

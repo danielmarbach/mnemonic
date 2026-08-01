@@ -39,8 +39,9 @@ export function collectDocumentChunkCandidates(
   query: string,
   limit: number,
 ): DocumentChunkRecallResult[] {
-  const results: DocumentChunkRecallResult[] = [];
-  const perDocumentCounts = new Map<string, number>();
+  if (limit <= 0) return [];
+
+  const candidates: DocumentChunkRecallResult[] = [];
   const maxChunksPerDocument = 5; // per-document chunk cap
 
   for (const attachmentId of attachmentIds) {
@@ -49,17 +50,13 @@ export function collectDocumentChunkCandidates(
 
     const chunks = getAllChunks(attachmentId);
     for (const chunk of chunks) {
-      // Apply per-document chunk cap
-      const docCount = perDocumentCounts.get(chunk.documentId) ?? 0;
-      if (docCount >= maxChunksPerDocument) continue;
-
-      // Score using lexical matching
+      // Score using lexical matching before applying the per-document cap. A
+      // document's early chunks may have weak bigram-only matches that should
+      // not hide a later chunk with a much stronger exact match.
       const score = computeLexicalScore(query, chunk.content);
       if (score <= 0) continue;
 
-      perDocumentCounts.set(chunk.documentId, docCount + 1);
-
-      results.push({
+      candidates.push({
         kind: "document-chunk",
         chunkId: chunk.chunkId,
         documentId: chunk.documentId,
@@ -75,9 +72,22 @@ export function collectDocumentChunkCandidates(
     }
   }
 
-  // Sort by score descending and apply limit
-  results.sort((a, b) => b.score - a.score);
-  return results.slice(0, limit);
+  // Rank globally first, then cap each document's contribution. Applying the
+  // cap while iterating chunks makes document order determine which matches
+  // survive instead of relevance.
+  candidates.sort((a, b) => b.score - a.score);
+  const results: DocumentChunkRecallResult[] = [];
+  const perDocumentCounts = new Map<string, number>();
+  for (const candidate of candidates) {
+    const docCount = perDocumentCounts.get(candidate.documentId) ?? 0;
+    if (docCount >= maxChunksPerDocument) continue;
+
+    perDocumentCounts.set(candidate.documentId, docCount + 1);
+    results.push(candidate);
+    if (results.length >= limit) break;
+  }
+
+  return results;
 }
 
 /**
