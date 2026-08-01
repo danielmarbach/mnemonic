@@ -7,7 +7,7 @@ tags:
   - structure
 lifecycle: permanent
 createdAt: '2026-03-07T17:58:59.865Z'
-updatedAt: '2026-05-09T21:06:02.096Z'
+updatedAt: '2026-08-01T10:55:12.739Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
@@ -21,7 +21,8 @@ memoryVersion: 1
 ---
 All runtime TypeScript source files live under `src/` to keep the repository layout obvious and predictable.
 
-- `src/index.ts` — MCP server entry point, all tool registrations, config, startup
+- `src/index.ts` — MCP server entry point, tool registration, `McpServer` construction with cache hints, startup via `serveStdio()`
+- `src/startup.ts` — Server startup via `serveStdio()` from `@modelcontextprotocol/server/stdio`, pending migration warnings
 - `src/storage.ts` — read/write notes (markdown + YAML frontmatter) and embeddings (JSON); defines `Note`, `Relationship`, `RelationshipType`, `EmbeddingRecord`
 - `src/embeddings.ts` — Ollama HTTP client, cosine similarity, `embedModel` constant
 - `src/git.ts` — git operations via `simple-git`; `GitOps` class, `SyncResult` type
@@ -34,3 +35,5 @@ Build output goes to `build/`. `tsconfig.json` uses `rootDir: src` and targets E
 **Important:** `simpleGit()` must be called in `GitOps.init()`, not the constructor — the vault directory does not exist until `Storage.init()` runs first.
 
 **Organization rule:** keep the repo simple and mostly flat; add feature folders only when the codebase actually pushes for them.
+
+**SDK:** `@modelcontextprotocol/server` v2 (MCP 2026-07-28). No more `_registeredTools` override — v2 defaults to JSON Schema 2020-12.
