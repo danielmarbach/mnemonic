@@ -300,7 +300,7 @@ async function main() {
             Array.isArray(d.headingAncestry) &&
             typeof d.excerpt === "string",
         ),
-      { count: dcs.length, sample: dcs.slice(0, 2), sourcePaths: [...new Set(dcs.map((d) => d.sourcePath))], textHasDocumentResults: recall.text.includes("Document Results") },
+      { count: dcs.length, sample: dcs.slice(0, 2), sourcePaths: [...new Set(dcs.map((d) => d.sourcePath))], textHasDocumentChunks: (recall.structured?.documentChunks?.length ?? 0) > 0, textHasChunkHandles: recall.text.includes("chunk:") },
     );
 
     // D5 — get resolves chunk: and doc: handles

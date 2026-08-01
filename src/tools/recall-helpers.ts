@@ -60,6 +60,10 @@ export function buildRecallCandidateContext(note: Note) {
 // Bounded policy priors remain smaller than meaningful multi-channel RRF agreement.
 export const PROJECT_SCOPE_BOOST = 0.005;
 export const ATTACHMENT_BOOST = PROJECT_SCOPE_BOOST / 2;
+// Document chunks fuse into the unified recall ranking with a prior smaller than
+// ATTACHMENT_BOOST so notes outrank chunks by default while documents stay visible
+// (rank just below notes; a dramatically stronger chunk can still rise).
+export const DOCUMENT_CHUNK_PRIOR = ATTACHMENT_BOOST / 2;
 
 interface LexicalCandidateOptions {
   excludeExisting: boolean;

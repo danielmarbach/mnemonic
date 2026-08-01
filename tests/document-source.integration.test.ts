@@ -96,6 +96,74 @@ async function startFailingEmbeddingServer(): Promise<{ url: string; close: () =
   };
 }
 
+/**
+ * Deterministic 8-dim vector for arbitrary text. The moonshadow/quicksilver
+ * marker phrases below are mapped to the SAME vector by the fake server so
+ * semantically-associated texts (chunk projection vs query) get cosine 1 while
+ * everything else gets a stable unrelated vector.
+ */
+function hashVector(text: string): number[] {
+  let h1 = 2166136261;
+  let h2 = 16777619;
+  for (let i = 0; i < text.length; i++) {
+    const code = text.charCodeAt(i);
+    h1 = Math.imul(h1 ^ code, 16777619);
+    h2 = Math.imul(h2 + code, 2654435761);
+  }
+  const vector: number[] = [];
+  for (let i = 0; i < 8; i++) {
+    const component = ((h1 >>> (i * 4)) & 0xffff) / 65535;
+    // Keep components away from the marker vector's all-zero tail so unrelated
+    // texts never look semantically close to the marker phrase.
+    vector.push(0.05 + 0.9 * (Number.isFinite(component) ? component : 0));
+  }
+  return vector;
+}
+
+const SEMANTIC_MARKER_VECTOR = [1, 0, 0, 0, 0, 0, 0, 0] as const;
+
+/**
+ * Fake Ollama embedder with real vectors: maps the moonshadow-vault chunk
+ * marker and the quicksilver-core query marker to the same vector (semantic
+ * match) and every other text to a stable unrelated hash vector.
+ */
+async function startSemanticFakeEmbeddingServer(): Promise<{
+  url: string;
+  close: () => Promise<void>;
+}> {
+  const server = http.createServer((req, res) => {
+    if (req.method !== "POST" || req.url !== "/api/embed") {
+      res.writeHead(404).end();
+      return;
+    }
+    let raw = "";
+    req.setEncoding("utf-8");
+    req.on("data", (chunk) => {
+      raw += chunk;
+    });
+    req.on("end", () => {
+      const body = JSON.parse(raw) as { input?: string };
+      const input = body.input ?? "";
+      const vector =
+        input.includes("moonshadow-vault") || input.includes("quicksilver-core")
+          ? [...SEMANTIC_MARKER_VECTOR]
+          : hashVector(input);
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ embeddings: [vector] }));
+    });
+  });
+  await new Promise<void>((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", () => resolve());
+  });
+  const addr = server.address();
+  if (!addr || typeof addr === "string") throw new Error("could not bind semantic server");
+  return {
+    url: `http://127.0.0.1:${addr.port}`,
+    close: () => new Promise<void>((resolve) => server.close(() => resolve())),
+  };
+}
+
 describe("document-source attachment integration", () => {
   it("indexes, recalls, retrieves, and rejects mutation of document chunks end-to-end", async () => {
     const env = await setupDocSourceEnv();
@@ -222,6 +290,112 @@ describe("document-source attachment integration", () => {
     } finally {
       await session.close();
       await failing.close();
+      await rm(env.base, { recursive: true, force: true });
+    }
+  }, 60000);
+
+  it("semantic recall surfaces a chunk that lexical matching misses", async () => {
+    const env = await setupDocSourceEnv();
+    // A doc whose content, heading, and path share no tokens with the query,
+    // but whose embedding (via the fake semantic embedder) sits on the query
+    // vector: the only channel that can surface it is the semantic one.
+    await writeFile(
+      path.join(env.docsource, "docs", "moonshadow.md"),
+      `# Moonshadow Vault\n\nThe moonshadow-vault subsystem coordinates durable state transitions across worker nodes.\n`,
+    );
+    await git(env.docsource, "add", ".");
+    await git(env.docsource, "commit", "-m", "moonshadow");
+    await git(env.docsource, "fetch", "origin");
+
+    const embedding = await startSemanticFakeEmbeddingServer();
+    const session = await createPersistentMcpSession(env.mainVault, {
+      ollamaUrl: embedding.url,
+      disableGit: false,
+    });
+    try {
+      const cwd = env.consumer;
+      // remember(scope: project) creates the .mnemonic project vault so sync
+      // can persist chunk embeddings under <gitRoot>/.mnemonic/embeddings.
+      await session.callTool("remember", {
+        cwd,
+        title: "Semantic doc-source test note",
+        content: "Seed note that creates the project vault.",
+        scope: "project",
+        summary: "Create project vault for document-source embedding tests",
+      });
+
+      await session.callTool("add_attachment", {
+        cwd,
+        localPath: env.docsource,
+        kind: "document-source",
+        root: ".",
+        include: ["**/*.md"],
+        acceptedMediaTypes: ["text/markdown"],
+      });
+
+      const sync = await session.callTool("sync", { cwd });
+      expect(sync.text).toMatch(/doc-source:.*Indexed \d+ documents, \d+ chunks/);
+      // The semantic fake embedder works, so sync must not report failures.
+      expect(sync.text).not.toMatch(/embedding failure/);
+
+      const recall = await session.callTool("recall", {
+        cwd,
+        query: "quicksilver-core reconciliation",
+        limit: 10,
+        scope: "all",
+      });
+      const chunks = asArr(recall.structuredContent?.documentChunks);
+      const semanticChunk = chunks.find(
+        (c) => (c as { sourcePath?: string }).sourcePath === "docs/moonshadow.md",
+      );
+      expect(semanticChunk).toBeDefined();
+      // Cosine of the marker vector against itself is 1: a semantic-only hit.
+      expect((semanticChunk as { semanticScore?: number }).semanticScore).toBeGreaterThan(0.9);
+      // Lexical evidence is negligible (bigram noise on shared substrings), so
+      // the semantic channel is what surfaces this chunk.
+      const lexicalScore = (semanticChunk as { lexicalScore?: number }).lexicalScore ?? 0;
+      expect(lexicalScore).toBeLessThan(0.1);
+      // The semantic-only chunk outranks every lexical candidate.
+      expect((chunks[0] as { sourcePath?: string }).sourcePath).toBe("docs/moonshadow.md");
+      // The chunk is also visible in the unified text with a chunk: handle.
+      expect(recall.text).toContain("chunk:");
+      expect(recall.text).toContain("docs/moonshadow.md");
+    } finally {
+      await session.close();
+      await embedding.close();
+      await rm(env.base, { recursive: true, force: true });
+    }
+  }, 60000);
+
+  it("a second identical sync reports unchanged (isGenerationCurrent reuses the generation)", async () => {
+    const env = await setupDocSourceEnv();
+    const embedding = await startFakeEmbeddingServer();
+    const session = await createPersistentMcpSession(env.mainVault, {
+      ollamaUrl: embedding.url,
+      disableGit: false,
+    });
+    try {
+      const cwd = env.consumer;
+      await session.callTool("add_attachment", {
+        cwd,
+        localPath: env.docsource,
+        kind: "document-source",
+        root: ".",
+        include: ["**/*.md"],
+        acceptedMediaTypes: ["text/markdown"],
+      });
+
+      const first = await session.callTool("sync", { cwd });
+      expect(first.text).toMatch(/doc-source:.*Indexed \d+ documents, \d+ chunks/);
+
+      // Same commit, same extractor/chunker/embedding identity: the generation
+      // is current, so a second sync must not re-index.
+      const second = await session.callTool("sync", { cwd });
+      expect(second.text).toMatch(/doc-source:.*No changes on/);
+      expect(second.text).not.toMatch(/Indexed/);
+    } finally {
+      await session.close();
+      await embedding.close();
       await rm(env.base, { recursive: true, force: true });
     }
   }, 60000);

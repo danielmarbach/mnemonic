@@ -4983,7 +4983,7 @@ Do not use this when:
 - You just want to browse by tags or scope; use \`list\`
 
 Returns: ranked matches (id, title, score, vault, tags, lifecycle, updatedAt), 1-hop relationship previews on top results, temporal history (mode: temporal), retrieval evidence (evidence: compact), including optional score decomposition, diagnostics: recallScopeNoteCount, diversity, retrievalCoverage, signalStrength.
-Document-source attachments return documentChunks (kind, chunkId, documentId, score, sourcePath, headingAncestry, excerpt, attachmentId, retrievalHandle).
+Document-source attachments return documentChunks (kind, chunkId, documentId, score, boosted, semanticScore, lexicalScore, sourcePath, headingAncestry, excerpt, attachmentId, sourceMediaType, extractionMetadata, indexedCommit, generationId, retrievalHandle); chunks rank below memories by default and render inline in the ranked list.
 
 Typical next step:
 - Use \`get\`, \`update\`, \`relate\`, or \`consolidate\` based on the results.",
@@ -5181,12 +5181,20 @@ Typical next step:
                 "description": "Result kind discriminator",
                 "type": "string",
               },
+              "lexicalScore": {
+                "description": "Composite lexical score",
+                "type": "number",
+              },
               "retrievalHandle": {
                 "description": "Revision-qualified handle for exact retrieval via get",
                 "type": "string",
               },
               "score": {
                 "description": "Composite relevance score",
+                "type": "number",
+              },
+              "semanticScore": {
+                "description": "Semantic cosine similarity, when available",
                 "type": "number",
               },
               "sourceMediaType": {

@@ -77,6 +77,7 @@ import {
   computeRecallDiversity,
   computeRecallRetrievalCoverage,
   ATTACHMENT_BOOST,
+  DOCUMENT_CHUNK_PRIOR,
 } from "./recall-helpers.js";
 import {
   collectDocumentChunkCandidates,
@@ -100,7 +101,7 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
         "- You already know the exact id; use `get`\n" +
         "- You just want to browse by tags or scope; use `list`\n\n" +
         "Returns: ranked matches (id, title, score, vault, tags, lifecycle, updatedAt), 1-hop relationship previews on top results, temporal history (mode: temporal), retrieval evidence (evidence: compact), including optional score decomposition, diagnostics: recallScopeNoteCount, diversity, retrievalCoverage, signalStrength.\n" +
-        "Document-source attachments return documentChunks (kind, chunkId, documentId, score, sourcePath, headingAncestry, excerpt, attachmentId, retrievalHandle).\n\n" +
+        "Document-source attachments return documentChunks (kind, chunkId, documentId, score, boosted, semanticScore, lexicalScore, sourcePath, headingAncestry, excerpt, attachmentId, sourceMediaType, extractionMetadata, indexedCommit, generationId, retrievalHandle); chunks rank below memories by default and render inline in the ranked list.\n\n" +
         "Typical next step:\n" +
         "- Use `get`, `update`, `relate`, or `consolidate` based on the results.",
       annotations: {
@@ -507,7 +508,12 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
         const attachmentConfigs = await ctx.configStore.getProjectAttachments(project.id);
         const docSourceAttachmentIds = getDocumentSourceAttachmentIds(attachmentConfigs);
         if (docSourceAttachmentIds.length > 0) {
-          const candidates = collectDocumentChunkCandidates(docSourceAttachmentIds, query, limit);
+          const candidates = collectDocumentChunkCandidates(
+            docSourceAttachmentIds,
+            query,
+            limit,
+            queryVec,
+          );
           for (const candidate of candidates) {
             const generation = getCurrentGeneration(candidate.attachmentId);
             const doc = generation?.documents.get(candidate.documentId);
@@ -517,6 +523,8 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
               documentId: candidate.documentId,
               score: candidate.score,
               boosted: candidate.score,
+              semanticScore: candidate.semanticScore,
+              lexicalScore: candidate.lexicalScore,
               sourcePath: doc?.sourcePath ?? candidate.sourcePath,
               headingAncestry: candidate.headingAncestry,
               excerpt: candidate.excerpt,
@@ -549,7 +557,7 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
         ? `Recall results for project **${project.name}** (scope: ${scope}):`
         : `Recall results (global):`;
 
-      const sections: string[] = [];
+      const noteEntries: Array<{ kind: "note"; score: number; sortKey: string; text: string }> = [];
       const structuredResults: Array<{
         id: string;
         title: string;
@@ -733,9 +741,12 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
             ? `\n${formatRetrievalEvidenceHint(retrievalEvidence, metadata?.role)}`
             : "";
           // Suppress raw related IDs when enriched preview is shown to avoid duplication
-          sections.push(
-            `${formatNote(note, score, relationships === undefined)}${provenanceLine}${evidenceLine}${formattedHistory}${formattedRelationships}`,
-          );
+          noteEntries.push({
+            kind: "note",
+            score: finalScore,
+            sortKey: id,
+            text: `${formatNote(note, score, relationships === undefined)}${provenanceLine}${evidenceLine}${formattedHistory}${formattedRelationships}`,
+          });
 
           structuredResults.push({
             id,
@@ -776,6 +787,44 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
         }
       }
 
+      // Fuse document chunks into the unified ranked list. Chunks get a prior
+      // smaller than ATTACHMENT_BOOST so notes outrank them by default while
+      // documents remain visible just below the notes; a dramatically stronger
+      // chunk match can still rise above weak note matches.
+      const chunkEntries: Array<{
+        kind: "document-chunk";
+        score: number;
+        sortKey: string;
+        text: string;
+      }> = [];
+      for (const dc of documentChunks) {
+        const headingStr =
+          dc.headingAncestry.length > 0
+            ? dc.headingAncestry.map((h) => `${"#".repeat(h.depth)} ${h.text}`).join(" > ")
+            : "(introduction)";
+        chunkEntries.push({
+          kind: "document-chunk",
+          score: dc.score + DOCUMENT_CHUNK_PRIOR,
+          sortKey: dc.chunkId,
+          text:
+            `- 📄 **${dc.sourcePath}** (document)\n` +
+            `  heading: ${headingStr}\n` +
+            `  ${dc.excerpt.slice(0, 150)}\n` +
+            `  \`${dc.retrievalHandle}\``,
+        });
+      }
+
+      type UnifiedEntry = (typeof noteEntries)[number] | (typeof chunkEntries)[number];
+      const unified: UnifiedEntry[] = [...noteEntries, ...chunkEntries];
+      unified.sort((a, b) => {
+        const delta = b.score - a.score;
+        if (Math.abs(delta) > 1e-9) return delta;
+        // tie-break: notes rank above chunks by default
+        if (a.kind !== b.kind) return a.kind === "note" ? -1 : 1;
+        return a.sortKey.localeCompare(b.sortKey); // deterministic
+      });
+      const unifiedText = unified.map((e) => e.text).join("\n\n---\n\n");
+
       let diversity: RecallResult["diversity"] | undefined;
       let retrievalCoverage: RecallRetrievalCoverage | undefined;
       if (structuredResults.length > 0) {
@@ -807,22 +856,7 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
       }
       const diagnosticsLine =
         diagnosticsParts.length > 0 ? `\n${diagnosticsParts.join(" | ")}` : "";
-      let textContent = `${header}${diagnosticsLine}\n\n${sections.join("\n\n---\n\n")}`;
-
-      // Add document chunk text rendering
-      if (documentChunks.length > 0) {
-        textContent += "\n\n## Document Results\n\n";
-        for (const dc of documentChunks) {
-          const headingStr =
-            dc.headingAncestry.length > 0
-              ? dc.headingAncestry.map((h) => `${"#".repeat(h.depth)} ${h.text}`).join(" > ")
-              : "(introduction)";
-          textContent += `- **${dc.sourcePath}** (${(dc.score * 100).toFixed(0)}%)\n`;
-          textContent += `  heading: ${headingStr}\n`;
-          textContent += `  ${dc.excerpt.slice(0, 150)}...\n`;
-          textContent += `  \`${dc.retrievalHandle}\`\n\n`;
-        }
-      }
+      const textContent = `${header}${diagnosticsLine}\n\n${unifiedText}`;
 
       const structuredContent: RecallResult = {
         action: "recalled",

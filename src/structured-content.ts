@@ -174,6 +174,8 @@ export interface RecallResult extends Record<string, unknown> {
     documentId: string;
     score: number;
     boosted: number;
+    semanticScore?: number;
+    lexicalScore?: number;
     sourcePath: string;
     headingAncestry: Array<{ depth: number; text: string }>;
     excerpt: string;
@@ -1168,6 +1170,8 @@ export const RecallResultSchema = z.object({
         documentId: z.string().describe("Stable document identifier"),
         score: z.number().describe("Composite relevance score"),
         boosted: z.number().describe("Score after policy boosts"),
+        semanticScore: z.number().optional().describe("Semantic cosine similarity, when available"),
+        lexicalScore: z.number().optional().describe("Composite lexical score"),
         sourcePath: z.string().describe("Repository-relative source path"),
         headingAncestry: z
           .array(
