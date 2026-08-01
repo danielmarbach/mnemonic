@@ -9,13 +9,7 @@ import type {
 } from "./retrieval-document.js";
 import { DOCUMENT_SOURCE_LIMITS } from "./retrieval-document.js";
 import { deriveDocumentId } from "./retrieval-document.js";
-import { registerExtractor } from "./document-extractor.js";
-import { markdownExtractor } from "./markdown-extractor.js";
-
 import { publishGeneration } from "./generation-storage.js";
-
-// Register built-in extractors
-registerExtractor(markdownExtractor);
 
 // Simple build result for document-sync.ts compatibility
 export interface SimpleBuildResult {

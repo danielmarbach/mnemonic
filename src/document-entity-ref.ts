@@ -4,11 +4,18 @@ import type { DocumentId, ChunkId } from "./retrieval-document.js";
 const DOC_PREFIX = "doc:";
 const CHUNK_PREFIX = "chunk:";
 
-// Parsed entity reference
+// Parsed document entity reference (doc: prefix)
 export interface DocumentEntityRef {
-  kind: "document" | "chunk";
+  kind: "document";
   documentId: DocumentId;
-  chunkId?: ChunkId;
+  raw: string;
+}
+
+// Parsed chunk entity reference (chunk: prefix)
+export interface ChunkEntityRef {
+  kind: "chunk";
+  documentId: DocumentId;
+  chunkId: ChunkId;
   raw: string;
 }
 
@@ -25,7 +32,7 @@ export interface UnknownEntityRef {
   raw: string;
 }
 
-export type EntityRef = DocumentEntityRef | MemoryEntityRef | UnknownEntityRef;
+export type EntityRef = DocumentEntityRef | ChunkEntityRef | MemoryEntityRef | UnknownEntityRef;
 
 /**
  * Check if an ID string looks like a document entity reference.

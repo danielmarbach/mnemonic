@@ -1,5 +1,6 @@
 import { getCurrentGeneration } from "./generation-storage.js";
 import type { RetrievalChunk } from "./retrieval-document.js";
+import type { ProjectAttachmentConfig } from "./vault.js";
 
 import { computeLexicalScore } from "./lexical.js";
 
@@ -62,7 +63,7 @@ export function collectDocumentChunkCandidates(
         kind: "document-chunk",
         chunkId: chunk.chunkId,
         documentId: chunk.documentId,
-        sourcePath: generation.manifest.indexedCommit, // Will be resolved from document
+        sourcePath: generation.documents.get(chunk.documentId)?.sourcePath ?? chunk.documentId,
         headingAncestry: chunk.headingAncestry,
         excerpt: chunk.excerpt,
         contentMediaType: chunk.contentMediaType,
@@ -84,7 +85,7 @@ export function collectDocumentChunkCandidates(
  * This is a helper to be called from the recall handler.
  */
 export function getDocumentSourceAttachmentIds(
-  attachmentConfigs: Array<{ kind: string; attachmentId: string; enabled: boolean }>,
+  attachmentConfigs: Pick<ProjectAttachmentConfig, "kind" | "attachmentId" | "enabled">[],
 ): string[] {
   return attachmentConfigs
     .filter((a) => a.kind === "document-source" && a.enabled)

@@ -3,6 +3,7 @@ import {
   buildGenerationFromFiles,
   validateAcceptedMediaTypes,
 } from "../src/document-source-index.js";
+import "../src/init-extractors.js";
 import { markdownExtractor } from "../src/markdown-extractor.js";
 import { markdownChunker } from "../src/markdown-chunker.js";
 import { clearAllGenerations } from "../src/generation-storage.js";

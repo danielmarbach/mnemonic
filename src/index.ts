@@ -8,6 +8,10 @@ import { registerAllTools } from "./tools/index.js";
 import { registerPrompts } from "./prompts.js";
 import { createServerContext, readPackageVersion } from "./context.js";
 import { startServer } from "./startup.js";
+
+// Register built-in document-source extractors at server startup.
+// Must run before any tool that depends on extractor registry (sync, recall).
+import "./init-extractors.js";
 import { isCliCommand, showHelp, rejectUnknownCommand, runCliCommand } from "./cli/dispatch.js";
 
 // ── CLI dispatch ────────────────────────────────────────────────────────────────

@@ -143,8 +143,8 @@ export function registerGetTool(server: McpServer, ctx: ServerContext): void {
             };
             documents.push(docResult);
             items.push({ kind: "document" as const, ...docResult });
-          } else if (parsed.kind === "chunk" && parsed.chunkId) {
-            // Chunk reference
+          } else if (parsed.kind === "chunk") {
+            // Chunk reference — chunkId is always present on ChunkEntityRef
             const attachmentId = extractAttachmentId(parsed.documentId);
             const generation = getCurrentGeneration(attachmentId);
             if (!generation) {
@@ -179,6 +179,22 @@ export function registerGetTool(server: McpServer, ctx: ServerContext): void {
             };
             documents.push(docResult);
             items.push({ kind: "document" as const, ...docResult });
+          } else if (parsed.kind === "memory") {
+            // Unreachable: the isDocumentEntityRef(id) guard above excludes
+            // bare memory IDs (no doc:/chunk: prefix). Handled explicitly so
+            // the exhaustiveness check below narrows to never.
+            itemErrors.push({
+              id,
+              error: "Memory ID resolved in document/chunk branch",
+              code: "unknown-document",
+            });
+            continue;
+          } else {
+            // Exhaustiveness check: if a new EntityRef variant is added,
+            // TypeScript will error here because parsed is not narrowed to never.
+            const _exhaustive: never = parsed;
+            void _exhaustive;
+            throw new Error("Unhandled entity kind");
           }
           continue;
         }
