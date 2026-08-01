@@ -523,3 +523,201 @@ export async function listLocalMcpTools(
 
   return tools;
 }
+
+// ── Modern (2026-07-28) test client ─────────────────────────────────────────
+
+/** The modern protocol revision served by the SDK (`SUPPORTED_MODERN_PROTOCOL_VERSIONS`). */
+export const MODERN_PROTOCOL_VERSION = "2026-07-28";
+
+/**
+ * Per-request `_meta` envelope every modern request must carry
+ * (`REQUIRED_ENVELOPE_KEYS`): protocolVersion + clientCapabilities.
+ * clientInfo is a SHOULD and included for realism.
+ */
+const MODERN_ENVELOPE = {
+  "io.modelcontextprotocol/protocolVersion": MODERN_PROTOCOL_VERSION,
+  "io.modelcontextprotocol/clientCapabilities": { elicitation: { form: {} } },
+  "io.modelcontextprotocol/clientInfo": { name: "vitest-modern", version: "1.0" },
+};
+
+/** Builds an accepted elicitation response entry for `inputResponses`. */
+export function elicitAccept(content: Record<string, unknown>): Record<string, unknown> {
+  return { action: "accept", content };
+}
+
+/** Builds a declined elicitation response entry for `inputResponses`. */
+export function elicitDecline(): Record<string, unknown> {
+  return { action: "decline" };
+}
+
+export interface ModernMcpSession {
+  /** Sends a request with the modern envelope attached. */
+  callMethod: (method: string, params: Record<string, unknown>) => Promise<Record<string, unknown>>;
+  /**
+   * One tools/call round. The result may be an `input_required` result
+   * (`resultType: "input_required"`, with `inputRequests` and optionally
+   * `requestState`) or a complete tool result.
+   */
+  callToolRaw: (
+    toolName: string,
+    args: Record<string, unknown>,
+  ) => Promise<Record<string, unknown>>;
+  /**
+   * tools/call with automatic MRTR fulfilment: re-issues the call with the
+   * collected `inputResponses` until the handler returns a complete result.
+   * `respond` maps the server's `inputRequests` to `inputResponses` entries.
+   */
+  callTool: (
+    toolName: string,
+    args: Record<string, unknown>,
+    respond: (inputRequests: Record<string, unknown>) => Record<string, unknown>,
+  ) => Promise<Record<string, unknown>>;
+  close: () => Promise<void>;
+}
+
+/**
+ * Creates a persistent MODERN (2026-07-28) MCP session against the built
+ * server. Unlike the legacy helpers this client speaks the modern protocol:
+ * it pins the era with `server/discover`, carries the required `_meta`
+ * envelope on every request, and can fulfil `input_required` results by
+ * re-issuing the call with `inputResponses` (the native MRTR flow).
+ */
+export async function createModernMcpSession(
+  vaultDir: string,
+  options?: { ollamaUrl?: string; disableGit?: boolean; env?: Record<string, string> },
+): Promise<ModernMcpSession> {
+  const child = spawn("node", [builtEntryPoint], {
+    cwd: repoRoot,
+    env: {
+      ...process.env,
+      DISABLE_GIT: options?.disableGit === false ? "false" : "true",
+      VAULT_PATH: vaultDir,
+      ...(options?.ollamaUrl ? { OLLAMA_URL: options.ollamaUrl } : {}),
+      ...options?.env,
+    },
+    stdio: ["pipe", "pipe", "pipe"],
+  });
+
+  let stdoutBuffer = "";
+  let stderrBuffer = "";
+  let nextId = 1;
+  const pending = new Map<
+    number,
+    {
+      resolve: (value: Record<string, unknown>) => void;
+      reject: (error: Error) => void;
+    }
+  >();
+
+  child.stdout.on("data", (chunk) => {
+    stdoutBuffer += chunk.toString();
+    const lines = stdoutBuffer.split("\n");
+    stdoutBuffer = lines.pop() ?? "";
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      const message = JSON.parse(line) as {
+        id?: number;
+        result?: Record<string, unknown>;
+        error?: { code?: number; message?: string };
+      };
+      if (message.id === undefined) continue;
+      const waiter = pending.get(message.id);
+      if (!waiter) continue;
+      pending.delete(message.id);
+      if (message.error) {
+        waiter.reject(
+          new Error(
+            `MCP JSON-RPC error ${message.error.code ?? "unknown"}: ${message.error.message ?? "unknown error"}`,
+          ),
+        );
+        continue;
+      }
+      if (!message.result) {
+        waiter.reject(new Error("MCP JSON-RPC response missing result"));
+        continue;
+      }
+      waiter.resolve(message.result);
+    }
+  });
+
+  child.stderr.on("data", (chunk) => {
+    stderrBuffer += chunk.toString();
+  });
+
+  child.on("close", (code) => {
+    if (code === 0) return;
+    const error = new Error(`Modern MCP session exited with code ${code}: ${stderrBuffer}`);
+    for (const waiter of pending.values()) {
+      waiter.reject(error);
+    }
+    pending.clear();
+  });
+
+  const callMethod = async (
+    method: string,
+    params: Record<string, unknown>,
+  ): Promise<Record<string, unknown>> => {
+    const id = nextId++;
+    const resultPromise = new Promise<Record<string, unknown>>((resolve, reject) => {
+      pending.set(id, { resolve, reject });
+    });
+    child.stdin.write(
+      JSON.stringify({
+        jsonrpc: "2.0",
+        id,
+        method,
+        params: { ...params, _meta: MODERN_ENVELOPE },
+      }) + "\n",
+    );
+    return resultPromise;
+  };
+
+  // Pin the connection to the modern era before any tool traffic.
+  await callMethod("server/discover", {});
+
+  const callToolRaw = async (
+    toolName: string,
+    args: Record<string, unknown>,
+  ): Promise<Record<string, unknown>> =>
+    callMethod("tools/call", { name: toolName, arguments: args });
+
+  const callTool = async (
+    toolName: string,
+    args: Record<string, unknown>,
+    respond: (inputRequests: Record<string, unknown>) => Record<string, unknown>,
+  ): Promise<Record<string, unknown>> => {
+    let params: Record<string, unknown> = { name: toolName, arguments: args };
+    const collectedResponses: Record<string, unknown> = {};
+    for (let round = 0; round < 8; round += 1) {
+      const result = await callMethod("tools/call", params);
+      if (result?.resultType !== "input_required") {
+        return result;
+      }
+      const responses = respond(result.inputRequests ?? {});
+      if (Object.keys(responses).length === 0) {
+        throw new Error(`input_required from '${toolName}' but responder produced no responses`);
+      }
+      Object.assign(collectedResponses, responses);
+      const retry: Record<string, unknown> = {
+        name: toolName,
+        arguments: args,
+        inputResponses: collectedResponses,
+      };
+      if (result.requestState !== undefined) {
+        retry.requestState = result.requestState;
+      }
+      params = retry;
+    }
+    throw new Error(`input_required fulfilment exceeded 8 rounds for '${toolName}'`);
+  };
+
+  return {
+    callMethod,
+    callToolRaw,
+    callTool,
+    close: async () => {
+      child.stdin.end();
+      await new Promise<void>((resolve) => child.once("close", () => resolve()));
+    },
+  };
+}
