@@ -106,6 +106,37 @@ export function hasNoteContent(note: NoteMetadata): note is Note {
   return "content" in note;
 }
 
+/** Maximum number of file descriptors opened at once during bulk listings. */
+const LIST_CONCURRENCY = 32;
+
+/**
+ * Map over an array with a bounded number of concurrent async operations while
+ * preserving input order in the result (each result is placed at its source
+ * index). Used by bulk listings so we never open a descriptor for every note or
+ * embedding at once when a vault grows large.
+ */
+async function mapWithConcurrency<T, R>(
+  items: readonly T[],
+  concurrency: number,
+  fn: (item: T, index: number) => Promise<R>,
+): Promise<R[]> {
+  if (items.length === 0) return [];
+  const results = new Array<R>(items.length);
+  let next = 0;
+  const workerCount = Math.min(concurrency, items.length);
+  const workers = Array.from({ length: workerCount }, async () => {
+    while (true) {
+      const index = next++;
+      if (index >= items.length) return;
+      const item = items[index];
+      if (item === undefined) return;
+      results[index] = await fn(item, index);
+    }
+  });
+  await Promise.all(workers);
+  return results;
+}
+
 export interface EmbeddingRecord {
   id: MemoryId;
   model: EmbeddingModelId;
@@ -288,9 +319,10 @@ export class Storage implements NoteStorage {
 
   async listNotes(filter?: { project?: string | null }): Promise<Note[]> {
     const ids = await this.listNoteIds();
-    const readNotes = await Promise.all(
-      ids.map(async (id) => ({ id, note: await this.readNote(id) })),
-    );
+    const readNotes = await mapWithConcurrency(ids, LIST_CONCURRENCY, async (id) => ({
+      id,
+      note: await this.readNote(id),
+    }));
     const notes: Note[] = [];
 
     for (const { note } of readNotes) {
@@ -315,9 +347,10 @@ export class Storage implements NoteStorage {
    */
   async listNotesMetadata(filter?: { project?: string | null }): Promise<NoteMetadata[]> {
     const ids = await this.listNoteIds();
-    const readNotes = await Promise.all(
-      ids.map(async (id) => ({ id, note: await this.readNoteMetadata(id) })),
-    );
+    const readNotes = await mapWithConcurrency(ids, LIST_CONCURRENCY, async (id) => ({
+      id,
+      note: await this.readNoteMetadata(id),
+    }));
     const notes: NoteMetadata[] = [];
 
     for (const { note } of readNotes) {
@@ -392,7 +425,7 @@ export class Storage implements NoteStorage {
     const ids = files
       .filter((file) => file.endsWith(".json"))
       .map((file) => memoryId(file.replace(/\.json$/, "")));
-    const records = await Promise.all(ids.map((id) => this.readEmbedding(id)));
+    const records = await mapWithConcurrency(ids, LIST_CONCURRENCY, (id) => this.readEmbedding(id));
     return records.filter((record): record is EmbeddingRecord => record !== null);
   }
 
@@ -512,7 +545,9 @@ export class Storage implements NoteStorage {
   }
 }
 
-const FRONTMATTER_READ_WINDOW_BYTES = 16_384;
+const INITIAL_FRONTMATTER_WINDOW_BYTES = 1024;
+const MAX_FRONTMATTER_WINDOW_BYTES = 16_384;
+const FULL_READ_CHUNK_BYTES = 64 * 1024;
 
 /**
  * Strip the body from a parsed note so the metadata-only contract holds at the
@@ -527,35 +562,69 @@ function toNoteMetadata(note: Note): NoteMetadata {
 /**
  * Read only enough of a note file to extract frontmatter metadata.
  *
- * Reads a bounded window (16KB) up front, which covers all realistic
- * frontmatter, and skips the (potentially large) note body. If the closing
- * `---` delimiter is not found within the window (unusually long frontmatter),
- * falls back to reading the remainder of the file so parsing stays correct.
+ * Starts with a small initial window (1KB) that covers virtually all realistic
+ * frontmatter, then grows incrementally (doubling) until the closing `---`
+ * delimiter is found, capped at a bounded metadata window (16KB). If the
+ * closing delimiter is still not found at the cap (unusually long frontmatter),
+ * falls back to reading the rest of the file so parsing stays correct.
+ *
+ * All reads accumulate into a single byte buffer that is decoded only once at
+ * the end, so a multibyte UTF-8 character split across a read boundary is never
+ * corrupted — the delimiter scan works on the raw bytes, and the intermediate
+ * decodes are used only for delimiter detection, never for the returned text.
  */
 async function readFrontmatter(filePath: string): Promise<string> {
   const fh = await fs.open(filePath, "r");
   return (async () => {
-    const buf = Buffer.alloc(FRONTMATTER_READ_WINDOW_BYTES);
-    const { bytesRead } = await fh.read(buf, 0, buf.length, 0);
-    let text = buf.toString("utf-8", 0, bytesRead);
+    const chunks: Buffer[] = [];
+    let position = 0;
 
-    const trimmed = text.trimStart();
-    if (trimmed.startsWith("---")) {
-      const afterFirst = trimmed.slice(3);
-      const closingIdx = afterFirst.indexOf("\n---");
-      if (closingIdx === -1) {
-        // Frontmatter doesn't close within the bounded window — read the rest.
-        const { size } = await fh.stat();
-        const remaining = size - bytesRead;
-        if (remaining > 0) {
-          const rest = Buffer.alloc(remaining);
-          const { bytesRead: restRead } = await fh.read(rest, 0, rest.length, bytesRead);
-          text = text + rest.toString("utf-8", 0, restRead);
+    const readChunk = async (length: number): Promise<number> => {
+      const chunk = Buffer.alloc(length);
+      const { bytesRead } = await fh.read(chunk, 0, length, position);
+      position += bytesRead;
+      chunks.push(chunk.subarray(0, bytesRead));
+      return bytesRead;
+    };
+
+    let bytesRead = await readChunk(INITIAL_FRONTMATTER_WINDOW_BYTES);
+    if (bytesRead === 0) return "";
+
+    // Only grow when the initial window looks like it holds unclosed frontmatter.
+    if (hasUnclosedFrontmatter(Buffer.concat(chunks))) {
+      while (position < MAX_FRONTMATTER_WINDOW_BYTES) {
+        const target = Math.min(position * 2, MAX_FRONTMATTER_WINDOW_BYTES);
+        bytesRead = await readChunk(target - position);
+        if (bytesRead === 0) break; // EOF — delimiter never closed
+        if (!hasUnclosedFrontmatter(Buffer.concat(chunks))) {
+          return Buffer.concat(chunks).toString("utf-8");
         }
       }
+
+      // Frontmatter didn't close within the bounded window — read the rest in
+      // bounded chunks until EOF so parsing stays correct for large notes.
+      while (true) {
+        const chunk = Buffer.alloc(FULL_READ_CHUNK_BYTES);
+        const { bytesRead: more } = await fh.read(chunk, 0, chunk.length, position);
+        if (more === 0) break;
+        position += more;
+        chunks.push(chunk.subarray(0, more));
+      }
     }
-    return text;
+    return Buffer.concat(chunks).toString("utf-8");
   })().finally(() => fh.close());
+}
+
+/**
+ * A note has unclosed frontmatter when it starts with `---` but the closing
+ * `\n---` delimiter has not yet appeared in the bytes read so far.
+ */
+function hasUnclosedFrontmatter(buffer: Buffer): boolean {
+  const text = buffer.toString("utf-8");
+  const trimmed = text.trimStart();
+  if (!trimmed.startsWith("---")) return false;
+  const afterFirst = trimmed.slice(3);
+  return afterFirst.indexOf("\n---") === -1;
 }
 
 function normalizeMemoryVersion(value: unknown): number {

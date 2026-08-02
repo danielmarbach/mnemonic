@@ -557,6 +557,46 @@ Body`;
       expect("content" in read!).toBe(false);
     });
 
+    it("should grow the read window incrementally and preserve non-ASCII frontmatter across the boundary", async () => {
+      const notesDir = path.join(tempDir, "notes");
+      // A multibyte-heavy title pushes the closing `---` well past the 1KB
+      // initial window, forcing an incremental grow. If the grow logic or the
+      // UTF-8 decode were wrong, the title would be truncated or corrupted.
+      const title = "Mémory " + "🚀".repeat(300);
+      const body = "Body " + "z".repeat(50_000);
+      const content = `---\ntitle: ${title}\ntags: ["boundary", "ümlaut"]\nlifecycle: permanent\ncreatedAt: 2023-01-01T00:00:00.000Z\nupdatedAt: 2023-01-01T00:00:00.000Z\n---\n\n${body}`;
+
+      await fs.writeFile(path.join(notesDir, "utf8-boundary.md"), content, "utf-8");
+
+      const read = await storage.readNoteMetadata("utf8-boundary");
+      expect(read).not.toBeNull();
+      expect(read!.title).toBe(title);
+      expect(read!.tags).toEqual(["boundary", "ümlaut"]);
+      expect("content" in read!).toBe(false);
+
+      // Full read must still return the complete body.
+      const full = await storage.readNote("utf8-boundary");
+      expect(full!.content).toBe(body);
+    });
+
+    it("should return metadata from a small frontmatter without reading a huge body", async () => {
+      const notesDir = path.join(tempDir, "notes");
+      // Frontmatter closes well within the initial window; body is far larger
+      // than the metadata cap. The metadata read must not need the body at all.
+      const body = "z".repeat(200_000);
+      const content = `---\ntitle: Small Frontmatter\nlifecycle: permanent\ncreatedAt: 2023-01-01T00:00:00.000Z\nupdatedAt: 2023-01-01T00:00:00.000Z\n---\n\n${body}`;
+
+      await fs.writeFile(path.join(notesDir, "small-frontmatter.md"), content, "utf-8");
+
+      const read = await storage.readNoteMetadata("small-frontmatter");
+      expect(read).not.toBeNull();
+      expect(read!.title).toBe("Small Frontmatter");
+      expect("content" in read!).toBe(false);
+
+      const full = await storage.readNote("small-frontmatter");
+      expect(full!.content).toBe(body);
+    });
+
     it("should list metadata for all notes without filter", async () => {
       const now = new Date().toISOString();
       const notes: Note[] = [
