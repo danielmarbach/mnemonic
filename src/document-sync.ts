@@ -163,23 +163,41 @@ export async function embedGenerationChunks(
 ): Promise<void> {
   const toEmbed: ChunkEmbeddingWorkItem[] = [];
 
-  for (const chunk of gen.chunks.values()) {
-    const sourcePath = gen.documents.get(chunk.documentId)?.sourcePath ?? chunk.documentId;
-    const projectionText = `${chunk.content}\n${joinHeadingAncestry(chunk.headingAncestry)}\n${sourcePath}`;
-    const contentHash = await xxh128(projectionText);
+  // Read existing on-disk embeddings and compute each chunk's content hash
+  // concurrently. On a re-sync of a large unchanged attachment every chunk hits
+  // the reuse branch, so this read/decide loop is the whole cost — serializing
+  // it makes re-syncs slow for no benefit. Bounded by `reindexEmbedConcurrency`
+  // (same knob as the embed workers below). Workers share no mutable state:
+  // each chunk reads a distinct file and sets a distinct chunk-id key
+  // (`Map.set` / `Array.push` are atomic between awaits), and `toEmbed` is
+  // sorted next, so gathering order doesn't matter. `xxh128` is concurrency-
+  // safe — its WASM executes synchronously between awaits (stress-checked).
+  const chunks = [...gen.chunks.values()];
+  let readIndex = 0;
+  const readWorkerCount = Math.min(ctx.config.reindexEmbedConcurrency, Math.max(chunks.length, 1));
+  const readWorkers = Array.from({ length: readWorkerCount }, async () => {
+    while (true) {
+      const chunk = chunks[readIndex++];
+      if (!chunk) return;
 
-    const existing = await storage.read(chunk.chunkId);
-    if (
-      existing &&
-      existing.contentHash === contentHash &&
-      checkEmbeddingCompatibility(existing, currentEmbeddingIdentity).status === "compatible"
-    ) {
-      gen.chunkEmbeddings.set(chunk.chunkId, existing);
-      continue;
+      const sourcePath = gen.documents.get(chunk.documentId)?.sourcePath ?? chunk.documentId;
+      const projectionText = `${chunk.content}\n${joinHeadingAncestry(chunk.headingAncestry)}\n${sourcePath}`;
+      const contentHash = await xxh128(projectionText);
+
+      const existing = await storage.read(chunk.chunkId);
+      if (
+        existing &&
+        existing.contentHash === contentHash &&
+        checkEmbeddingCompatibility(existing, currentEmbeddingIdentity).status === "compatible"
+      ) {
+        gen.chunkEmbeddings.set(chunk.chunkId, existing);
+        continue;
+      }
+
+      toEmbed.push({ chunk, projectionText, contentHash, sourcePath });
     }
-
-    toEmbed.push({ chunk, projectionText, contentHash, sourcePath });
-  }
+  });
+  await Promise.all(readWorkers);
 
   // Recency-priority ordering: newest last-modified first, tie-break by source
   // path for determinism. ISO dates compare lexicographically = chronologically.
