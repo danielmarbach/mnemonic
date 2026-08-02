@@ -7,7 +7,7 @@ tags:
   - attachments
 lifecycle: permanent
 createdAt: '2026-08-02T06:15:43.841Z'
-updatedAt: '2026-08-02T06:16:01.222Z'
+updatedAt: '2026-08-02T06:24:14.893Z'
 role: decision
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -33,13 +33,15 @@ Retrieval is unaffected by either change: `collectDocumentChunkCandidates` keys 
 
 2. **Content hash = `xxh128(projectionText)`**, replacing SHA-256. Unifies both sites under one deliberate non-cryptographic hash.
 
-3. **128-bit, not 64-bit.** xxh64 was considered and rejected: at `maxTotalChunks: 50000` a 64-bit hash has birthday-collision probability ~7×10⁻¹¹. For filenames a collision silently clobbers one chunk's embedding (retrieval degrades to lexical-only for that chunk; reconcile cannot detect it). For content a collision causes a false cache-hit (wrong vector reused for a changed chunk). 128-bit removes both concerns entirely.
+3. **128-bit, not 64-bit.** xxh64 was considered and rejected: at `maxTotalChunks: 50000` a 64-bit hash has birthday-collision probability \~7×10⁻¹¹. For filenames a collision silently clobbers one chunk's embedding (retrieval degrades to lexical-only for that chunk; reconcile cannot detect it). For content a collision causes a false cache-hit (wrong vector reused for a changed chunk). 128-bit removes both concerns entirely.
 
 4. **xxh128 over SHA-256** because SHA-256's prior use was arbitrary and xxh128 is the purpose-built tool for content addressing at this scale. xxh128 over xxh64 for the collision-proofing above.
 
-5. **Dependency: `xxhash-wasm`.** `node:crypto` has no xxhash (confirmed on Node 25.2.1). Hashing speed is not the bottleneck — the embed loop's per-chunk sequential `storage.read()` I/O dominates — but using the right tool is worth a tiny dep.
+5. **Dependency: `hash-wasm`.** `node:crypto` ships no non-cryptographic 128-bit hash (confirmed on Node 25.2.1). `xxhash-wasm` was tried first but its v1.x exposes only 32/64-bit variants, so `hash-wasm` (real XXH3-128 via `xxhash128`) is used instead. Hashing speed is not the bottleneck — the embed loop's per-chunk sequential `storage.read()` I/O dominates — but using the right tool is worth a tiny dep.
 
 ## Implementation consequences
+
+- **`pathFor` is now async** (`Promise<string>`): `hash-wasm`'s `xxhash128` lazily compiles its WASM on first use, so the hash is a `Promise`. Every caller (`read`, `write`, `remove`, `reconcile`) was already async, so this is a contained change; the few tests that called `pathFor` synchronously now `await` it.
 
 - **`list()` must read files directly** instead of round-tripping the basename through `read()`/`pathFor()`. The slug was idempotent (`slug(slug(x)) === slug(x)`), so the old round-trip worked by coincidence; a hash is NOT idempotent (`hash(hash(x)) !== hash(x)`), so the round-trip would hash the hex filename again and miss the file. `read(chunkId)` (takes the real chunkId) and `reconcile()` (already reads directly) keep working unchanged. The fix mirrors `reconcile`'s direct-read approach.
 
@@ -49,7 +51,8 @@ Retrieval is unaffected by either change: `collectDocumentChunkCandidates` keys 
 
 ## What changes
 
-- `src/chunk-embedding-storage.ts`: `pathFor` uses `xxh128(suffix)`; `list()` reads files directly; contentHash comment updated (no longer "hex sha256").
-- `src/document-sync.ts`: content hash at `:169` uses `xxh128`.
-- New `xxhash-wasm` dependency + a small shared hash helper.
-- Tests updated: filename assertion becomes the xxh128 digest; reconcile legacy-file test still valid (v2 slug names are the legacy).
+- `src/hashing.ts` (new): shared `xxh128(input)` wrapper over `hash-wasm`'s `xxhash128`.
+- `src/chunk-embedding-storage.ts`: `pathFor` is async and uses `xxh128(suffix)`; `read`/`write`/`remove`/`reconcile` `await` it; `list()` reads files directly (not via `pathFor`); contentHash comment updated (no longer "hex sha256").
+- `src/document-sync.ts`: content hash at `:169` uses `await xxh128(...)`; `createHash` import dropped.
+- New `hash-wasm` dependency.
+- Tests updated: filename assertion becomes the xxh128 digest; `pathFor` calls awaited; reconcile legacy-file test still valid (v2 slug names are the legacy).
