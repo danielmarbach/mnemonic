@@ -95,6 +95,22 @@ describe("ChunkEmbeddingStorage", () => {
     await expect(storage.list()).resolves.toEqual([]);
   });
 
+  it("returns null for a record whose payload chunkId differs from the requested one", async () => {
+    const { storage } = await makeStorage();
+    const requestedId = "att-1::docs/requested.md::Intro::0::0";
+    const mismatchedId = "att-1::docs/other.md::Intro::0::0";
+    // A well-formed record for `mismatchedId` placed at the path for
+    // `requestedId` — simulating a corrupt/misplaced file. read must reject it
+    // so a caller can't reuse a record keyed under the wrong id.
+    await fs.writeFile(
+      await storage.pathFor(requestedId),
+      JSON.stringify(makeRecord({ chunkId: mismatchedId })),
+      "utf-8",
+    );
+
+    await expect(storage.read(requestedId)).resolves.toBeNull();
+  });
+
   it("lists only valid records and ignores corrupt siblings", async () => {
     const { dir, storage } = await makeStorage();
     const valid = makeRecord();

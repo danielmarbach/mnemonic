@@ -82,7 +82,12 @@ export class ChunkEmbeddingStorage {
     if (!raw.ok) return null;
     const parsed = await attempt("chunk-embedding:read", (): unknown => JSON.parse(raw.value));
     if (!parsed.ok) return null;
-    return validateChunkEmbeddingRecord(parsed.value);
+    const record = validateChunkEmbeddingRecord(parsed.value);
+    // A canonical file lives at pathFor(chunkId) and carries that same chunkId
+    // in its payload. A mismatch means the file is corrupt or misplaced; treat
+    // it as unreadable so callers re-embed rather than reuse a record keyed
+    // under the wrong id.
+    return record && record.chunkId === chunkId ? record : null;
   }
 
   async write(record: ChunkEmbeddingRecord): Promise<void> {
