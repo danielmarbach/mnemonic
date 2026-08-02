@@ -7,11 +7,14 @@ tags:
   - attachments
 lifecycle: permanent
 createdAt: '2026-08-02T06:15:43.841Z'
-updatedAt: '2026-08-02T06:15:43.841Z'
+updatedAt: '2026-08-02T06:16:01.222Z'
 role: decision
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: chunk-embedding-path-layout-drop-redundant-guid-prefix-lower-6b739d42
+    type: derives-from
 memoryVersion: 1
 ---
 Document-source chunk embedding cache files are now named by an **xxh128 digest** of the chunkId suffix, and the per-chunk **content hash is also xxh128**. Both sites had been slug-based / SHA-256 by accident; this makes one deliberate non-cryptographic hash the single source of truth. Reverses the "hash-based names judged overkill" residual in `chunk-embedding-path-layout-drop-redundant-guid-prefix-lower-6b739d42`.
