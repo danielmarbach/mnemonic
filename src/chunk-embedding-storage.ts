@@ -17,7 +17,7 @@ import {
   isValidIsoDateString,
 } from "./brands.js";
 import { attempt } from "./error-utils.js";
-import { normalizePathToSlug } from "./retrieval-document.js";
+import { xxh128 } from "./hashing.js";
 
 /**
  * A persisted embedding record for a single retrieval chunk.
@@ -28,7 +28,7 @@ import { normalizePathToSlug } from "./retrieval-document.js";
  */
 export interface ChunkEmbeddingRecord {
   chunkId: string; // the ChunkId (branded string) serialized as plain string
-  contentHash: string; // hex sha256 of the chunk's projection text (set by Stage 2)
+  contentHash: string; // 32-hex-char xxh128 of the chunk's projection text (set by Stage 2)
   model: EmbeddingModelId;
   provider?: EmbeddingProviderId;
   dimensions?: EmbeddingDimensions;
@@ -43,14 +43,22 @@ export interface ChunkEmbeddingRecord {
  *
  * Owns a single directory (the per-attachment directory resolved by the caller,
  * e.g. `.mnemonic/embeddings/doc-source/<attachmentId>/`). Files are named by
- * the slugified, lowercased chunk-id *suffix* — the leading `<attachmentId>::`
- * prefix is stripped because the directory already scopes by attachment id, so
- * the prefix would be redundant on every file: `<slug(suffix)>.json`.
+ * the xxh128 digest of the chunk-id *suffix* — the leading `<attachmentId>::`
+ * prefix is stripped first because the directory already scopes by attachment
+ * id, so it would be redundant in the hash input: `<xxh128(suffix)>.json`
+ * (32 lowercase hex chars, fixed length regardless of source-path depth or
+ * heading ancestry).
  *
- * Lowercasing is applied here ONLY (not in the shared `normalizePathToSlug`,
- * which stays case-preserving so the `::`-separated chunkId stored in JSON is
- * never altered). This keeps file names deterministic across case-insensitive
- * filesystems (macOS APFS, Windows NTFS) without touching the id contract.
+ * xxh128 (XXH3-128, non-cryptographic) bounds the filename to a fixed length so
+ * document sources with arbitrarily deep paths and long heading ancestry never
+ * hit the 255-byte single-component limit shared by APFS/ext4/NTFS — a problem
+ * unique to document sources, since note-embedding files are named by short
+ * GUIDs. 128 bits removes any practical collision concern at the
+ * document-source scale (`maxTotalChunks` = 50 000). The authoritative
+ * `::`-separated chunkId lives inside the JSON payload and is never derived
+ * from or altered by the filename; retrieval keys on that id, not the file
+ * name. `pathFor` is async because hash-wasm lazily compiles its WASM on first
+ * use. See the `document-source-chunk-embeddings-use-xxh128-...` decision note.
  */
 export class ChunkEmbeddingStorage {
   constructor(
@@ -62,16 +70,15 @@ export class ChunkEmbeddingStorage {
     await fs.mkdir(this.dir, { recursive: true });
   }
 
-  pathFor(chunkId: string): string {
+  async pathFor(chunkId: string): Promise<string> {
     const prefix = `${this.attachmentId}::`;
     const suffix = chunkId.startsWith(prefix) ? chunkId.slice(prefix.length) : chunkId;
-    return path.join(this.dir, normalizePathToSlug(suffix).toLowerCase() + ".json");
+    return path.join(this.dir, (await xxh128(suffix)) + ".json");
   }
 
   async read(chunkId: string): Promise<ChunkEmbeddingRecord | null> {
-    const raw = await attempt("chunk-embedding:read", () =>
-      fs.readFile(this.pathFor(chunkId), "utf-8"),
-    );
+    const filePath = await this.pathFor(chunkId);
+    const raw = await attempt("chunk-embedding:read", () => fs.readFile(filePath, "utf-8"));
     if (!raw.ok) return null;
     const parsed = await attempt("chunk-embedding:read", (): unknown => JSON.parse(raw.value));
     if (!parsed.ok) return null;
@@ -80,7 +87,8 @@ export class ChunkEmbeddingStorage {
 
   async write(record: ChunkEmbeddingRecord): Promise<void> {
     await fs.mkdir(this.dir, { recursive: true });
-    await fs.writeFile(this.pathFor(record.chunkId), JSON.stringify(record, null, 2), "utf-8");
+    const filePath = await this.pathFor(record.chunkId);
+    await fs.writeFile(filePath, JSON.stringify(record, null, 2), "utf-8");
   }
 
   async list(): Promise<ChunkEmbeddingRecord[]> {
@@ -90,15 +98,32 @@ export class ChunkEmbeddingStorage {
       [] as string[],
     );
     const files = filesResult.ok ? filesResult.value : [];
-    const chunkIds = files
-      .filter((file) => file.endsWith(".json"))
-      .map((file) => file.replace(/\.json$/, ""));
-    const records = await Promise.all(chunkIds.map((id) => this.read(id)));
+    // Read files directly rather than round-tripping the basename through
+    // read()/pathFor(). The old slug scheme was idempotent (slug(slug(x)) ===
+    // slug(x)), so the round-trip worked by coincidence; the xxh128 name is NOT
+    // idempotent (hash(hash(x)) !== hash(x)), so pathFor(basename) would
+    // re-hash the hex and miss every file. Mirrors reconcile()'s direct read.
+    const records = await Promise.all(
+      files
+        .filter((file) => file.endsWith(".json"))
+        .map(async (file) => {
+          const raw = await attempt("chunk-embedding:list", () =>
+            fs.readFile(path.join(this.dir, file), "utf-8"),
+          );
+          if (!raw.ok) return null;
+          const parsed = await attempt("chunk-embedding:list", (): unknown =>
+            JSON.parse(raw.value),
+          );
+          if (!parsed.ok) return null;
+          return validateChunkEmbeddingRecord(parsed.value);
+        }),
+    );
     return records.filter((record): record is ChunkEmbeddingRecord => record !== null);
   }
 
   async remove(chunkId: string): Promise<void> {
-    await attempt("chunk-embedding:remove", () => fs.unlink(this.pathFor(chunkId)));
+    const filePath = await this.pathFor(chunkId);
+    await attempt("chunk-embedding:remove", () => fs.unlink(filePath));
   }
 
   async removeAll(): Promise<void> {
@@ -153,7 +178,7 @@ export class ChunkEmbeddingStorage {
         if (r.ok) stale++;
         continue;
       }
-      if (removeNonCanonical && path.basename(this.pathFor(record.chunkId)) !== file) {
+      if (removeNonCanonical && path.basename(await this.pathFor(record.chunkId)) !== file) {
         const r = await attempt("chunk-embedding:reconcile", () => fs.unlink(filePath));
         if (r.ok) nonCanonical++;
       }

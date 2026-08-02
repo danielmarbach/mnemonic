@@ -1,6 +1,6 @@
 import { simpleGit } from "simple-git";
 import path from "path";
-import { createHash } from "node:crypto";
+import { xxh128 } from "./hashing.js";
 import { expandHomePath } from "./paths.js";
 import { getExtractor } from "./document-extractor.js";
 import { markdownChunker } from "./markdown-chunker.js";
@@ -166,7 +166,7 @@ export async function embedGenerationChunks(
   for (const chunk of gen.chunks.values()) {
     const sourcePath = gen.documents.get(chunk.documentId)?.sourcePath ?? chunk.documentId;
     const projectionText = `${chunk.content}\n${joinHeadingAncestry(chunk.headingAncestry)}\n${sourcePath}`;
-    const contentHash = createHash("sha256").update(projectionText, "utf-8").digest("hex");
+    const contentHash = await xxh128(projectionText);
 
     const existing = await storage.read(chunk.chunkId);
     if (

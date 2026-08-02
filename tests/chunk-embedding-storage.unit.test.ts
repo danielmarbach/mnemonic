@@ -7,6 +7,7 @@ import {
   validateChunkEmbeddingRecord,
 } from "../src/chunk-embedding-storage.js";
 import type { ChunkEmbeddingRecord } from "../src/chunk-embedding-storage.js";
+import { xxh128 } from "../src/hashing.js";
 import {
   embeddingCompatibilityKey,
   embeddingDimensions,
@@ -75,7 +76,7 @@ describe("ChunkEmbeddingStorage", () => {
   it("returns null for corrupt JSON and skips it in list", async () => {
     const { dir, storage } = await makeStorage();
     const chunkId = "att-1::docs/corrupt.md::Intro::0::0";
-    await fs.writeFile(storage.pathFor(chunkId), "{ not valid json", "utf-8");
+    await fs.writeFile(await storage.pathFor(chunkId), "{ not valid json", "utf-8");
 
     await expect(storage.read(chunkId)).resolves.toBeNull();
     await expect(storage.list()).resolves.toEqual([]);
@@ -85,7 +86,7 @@ describe("ChunkEmbeddingStorage", () => {
     const { dir, storage } = await makeStorage();
     const chunkId = "att-1::docs/shape.md::Intro::0::0";
     await fs.writeFile(
-      storage.pathFor(chunkId),
+      await storage.pathFor(chunkId),
       JSON.stringify({ chunkId, embedding: "not-an-array" }),
       "utf-8",
     );
@@ -99,7 +100,7 @@ describe("ChunkEmbeddingStorage", () => {
     const valid = makeRecord();
     const corruptId = "att-1::docs/corrupt.md::Intro::0::0";
     await storage.write(valid);
-    await fs.writeFile(storage.pathFor(corruptId), "garbage", "utf-8");
+    await fs.writeFile(await storage.pathFor(corruptId), "garbage", "utf-8");
 
     const listed = await storage.list();
 
@@ -128,23 +129,25 @@ describe("ChunkEmbeddingStorage", () => {
     await expect(storage.removeAll()).resolves.toBeUndefined();
   });
 
-  it("names files by the slugified, lowercased chunk-id suffix (attachment id stripped)", async () => {
+  it("names files by the xxh128 digest of the chunk-id suffix (attachment id stripped)", async () => {
     const { dir, storage } = await makeStorage();
     const chunkId = "att-1::docs/Guide.md::Setup & Config::0::0";
     await storage.write(makeRecord({ chunkId }));
 
     // The attachment-id prefix is dropped (the directory already scopes by it)
-    // and the remaining suffix is slugified + lowercased for cross-filesystem
-    // safety. The shared `normalizePathToSlug` stays case-preserving; only the
-    // file-name path lowercases.
-    const expectedFile = path.join(dir, "docs-guide-md-setup-config-0-0.json");
+    // and the remaining suffix is hashed with xxh128 to a fixed 32-hex-char
+    // name, so source-path depth and heading-ancestry length can never exceed
+    // the filesystem's single-component limit.
+    const suffix = "docs/Guide.md::Setup & Config::0::0";
+    const expectedFile = path.join(dir, `${await xxh128(suffix)}.json`);
     await expect(fs.access(expectedFile)).resolves.toBeUndefined();
+    expect(path.basename(expectedFile)).toMatch(/^[0-9a-f]{32}\.json$/);
 
     // The authoritative chunkId round-trips intact from the JSON payload.
     const readBack = await storage.read(chunkId);
     expect(readBack?.chunkId).toBe(chunkId);
 
-    // Neither the verbatim chunkId nor an attachment-id-prefixed name is used.
+    // Neither the verbatim chunkId nor an attachment-id-prefixed slug is used.
     await expect(fs.access(path.join(dir, `${chunkId}.json`))).rejects.toThrow();
     await expect(
       fs.access(path.join(dir, "att-1-docs-guide-md-setup-config-0-0.json")),
