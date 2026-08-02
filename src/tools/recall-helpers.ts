@@ -1,5 +1,7 @@
-import type { Note, NoteLifecycle } from "../storage.js";
+import type { NoteMetadata, NoteLifecycle } from "../storage.js";
+import { hasNoteContent } from "../storage.js";
 import type { Vault } from "../vault.js";
+import { memoryId } from "../brands.js";
 import { getEffectiveMetadata } from "../role-suggestions.js";
 import {
   computeRecallMetadataBoost,
@@ -10,7 +12,7 @@ import {
   computeTemporalRecencyBoost,
   isWithinTemporalFilterWindow,
 } from "../recall.js";
-import { getOrBuildProjection } from "../projections.js";
+import { getOrBuildProjection, getProjection, isProjectionStale } from "../projections.js";
 import { attempt } from "../error-utils.js";
 import {
   getSessionCachedProjection,
@@ -31,13 +33,20 @@ import {
   LEXICAL_RESCUE_THRESHOLD,
   LEXICAL_RESCUE_RESULT_LIMIT,
 } from "../lexical.js";
-import type { RecallDiversity, RecallRetrievalCoverage } from "../structured-content.js";
+import type {
+  RecallDiversity,
+  RecallRetrievalCoverage,
+  NoteProjection,
+} from "../structured-content.js";
 
 // ── Recall candidate context ──────────────────────────────────────────────────
 
-export function buildRecallCandidateContext(note: Note) {
+export function buildRecallCandidateContext(note: NoteMetadata) {
   const metadata = getEffectiveMetadata(note);
   const relatedCount = note.relatedTo?.length ?? 0;
+  // Metadata-only notes have no body — treat their structure as empty (matches
+  // the prior sentinel behavior where metadata notes carried content: "").
+  const content = hasNoteContent(note) ? note.content : "";
   return {
     metadata,
     metadataBoost: computeRecallMetadataBoost(metadata),
@@ -47,9 +56,9 @@ export function buildRecallCandidateContext(note: Note) {
     structureScore: Math.min(
       0.04,
       [
-        note.content.includes("## ") ? 0.02 : 0,
-        note.content.includes("- ") || note.content.includes("1. ") ? 0.01 : 0,
-        note.content.length >= 400 ? 0.01 : 0,
+        content.includes("## ") ? 0.02 : 0,
+        content.includes("- ") || content.includes("1. ") ? 0.01 : 0,
+        content.length >= 400 ? 0.01 : 0,
       ].reduce((sum, value) => sum + value, 0),
     ),
   };
@@ -147,9 +156,24 @@ export async function collectLexicalCandidates(
       const cachedProjection = projectId
         ? getSessionCachedProjection(projectId, vault.storage.vaultPath, note.id)
         : undefined;
-      const projection =
-        cachedProjection ??
-        (await getOrBuildProjection(vault.storage, note).catch(() => undefined));
+      // The cached note list is metadata-only (no content field). A stale or
+      // missing projection must be (re)built from the full note body, so load
+      // the full note before building — otherwise we would persist degraded
+      // projections (empty summaries) that feed embedding/lexical text.
+      let projection: NoteProjection | undefined = cachedProjection;
+      if (!projection) {
+        const stored = await getProjection(vault.storage, note.id).catch(() => undefined);
+        if (stored && !isProjectionStale(note, stored)) {
+          projection = stored;
+        } else {
+          const fullNote = hasNoteContent(note)
+            ? note
+            : await vault.storage.readNote(memoryId(note.id)).catch(() => null);
+          if (fullNote) {
+            projection = await getOrBuildProjection(vault.storage, fullNote).catch(() => undefined);
+          }
+        }
+      }
       if (!projection) continue;
 
       const projectionTokens = projectId

@@ -470,6 +470,178 @@ Body`;
     });
   });
 
+  describe("Metadata-only reads", () => {
+    it("should return frontmatter metadata without a content field", async () => {
+      const now = new Date().toISOString();
+      const note: Note = {
+        id: "meta-note-1",
+        title: "Meta Note",
+        content: "This is the full body that metadata reads must skip.",
+        tags: ["meta"],
+        lifecycle: "permanent",
+        role: "decision",
+        project: "project-a",
+        projectName: "Project A",
+        relatedTo: [{ id: "related-1", type: "related-to" }],
+        createdAt: now,
+        updatedAt: now,
+      };
+
+      await storage.writeNote(note);
+      const read = await storage.readNoteMetadata(note.id);
+
+      expect(read).not.toBeNull();
+      expect(read!.id).toBe(note.id);
+      expect(read!.title).toBe(note.title);
+      expect(read!.tags).toEqual(note.tags);
+      expect(read!.lifecycle).toBe(note.lifecycle);
+      expect(read!.role).toBe(note.role);
+      expect(read!.project).toBe(note.project);
+      expect(read!.projectName).toBe(note.projectName);
+      expect(read!.relatedTo).toEqual(note.relatedTo);
+      expect(read!.createdAt).toBe(note.createdAt);
+      expect(read!.updatedAt).toBe(note.updatedAt);
+      // Metadata-only reads must not expose a content field at all.
+      expect("content" in read!).toBe(false);
+    });
+
+    it("should return null for non-existent note", async () => {
+      expect(await storage.readNoteMetadata("non-existent")).toBeNull();
+    });
+
+    it("should return null for notes without frontmatter", async () => {
+      const notesDir = path.join(tempDir, "notes");
+      await fs.writeFile(path.join(notesDir, "malformed-meta.md"), "This has no frontmatter");
+
+      expect(await storage.readNoteMetadata("malformed-meta")).toBeNull();
+    });
+
+    it("should parse metadata correctly for notes with bodies larger than the read window", async () => {
+      const now = new Date().toISOString();
+      const largeBody = "x".repeat(100_000);
+      const note: Note = {
+        id: "large-body-note",
+        title: "Large Body Note",
+        content: largeBody,
+        tags: ["big"],
+        lifecycle: "temporary",
+        createdAt: now,
+        updatedAt: now,
+      };
+
+      await storage.writeNote(note);
+
+      const read = await storage.readNoteMetadata(note.id);
+      expect(read).not.toBeNull();
+      expect(read!.title).toBe("Large Body Note");
+      expect(read!.tags).toEqual(["big"]);
+      expect(read!.lifecycle).toBe("temporary");
+      expect("content" in read!).toBe(false);
+
+      // Full read must still return the complete body
+      const full = await storage.readNote(note.id);
+      expect(full!.content).toBe(largeBody);
+    });
+
+    it("should fall back to a full read when frontmatter exceeds the read window", async () => {
+      const notesDir = path.join(tempDir, "notes");
+      const longDescription = "d".repeat(20_000);
+      const content = `---\ntitle: Long Frontmatter\ntags: ["edge"]\nlifecycle: permanent\ndescription: ${longDescription}\ncreatedAt: 2023-01-01T00:00:00.000Z\nupdatedAt: 2023-01-01T00:00:00.000Z\n---\n\nBody`;
+
+      await fs.writeFile(path.join(notesDir, "long-frontmatter.md"), content, "utf-8");
+
+      const read = await storage.readNoteMetadata("long-frontmatter");
+      expect(read).not.toBeNull();
+      expect(read!.title).toBe("Long Frontmatter");
+      expect(read!.tags).toEqual(["edge"]);
+      expect("content" in read!).toBe(false);
+    });
+
+    it("should list metadata for all notes without filter", async () => {
+      const now = new Date().toISOString();
+      const notes: Note[] = [
+        {
+          id: "meta-list-1",
+          title: "Meta List 1",
+          content: "Body 1",
+          tags: [],
+          lifecycle: "permanent",
+          createdAt: now,
+          updatedAt: now,
+        },
+        {
+          id: "meta-list-2",
+          title: "Meta List 2",
+          content: "Body 2",
+          tags: [],
+          lifecycle: "permanent",
+          createdAt: now,
+          updatedAt: now,
+        },
+      ];
+
+      for (const note of notes) {
+        await storage.writeNote(note);
+      }
+
+      const listed = await storage.listNotesMetadata();
+      expect(listed).toHaveLength(2);
+      expect(listed.map((n) => n.id).sort()).toEqual(["meta-list-1", "meta-list-2"]);
+      for (const note of listed) {
+        expect("content" in note).toBe(false);
+      }
+    });
+
+    it("should filter metadata notes by project like listNotes", async () => {
+      const now = new Date().toISOString();
+      const notes: Note[] = [
+        {
+          id: "meta-proj-a",
+          title: "Proj A",
+          content: "Body A",
+          tags: [],
+          lifecycle: "permanent",
+          project: "project-a",
+          createdAt: now,
+          updatedAt: now,
+        },
+        {
+          id: "meta-proj-b",
+          title: "Proj B",
+          content: "Body B",
+          tags: [],
+          lifecycle: "permanent",
+          project: "project-b",
+          createdAt: now,
+          updatedAt: now,
+        },
+        {
+          id: "meta-global",
+          title: "Global",
+          content: "Body G",
+          tags: [],
+          lifecycle: "permanent",
+          createdAt: now,
+          updatedAt: now,
+        },
+      ];
+
+      for (const note of notes) {
+        await storage.writeNote(note);
+      }
+
+      const projectA = await storage.listNotesMetadata({ project: "project-a" });
+      const global = await storage.listNotesMetadata({ project: null });
+
+      expect(projectA).toHaveLength(1);
+      expect(projectA[0].id).toBe("meta-proj-a");
+      expect("content" in projectA[0]).toBe(false);
+
+      expect(global).toHaveLength(1);
+      expect(global[0].id).toBe("meta-global");
+    });
+  });
+
   describe("Embedding Operations", () => {
     it("should write and read embedding", async () => {
       const embedding: EmbeddingRecord = {

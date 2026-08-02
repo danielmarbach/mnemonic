@@ -1,5 +1,5 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
-import type { Note, EmbeddingRecord } from "../src/storage.js";
+import type { NoteMetadata, EmbeddingRecord } from "../src/storage.js";
 import type { NoteProjection } from "../src/structured-content.js";
 import type { Vault } from "../src/vault.js";
 
@@ -19,11 +19,12 @@ import {
 
 const NOW = "2026-01-01T00:00:00.000Z";
 
-function makeNote(id: string, overrides: Partial<Note> = {}): Note {
+// The vault cache is built from `listNotesMetadata`, which returns metadata-only
+// notes without any `content` property.
+function makeNoteMetadata(id: string, overrides: Partial<NoteMetadata> = {}): NoteMetadata {
   return {
     id,
     title: `Note ${id}`,
-    content: `Content for ${id}`,
     tags: [],
     lifecycle: "permanent",
     createdAt: NOW,
@@ -50,11 +51,12 @@ function makeProjection(noteId: string): NoteProjection {
   };
 }
 
-function makeVault(vaultPath: string, notes: Note[], embeddings: EmbeddingRecord[]): Vault {
+function makeVault(vaultPath: string, notes: NoteMetadata[], embeddings: EmbeddingRecord[]): Vault {
   return {
     storage: {
       vaultPath,
-      listNotes: vi.fn().mockResolvedValue(notes),
+      listNotes: vi.fn(),
+      listNotesMetadata: vi.fn().mockResolvedValue(notes),
       listEmbeddings: vi.fn().mockResolvedValue(embeddings),
       readNote: vi.fn(),
       writeNote: vi.fn(),
@@ -89,25 +91,27 @@ describe("cache lifecycle", () => {
   });
 
   it("builds vault note list on first access (cache miss)", async () => {
-    const notes = [makeNote("note-1"), makeNote("note-2")];
+    const notes = [makeNoteMetadata("note-1"), makeNoteMetadata("note-2")];
     const vault = makeVault("/vault/project", notes, []);
 
     const result = await getOrBuildVaultNoteList("test-project", vault);
 
     expect(result).toEqual(notes);
-    expect(vault.storage.listNotes).toHaveBeenCalledOnce();
+    // The cached note list is metadata-only — no content property.
+    expect(result![0]).not.toHaveProperty("content");
+    expect(vault.storage.listNotesMetadata).toHaveBeenCalledOnce();
   });
 
   it("reuses cached note list on subsequent access (cache hit)", async () => {
-    const notes = [makeNote("note-1")];
+    const notes = [makeNoteMetadata("note-1")];
     const vault = makeVault("/vault/project", notes, []);
 
     await getOrBuildVaultNoteList("test-project", vault);
     const second = await getOrBuildVaultNoteList("test-project", vault);
 
     expect(second).toEqual(notes);
-    // listNotes should only be called once — second call hits cache
-    expect(vault.storage.listNotes).toHaveBeenCalledOnce();
+    // listNotesMetadata should only be called once — second call hits cache
+    expect(vault.storage.listNotesMetadata).toHaveBeenCalledOnce();
   });
 
   it("builds vault embeddings on first access (cache miss)", async () => {
@@ -132,7 +136,7 @@ describe("cache lifecycle", () => {
   });
 
   it("shares vault data between note list and embeddings calls", async () => {
-    const notes = [makeNote("note-1")];
+    const notes = [makeNoteMetadata("note-1")];
     const embeddings = [makeEmbedding("note-1")];
     const vault = makeVault("/vault/project", notes, embeddings);
 
@@ -143,7 +147,7 @@ describe("cache lifecycle", () => {
 
     expect(cachedEmbeddings).toEqual(embeddings);
     // Only one call to each because both were loaded in a single build
-    expect(vault.storage.listNotes).toHaveBeenCalledOnce();
+    expect(vault.storage.listNotesMetadata).toHaveBeenCalledOnce();
     expect(vault.storage.listEmbeddings).toHaveBeenCalledOnce();
   });
 
@@ -168,7 +172,7 @@ describe("cache lifecycle", () => {
 
 describe("invalidation", () => {
   it("clears cache on invalidation", async () => {
-    const vault = makeVault("/vault/project", [makeNote("note-1")], []);
+    const vault = makeVault("/vault/project", [makeNoteMetadata("note-1")], []);
     await getOrBuildVaultNoteList("test-project", vault);
 
     expect(getActiveProjectCache("test-project")).toBeDefined();
@@ -183,19 +187,19 @@ describe("invalidation", () => {
   });
 
   it("forces a rebuild on next access after invalidation", async () => {
-    const vault = makeVault("/vault/project", [makeNote("note-1")], []);
+    const vault = makeVault("/vault/project", [makeNoteMetadata("note-1")], []);
 
     await getOrBuildVaultNoteList("test-project", vault);
     invalidateActiveProjectCache();
     await getOrBuildVaultNoteList("test-project", vault);
 
     // Called twice: once before invalidation, once after rebuild
-    expect(vault.storage.listNotes).toHaveBeenCalledTimes(2);
+    expect(vault.storage.listNotesMetadata).toHaveBeenCalledTimes(2);
   });
 
   it("creates a fresh cache when project switches", async () => {
-    const vaultA = makeVault("/vault/A", [makeNote("note-a")], []);
-    const vaultB = makeVault("/vault/B", [makeNote("note-b")], []);
+    const vaultA = makeVault("/vault/A", [makeNoteMetadata("note-a")], []);
+    const vaultB = makeVault("/vault/B", [makeNoteMetadata("note-b")], []);
 
     await getOrBuildVaultNoteList("project-A", vaultA);
     // Accessing project-B should silently discard project-A cache and start fresh
@@ -210,7 +214,7 @@ describe("invalidation", () => {
 
 describe("getSessionCachedNote", () => {
   it("returns note after vault cache is built", async () => {
-    const note = makeNote("note-1");
+    const note = makeNoteMetadata("note-1");
     const vault = makeVault("/vault/project", [note], []);
 
     await getOrBuildVaultNoteList("test-project", vault);
@@ -220,7 +224,7 @@ describe("getSessionCachedNote", () => {
   });
 
   it("returns undefined for an id not in the vault", async () => {
-    const vault = makeVault("/vault/project", [makeNote("note-1")], []);
+    const vault = makeVault("/vault/project", [makeNoteMetadata("note-1")], []);
     await getOrBuildVaultNoteList("test-project", vault);
 
     expect(getSessionCachedNote("test-project", "/vault/project", "missing")).toBeUndefined();
@@ -231,7 +235,7 @@ describe("getSessionCachedNote", () => {
   });
 
   it("returns undefined for a different project", async () => {
-    const note = makeNote("note-1");
+    const note = makeNoteMetadata("note-1");
     const vault = makeVault("/vault/project", [note], []);
     await getOrBuildVaultNoteList("project-A", vault);
 
@@ -359,9 +363,9 @@ describe("projection cache", () => {
 // ── E. Failure handling ────────────────────────────────────────────────────────
 
 describe("failure handling", () => {
-  it("returns undefined when storage.listNotes throws", async () => {
+  it("returns undefined when storage.listNotesMetadata throws", async () => {
     const vault = makeVault("/vault/project", [], []);
-    vi.mocked(vault.storage.listNotes).mockRejectedValueOnce(new Error("disk error"));
+    vi.mocked(vault.storage.listNotesMetadata).mockRejectedValueOnce(new Error("disk error"));
 
     const result = await getOrBuildVaultNoteList("test-project", vault);
 
@@ -378,9 +382,9 @@ describe("failure handling", () => {
   });
 
   it("does not corrupt cache state after a failed build", async () => {
-    const notes = [makeNote("note-1")];
+    const notes = [makeNoteMetadata("note-1")];
     const vault = makeVault("/vault/project", notes, []);
-    vi.mocked(vault.storage.listNotes).mockRejectedValueOnce(new Error("first call fails"));
+    vi.mocked(vault.storage.listNotesMetadata).mockRejectedValueOnce(new Error("first call fails"));
 
     // First call fails
     const failed = await getOrBuildVaultNoteList("test-project", vault);
@@ -453,7 +457,7 @@ describe("measurement / instrumentation", () => {
   it("emits cache:fallback log on storage error", async () => {
     const spy = vi.spyOn(console, "error").mockImplementation(() => {});
     const vault = makeVault("/vault/project", [], []);
-    vi.mocked(vault.storage.listNotes).mockRejectedValueOnce(new Error("io error"));
+    vi.mocked(vault.storage.listNotesMetadata).mockRejectedValueOnce(new Error("io error"));
 
     await getOrBuildVaultNoteList("test-project", vault);
 
@@ -463,7 +467,7 @@ describe("measurement / instrumentation", () => {
   });
 
   it("instrumentation does not affect returned data", async () => {
-    const notes = [makeNote("note-1"), makeNote("note-2")];
+    const notes = [makeNoteMetadata("note-1"), makeNoteMetadata("note-2")];
     const embeddings = [makeEmbedding("note-1")];
     const vault = makeVault("/vault/project", notes, embeddings);
 

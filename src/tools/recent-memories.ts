@@ -9,6 +9,7 @@ import {
   ensureBranchSynced,
 } from "../helpers/project.js";
 import { collectVisibleNotes, formatListEntry, storageLabel } from "../helpers/vault.js";
+import { hasNoteContent } from "../storage.js";
 
 export function registerRecentMemoriesTool(server: McpServer, ctx: ServerContext): void {
   server.registerTool(
@@ -86,19 +87,22 @@ export function registerRecentMemoriesTool(server: McpServer, ctx: ServerContext
 
       const textContent = `${header}\n\n${lines.join("\n")}`;
 
-      const structuredNotes = recent.map(({ note, vault }) => ({
-        id: note.id,
-        title: note.title,
-        project: noteProjectRef(note),
-        tags: note.tags,
-        lifecycle: note.lifecycle,
-        vault: storageLabel(vault),
-        updatedAt: note.updatedAt,
-        preview:
-          includePreview && note.content
-            ? note.content.substring(0, 100) + (note.content.length > 100 ? "..." : "")
-            : undefined,
-      }));
+      const structuredNotes = recent.map(({ note, vault }) => {
+        const content = hasNoteContent(note) ? note.content : "";
+        return {
+          id: note.id,
+          title: note.title,
+          project: noteProjectRef(note),
+          tags: note.tags,
+          lifecycle: note.lifecycle,
+          vault: storageLabel(vault),
+          updatedAt: note.updatedAt,
+          preview:
+            includePreview && content
+              ? content.substring(0, 100) + (content.length > 100 ? "..." : "")
+              : undefined,
+        };
+      });
 
       const structuredContent: RecentResult = {
         action: "recent_shown",

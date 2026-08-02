@@ -3,7 +3,9 @@ import { performance } from "perf_hooks";
 import type { McpServer } from "@modelcontextprotocol/server";
 import type { ServerContext } from "../server-context.js";
 import type { Note } from "../storage.js";
+import { hasNoteContent } from "../storage.js";
 import type { Vault } from "../vault.js";
+import { memoryId } from "../brands.js";
 import {
   GetResultSchema,
   EntityRefSchema,
@@ -205,8 +207,16 @@ export function registerGetTool(server: McpServer, ctx: ServerContext): void {
           for (const vault of ctx.vaultManager.allKnownVaults(project.id)) {
             const cached = getSessionCachedNote(project.id, vault.storage.vaultPath, id);
             if (cached !== undefined) {
-              result = { note: cached, vault };
-              break;
+              if (hasNoteContent(cached)) {
+                result = { note: cached, vault };
+                break;
+              }
+              // Metadata-only cache entry — load full content from storage.
+              const full = await vault.storage.readNote(memoryId(id));
+              if (full) {
+                result = { note: full, vault };
+                break;
+              }
             }
           }
         }

@@ -5,6 +5,7 @@ import type { ServerContext } from "../server-context.js";
 import type { Vault } from "../vault.js";
 import type { Note, NoteLifecycle, RelationshipType } from "../storage.js";
 import { memoryId } from "../brands.js";
+import { hasNoteContent } from "../storage.js";
 import {
   Confidence,
   RecallResult,
@@ -221,7 +222,20 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
         // Check session cache first (populated when getOrBuildVaultEmbeddings was called)
         if (project) {
           const sessionNote = getSessionCachedNote(project.id, vault.storage.vaultPath, id);
-          if (sessionNote !== undefined) return sessionNote;
+          if (sessionNote !== undefined) {
+            // The vault cache stores metadata-only notes (frontmatter, no
+            // content field). When full content is needed, fall through to a
+            // full read and refresh the session cache with the full note.
+            if (hasNoteContent(sessionNote)) {
+              return sessionNote;
+            }
+            const fullNote = await vault.storage.readNote(memoryId(id));
+            if (fullNote) {
+              setSessionCachedNote(project.id, vault.storage.vaultPath, fullNote);
+              noteCache.set(noteCacheKey(vault, id), fullNote);
+            }
+            return fullNote;
+          }
         }
         const key = noteCacheKey(vault, id);
         const cached = noteCache.get(key);

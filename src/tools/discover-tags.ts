@@ -11,6 +11,7 @@ import {
 } from "../tools/recall-helpers.js";
 import { projectParam, ensureBranchSynced } from "../helpers/project.js";
 import { collectVisibleNotes, storageLabel } from "../helpers/vault.js";
+import { hasNoteContent } from "../storage.js";
 
 export function registerDiscoverTagsTool(server: McpServer, ctx: ServerContext): void {
   server.registerTool(
@@ -92,7 +93,9 @@ export function registerDiscoverTagsTool(server: McpServer, ctx: ServerContext):
 
       for (const { note } of entries) {
         const noteTokens = new Set(
-          tokenizeTagDiscoveryText(`${note.title} ${note.content} ${note.tags.join(" ")}`),
+          tokenizeTagDiscoveryText(
+            `${note.title} ${hasNoteContent(note) ? note.content : ""} ${note.tags.join(" ")}`,
+          ),
         );
         const contextMatches =
           contextTokens.size > 0 ? countTokenOverlap(contextTokens, noteTokens) : 0;

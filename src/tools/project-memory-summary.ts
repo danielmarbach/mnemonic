@@ -33,6 +33,9 @@ import {
 } from "../project-introspection.js";
 import { getEffectiveMetadata, type EffectiveNoteMetadata } from "../role-suggestions.js";
 import type { Vault } from "../vault.js";
+import type { Note } from "../storage.js";
+import { hasNoteContent } from "../storage.js";
+import { attempt } from "../error-utils.js";
 import {
   ProjectSummaryResultSchema,
   type ProjectSummaryResult,
@@ -42,6 +45,14 @@ import {
   type RelationshipPreview,
   type ProjectMaintenanceWarning,
 } from "../structured-content.js";
+
+/**
+ * An entry whose note is guaranteed to carry a full body. This tool hydrates
+ * all metadata-only entries from `collectVisibleNotes` up front, so downstream
+ * content-dependent computations (previews, theme keywords, next-action
+ * extraction) can rely on `note.content` being present.
+ */
+type HydratedNoteEntry = { note: Note; vault: Vault };
 
 function sampleWarningNotes(entries: NoteEntry[]): Array<{ id: string; title: string }> {
   return entries.slice(0, 3).map((entry) => ({ id: entry.note.id, title: entry.note.title }));
@@ -178,7 +189,7 @@ export function registerProjectMemorySummaryTool(server: McpServer, ctx: ServerC
 
       // Pre-resolve project so we can pass its id to collectVisibleNotes for session caching
       const preProject = await resolveProject(ctx, cwd);
-      const { project, entries } = await collectVisibleNotes(
+      const { project, entries: rawEntries } = await collectVisibleNotes(
         ctx,
         cwd,
         "all",
@@ -188,6 +199,27 @@ export function registerProjectMemorySummaryTool(server: McpServer, ctx: ServerC
       );
       if (!project) {
         return projectNotFoundResponse(cwd);
+      }
+
+      // The session cache stores metadata-only notes (no content field). This
+      // tool needs full note bodies for next-action extraction, previews, and
+      // theme keywords, so hydrate content on demand from storage.
+      const entries: HydratedNoteEntry[] = [];
+      for (const entry of rawEntries) {
+        if (hasNoteContent(entry.note)) {
+          entries.push({ note: entry.note, vault: entry.vault });
+          continue;
+        }
+        const full = await attempt("project-summary:read-note", () =>
+          entry.vault.storage.readNote(memoryId(entry.note.id)),
+        );
+        entries.push(
+          full.ok && full.value
+            ? { note: full.value, vault: entry.vault }
+            : // Full read failed — keep the note visible with empty content
+              // (matches prior behavior where metadata notes carried content: "").
+              { note: { ...entry.note, content: "" }, vault: entry.vault },
+        );
       }
 
       // Separate project-scoped notes (for themes/anchors) from global notes
@@ -263,7 +295,7 @@ export function registerProjectMemorySummaryTool(server: McpServer, ctx: ServerC
       );
 
       // Categorize by theme with graduation (project-scoped only)
-      const themed = new Map<string, NoteEntry[]>();
+      const themed = new Map<string, HydratedNoteEntry[]>();
       for (const entry of projectEntries) {
         const theme = classifyThemeWithGraduation(entry.note, promotedThemes);
         const bucket = themed.get(theme) ?? [];

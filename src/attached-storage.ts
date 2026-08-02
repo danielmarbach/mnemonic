@@ -1,7 +1,13 @@
 import path from "path";
 import { simpleGit } from "simple-git";
 import { memoryId, type MemoryId } from "./brands.js";
-import { Storage, type Note, type NoteStorage, type EmbeddingRecord } from "./storage.js";
+import {
+  Storage,
+  type Note,
+  type NoteMetadata,
+  type NoteStorage,
+  type EmbeddingRecord,
+} from "./storage.js";
 import type { NoteProjection } from "./structured-content.js";
 import { attempt, debugLog, getErrorMessage } from "./error-utils.js";
 import { InvalidBranchNameError, AttachedVaultReadOnlyError } from "./domain-errors.js";
@@ -121,6 +127,37 @@ export class AttachedStorage implements NoteStorage {
     return note;
   }
 
+  async readNoteMetadata(id: MemoryId): Promise<NoteMetadata | null> {
+    if (this.branch === "") {
+      return this.baseStorage.readNoteMetadata(id);
+    }
+
+    validateBranch(this.branch);
+
+    const notePath = `${this.notesRelDir}/${id}.md`;
+    const result = await attempt("attached-storage:read-note-metadata", async () => {
+      const git = simpleGit(this.repoPath);
+      const content = await git.raw(["show", `${this.branch}:${notePath}`]);
+      return content;
+    });
+
+    if (!result.ok || !result.value) {
+      debugLog(
+        "attached-storage:read-note-metadata",
+        `failed for ${id}: ${result.ok ? "empty" : getErrorMessage(result.error)}`,
+      );
+      return null;
+    }
+
+    const note = this.baseStorage.parseNote(id, result.value.trim());
+    if (!note) return null;
+    // The full file is read from git anyway, so the parsed note carries the
+    // complete body. Return it as NoteMetadata (valid since Note extends
+    // NoteMetadata) without touching noteCache: a cached full-content note must
+    // never be shadowed by a content-less variant for subsequent readNote calls.
+    return note;
+  }
+
   async listNotes(filter?: { project?: string | null }): Promise<Note[]> {
     const ids = await this.listNoteIds();
     const notes: Note[] = [];
@@ -129,6 +166,24 @@ export class AttachedStorage implements NoteStorage {
       if (note && (!filter?.project || note.project === filter.project)) {
         notes.push(note);
       }
+    }
+    return notes;
+  }
+
+  async listNotesMetadata(filter?: { project?: string | null }): Promise<NoteMetadata[]> {
+    const ids = await this.listNoteIds();
+    const notes: NoteMetadata[] = [];
+    for (const id of ids) {
+      const note = await this.readNoteMetadata(id);
+      if (!note) continue;
+      if (filter !== undefined) {
+        if (filter.project === null) {
+          if (note.project) continue;
+        } else if (filter.project !== undefined) {
+          if (note.project !== filter.project) continue;
+        }
+      }
+      notes.push(note);
     }
     return notes;
   }

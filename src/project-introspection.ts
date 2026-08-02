@@ -1,4 +1,4 @@
-import type { Note } from "./storage.js";
+import type { Note, NoteMetadata } from "./storage.js";
 import type { EffectiveNoteMetadata } from "./role-suggestions.js";
 import { MS_PER_DAY } from "./date-utils.js";
 
@@ -212,7 +212,7 @@ export function summarizePreview(content: string, maxLength = 120): string {
   return `${singleLine.slice(0, maxLength - 3)}...`;
 }
 
-export function classifyTheme(note: Note): string {
+export function classifyTheme(note: NoteMetadata): string {
   const title = note.title.toLowerCase();
   const tags = new Set(note.tags.map((tag) => tag.toLowerCase()));
 

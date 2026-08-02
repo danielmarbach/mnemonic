@@ -1,4 +1,5 @@
-import type { Note, NoteImportance, NoteRole } from "./storage.js";
+import type { NoteMetadata, NoteImportance, NoteRole } from "./storage.js";
+import { hasNoteContent } from "./storage.js";
 
 export interface RoleSuggestionContext {
   inboundReferences?: number;
@@ -37,7 +38,7 @@ const ROLE_THRESHOLD = 5;
 const ROLE_MARGIN = 2;
 
 export function getEffectiveMetadata(
-  note: Note,
+  note: NoteMetadata,
   context: RoleSuggestionContext = {},
 ): EffectiveNoteMetadata {
   const effectiveRole = note.role ?? suggestRole(note, context);
@@ -53,8 +54,11 @@ export function getEffectiveMetadata(
   };
 }
 
-export function suggestRole(note: Note, context: RoleSuggestionContext = {}): NoteRole | undefined {
-  const shape = analyzeContent(note.content, note.title);
+export function suggestRole(
+  note: NoteMetadata,
+  context: RoleSuggestionContext = {},
+): NoteRole | undefined {
+  const shape = analyzeContent(hasNoteContent(note) ? note.content : "", note.title);
   const inbound = context.inboundReferences ?? 0;
   const linkedByPermanentNotes = context.linkedByPermanentNotes ?? 0;
   const explanatoryRelations =
@@ -124,14 +128,14 @@ export function suggestRole(note: Note, context: RoleSuggestionContext = {}): No
 }
 
 export function suggestImportance(
-  note: Note,
+  note: NoteMetadata,
   context: RoleSuggestionContext = {},
 ): SuggestedImportance | undefined {
   const inbound = context.inboundReferences ?? 0;
   const linkedByPermanentNotes = context.linkedByPermanentNotes ?? 0;
   const outbound = note.relatedTo?.length ?? 0;
   const connections = inbound + outbound + linkedByPermanentNotes;
-  const shape = analyzeContent(note.content, note.title);
+  const shape = analyzeContent(hasNoteContent(note) ? note.content : "", note.title);
   const structuralStrength =
     (shape.headingCount >= 2 ? 1 : 0) +
     (shape.bulletCount >= 4 ? 1 : 0) +

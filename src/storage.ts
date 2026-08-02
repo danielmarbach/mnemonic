@@ -63,10 +63,16 @@ export interface Relationship {
   vaultPath?: string;
 }
 
-export interface Note {
+/**
+ * Frontmatter metadata of a note — the `content` field is intentionally absent.
+ *
+ * Metadata-only notes (from `readNoteMetadata` / `listNotesMetadata`) carry no
+ * body at all, so accidental `.content` access is a compile error and
+ * `hasNoteContent` can reliably distinguish them from full notes.
+ */
+export interface NoteMetadata {
   id: MemoryId;
   title: string;
-  content: string;
   tags: string[];
   lifecycle: NoteLifecycle;
   role?: NoteRole;
@@ -81,6 +87,23 @@ export interface Note {
   updatedAt: ISO8601DateString;
   /** Schema version for forward compatibility (0 = pre-v0.2.0) */
   memoryVersion?: number;
+}
+
+/** Full note — metadata plus body content. */
+export interface Note extends NoteMetadata {
+  content: string;
+}
+
+/**
+ * Narrow a possibly metadata-only note to a full note.
+ *
+ * Full notes (from `readNote` / `listNotes`) carry a `content` property;
+ * metadata-only notes (from `readNoteMetadata` / `listNotesMetadata`) have no
+ * `content` property at all. Use this guard before accessing `.content` on a
+ * `NoteMetadata`.
+ */
+export function hasNoteContent(note: NoteMetadata): note is Note {
+  return "content" in note;
 }
 
 export interface EmbeddingRecord {
@@ -103,7 +126,11 @@ export interface NoteStorage {
   init(): Promise<void>;
   listNoteIds(): Promise<MemoryId[]>;
   readNote(id: MemoryId): Promise<Note | null>;
+  /** Read only the frontmatter metadata of a note (no content field). */
+  readNoteMetadata(id: MemoryId): Promise<NoteMetadata | null>;
   listNotes(filter?: { project?: string | null }): Promise<Note[]>;
+  /** Bulk list of frontmatter metadata only — no content field. */
+  listNotesMetadata(filter?: { project?: string | null }): Promise<NoteMetadata[]>;
   writeNote(note: Note): Promise<void>;
   deleteNote(id: MemoryId): Promise<boolean>;
   beginAtomicNotesWrite(): Promise<void>;
@@ -222,6 +249,25 @@ export class Storage implements NoteStorage {
     return result.ok ? result.value : null;
   }
 
+  async readNoteMetadata(id: MemoryId): Promise<NoteMetadata | null> {
+    if (this.stagedDeletedNoteIds.has(id)) return null;
+
+    const stagedPath = this.stagedNotePath(id);
+    if (stagedPath) {
+      const stagedResult = await attempt("storage:readNoteMetadata", async () => {
+        const raw = await readFrontmatter(stagedPath);
+        return toNoteMetadata(this.parseNote(id, raw));
+      });
+      if (stagedResult.ok) return stagedResult.value;
+    }
+
+    const result = await attempt("storage:readNoteMetadata", async () => {
+      const raw = await readFrontmatter(this.notePath(id));
+      return toNoteMetadata(this.parseNote(id, raw));
+    });
+    return result.ok ? result.value : null;
+  }
+
   async deleteNote(id: MemoryId): Promise<boolean> {
     if (this.stagedNotesDir) {
       this.stagedDeletedNoteIds.add(id);
@@ -246,6 +292,33 @@ export class Storage implements NoteStorage {
       ids.map(async (id) => ({ id, note: await this.readNote(id) })),
     );
     const notes: Note[] = [];
+
+    for (const { note } of readNotes) {
+      if (!note) continue;
+
+      if (filter !== undefined) {
+        if (filter.project === null) {
+          if (note.project) continue;
+        } else if (filter.project !== undefined) {
+          if (note.project !== filter.project) continue;
+        }
+      }
+
+      notes.push(note);
+    }
+    return notes;
+  }
+
+  /**
+   * Metadata-only bulk listing: each note is read through `readNoteMetadata`
+   * (bounded frontmatter read) and carries no `content` field at all.
+   */
+  async listNotesMetadata(filter?: { project?: string | null }): Promise<NoteMetadata[]> {
+    const ids = await this.listNoteIds();
+    const readNotes = await Promise.all(
+      ids.map(async (id) => ({ id, note: await this.readNoteMetadata(id) })),
+    );
+    const notes: NoteMetadata[] = [];
 
     for (const { note } of readNotes) {
       if (!note) continue;
@@ -437,6 +510,52 @@ export class Storage implements NoteStorage {
       memoryVersion: normalizeMemoryVersion(parsed.data["memoryVersion"]),
     };
   }
+}
+
+const FRONTMATTER_READ_WINDOW_BYTES = 16_384;
+
+/**
+ * Strip the body from a parsed note so the metadata-only contract holds at the
+ * value level too: metadata notes have no `content` property at all, which lets
+ * `hasNoteContent` reliably distinguish them from full notes.
+ */
+function toNoteMetadata(note: Note): NoteMetadata {
+  const { content: _content, ...metadata } = note;
+  return metadata;
+}
+
+/**
+ * Read only enough of a note file to extract frontmatter metadata.
+ *
+ * Reads a bounded window (16KB) up front, which covers all realistic
+ * frontmatter, and skips the (potentially large) note body. If the closing
+ * `---` delimiter is not found within the window (unusually long frontmatter),
+ * falls back to reading the remainder of the file so parsing stays correct.
+ */
+async function readFrontmatter(filePath: string): Promise<string> {
+  const fh = await fs.open(filePath, "r");
+  return (async () => {
+    const buf = Buffer.alloc(FRONTMATTER_READ_WINDOW_BYTES);
+    const { bytesRead } = await fh.read(buf, 0, buf.length, 0);
+    let text = buf.toString("utf-8", 0, bytesRead);
+
+    const trimmed = text.trimStart();
+    if (trimmed.startsWith("---")) {
+      const afterFirst = trimmed.slice(3);
+      const closingIdx = afterFirst.indexOf("\n---");
+      if (closingIdx === -1) {
+        // Frontmatter doesn't close within the bounded window — read the rest.
+        const { size } = await fh.stat();
+        const remaining = size - bytesRead;
+        if (remaining > 0) {
+          const rest = Buffer.alloc(remaining);
+          const { bytesRead: restRead } = await fh.read(rest, 0, rest.length, bytesRead);
+          text = text + rest.toString("utf-8", 0, restRead);
+        }
+      }
+    }
+    return text;
+  })().finally(() => fh.close());
 }
 
 function normalizeMemoryVersion(value: unknown): number {

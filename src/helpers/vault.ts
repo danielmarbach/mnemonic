@@ -1,4 +1,5 @@
-import type { Note, NoteLifecycle, NoteRole } from "../storage.js";
+import type { Note, NoteMetadata, NoteLifecycle, NoteRole } from "../storage.js";
+import { hasNoteContent } from "../storage.js";
 import type { ServerContext } from "../server-context.js";
 import type { Vault } from "../vault.js";
 import type { PersistenceStatus } from "../structured-content.js";
@@ -22,7 +23,7 @@ export type SearchScope = "project" | "global" | "all";
 export type StorageScope = "project-vault" | "main-vault" | "any" | "attached";
 
 export type NoteEntry = {
-  note: Note;
+  note: NoteMetadata;
   vault: Vault;
 };
 
@@ -82,7 +83,7 @@ export async function collectVisibleNotes(
       filterProject !== undefined;
     const effectiveFilter = includeAllForScope ? undefined : filterProject;
 
-    let rawNotes: Note[];
+    let rawNotes: NoteMetadata[];
     if (sessionProjectId) {
       const cached = await getOrBuildVaultNoteList(sessionProjectId, vault);
       if (cached !== undefined) {
@@ -154,7 +155,8 @@ export function formatListEntry(
     lines.push(`  related: ${note.relatedTo.map((rel) => `${rel.id} (${rel.type})`).join(", ")}`);
   }
   if (options.includePreview) {
-    lines.push(`  preview: ${summarizePreview(note.content)}`);
+    const content = hasNoteContent(note) ? note.content : "";
+    lines.push(`  preview: ${summarizePreview(content)}`);
   }
   return lines.join("\n");
 }

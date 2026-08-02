@@ -1,5 +1,5 @@
 import { performance } from "perf_hooks";
-import type { Note, EmbeddingRecord } from "./storage.js";
+import type { Note, NoteMetadata, EmbeddingRecord } from "./storage.js";
 import type { NoteProjection } from "./structured-content.js";
 import type { Vault } from "./vault.js";
 import { attempt, debugLog } from "./error-utils.js";
@@ -7,8 +7,8 @@ import { attempt, debugLog } from "./error-utils.js";
 // ── Types ──────────────────────────────────────────────────────────────────────
 
 interface VaultCache {
-  notesById: Map<string, Note>;
-  noteList: Note[];
+  notesById: Map<string, NoteMetadata>;
+  noteList: NoteMetadata[];
   embeddings: EmbeddingRecord[];
 }
 
@@ -36,7 +36,7 @@ export interface SessionProjectCache {
   /** Recently inspected notes in the current MCP session. */
   recentAccesses: SessionAccessRecord[];
   /** Snapshots of recently inspected notes that survive cache invalidation. */
-  recentNotesByKey: Map<string, Note>;
+  recentNotesByKey: Map<string, NoteMetadata>;
   /** ISO timestamp of when this cache entry was first created. */
   lastBuiltAt: string;
 }
@@ -120,7 +120,7 @@ export function getActiveProjectCache(projectId: string): SessionProjectCache | 
 export async function getOrBuildVaultNoteList(
   projectId: string,
   vault: Vault,
-): Promise<Note[] | undefined> {
+): Promise<NoteMetadata[] | undefined> {
   const vaultPath = vault.storage.vaultPath;
   const cache = ensureActiveProjectCache(projectId);
 
@@ -136,11 +136,13 @@ export async function getOrBuildVaultNoteList(
   debugLog("cache:miss", `project=${projectId} vault=${vaultPath}`);
   const result = await attempt("cache:build", async () => {
     const t0 = performance.now();
+    // Note list is metadata-only (frontmatter; no content field). Callers that
+    // need full note bodies fall through to a full `readNote` on demand.
     const [noteList, embeddings] = await Promise.all([
-      vault.storage.listNotes(),
+      vault.storage.listNotesMetadata(),
       vault.storage.listEmbeddings(),
     ]);
-    const notesById = new Map<string, Note>(noteList.map((n) => [n.id, n]));
+    const notesById = new Map<string, NoteMetadata>(noteList.map((n) => [n.id, n]));
     cache.vaultCaches.set(vaultPath, { notesById, noteList, embeddings });
     const ms = (performance.now() - t0).toFixed(1);
     debugLog(
@@ -182,11 +184,13 @@ export async function getOrBuildVaultEmbeddings(
   debugLog("cache:miss", `project=${projectId} vault=${vaultPath}`);
   const result = await attempt("cache:build", async () => {
     const t0 = performance.now();
+    // Note list is metadata-only (frontmatter; no content field). Callers that
+    // need full note bodies fall through to a full `readNote` on demand.
     const [noteList, embeddings] = await Promise.all([
-      vault.storage.listNotes(),
+      vault.storage.listNotesMetadata(),
       vault.storage.listEmbeddings(),
     ]);
-    const notesById = new Map<string, Note>(noteList.map((n) => [n.id, n]));
+    const notesById = new Map<string, NoteMetadata>(noteList.map((n) => [n.id, n]));
     cache.vaultCaches.set(vaultPath, { notesById, noteList, embeddings });
     const ms = (performance.now() - t0).toFixed(1);
     debugLog(
@@ -211,7 +215,7 @@ export function getSessionCachedNote(
   projectId: string,
   vaultPath: string,
   noteId: string,
-): Note | undefined {
+): NoteMetadata | undefined {
   const cache = sessionCaches.activeProject;
   if (!cache || cache.projectId !== projectId) return undefined;
   return cache.vaultCaches.get(vaultPath)?.notesById.get(noteId);
@@ -244,7 +248,7 @@ export function setSessionCachedNote(projectId: string, vaultPath: string, note:
   }
 
   cache.vaultCaches.set(vaultPath, {
-    notesById: new Map([[note.id, note]]),
+    notesById: new Map<string, NoteMetadata>([[note.id, note]]),
     noteList: [note],
     embeddings: [],
   });
@@ -254,7 +258,7 @@ export function getRecentSessionAccessNote(
   projectId: string,
   vaultPath: string,
   noteId: string,
-): Note | undefined {
+): NoteMetadata | undefined {
   const cache = sessionCaches.activeProject;
   if (!cache || cache.projectId !== projectId) {
     return undefined;

@@ -1,4 +1,5 @@
-import type { Note, NoteStorage } from "./storage.js";
+import type { Note, NoteMetadata, NoteStorage } from "./storage.js";
+import { hasNoteContent } from "./storage.js";
 import type { NoteProjection } from "./structured-content.js";
 import { memoryId } from "./brands.js";
 
@@ -169,10 +170,15 @@ export function buildProjection(note: Note): NoteProjection {
  *
  * Relationship-only changes bump note.updatedAt without affecting projectionText.
  * Comparing projectionText avoids unnecessary re-embeds in those cases.
+ *
+ * A metadata-only note (no content field) cannot be compared against the
+ * stored projectionText; treat it as stale so the caller rebuilds from a full
+ * read of the note body.
  */
-export function isProjectionStale(note: Note, projection: NoteProjection): boolean {
+export function isProjectionStale(note: NoteMetadata, projection: NoteProjection): boolean {
   if (!projection.updatedAt) return true;
   if (projection.updatedAt === note.updatedAt) return false;
+  if (!hasNoteContent(note)) return true;
   const currentText = buildProjectionText({
     title: note.title,
     lifecycle: note.lifecycle,

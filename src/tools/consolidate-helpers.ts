@@ -54,6 +54,7 @@ import {
 import { toProjectRef } from "../helpers/project.js";
 import { embedTextForNote as embedTextForNoteFromModule } from "../helpers/embed.js";
 import type { EmbeddingRecord, Note, NoteStorage } from "../storage.js";
+import { hasNoteContent } from "../storage.js";
 import type { Vault } from "../vault.js";
 import type { ConsolidationMode, ProjectMemoryPolicy } from "../project-memory-policy.js";
 import type {
@@ -99,6 +100,17 @@ async function removeRelationshipsToNoteIds(ctx: ServerContext, noteIds: string[
 
 async function embedTextForNote(storage: NoteStorage, note: Note) {
   return embedTextForNoteFromModule(storage, note);
+}
+
+/**
+ * Resolve the full body of an entry's note. Entries from `collectVisibleNotes`
+ * are full notes (from `listNotes`) so this is a no-op in practice; the read
+ * fallback only exists for the type-level possibility of a metadata-only entry.
+ */
+async function resolveFullNoteContent(entry: NoteEntry): Promise<string> {
+  if (hasNoteContent(entry.note)) return entry.note.content;
+  const full = await entry.vault.storage.readNote(entry.note.id);
+  return full?.content ?? "";
 }
 
 // ── Merge validation helpers ────────────────────────────────────────────────
@@ -148,11 +160,11 @@ function validateMergePlan(
   return { ok: true };
 }
 
-function buildConsolidatedContent(
+async function buildConsolidatedContent(
   sourceEntries: NoteEntry[],
   customContent: string | undefined,
   description: string | undefined,
-): string {
+): Promise<string> {
   const sections: string[] = [];
   if (description) {
     sections.push(description);
@@ -167,7 +179,7 @@ function buildConsolidatedContent(
       sections.push(`### ${entry.note.title}`);
       sections.push(`*Source: \`${entry.note.id}\`*`);
       sections.push("");
-      sections.push(entry.note.content);
+      sections.push(await resolveFullNoteContent(entry));
       sections.push("");
     }
   }
@@ -306,8 +318,15 @@ async function handleSupersedesMode(
     if (!updatedRels.some((r) => r.id === targetId)) {
       updatedRels.push({ id: memoryId(targetId), type: "supersedes" });
     }
+    // Rewriting requires the full body — resolve it (entries from
+    // collectVisibleNotes are full notes) and skip if it cannot be loaded so
+    // the note body is never overwritten with empty content.
+    const fullNote = hasNoteContent(entry.note)
+      ? entry.note
+      : ((await entry.vault.storage.readNote(entry.note.id).catch(() => null)) ?? undefined);
+    if (!fullNote) continue;
     await entry.vault.storage.writeNote({
-      ...entry.note,
+      ...fullNote,
       relatedTo: updatedRels,
       updatedAt: isoDateString(now),
     });
@@ -476,7 +495,11 @@ export async function executeMerge(
   const now = isoDateString(new Date().toISOString());
 
   // Build consolidated note
-  const consolidatedContent = buildConsolidatedContent(sourceEntries, customContent, description);
+  const consolidatedContent = await buildConsolidatedContent(
+    sourceEntries,
+    customContent,
+    description,
+  );
   const combinedTags = buildCombinedTags(sourceEntries, tags);
   const sourceIdsSet = new Set(sourceIds);
   const relationshipSources = existingTargetEntry

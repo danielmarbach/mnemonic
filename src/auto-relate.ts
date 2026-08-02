@@ -1,9 +1,10 @@
 import { buildProjection, extractProjectionSummary } from "./projections.js";
 import { computeLexicalScore, normalizeText, tokenize } from "./lexical.js";
-import type { Note, Relationship } from "./storage.js";
+import type { Note, NoteMetadata, Relationship } from "./storage.js";
+import { hasNoteContent } from "./storage.js";
 
 export interface SessionAccessCandidate {
-  note: Note;
+  note: NoteMetadata;
   accessedAt: string;
   accessKind: "get" | "recall" | "summary";
   score?: number;
@@ -20,7 +21,7 @@ const AUTO_RELATE_TAG_WEIGHT_PER_SHARED = 0.08; // Per shared tag (capped at 3 t
 const AUTO_RELATE_RECENCY_WEIGHT = 0.05; // Weight for recency-based boost
 const AUTO_RELATE_MIN_SCORE = 0.32; // Minimum combined score to suggest relationship
 
-function hasExplicitTitleMention(source: Note, candidate: Note): boolean {
+function hasExplicitTitleMention(source: Note, candidate: NoteMetadata): boolean {
   const normalizedTitle = normalizeText(candidate.title);
   if (normalizedTitle.length < MIN_TITLE_MENTION_LENGTH) {
     return false;
@@ -30,7 +31,7 @@ function hasExplicitTitleMention(source: Note, candidate: Note): boolean {
   return haystack.includes(normalizedTitle);
 }
 
-function computeSharedTagScore(source: Note, candidate: Note): number {
+function computeSharedTagScore(source: Note, candidate: NoteMetadata): number {
   if (source.tags.length === 0 || candidate.tags.length === 0) {
     return 0;
   }
@@ -47,7 +48,7 @@ function computeSharedTagScore(source: Note, candidate: Note): number {
   return Math.min(shared, 3) * AUTO_RELATE_TAG_WEIGHT_PER_SHARED;
 }
 
-function computeTitleTokenOverlap(source: Note, candidate: Note): number {
+function computeTitleTokenOverlap(source: Note, candidate: NoteMetadata): number {
   const sourceTokens = new Set(tokenize(source.title));
   const candidateTokens = new Set(tokenize(candidate.title));
   if (sourceTokens.size === 0 || candidateTokens.size === 0) {
@@ -77,7 +78,9 @@ export function suggestAutoRelationships(
     .map((candidate) => {
       const explicitMention = hasExplicitTitleMention(source, candidate.note);
       const sourceSummary = extractProjectionSummary(source);
-      const candidateProjection = buildProjection(candidate.note).projectionText;
+      const candidateProjection = hasNoteContent(candidate.note)
+        ? buildProjection(candidate.note).projectionText
+        : "";
       const lexical = computeLexicalScore(sourceSummary || source.title, candidateProjection);
       const titleOverlap = computeTitleTokenOverlap(source, candidate.note);
       const sharedTags = computeSharedTagScore(source, candidate.note);
