@@ -8,12 +8,24 @@ import {
 import { memoryId, isoDateString } from "../brands.js";
 import { getOrBuildProjection } from "../projections.js";
 import { attempt, getErrorMessage } from "../error-utils.js";
-import type { NoteStorage, Note } from "../storage.js";
+import type { NoteStorage, Note, NoteMetadata, EmbeddingRecord } from "../storage.js";
 import type { ServerContext } from "../server-context.js";
 
 export interface FailedEmbedding {
   id: string;
   error: string;
+}
+
+/**
+ * Precomputed snapshots used to determine which embeddings are missing or
+ * stale without re-reading the corpus. When omitted, `embedMissingNotes` loads
+ * metadata and embeddings itself (still cheap — metadata-only reads).
+ */
+export interface EmbeddingBackfillSource {
+  /** Note metadata (id + updatedAt) — no full bodies required. */
+  notes?: NoteMetadata[];
+  /** Existing embeddings used to detect stale/missing entries. */
+  embeddings?: EmbeddingRecord[];
 }
 
 export async function embedTextForNote(storage: NoteStorage, note: Note): Promise<string> {
@@ -27,12 +39,40 @@ export async function embedMissingNotes(
   storage: NoteStorage,
   noteIds?: string[],
   force = false,
+  source?: EmbeddingBackfillSource,
 ): Promise<{ rebuilt: number; failed: FailedEmbedding[] }> {
-  const notes = noteIds
-    ? (await Promise.all(noteIds.map((id) => storage.readNote(memoryId(id))))).filter(
-        (n): n is Note => n !== null,
-      )
-    : await storage.listNotes();
+  // Determine which notes need (re)embedding WITHOUT loading full bodies: compare
+  // note metadata (id + updatedAt) against the existing embedding snapshots.
+  // This keeps the common cold-recall case (all embeddings current) to a cheap
+  // metadata + embeddings pass and zero full reads.
+  const noteMetadata =
+    source?.notes ??
+    (noteIds
+      ? (await Promise.all(noteIds.map((id) => storage.readNoteMetadata(memoryId(id))))).filter(
+          (n): n is NoteMetadata => n !== null,
+        )
+      : await storage.listNotesMetadata());
+
+  const existingEmbeddings = source?.embeddings ?? (await storage.listEmbeddings());
+  const embeddingsById = new Map(existingEmbeddings.map((e) => [e.id, e]));
+
+  const needsEmbedding = noteMetadata.filter((note) => {
+    if (force) return true;
+    const existing = embeddingsById.get(note.id);
+    if (
+      existing &&
+      checkEmbeddingCompatibility(existing, currentEmbeddingIdentity).status === "compatible" &&
+      existing.updatedAt >= note.updatedAt
+    ) {
+      return false;
+    }
+    return true;
+  });
+
+  // Only hydrate full bodies for the notes that actually need (re)embedding.
+  const notes = (await Promise.all(needsEmbedding.map((note) => storage.readNote(note.id)))).filter(
+    (n): n is Note => n !== null,
+  );
 
   let rebuilt = 0;
   const failed: FailedEmbedding[] = [];
@@ -42,20 +82,7 @@ export async function embedMissingNotes(
   const workers = Array.from({ length: workerCount }, async () => {
     while (true) {
       const note = notes[index++];
-      if (!note) {
-        return;
-      }
-
-      if (!force) {
-        const existing = await storage.readEmbedding(note.id);
-        if (
-          existing &&
-          checkEmbeddingCompatibility(existing, currentEmbeddingIdentity).status === "compatible" &&
-          existing.updatedAt >= note.updatedAt
-        ) {
-          continue;
-        }
-      }
+      if (!note) return;
 
       const embedResult = await attempt("embed:note", async () => {
         const text = await embedTextForNote(storage, note);

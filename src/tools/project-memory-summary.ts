@@ -36,6 +36,7 @@ import type { Vault } from "../vault.js";
 import type { Note } from "../storage.js";
 import { hasNoteContent } from "../storage.js";
 import { attempt } from "../error-utils.js";
+import { getSessionCachedNote, setSessionCachedNote } from "../cache.js";
 import {
   ProjectSummaryResultSchema,
   type ProjectSummaryResult,
@@ -53,6 +54,54 @@ import {
  * extraction) can rely on `note.content` being present.
  */
 type HydratedNoteEntry = { note: Note; vault: Vault };
+
+/** Max concurrent full-note hydrations during a project summary. */
+const HYDRATION_CONCURRENCY = 16;
+
+/**
+ * Hydrate metadata-only entries to full notes with bounded concurrency, reusing
+ * an already-full cached note from the session cache and caching hydrated notes
+ * back so repeated summaries do not re-read the corpus. Results are placed at
+ * their source index to preserve the caller's ordering.
+ */
+async function hydrateEntries(projectId: string, raw: NoteEntry[]): Promise<HydratedNoteEntry[]> {
+  const results = new Array<HydratedNoteEntry>(raw.length);
+  let next = 0;
+  const workerCount = Math.min(HYDRATION_CONCURRENCY, Math.max(raw.length, 1));
+  const workers = Array.from({ length: workerCount }, async () => {
+    while (true) {
+      const i = next++;
+      if (i >= raw.length) return;
+      const entry = raw[i];
+      if (entry === undefined) return;
+
+      if (hasNoteContent(entry.note)) {
+        results[i] = { note: entry.note, vault: entry.vault };
+        continue;
+      }
+
+      const cached = getSessionCachedNote(projectId, entry.vault.storage.vaultPath, entry.note.id);
+      if (cached !== undefined && hasNoteContent(cached)) {
+        results[i] = { note: cached, vault: entry.vault };
+        continue;
+      }
+
+      const full = await attempt("project-summary:read-note", () =>
+        entry.vault.storage.readNote(memoryId(entry.note.id)),
+      );
+      if (full.ok && full.value) {
+        setSessionCachedNote(projectId, entry.vault.storage.vaultPath, full.value);
+        results[i] = { note: full.value, vault: entry.vault };
+      } else {
+        // Full read failed — keep the note visible with empty content
+        // (matches prior behavior where metadata notes carried content: "").
+        results[i] = { note: { ...entry.note, content: "" }, vault: entry.vault };
+      }
+    }
+  });
+  await Promise.all(workers);
+  return results;
+}
 
 function sampleWarningNotes(entries: NoteEntry[]): Array<{ id: string; title: string }> {
   return entries.slice(0, 3).map((entry) => ({ id: entry.note.id, title: entry.note.title }));
@@ -201,31 +250,18 @@ export function registerProjectMemorySummaryTool(server: McpServer, ctx: ServerC
         return projectNotFoundResponse(cwd);
       }
 
-      // The session cache stores metadata-only notes (no content field). This
-      // tool needs full note bodies for next-action extraction, previews, and
-      // theme keywords, so hydrate content on demand from storage.
-      const entries: HydratedNoteEntry[] = [];
-      for (const entry of rawEntries) {
-        if (hasNoteContent(entry.note)) {
-          entries.push({ note: entry.note, vault: entry.vault });
-          continue;
-        }
-        const full = await attempt("project-summary:read-note", () =>
-          entry.vault.storage.readNote(memoryId(entry.note.id)),
-        );
-        entries.push(
-          full.ok && full.value
-            ? { note: full.value, vault: entry.vault }
-            : // Full read failed — keep the note visible with empty content
-              // (matches prior behavior where metadata notes carried content: "").
-              { note: { ...entry.note, content: "" }, vault: entry.vault },
-        );
-      }
-
-      // Separate project-scoped notes (for themes/anchors) from global notes
-      const projectEntries = entries.filter(
+      // Separate project-scoped entries (for themes/anchors) from global entries
+      // by metadata BEFORE hydrating, so the summary only reads full bodies for
+      // the notes it actually analyzes (global bodies are deferred to the
+      // optional related-global block below).
+      const projectRawEntries = rawEntries.filter(
         (e) => e.note.project === project.id || e.vault.provenance !== "main",
       );
+      const globalRawEntries = rawEntries.filter((e) => !e.note.project);
+
+      // Hydrate project-scoped entries with bounded concurrency, caching full
+      // notes so repeated summaries reuse them instead of re-reading the corpus.
+      const projectEntries = await hydrateEntries(project.id, projectRawEntries);
 
       // Empty-project case: no project-scoped notes exist
       if (projectEntries.length === 0) {
@@ -513,8 +549,9 @@ export function registerProjectMemorySummaryTool(server: McpServer, ctx: ServerC
         const validAnchors = anchorEmbeddings.filter((e): e is NonNullable<typeof e> => e !== null);
 
         if (validAnchors.length > 0) {
-          // Get global notes (not project-scoped)
-          const globalEntries = entries.filter((e) => !e.note.project);
+          // Get global notes (not project-scoped) — hydrated lazily only when
+          // the caller opted into related-global expansion.
+          const globalEntries = await hydrateEntries(project.id, globalRawEntries);
           const globalCandidates: Array<{
             id: string;
             title: string;

@@ -240,8 +240,9 @@ export function setSessionCachedNote(projectId: string, vaultPath: string, note:
   cache.recentNotesByKey.set(`${vaultPath}::${note.id}`, note);
   const existing = cache.vaultCaches.get(vaultPath);
   if (existing) {
+    const had = existing.notesById.has(note.id);
     existing.notesById.set(note.id, note);
-    if (!existing.notesById.has(note.id)) {
+    if (!had) {
       existing.noteList.push(note);
     }
     return;

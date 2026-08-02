@@ -251,12 +251,32 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
         return note;
       };
 
-      await Promise.allSettled(
-        vaults.map((vault) =>
-          embedMissingNotes(ctx, vault.storage).catch(() => {
-            /* best-effort: don't block recall if Ollama is down */
+      // Warm the vault caches (metadata + embeddings) so the lazy embedding
+      // backfill below can determine stale/missing IDs from already-loaded
+      // snapshots instead of re-reading the corpus. The scoring loop below
+      // reuses the same cached lists, so this adds no extra I/O.
+      if (project) {
+        await Promise.all(
+          vaults.map(async (vault) => {
+            await getOrBuildVaultNoteList(project.id, vault);
+            await getOrBuildVaultEmbeddings(project.id, vault);
           }),
-        ),
+        );
+      }
+
+      await Promise.allSettled(
+        vaults.map(async (vault) => {
+          const notes = project ? await getOrBuildVaultNoteList(project.id, vault) : undefined;
+          const embeddings = project
+            ? await getOrBuildVaultEmbeddings(project.id, vault)
+            : undefined;
+          await embedMissingNotes(ctx, vault.storage, undefined, false, {
+            notes: notes ?? undefined,
+            embeddings: embeddings ?? undefined,
+          }).catch(() => {
+            /* best-effort: don't block recall if Ollama is down */
+          });
+        }),
       );
 
       const scored: ScoredRecallCandidate[] = [];
