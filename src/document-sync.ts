@@ -199,15 +199,23 @@ export async function embedGenerationChunks(
   });
   await Promise.all(readWorkers);
 
-  // Recency-priority ordering: newest last-modified first, tie-break by source
-  // path for determinism. ISO dates compare lexicographically = chronologically.
+  // Recency-priority ordering: newest last-modified first, then source path,
+  // then chunkId. The chunkId tie-break makes this a TOTAL ordering so cap
+  // selection is deterministic regardless of the (now concurrent) read
+  // completion order — without it, same-document chunks tie on recency and
+  // source path, and a stable sort would preserve the nondeterministic push
+  // order, letting slice(maxEmbeddingWork) pick different chunks across runs.
+  // ISO dates compare lexicographically = chronologically.
   toEmbed.sort((a, b) => {
     const aLastMod = lastModByPath.get(a.sourcePath) ?? "";
     const bLastMod = lastModByPath.get(b.sourcePath) ?? "";
     if (aLastMod !== bLastMod) {
       return aLastMod < bLastMod ? 1 : -1;
     }
-    return a.sourcePath.localeCompare(b.sourcePath);
+    if (a.sourcePath !== b.sourcePath) {
+      return a.sourcePath.localeCompare(b.sourcePath);
+    }
+    return a.chunk.chunkId.localeCompare(b.chunk.chunkId);
   });
 
   const capped = toEmbed.slice(0, maxEmbeddingWork);

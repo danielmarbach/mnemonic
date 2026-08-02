@@ -146,6 +146,28 @@ function isDefined(value: string | undefined): value is string {
   return value !== undefined;
 }
 
+/**
+ * Storage wrapper that delays `read` for a chosen set of chunk ids, used to
+ * force a deterministic read-completion order in the cap-selection test below.
+ */
+class DelayedReadStorage extends ChunkEmbeddingStorage {
+  constructor(
+    dir: string,
+    attachmentId: string,
+    private readonly delayed: Set<string>,
+    private readonly delayMs: number,
+  ) {
+    super(dir, attachmentId);
+  }
+
+  override async read(chunkId: string): Promise<ChunkEmbeddingRecord | null> {
+    if (this.delayed.has(chunkId)) {
+      await new Promise((resolve) => setTimeout(resolve, this.delayMs));
+    }
+    return super.read(chunkId);
+  }
+}
+
 describe("embedGenerationChunks", () => {
   it("embeds every chunk during sync and persists records to disk", async () => {
     const { storage } = await makeStorage();
@@ -208,6 +230,45 @@ describe("embedGenerationChunks", () => {
     expect(onDisk).toHaveLength(1);
     // Deterministic recency tie-break: docs/a.md sorts first.
     expect(onDisk[0]?.chunkId).toContain("docs-a-md");
+  });
+
+  it("breaks recency/source-path ties by chunkId so cap selection is deterministic regardless of read completion order", async () => {
+    // One document with two H1 sections -> two chunks that share sourcePath and
+    // recency, so they tie on every sort key except chunkId. Document order
+    // (Sierra then Alpha) deliberately differs from chunkId order (Alpha first),
+    // so a completion-order sort would select Sierra while a chunkId tie-break
+    // selects Alpha.
+    const gen = buildGeneration("att-1", [
+      makeFile(
+        "docs/two.md",
+        "# Sierra\n\nSierra section body content goes here.\n\n# Alpha\n\nAlpha section body content goes here.",
+      ),
+    ]);
+    expect(gen.chunks.size).toBe(2);
+    const sortedIds = [...gen.chunks.keys()].sort((a, b) => a.localeCompare(b));
+    expect(sortedIds).toHaveLength(2);
+    const winner = sortedIds[0];
+    if (winner === undefined) throw new Error("expected two chunks");
+
+    // Delay the winner's read so it completes LAST. Both chunks are new, so
+    // read returns null either way; the delay only changes when each lands in
+    // toEmbed. A sort that preserved completion order would then pick the
+    // faster (non-winner) chunk; the chunkId tie-break must pick the winner.
+    const base = await fs.mkdtemp(path.join(os.tmpdir(), "mnemonic-sync-embedding-"));
+    tempDirs.push(base);
+    const storage = new DelayedReadStorage(
+      path.join(base, "doc-source", "att-1"),
+      "att-1",
+      new Set([winner]),
+      30,
+    );
+    await storage.init();
+
+    await embedGenerationChunks(gen, makeContext(), "att-1", storage, new Map(), 1);
+
+    expect(embedMock).toHaveBeenCalledTimes(1);
+    expect(gen.chunkEmbeddings.size).toBe(1);
+    expect([...gen.chunkEmbeddings.keys()]).toEqual([winner]);
   });
 
   it("reuses on-disk embeddings for unchanged chunks and re-embeds only changed ones", async () => {
