@@ -299,7 +299,7 @@ User-tunable fields:
 
 | Field                     | Default       | Description                                                          |
 | ------------------------- | ------------- | -------------------------------------------------------------------- |
-| `reindexEmbedConcurrency` | `4`           | Parallel embedding requests during `sync` (capped from 1 to 16)     |
+| `reindexEmbedConcurrency` | `4`           | Parallel embedding and cache reads during `sync` (capped 1 to 16)   |
 | `mutationPushMode`        | `"main-only"` | When to auto-push after a write: `"all"`, `"main-only"`, or `"none"` |
 
 `projectMemoryPolicies` and `projectIdentityOverrides` are written automatically by `set_project_memory_policy` and `set_project_identity`. You do not need to edit them by hand.
