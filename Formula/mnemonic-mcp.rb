@@ -1,8 +1,8 @@
 class MnemonicMcp < Formula
   desc "Local MCP memory server backed by markdown + JSON files, synced via git"
   homepage "https://github.com/danielmarbach/mnemonic"
-  url "https://registry.npmjs.org/@danielmarbach/mnemonic-mcp/-/mnemonic-mcp-0.40.0.tgz"
-  sha256 "a4498fa6bdc104b5a1fbd10df0d99465ab51146090027fbc45feb4a00366b151"
+  url "https://registry.npmjs.org/@danielmarbach/mnemonic-mcp/-/mnemonic-mcp-0.41.0.tgz"
+  sha256 "535a45a3d9024c632e51f9e32e1ed01a7c6f3da71d655de393ac92236e5d43db"
   license "Apache-2.0"
 
   depends_on "node"
