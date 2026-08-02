@@ -1,10 +1,337 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, beforeEach, vi } from "vitest";
 
 import {
+  buildRecallCandidateContext,
+  collectLexicalCandidates,
   computeRecallDiversity,
   computeRecallRetrievalCoverage,
 } from "../src/tools/recall-helpers.js";
-import type { NoteLifecycle } from "../src/storage.js";
+import { buildProjection } from "../src/projections.js";
+import { analyzeNoteContent } from "../src/role-suggestions.js";
+import { invalidateActiveProjectCache } from "../src/cache.js";
+import type { Note, NoteLifecycle, NoteMetadata } from "../src/storage.js";
+import type { NoteContentSignals, NoteProjection } from "../src/structured-content.js";
+import type { Vault } from "../src/vault.js";
+
+describe("buildRecallCandidateContext equivalence", () => {
+  const NOW = "2026-04-20T00:00:00.000Z";
+
+  // A rich full note exercising inferred role + importance, headings, lists,
+  // body length >= 400, and relationships.
+  function richNote(): Note {
+    return {
+      id: "n1",
+      title: "Recall signal persistence",
+      tags: ["recall", "projections"],
+      lifecycle: "permanent",
+      content: `
+## Overview
+
+This note documents how the recall pipeline persists body-derived structural signals so
+that steady-state metadata-only reads reproduce the exact ranking the system produced when
+it still loaded full note bodies. The change keeps embedding text stable while making the
+derived projection the single source of truth for structural scoring.
+
+## Background
+
+Previously every recall cached full notes and derived the suggested role, the suggested
+importance, and the structure score directly from the body content. The metadata split
+removed the body from the cached corpus, so those structural signals disappeared from the
+recall ranking entirely.
+
+## Design
+
+- Persist NoteContentSignals in the derived NoteProjection
+- Keep the field optional so legacy projection files remain readable
+- Rebuild legacy projections lazily once, then serve metadata plus signals
+- Preserve projectionText and embedding identity exactly
+
+## Trade-offs
+
+- Pro: no full-corpus hydration on steady-state recall
+- Pro: old projections migrate without a database migration
+- Con: first recall after upgrade reads each note body once
+- Con: derived projections must be kept in sync with the body
+`.trim(),
+      relatedTo: [
+        { id: "r1", type: "explains" as const },
+        { id: "r2", type: "supersedes" as const },
+      ],
+      createdAt: NOW,
+      updatedAt: NOW,
+    };
+  }
+
+  beforeEach(() => {
+    invalidateActiveProjectCache();
+  });
+
+  it("equals full-note context when metadata is paired with projection contentSignals", () => {
+    const note = richNote();
+    const projection = buildProjection(note);
+    const { content: _, ...metadata } = note;
+
+    expect(buildRecallCandidateContext(metadata, projection.contentSignals)).toEqual(
+      buildRecallCandidateContext(note),
+    );
+  });
+
+  it("derives an inferred role, importance, and non-zero structureScore from the rich note", () => {
+    const note = richNote();
+    const context = buildRecallCandidateContext(note);
+    expect(context.metadata.role).toBeDefined();
+    expect(context.metadata.importance).toBeDefined();
+    expect(context.metadata.roleSource).toBe("suggested");
+    expect(context.metadata.importanceSource).toBe("suggested");
+    expect(context.structureScore).toBeGreaterThan(0);
+    expect(context.relatedCount).toBe(2);
+  });
+
+  it("uses persisted signals for structure scoring instead of reading the body", () => {
+    const note = richNote();
+    const metadata = { ...note } as NoteMetadata;
+    // metadata-only view of the note (no content field)
+    const signals = analyzeNoteContent(note.content);
+    const context = buildRecallCandidateContext(metadata, signals);
+    expect(context.structureScore).toBe(
+      Math.min(
+        0.04,
+        (signals.hasSubheading ? 0.02 : 0) +
+          (signals.hasListMarker ? 0.01 : 0) +
+          (signals.hasAtLeast400Characters ? 0.01 : 0),
+      ),
+    );
+  });
+});
+
+describe("collectLexicalCandidates projection I/O behavior", () => {
+  const NOW = "2026-04-20T00:00:00.000Z";
+
+  const signals: NoteContentSignals = {
+    headingCount: 2,
+    bulletCount: 4,
+    checklistCount: 0,
+    numberedCount: 0,
+    colonPairCount: 0,
+    tableRowCount: 0,
+    paragraphCount: 2,
+    shortLineCount: 2,
+    hasSubheading: true,
+    hasListMarker: true,
+    hasAtLeast400Characters: false,
+  };
+
+  function projectionFor(id: string, opts: { legacy?: boolean } = {}): NoteProjection {
+    const p: NoteProjection = {
+      noteId: id,
+      title: "Shared Note",
+      summary: "shared summary about test recall",
+      headings: ["Overview", "Design"],
+      tags: [],
+      lifecycle: "permanent",
+      updatedAt: NOW,
+      projectionText: "Title: Shared Note\nSummary: shared summary about test recall",
+      generatedAt: NOW,
+      contentSignals: signals,
+    };
+    if (opts.legacy) {
+      delete p.contentSignals;
+    }
+    return p;
+  }
+
+  function metadataNote(id: string, project: string): NoteMetadata {
+    return {
+      id,
+      title: "Shared Note",
+      tags: [],
+      lifecycle: "permanent",
+      project,
+      relatedTo: [{ id: "r1", type: "explains" as const }],
+      createdAt: NOW,
+      updatedAt: NOW,
+    };
+  }
+
+  // Full note used when a legacy projection forces a body read + rebuild.
+  function fullNote(id: string, project: string): Note {
+    return {
+      ...metadataNote(id, project),
+      content:
+        "## Overview\n\nShared summary about test recall and projections.\n\n- one\n- two\n- three\n- four",
+    };
+  }
+
+  function makeVault(
+    vaultPath: string,
+    provenance: Vault["provenance"],
+    notes: NoteMetadata[],
+    readProjection: () => NoteProjection | null,
+    readNoteImpl?: () => Note | null,
+  ): {
+    vault: Vault;
+    readNote: ReturnType<typeof vi.fn>;
+    writeProjection: ReturnType<typeof vi.fn>;
+    readProjection: ReturnType<typeof vi.fn>;
+  } {
+    const readNote = readNoteImpl
+      ? vi.fn().mockImplementation(async () => readNoteImpl())
+      : vi.fn().mockResolvedValue(null);
+    const writeProjection = vi.fn().mockResolvedValue(undefined);
+    const readProjectionMock = vi.fn().mockImplementation(readProjection);
+    const storage = {
+      vaultPath,
+      notesDir: `${vaultPath}/notes`,
+      embeddingsDir: `${vaultPath}/embeddings`,
+      projectionsDir: `${vaultPath}/projections`,
+      init: vi.fn(),
+      listNotes: vi.fn(),
+      listNotesMetadata: vi.fn().mockResolvedValue(notes),
+      listEmbeddings: vi.fn().mockResolvedValue([]),
+      readNote,
+      readNoteMetadata: vi.fn(),
+      writeNote: vi.fn(),
+      deleteNote: vi.fn(),
+      readEmbedding: vi.fn(),
+      writeEmbedding: vi.fn(),
+      readProjection: readProjectionMock,
+      writeProjection,
+    } as unknown as Vault["storage"];
+    return {
+      vault: {
+        storage,
+        git: {} as Vault["git"],
+        provenance,
+        notesRelDir: ".mnemonic/notes",
+        vaultFolderName: ".mnemonic",
+        writable: true,
+      } as unknown as Vault,
+      readNote,
+      writeProjection,
+      readProjection: readProjectionMock,
+    };
+  }
+
+  beforeEach(() => {
+    invalidateActiveProjectCache();
+  });
+
+  it("metadata plus a current projection with signals does not call readNote()", async () => {
+    const note = metadataNote("n1", "p");
+    const { vault, readNote, writeProjection } = makeVault(
+      "/vault/local",
+      "project-local",
+      [note],
+      () => projectionFor("n1"),
+    );
+
+    await collectLexicalCandidates(
+      [vault],
+      "shared test recall",
+      undefined,
+      { id: "p", name: "P" },
+      "project",
+      undefined,
+      undefined,
+      [],
+    );
+
+    expect(readNote).not.toHaveBeenCalled();
+    expect(writeProjection).not.toHaveBeenCalled();
+  });
+
+  it("a legacy projection causes one full read and one projection rebuild", async () => {
+    const note = metadataNote("n1", "p");
+    const { vault, readNote, writeProjection } = makeVault(
+      "/vault/local",
+      "project-local",
+      [note],
+      () => projectionFor("n1", { legacy: true }),
+      () => fullNote("n1", "p"),
+    );
+
+    await collectLexicalCandidates(
+      [vault],
+      "shared test recall",
+      undefined,
+      { id: "p", name: "P" },
+      "project",
+      undefined,
+      undefined,
+      [],
+    );
+
+    expect(readNote).toHaveBeenCalledTimes(1);
+    expect(writeProjection).toHaveBeenCalledTimes(1);
+  });
+
+  it("a second recall reuses the migrated projection without another full read", async () => {
+    const note = metadataNote("n1", "p");
+    const { vault, readNote, writeProjection } = makeVault(
+      "/vault/local",
+      "project-local",
+      [note],
+      () => projectionFor("n1", { legacy: true }),
+      () => fullNote("n1", "p"),
+    );
+
+    await collectLexicalCandidates(
+      [vault],
+      "shared test recall",
+      undefined,
+      { id: "p", name: "P" },
+      "project",
+      undefined,
+      undefined,
+      [],
+    );
+    await collectLexicalCandidates(
+      [vault],
+      "shared test recall",
+      undefined,
+      { id: "p", name: "P" },
+      "project",
+      undefined,
+      undefined,
+      [],
+    );
+
+    expect(readNote).toHaveBeenCalledTimes(1);
+    expect(writeProjection).toHaveBeenCalledTimes(1);
+  });
+
+  it("attached and local metadata produce identical candidate context with the same signals", async () => {
+    const localNote = metadataNote("n1", "p");
+    const attachedNote = metadataNote("n1", "attached-slug");
+    const local = makeVault("/vault/local", "project-local", [localNote], () =>
+      projectionFor("n1"),
+    );
+    const attached = makeVault("/vault/attached", "project-attached", [attachedNote], () =>
+      projectionFor("n1"),
+    );
+
+    const results = await collectLexicalCandidates(
+      [local.vault, attached.vault],
+      "shared test recall",
+      undefined,
+      { id: "p", name: "P" },
+      "project",
+      undefined,
+      undefined,
+      [],
+    );
+
+    const localCandidate = results.find((c) => c.identityKey.startsWith("/vault/local::"));
+    const attachedCandidate = results.find((c) => c.identityKey.startsWith("/vault/attached::"));
+    expect(localCandidate).toBeDefined();
+    expect(attachedCandidate).toBeDefined();
+    expect(localCandidate!.metadata).toEqual(attachedCandidate!.metadata);
+    expect(localCandidate!.metadataPrior).toBe(attachedCandidate!.metadataPrior);
+    expect(localCandidate!.structureScore).toBe(attachedCandidate!.structureScore);
+    expect(localCandidate!.relatedCount).toBe(attachedCandidate!.relatedCount);
+    expect(localCandidate!.connectionDiversity).toBe(attachedCandidate!.connectionDiversity);
+  });
+});
 
 describe("computeRecallDiversity", () => {
   it("returns diversity metrics from recall results", async () => {

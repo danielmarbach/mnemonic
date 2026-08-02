@@ -7,7 +7,9 @@ import {
   extractProjectionSummary,
   isProjectionStale,
 } from "../src/projections.js";
-import type { NoteProjection } from "../src/structured-content.js";
+import { analyzeNoteContent } from "../src/role-suggestions.js";
+import type { NoteContentSignals, NoteProjection } from "../src/structured-content.js";
+import { validateNoteProjection } from "../src/validation.js";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -237,6 +239,7 @@ describe("buildProjection", () => {
     expect(proj1.summary).toBe(proj2.summary);
     expect(proj1.headings).toEqual(proj2.headings);
     expect(proj1.projectionText).toBe(proj2.projectionText);
+    expect(proj1.contentSignals).toEqual(proj2.contentSignals);
   });
 });
 
@@ -245,7 +248,22 @@ describe("buildProjection", () => {
 describe("isProjectionStale", () => {
   const updatedAt = "2026-01-15T00:00:00.000Z";
 
-  function makeProjection(overrides: Partial<NoteProjection> = {}): NoteProjection {
+  function makeProjection(
+    overrides: Partial<NoteProjection> = {},
+    signals: NoteContentSignals = {
+      headingCount: 0,
+      bulletCount: 0,
+      checklistCount: 0,
+      numberedCount: 0,
+      colonPairCount: 0,
+      tableRowCount: 0,
+      paragraphCount: 0,
+      shortLineCount: 0,
+      hasSubheading: false,
+      hasListMarker: false,
+      hasAtLeast400Characters: false,
+    },
+  ): NoteProjection {
     return {
       noteId: "test-note-abc123",
       title: "Test Note",
@@ -256,6 +274,7 @@ describe("isProjectionStale", () => {
       updatedAt,
       projectionText: "Title: Test Note",
       generatedAt: "2026-01-15T01:00:00.000Z",
+      contentSignals: signals,
       ...overrides,
     };
   }
@@ -272,6 +291,14 @@ describe("isProjectionStale", () => {
     expect(isProjectionStale(note, proj)).toBe(true);
   });
 
+  it("returns true for a legacy projection without contentSignals even when updatedAt matches", () => {
+    const note = makeNote({ updatedAt });
+    const proj = makeProjection({ updatedAt });
+    // Simulate a projection written before content signals were persisted.
+    delete proj.contentSignals;
+    expect(isProjectionStale(note, proj)).toBe(true);
+  });
+
   it("returns true when updatedAt differs", () => {
     const note = makeNote({ updatedAt: "2026-02-01T00:00:00.000Z" });
     const proj = makeProjection({ updatedAt: "2026-01-01T00:00:00.000Z" });
@@ -284,16 +311,113 @@ describe("isProjectionStale", () => {
     expect(isProjectionStale(note, proj)).toBe(true);
   });
 
-  it("returns false when updatedAt differs but projectionText is unchanged", () => {
+  it("returns false when updatedAt differs but projectionText and contentSignals are unchanged", () => {
     // Relationship-only changes bump updatedAt without affecting projected content.
-    // Build the actual projection text for the default note so they match.
+    // Build the actual projection text and signals for the default note so they match.
     const note = makeNote({ updatedAt: "2026-02-01T00:00:00.000Z" });
     const fresh = buildProjection(note);
     const proj = makeProjection({
       updatedAt: "2026-01-01T00:00:00.000Z",
       projectionText: fresh.projectionText,
+      contentSignals: fresh.contentSignals,
     });
     expect(isProjectionStale(note, proj)).toBe(false);
+  });
+
+  it("returns true for a structure-only content edit even when projectionText is unchanged", () => {
+    // Editing the body structure (e.g. adding a subheading) changes contentSignals
+    // but leaves the summary and headings in projectionText untouched.
+    const note = makeNote({
+      content: "Plain paragraph of text that remains identical.",
+      updatedAt: "2026-02-01T00:00:00.000Z",
+    });
+    const fresh = buildProjection(note);
+    const proj = makeProjection({
+      updatedAt: "2026-01-01T00:00:00.000Z",
+      projectionText: fresh.projectionText,
+      // Same summary/projection text but an additional subheading the projection lacks.
+      contentSignals: { ...fresh.contentSignals!, hasSubheading: true, headingCount: 1 },
+    });
+    expect(isProjectionStale(note, proj)).toBe(true);
+  });
+
+  it("returns false when only relationships change (updatedAt differs, projection unchanged)", () => {
+    // Relationship-only updates are non-stale when projection text and signals match.
+    const note = makeNote({
+      content: "Body content that does not change.",
+      updatedAt: "2026-02-01T00:00:00.000Z",
+    });
+    const fresh = buildProjection(note);
+    const proj = makeProjection({
+      updatedAt: "2026-01-01T00:00:00.000Z",
+      projectionText: fresh.projectionText,
+      contentSignals: fresh.contentSignals,
+    });
+    expect(isProjectionStale(note, proj)).toBe(false);
+  });
+});
+
+describe("buildProjection contentSignals", () => {
+  it("persists all content signals from the note body", () => {
+    const note = makeNote({
+      content: `## Overview\n\nThis paragraph is long enough to keep the body substantial for testing.\n\n- bullet one\n- bullet two\n- bullet three\n\n1. first\n2. second\n\n- [ ] todo\n\nKey: value\n\n| a | b |\n| --- | --- |\n| 1 | 2 |`,
+    });
+    const proj = buildProjection(note);
+    const expected = analyzeNoteContent(note.content);
+    expect(proj.contentSignals).toEqual(expected);
+    expect(proj.contentSignals!.headingCount).toBeGreaterThan(0);
+    expect(proj.contentSignals!.bulletCount).toBeGreaterThan(0);
+    expect(proj.contentSignals!.checklistCount).toBeGreaterThan(0);
+    expect(proj.contentSignals!.numberedCount).toBeGreaterThan(0);
+    expect(proj.contentSignals!.colonPairCount).toBeGreaterThan(0);
+    expect(proj.contentSignals!.tableRowCount).toBeGreaterThan(0);
+  });
+
+  it("does not include contentSignals in projectionText", () => {
+    const note = makeNote({
+      content: "## Heading\n\n- item\n- item2\n\nSome longer body text here.",
+    });
+    const proj = buildProjection(note);
+    expect(proj.projectionText).not.toContain("headingCount");
+    expect(proj.projectionText).not.toContain("hasSubheading");
+  });
+});
+
+describe("validateNoteProjection compatibility", () => {
+  it("round-trips a new projection through validation with signals intact", () => {
+    const note = makeNote({
+      content:
+        "## A\n\nParagraph text here.\n\n- one\n- two\n- three\n- four\n\n## B\n\nMore body so the note is long enough for structural scoring.",
+    });
+    const proj = buildProjection(note);
+    const validated = validateNoteProjection(JSON.parse(JSON.stringify(proj)));
+    expect(validated).not.toBeNull();
+    expect(validated!.contentSignals).toEqual(proj.contentSignals);
+  });
+
+  it("accepts a legacy projection without contentSignals", () => {
+    const legacy = {
+      noteId: "abc",
+      title: "Legacy",
+      summary: "S",
+      headings: [],
+      tags: [],
+      lifecycle: "permanent",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+      projectionText: "Title: Legacy",
+      generatedAt: "2026-01-01T01:00:00.000Z",
+    };
+    const validated = validateNoteProjection(legacy);
+    expect(validated).not.toBeNull();
+    expect(validated!.contentSignals).toBeUndefined();
+  });
+
+  it("rejects a projection with invalid contentSignals", () => {
+    const note = makeNote({ content: "## Heading\n\nBody text." });
+    const proj = buildProjection(note);
+    const raw = JSON.parse(JSON.stringify(proj)) as Record<string, unknown>;
+    (raw.contentSignals as Record<string, unknown>).headingCount = -1;
+    expect(validateNoteProjection(raw)).toBeNull();
   });
 });
 

@@ -1,6 +1,7 @@
 import type { Note, NoteMetadata, NoteStorage } from "./storage.js";
 import { hasNoteContent } from "./storage.js";
-import type { NoteProjection } from "./structured-content.js";
+import type { NoteContentSignals, NoteProjection } from "./structured-content.js";
+import { analyzeNoteContent } from "./role-suggestions.js";
 import { memoryId } from "./brands.js";
 
 const MAX_SUMMARY_LENGTH = 280;
@@ -138,6 +139,7 @@ export function buildProjectionText(
 export function buildProjection(note: Note): NoteProjection {
   const summary = extractProjectionSummary(note);
   const headings = extractHeadings(note.content);
+  const contentSignals = analyzeNoteContent(note.content);
   const partial = {
     title: note.title,
     lifecycle: note.lifecycle,
@@ -157,6 +159,7 @@ export function buildProjection(note: Note): NoteProjection {
     updatedAt: note.updatedAt,
     projectionText,
     generatedAt: new Date().toISOString(),
+    contentSignals,
   };
 }
 
@@ -166,17 +169,23 @@ export function buildProjection(note: Note): NoteProjection {
  * A projection is stale when:
  * - projection is missing → stale (caller handles null case)
  * - projection.updatedAt missing → stale
+ * - projection lacks persisted contentSignals → stale (one-time lazy migration
+ *   of legacy projections written before content signals were persisted)
  * - updatedAt differs AND projected content actually changed
  *
- * Relationship-only changes bump note.updatedAt without affecting projectionText.
- * Comparing projectionText avoids unnecessary re-embeds in those cases.
+ * Relationship-only changes bump note.updatedAt without affecting projectionText
+ * or contentSignals; comparing both avoids unnecessary re-embeds in those cases.
  *
  * A metadata-only note (no content field) cannot be compared against the
- * stored projectionText; treat it as stale so the caller rebuilds from a full
+ * stored projection; treat it as stale so the caller rebuilds from a full
  * read of the note body.
  */
 export function isProjectionStale(note: NoteMetadata, projection: NoteProjection): boolean {
   if (!projection.updatedAt) return true;
+
+  // Force a one-time lazy rebuild of legacy projections.
+  if (!projection.contentSignals) return true;
+
   if (projection.updatedAt === note.updatedAt) return false;
   if (!hasNoteContent(note)) return true;
   const currentText = buildProjectionText({
@@ -186,7 +195,24 @@ export function isProjectionStale(note: NoteMetadata, projection: NoteProjection
     summary: extractProjectionSummary(note),
     headings: extractHeadings(note.content),
   });
-  return currentText !== projection.projectionText;
+  if (currentText !== projection.projectionText) return true;
+  return !contentSignalsEqual(analyzeNoteContent(note.content), projection.contentSignals);
+}
+
+function contentSignalsEqual(a: NoteContentSignals, b: NoteContentSignals): boolean {
+  return (
+    a.headingCount === b.headingCount &&
+    a.bulletCount === b.bulletCount &&
+    a.checklistCount === b.checklistCount &&
+    a.numberedCount === b.numberedCount &&
+    a.colonPairCount === b.colonPairCount &&
+    a.tableRowCount === b.tableRowCount &&
+    a.paragraphCount === b.paragraphCount &&
+    a.shortLineCount === b.shortLineCount &&
+    a.hasSubheading === b.hasSubheading &&
+    a.hasListMarker === b.hasListMarker &&
+    a.hasAtLeast400Characters === b.hasAtLeast400Characters
+  );
 }
 
 // ── NoteStorage helpers ───────────────────────────────────────────────────────────

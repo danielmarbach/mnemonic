@@ -1,10 +1,12 @@
 import type { NoteMetadata, NoteImportance, NoteRole } from "./storage.js";
 import { hasNoteContent } from "./storage.js";
+import type { NoteContentSignals } from "./structured-content.js";
 
 export interface RoleSuggestionContext {
   inboundReferences?: number;
   linkedByPermanentNotes?: number;
   anchorCandidate?: boolean;
+  contentSignals?: NoteContentSignals;
 }
 
 export interface EffectiveNoteMetadata {
@@ -17,17 +19,6 @@ export interface EffectiveNoteMetadata {
 }
 
 type SuggestedImportance = Exclude<NoteImportance, "low">;
-
-interface ContentShape {
-  headingCount: number;
-  bulletCount: number;
-  checklistCount: number;
-  numberedCount: number;
-  colonPairCount: number;
-  tableRowCount: number;
-  paragraphCount: number;
-  shortLineCount: number;
-}
 
 interface RoleScore {
   role: NoteRole;
@@ -58,7 +49,8 @@ export function suggestRole(
   note: NoteMetadata,
   context: RoleSuggestionContext = {},
 ): NoteRole | undefined {
-  const shape = analyzeContent(hasNoteContent(note) ? note.content : "", note.title);
+  const shape =
+    context.contentSignals ?? analyzeNoteContent(hasNoteContent(note) ? note.content : "");
   const inbound = context.inboundReferences ?? 0;
   const linkedByPermanentNotes = context.linkedByPermanentNotes ?? 0;
   const explanatoryRelations =
@@ -135,7 +127,8 @@ export function suggestImportance(
   const linkedByPermanentNotes = context.linkedByPermanentNotes ?? 0;
   const outbound = note.relatedTo?.length ?? 0;
   const connections = inbound + outbound + linkedByPermanentNotes;
-  const shape = analyzeContent(hasNoteContent(note) ? note.content : "", note.title);
+  const shape =
+    context.contentSignals ?? analyzeNoteContent(hasNoteContent(note) ? note.content : "");
   const structuralStrength =
     (shape.headingCount >= 2 ? 1 : 0) +
     (shape.bulletCount >= 4 ? 1 : 0) +
@@ -165,7 +158,15 @@ export function suggestImportance(
   return undefined;
 }
 
-function analyzeContent(content: string, _title: string): ContentShape {
+/**
+ * Analyze note body content into persisted structural signals.
+ *
+ * The eight counts drive suggested role and importance; the three booleans
+ * preserve the recall structureScore exactly. Kept in this module so the
+ * projection builder, recall helpers, and full-note callers all share one
+ * implementation.
+ */
+export function analyzeNoteContent(content: string): NoteContentSignals {
   const lines = content
     .split(/\r?\n/)
     .map((line) => line.trim())
@@ -193,5 +194,8 @@ function analyzeContent(content: string, _title: string): ContentShape {
     tableRowCount,
     paragraphCount,
     shortLineCount,
+    hasSubheading: content.includes("## "),
+    hasListMarker: content.includes("- ") || content.includes("1. "),
+    hasAtLeast400Characters: content.length >= 400,
   };
 }

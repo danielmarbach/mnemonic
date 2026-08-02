@@ -2,7 +2,7 @@ import type { NoteMetadata, NoteLifecycle } from "../storage.js";
 import { hasNoteContent } from "../storage.js";
 import type { Vault } from "../vault.js";
 import { memoryId } from "../brands.js";
-import { getEffectiveMetadata } from "../role-suggestions.js";
+import { analyzeNoteContent, getEffectiveMetadata } from "../role-suggestions.js";
 import {
   computeRecallMetadataBoost,
   recallCandidateIdentity,
@@ -37,28 +37,31 @@ import type {
   RecallDiversity,
   RecallRetrievalCoverage,
   NoteProjection,
+  NoteContentSignals,
 } from "../structured-content.js";
 
 // ── Recall candidate context ──────────────────────────────────────────────────
 
-export function buildRecallCandidateContext(note: NoteMetadata) {
-  const metadata = getEffectiveMetadata(note);
-  const relatedCount = note.relatedTo?.length ?? 0;
-  // Metadata-only notes have no body — treat their structure as empty (matches
-  // the prior sentinel behavior where metadata notes carried content: "").
-  const content = hasNoteContent(note) ? note.content : "";
+export function buildRecallCandidateContext(
+  note: NoteMetadata,
+  contentSignals?: NoteContentSignals,
+) {
+  const signals = contentSignals ?? analyzeNoteContent(hasNoteContent(note) ? note.content : "");
+  const metadata = getEffectiveMetadata(note, {
+    contentSignals: signals,
+  });
   return {
     metadata,
     metadataBoost: computeRecallMetadataBoost(metadata),
     lifecycle: note.lifecycle,
-    relatedCount,
+    relatedCount: note.relatedTo?.length ?? 0,
     connectionDiversity: new Set((note.relatedTo ?? []).map((rel) => rel.type)).size,
     structureScore: Math.min(
       0.04,
       [
-        content.includes("## ") ? 0.02 : 0,
-        content.includes("- ") || content.includes("1. ") ? 0.01 : 0,
-        content.length >= 400 ? 0.01 : 0,
+        signals.hasSubheading ? 0.02 : 0,
+        signals.hasListMarker ? 0.01 : 0,
+        signals.hasAtLeast400Characters ? 0.01 : 0,
       ].reduce((sum, value) => sum + value, 0),
     ),
   };
@@ -159,8 +162,13 @@ export async function collectLexicalCandidates(
       // The cached note list is metadata-only (no content field). A stale or
       // missing projection must be (re)built from the full note body, so load
       // the full note before building — otherwise we would persist degraded
-      // projections (empty summaries) that feed embedding/lexical text.
-      let projection: NoteProjection | undefined = cachedProjection;
+      // projections (empty summaries) that feed embedding/lexical text. Cached
+      // projections are also validated with isProjectionStale so a cached
+      // legacy projection without contentSignals does not bypass lazy migration.
+      let projection: NoteProjection | undefined =
+        cachedProjection && !isProjectionStale(note, cachedProjection)
+          ? cachedProjection
+          : undefined;
       if (!projection) {
         const stored = await getProjection(vault.storage, note.id).catch(() => undefined);
         if (stored && !isProjectionStale(note, stored)) {
@@ -193,7 +201,7 @@ export async function collectLexicalCandidates(
         updatedAt: note.updatedAt,
         projectionText: projection.projectionText,
         projectionTokens,
-        context: buildRecallCandidateContext(note),
+        context: buildRecallCandidateContext(note, projection.contentSignals),
       });
 
       if (projectId) {

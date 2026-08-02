@@ -23,6 +23,20 @@ export const EmbeddingRecordSchema = z.object({
   updatedAt: z.string(),
 });
 
+export const NoteContentSignalsSchema = z.object({
+  headingCount: z.number().int().min(0),
+  bulletCount: z.number().int().min(0),
+  checklistCount: z.number().int().min(0),
+  numberedCount: z.number().int().min(0),
+  colonPairCount: z.number().int().min(0),
+  tableRowCount: z.number().int().min(0),
+  paragraphCount: z.number().int().min(0),
+  shortLineCount: z.number().int().min(0),
+  hasSubheading: z.boolean(),
+  hasListMarker: z.boolean(),
+  hasAtLeast400Characters: z.boolean(),
+});
+
 export const NoteProjectionSchema = z.object({
   noteId: z.string(),
   title: z.string(),
@@ -33,6 +47,7 @@ export const NoteProjectionSchema = z.object({
   updatedAt: z.string().optional(),
   projectionText: z.string(),
   generatedAt: z.string(),
+  contentSignals: NoteContentSignalsSchema.optional(),
 });
 
 const RelationshipSchema = z.object({

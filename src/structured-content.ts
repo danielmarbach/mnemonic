@@ -753,6 +753,33 @@ export interface NoteProjection {
   updatedAt?: string;
   projectionText: string;
   generatedAt: string;
+  /**
+   * Body-derived structural signals persisted so metadata-only reads can
+   * reproduce recall ranking without loading note bodies. Optional so legacy
+   * projection files remain readable; rebuilt lazily on first use.
+   */
+  contentSignals?: NoteContentSignals;
+}
+
+/**
+ * Body-derived structural signals that feed recall ranking (suggested role,
+ * suggested importance, and structure score). These let metadata-only reads
+ * reproduce the pre-metadata-split behavior without hydrating note bodies.
+ */
+export interface NoteContentSignals {
+  headingCount: number;
+  bulletCount: number;
+  checklistCount: number;
+  numberedCount: number;
+  colonPairCount: number;
+  tableRowCount: number;
+  paragraphCount: number;
+  shortLineCount: number;
+
+  // Preserve the old recall structureScore exactly.
+  hasSubheading: boolean;
+  hasListMarker: boolean;
+  hasAtLeast400Characters: boolean;
 }
 
 export interface ProjectSummaryResult extends Record<string, unknown> {
