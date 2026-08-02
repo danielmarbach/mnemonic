@@ -10,6 +10,7 @@ import { buildProjection } from "../src/projections.js";
 import { analyzeNoteContent } from "../src/role-suggestions.js";
 import {
   invalidateActiveProjectCache,
+  getOrBuildVaultNoteList,
   getSessionCachedProjection,
   setSessionCachedProjection,
 } from "../src/cache.js";
@@ -312,10 +313,6 @@ describe("collectLexicalCandidates projection I/O behavior", () => {
     const freshProjection = buildProjection(staleFullNote);
     const stale = { ...freshProjection, updatedAt: "2026-01-01T00:00:00.000Z" };
 
-    // Seed the session cache with the stale projection so the recall hits the
-    // "cached projection exists but is stale" path.
-    setSessionCachedProjection("p", "/vault/local", "n1", stale);
-
     const { vault, readNote } = makeVault(
       "/vault/local",
       "project-local",
@@ -323,6 +320,15 @@ describe("collectLexicalCandidates projection I/O behavior", () => {
       () => stale,
       () => staleFullNote,
     );
+
+    // Build the vault cache first so the seed below takes effect —
+    // setSessionCachedProjection is a no-op until an active cache exists for
+    // the project.
+    await getOrBuildVaultNoteList("p", vault);
+
+    // Seed the session cache with the stale projection so the recall hits the
+    // "cached projection exists but is stale" path.
+    setSessionCachedProjection("p", "/vault/local", "n1", stale);
 
     await collectLexicalCandidates(
       [vault],

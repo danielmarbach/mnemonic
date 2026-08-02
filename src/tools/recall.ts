@@ -3,7 +3,7 @@ import { performance } from "perf_hooks";
 import type { McpServer } from "@modelcontextprotocol/server";
 import type { ServerContext } from "../server-context.js";
 import type { Vault } from "../vault.js";
-import type { Note, NoteLifecycle, RelationshipType } from "../storage.js";
+import type { Note, NoteMetadata, NoteLifecycle, RelationshipType } from "../storage.js";
 import { memoryId } from "../brands.js";
 import { hasNoteContent } from "../storage.js";
 import {
@@ -253,6 +253,22 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
         return note;
       };
 
+      // Metadata-only reader for the graph-spread pipeline. Vault resolution
+      // and graph filtering only need frontmatter (project, tags, lifecycle,
+      // updatedAt), so they read metadata — from the session cache when warm,
+      // else readNoteMetadata — and defer full-body hydration to projection
+      // rebuilds and final rendering. Reading full bodies here would duplicate
+      // the eager hydration the final loop performs on selected results.
+      const readCachedMetadata = async (vault: Vault, id: string): Promise<NoteMetadata | null> => {
+        if (project) {
+          const sessionNote = getSessionCachedNote(project.id, vault.storage.vaultPath, id);
+          if (sessionNote !== undefined) {
+            return sessionNote;
+          }
+        }
+        return vault.storage.readNoteMetadata(memoryId(id)).catch(() => null);
+      };
+
       // Shared projection loader for this recall. Projections are the single
       // source of body-derived structural signals (contentSignals + projection
       // text). Loading one per candidate here lets the semantic context and the
@@ -397,8 +413,13 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
           // Build candidate context from metadata plus the projection's
           // persisted content signals — no full-body read for steady-state
           // recalls. Body hydration is deferred to the final selected results.
+          // If the projection cannot be loaded (e.g. the note is unreadable and
+          // has no current projection), skip the candidate entirely rather than
+          // scoring it with empty signals: it could otherwise displace a
+          // readable note and then vanish during rendering.
           const projection = await loadProjection(vault, rec.id);
-          const context = buildRecallCandidateContext(meta, projection?.contentSignals);
+          if (!projection) continue;
+          const context = buildRecallCandidateContext(meta, projection.contentSignals);
           const temporalBoost = temporalQueryHint
             ? computeTemporalRecencyBoost(meta.updatedAt, temporalQueryHint)
             : 0;
@@ -505,9 +526,9 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
           ? vaults.filter((vault) => vault.storage.vaultPath === targetVaultPath)
           : vaults;
         for (const v of candidateVaults) {
-          const note = await v.storage.readNote(memoryId(id)).catch(() => null);
-          if (note) {
-            const isCurrentProject = project ? note.project === project.id : false;
+          const meta = await readCachedMetadata(v, id);
+          if (meta) {
+            const isCurrentProject = project ? meta.project === project.id : false;
             return { vault: v, isCurrentProject };
           }
         }
@@ -523,17 +544,17 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
           continue;
         }
 
-        const note = await readCachedNote(candidate.vault, candidate.id);
-        if (!note) continue;
-        if (tags && tags.length > 0 && !tags.every((tag) => note.tags.includes(tag))) continue;
-        if (lifecycle && note.lifecycle !== lifecycle) continue;
+        const meta = await readCachedMetadata(candidate.vault, candidate.id);
+        if (!meta) continue;
+        if (tags && tags.length > 0 && !tags.every((tag) => meta.tags.includes(tag))) continue;
+        if (lifecycle && meta.lifecycle !== lifecycle) continue;
         const isAttachedVault = candidate.vault.provenance === "project-attached";
         if (scope === "project" && !candidate.isCurrentProject && !isAttachedVault) continue;
-        if (scope === "global" && note.project !== undefined && !isAttachedVault) continue;
+        if (scope === "global" && meta.project !== undefined && !isAttachedVault) continue;
         if (
           applyTemporalFilter &&
           temporalFilterWindowDays !== undefined &&
-          !isWithinTemporalFilterWindow(note.updatedAt, temporalFilterWindowDays)
+          !isWithinTemporalFilterWindow(meta.updatedAt, temporalFilterWindowDays)
         ) {
           continue;
         }
