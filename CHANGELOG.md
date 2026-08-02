@@ -9,6 +9,7 @@ The format is loosely based on Keep a Changelog and uses semver-style version he
 ### Changed
 
 - Document-source chunk embedding cache files are now named by an xxh128 digest of the chunk id (a fixed 32-character name) instead of a slugified path. Slug names were unbounded, so a document in a deeply nested path with long heading ancestry could exceed the 255-character single-filename limit shared by macOS, Windows, and Linux — a problem unique to document sources, since note embeddings are keyed by short ids. The per-chunk content hash (used to reuse embeddings across syncs) also switched from SHA-256 to xxh128, unifying both sites under one deliberate non-cryptographic hash. The first `sync` after upgrade rebuilds and re-embeds affected attachments once (the cache-reuse check changes), then removes the old cache files automatically.
+- Re-syncing a large unchanged document-source attachment is faster: cached chunk embeddings are now read concurrently instead of one at a time, reducing serialized disk I/O without changing results.
 
 ## [0.40.0] - 2026-08-01
 
