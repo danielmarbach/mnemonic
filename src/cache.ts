@@ -255,6 +255,36 @@ export function setSessionCachedNote(projectId: string, vaultPath: string, note:
   });
 }
 
+/**
+ * Merge freshly (re)built embeddings into the vault's cached embedding snapshot.
+ *
+ * `embedMissingNotes` writes new embeddings to disk; the in-memory snapshot must
+ * reflect them or the current recall would exclude them and later recalls would
+ * re-detect them as missing and re-embed. Upserts by id, preserving the existing
+ * snapshot as the base so pre-existing embeddings are kept.
+ */
+export function setSessionCachedEmbeddings(
+  projectId: string,
+  vaultPath: string,
+  records: EmbeddingRecord[],
+): void {
+  const cache = ensureActiveProjectCache(projectId);
+  const existing = cache.vaultCaches.get(vaultPath);
+  if (!existing) {
+    cache.vaultCaches.set(vaultPath, {
+      notesById: new Map(),
+      noteList: [],
+      embeddings: [...records],
+    });
+    return;
+  }
+  const byId = new Map(existing.embeddings.map((e) => [e.id, e]));
+  for (const record of records) {
+    byId.set(record.id, record);
+  }
+  existing.embeddings = [...byId.values()];
+}
+
 export function getRecentSessionAccessNote(
   projectId: string,
   vaultPath: string,

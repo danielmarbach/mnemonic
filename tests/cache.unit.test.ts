@@ -13,6 +13,7 @@ import {
   getSessionCachedProjectionTokens,
   setSessionCachedProjection,
   setSessionCachedProjectionTokens,
+  setSessionCachedEmbeddings,
 } from "../src/cache.js";
 
 // ── Test helpers ──────────────────────────────────────────────────────────────
@@ -240,6 +241,32 @@ describe("getSessionCachedNote", () => {
     await getOrBuildVaultNoteList("project-A", vault);
 
     expect(getSessionCachedNote("project-B", "/vault/project", "note-1")).toBeUndefined();
+  });
+});
+
+// ── Set-cached embeddings (post-backfill merge) ───────────────────────────────
+
+describe("setSessionCachedEmbeddings", () => {
+  it("merges freshly rebuilt embeddings into the cached snapshot by id", async () => {
+    const vault = makeVault("/vault/project", [makeNoteMetadata("a")], [makeEmbedding("a")]);
+    await getOrBuildVaultEmbeddings("test-project", vault);
+
+    // Simulate a backfill that refreshed note "a" and rebuilt missing note "b".
+    const refreshed = { ...makeEmbedding("a"), updatedAt: "2026-02-01T00:00:00.000Z" };
+    setSessionCachedEmbeddings("test-project", "/vault/project", [refreshed, makeEmbedding("b")]);
+
+    const embeddings = await getOrBuildVaultEmbeddings("test-project", vault);
+    expect(embeddings).toHaveLength(2);
+    expect(embeddings!.find((e) => e.id === "a")!.updatedAt).toBe("2026-02-01T00:00:00.000Z");
+    expect(embeddings!.some((e) => e.id === "b")).toBe(true);
+  });
+
+  it("builds a vault cache when none exists yet", () => {
+    setSessionCachedEmbeddings("test-project", "/vault/project", [makeEmbedding("a")]);
+
+    const cache = getActiveProjectCache("test-project");
+    const embeddings = cache?.vaultCaches.get("/vault/project")?.embeddings ?? [];
+    expect(embeddings.map((e) => e.id)).toEqual(["a"]);
   });
 });
 

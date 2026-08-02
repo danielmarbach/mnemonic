@@ -45,6 +45,7 @@ import {
   recordSessionNoteAccess,
   setSessionCachedNote,
   getSessionCachedNote,
+  setSessionCachedEmbeddings,
 } from "../cache.js";
 import { getOrBuildProjection } from "../projections.js";
 import { embedMissingNotes } from "../helpers/embed.js";
@@ -270,12 +271,20 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
           const embeddings = project
             ? await getOrBuildVaultEmbeddings(project.id, vault)
             : undefined;
-          await embedMissingNotes(ctx, vault.storage, undefined, false, {
+          const result = await embedMissingNotes(ctx, vault.storage, undefined, false, {
             notes: notes ?? undefined,
             embeddings: embeddings ?? undefined,
           }).catch(() => {
             /* best-effort: don't block recall if Ollama is down */
+            return null;
           });
+          // Backfill writes new embeddings to disk; merge them into the in-memory
+          // snapshot so the scoring loop below sees them and future recalls don't
+          // re-embed the same notes as still-missing. Only the project path uses
+          // the embedding cache — non-project recalls read embeddings fresh.
+          if (project && result && result.embeddings.length > 0) {
+            setSessionCachedEmbeddings(project.id, vault.storage.vaultPath, result.embeddings);
+          }
         }),
       );
 

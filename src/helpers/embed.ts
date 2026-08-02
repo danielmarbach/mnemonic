@@ -40,7 +40,7 @@ export async function embedMissingNotes(
   noteIds?: string[],
   force = false,
   source?: EmbeddingBackfillSource,
-): Promise<{ rebuilt: number; failed: FailedEmbedding[] }> {
+): Promise<{ rebuilt: number; failed: FailedEmbedding[]; embeddings: EmbeddingRecord[] }> {
   // Determine which notes need (re)embedding WITHOUT loading full bodies: compare
   // note metadata (id + updatedAt) against the existing embedding snapshots.
   // This keeps the common cold-recall case (all embeddings current) to a cheap
@@ -69,35 +69,43 @@ export async function embedMissingNotes(
     return true;
   });
 
-  // Only hydrate full bodies for the notes that actually need (re)embedding.
-  const notes = (await Promise.all(needsEmbedding.map((note) => storage.readNote(note.id)))).filter(
-    (n): n is Note => n !== null,
-  );
-
+  // Only notes that actually need (re)embedding are hydrated, and the full-body
+  // read happens inside the worker pool below so concurrent reads stay bounded
+  // by `reindexEmbedConcurrency` and no worker retains every full note at once.
   let rebuilt = 0;
   const failed: FailedEmbedding[] = [];
+  const rebuiltEmbeddings: EmbeddingRecord[] = [];
   let index = 0;
 
-  const workerCount = Math.min(ctx.config.reindexEmbedConcurrency, Math.max(notes.length, 1));
+  const workerCount = Math.min(
+    ctx.config.reindexEmbedConcurrency,
+    Math.max(needsEmbedding.length, 1),
+  );
   const workers = Array.from({ length: workerCount }, async () => {
     while (true) {
-      const note = notes[index++];
-      if (!note) return;
+      const meta = needsEmbedding[index++];
+      if (!meta) return;
+
+      const note = await storage.readNote(meta.id);
+      if (!note) continue;
 
       const embedResult = await attempt("embed:note", async () => {
         const text = await embedTextForNote(storage, note);
         const vector = await embed(text);
-        await storage.writeEmbedding({
+        const record: EmbeddingRecord = {
           id: note.id,
           ...embeddingMetadata(vector),
           embedding: vector,
           updatedAt: isoDateString(new Date().toISOString()),
-        });
+        };
+        await storage.writeEmbedding(record);
+        return record;
       });
       if (embedResult.ok) {
         rebuilt++;
+        rebuiltEmbeddings.push(embedResult.value);
       } else {
-        failed.push({ id: note.id, error: getErrorMessage(embedResult.error) });
+        failed.push({ id: meta.id, error: getErrorMessage(embedResult.error) });
       }
     }
   });
@@ -106,7 +114,7 @@ export async function embedMissingNotes(
 
   failed.sort((a, b) => a.id.localeCompare(b.id));
 
-  return { rebuilt, failed };
+  return { rebuilt, failed, embeddings: rebuiltEmbeddings };
 }
 
 export async function backfillEmbeddingsAfterSync(
