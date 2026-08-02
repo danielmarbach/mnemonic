@@ -421,7 +421,11 @@ export class Storage implements NoteStorage {
       () => fs.readdir(this.embeddingsDir),
       [] as string[],
     );
-    const files = filesResult.ok ? filesResult.value : [];
+    // Sort filenames so the embedding order is deterministic and
+    // filesystem-independent; `readdir` alone preserves directory order, which
+    // is not guaranteed across platforms. Concurrency below preserves this
+    // input order, so sorting here keeps `listEmbeddings` stable.
+    const files = (filesResult.ok ? filesResult.value : []).sort();
     const ids = files
       .filter((file) => file.endsWith(".json"))
       .map((file) => memoryId(file.replace(/\.json$/, "")));

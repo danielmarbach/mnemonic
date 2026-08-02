@@ -611,10 +611,14 @@ export function registerProjectMemorySummaryTool(server: McpServer, ctx: ServerC
       // Compute orientation layer for actionable guidance
       const primaryAnchor = anchors[0];
 
-      // Build noteId -> vault lookup for provenance enrichment
+      // Build noteId -> vault lookup for provenance enrichment and a noteId ->
+      // full-note map so anchor relationship enrichment reuses notes already
+      // hydrated in projectEntries instead of re-reading them from storage.
       const noteVaultMap = new Map<string, Vault>();
+      const noteById = new Map<string, Note>();
       for (const entry of projectEntries) {
         noteVaultMap.set(entry.note.id, entry.vault);
+        noteById.set(entry.note.id, entry.note);
       }
 
       // Helper to enrich an anchor with provenance and confidence
@@ -631,7 +635,8 @@ export function registerProjectMemorySummaryTool(server: McpServer, ctx: ServerC
       const enrichOrientationNoteWithRelationships = async (anchor: AnchorNote) => {
         const vault = noteVaultMap.get(anchor.id);
         if (!vault) return {};
-        const note = await vault.storage.readNote(memoryId(anchor.id));
+        // projectEntries carry full bodies, so reuse the already-hydrated note.
+        const note = noteById.get(anchor.id) ?? (await vault.storage.readNote(memoryId(anchor.id)));
         if (!note) return {};
         const relationships = await getRelationshipPreview(
           note,

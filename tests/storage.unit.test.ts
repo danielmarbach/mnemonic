@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { Storage, type Note, type EmbeddingRecord } from "../src/storage.js";
 import {
   validateRelatedTo,
@@ -8,6 +8,40 @@ import {
 import * as fs from "fs/promises";
 import * as path from "path";
 import os from "os";
+
+// Shared byte counter populated by the fs/promises mock below, so a test can
+// assert how many bytes a read path actually consumes (e.g. metadata reads must
+// skip the body). Reset it at the start of the test that inspects it.
+const frontmatterReadBytes = vi.hoisted(() => ({ total: 0 }));
+
+// Wrap `open` (streamed reads) and `readFile` (whole-file reads) to count
+// bytes returned; forward everything else unchanged so all other storage
+// behavior is unaffected. Both the default and namespace export must point at
+// the wrapped object because storage.ts imports `fs/promises` as a default
+// while tests use the namespace.
+vi.mock("fs/promises", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("fs/promises")>();
+  const wrapped = {
+    ...actual,
+    open: (async (...args: Parameters<typeof actual.open>) => {
+      const handle = await actual.open(...args);
+      const originalRead = handle.read.bind(handle);
+      handle.read = (buffer: Buffer, offset: number, length: number, position: number) =>
+        originalRead(buffer, offset, length, position).then((result) => {
+          frontmatterReadBytes.total += result.bytesRead;
+          return result;
+        });
+      return handle;
+    }) as typeof actual.open,
+    readFile: ((...args: Parameters<typeof actual.readFile>) => {
+      return actual.readFile(...args).then((result) => {
+        frontmatterReadBytes.total += Buffer.byteLength(result);
+        return result;
+      });
+    }) as typeof actual.readFile,
+  };
+  return { ...wrapped, default: wrapped };
+});
 
 describe("Storage", () => {
   let tempDir: string;
@@ -531,16 +565,28 @@ Body`;
 
       await storage.writeNote(note);
 
+      // Instrument bytes read so the test can prove the metadata read skips the
+      // 100KB body. `frontmatterReadBytes` is populated by the fs/promises mock
+      // at the top of this file (wrapping each open() handle's read()).
+      frontmatterReadBytes.total = 0;
       const read = await storage.readNoteMetadata(note.id);
+      const metadataBytes = frontmatterReadBytes.total;
       expect(read).not.toBeNull();
       expect(read!.title).toBe("Large Body Note");
       expect(read!.tags).toEqual(["big"]);
       expect(read!.lifecycle).toBe("temporary");
       expect("content" in read!).toBe(false);
 
-      // Full read must still return the complete body
+      // The metadata-only read must not consume the 100KB body: frontmatter
+      // closes within the initial window, so only a small fraction is read.
+      expect(metadataBytes).toBeGreaterThan(0);
+      expect(metadataBytes).toBeLessThan(10_000);
+
+      // A full read must still return the complete body (and read it).
+      frontmatterReadBytes.total = 0;
       const full = await storage.readNote(note.id);
       expect(full!.content).toBe(largeBody);
+      expect(frontmatterReadBytes.total).toBeGreaterThanOrEqual(largeBody.length);
     });
 
     it("should fall back to a full read when frontmatter exceeds the read window", async () => {
