@@ -74,7 +74,7 @@ describe("ChunkEmbeddingStorage", () => {
   });
 
   it("returns null for corrupt JSON and skips it in list", async () => {
-    const { dir, storage } = await makeStorage();
+    const { storage } = await makeStorage();
     const chunkId = "att-1::docs/corrupt.md::Intro::0::0";
     await fs.writeFile(await storage.pathFor(chunkId), "{ not valid json", "utf-8");
 
@@ -83,7 +83,7 @@ describe("ChunkEmbeddingStorage", () => {
   });
 
   it("returns null for a well-formed file with the wrong shape and skips it in list", async () => {
-    const { dir, storage } = await makeStorage();
+    const { storage } = await makeStorage();
     const chunkId = "att-1::docs/shape.md::Intro::0::0";
     await fs.writeFile(
       await storage.pathFor(chunkId),
@@ -112,7 +112,7 @@ describe("ChunkEmbeddingStorage", () => {
   });
 
   it("lists only valid records and ignores corrupt siblings", async () => {
-    const { dir, storage } = await makeStorage();
+    const { storage } = await makeStorage();
     const valid = makeRecord();
     const corruptId = "att-1::docs/corrupt.md::Intro::0::0";
     await storage.write(valid);
