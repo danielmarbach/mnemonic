@@ -267,6 +267,48 @@ Branch note body`;
       process.env.DISABLE_GIT = "true";
     });
 
+    it("readNoteMetadata returns content-less NoteMetadata for git-branch reads", async () => {
+      await initGitRepoWithCommit(repoDir, "# Init");
+      delete process.env.DISABLE_GIT;
+
+      const notesDir = path.join(repoDir, ".mnemonic", "notes");
+      await fs.mkdir(notesDir, { recursive: true });
+
+      const noteContent = `---\ntitle: Branch Meta\ntags: [tag1]\nlifecycle: permanent\ncreatedAt: 2024-01-01T00:00:00.000Z\nupdatedAt: 2024-01-01T00:00:00.000Z\n---\n\nBranch meta body`;
+
+      await fs.writeFile(path.join(notesDir, "branch-meta.md"), noteContent, "utf-8");
+
+      const git = simpleGit(repoDir);
+      await git.add(".mnemonic/notes/branch-meta.md");
+      await git.commit("add branch meta note");
+
+      baseStorage = new Storage(path.join(tempDir, "vault"));
+      await baseStorage.init();
+      const attached = new AttachedStorage(
+        baseStorage,
+        baseStorage,
+        repoDir,
+        "main",
+        ".mnemonic/notes",
+      );
+
+      // Metadata must be representation-independent across storage impls: no
+      // content field, so content-sensitive ranking inference behaves the same
+      // for attached and local/project notes.
+      const meta = await attached.readNoteMetadata(memoryId("branch-meta"));
+      expect(meta).toBeTruthy();
+      expect(meta!.id).toBe(memoryId("branch-meta"));
+      expect(meta!.title).toBe("Branch Meta");
+      expect(meta!.tags).toEqual(["tag1"]);
+      expect("content" in meta!).toBe(false);
+
+      // A full read still returns the complete body.
+      const full = await attached.readNote(memoryId("branch-meta"));
+      expect(full!.content).toBe("Branch meta body");
+
+      process.env.DISABLE_GIT = "true";
+    });
+
     it("readNote returns null for missing note on branch", async () => {
       await initGitRepoWithCommit(repoDir, "# Init");
       delete process.env.DISABLE_GIT;

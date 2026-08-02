@@ -151,11 +151,15 @@ export class AttachedStorage implements NoteStorage {
 
     const note = this.baseStorage.parseNote(id, result.value.trim());
     if (!note) return null;
-    // The full file is read from git anyway, so the parsed note carries the
-    // complete body. Return it as NoteMetadata (valid since Note extends
-    // NoteMetadata) without touching noteCache: a cached full-content note must
-    // never be shadowed by a content-less variant for subsequent readNote calls.
-    return note;
+    // The NoteMetadata contract must be uniform across storage implementations:
+    // metadata notes carry no `content` field, exactly like the base Storage
+    // path. Otherwise scoring that inspects content (role/importance/structure
+    // inference) would see a full body for attached notes but an empty one for
+    // local/project notes, making lexical ranking depend on where a note is
+    // stored. Do not touch noteCache: a cached full-content note must never be
+    // shadowed by a content-less variant for subsequent readNote calls.
+    const { content: _content, ...metadata } = note;
+    return metadata;
   }
 
   async listNotes(filter?: { project?: string | null }): Promise<Note[]> {
