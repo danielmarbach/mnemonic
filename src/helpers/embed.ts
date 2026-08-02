@@ -113,6 +113,9 @@ export async function embedMissingNotes(
   await Promise.all(workers);
 
   failed.sort((a, b) => a.id.localeCompare(b.id));
+  // Workers append records in completion order, which is nondeterministic.
+  // Sort by id so rebuilt embeddings preserve deterministic ranking for score ties.
+  rebuiltEmbeddings.sort((a, b) => a.id.localeCompare(b.id));
 
   return { rebuilt, failed, embeddings: rebuiltEmbeddings };
 }

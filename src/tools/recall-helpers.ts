@@ -205,7 +205,10 @@ export async function collectLexicalCandidates(
       });
 
       if (projectId) {
-        if (cachedProjection === undefined) {
+        // Write the (re)built projection back to the session cache even when a
+        // stale cached projection already existed, so the next recall reuses it
+        // without a body read.
+        if (cachedProjection === undefined || cachedProjection !== projection) {
           setSessionCachedProjection(projectId, vault.storage.vaultPath, note.id, projection);
         }
         setSessionCachedProjectionTokens(

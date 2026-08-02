@@ -261,12 +261,39 @@ describe("setSessionCachedEmbeddings", () => {
     expect(embeddings!.some((e) => e.id === "b")).toBe(true);
   });
 
-  it("builds a vault cache when none exists yet", () => {
+  it("does not build a partial vault cache when none exists yet (no-op)", async () => {
     setSessionCachedEmbeddings("test-project", "/vault/project", [makeEmbedding("a")]);
 
-    const cache = getActiveProjectCache("test-project");
-    const embeddings = cache?.vaultCaches.get("/vault/project")?.embeddings ?? [];
-    expect(embeddings.map((e) => e.id)).toEqual(["a"]);
+    // No vault cache should be created — the merge only applies to an already
+    // complete vault snapshot, so later cache construction builds it normally
+    // (notes + embeddings together) instead of reading a partial empty corpus.
+    // An empty/absent cache surfaces as undefined from getActiveProjectCache.
+    expect(getActiveProjectCache("test-project")).toBeUndefined();
+
+    // Normal cache construction afterward still works and loads the backfilled
+    // record from disk.
+    const vault = makeVault("/vault/project", [makeNoteMetadata("a")], [makeEmbedding("a")]);
+    const embeddings = await getOrBuildVaultEmbeddings("test-project", vault);
+    expect(embeddings?.map((e) => e.id)).toEqual(["a"]);
+  });
+
+  it("sorts merged embeddings by id for deterministic ranking", async () => {
+    const vault = makeVault(
+      "/vault/project",
+      [makeNoteMetadata("b"), makeNoteMetadata("a")],
+      [makeEmbedding("b")],
+    );
+    await getOrBuildVaultEmbeddings("test-project", vault);
+
+    // Rebuilt records arrive in completion order (nondeterministic); ensure the
+    // merged snapshot is sorted by id regardless of arrival order.
+    setSessionCachedEmbeddings("test-project", "/vault/project", [
+      makeEmbedding("a"),
+      makeEmbedding("c"),
+    ]);
+
+    const embeddings = await getOrBuildVaultEmbeddings("test-project", vault);
+    expect(embeddings!.map((e) => e.id)).toEqual(["a", "b", "c"]);
   });
 });
 

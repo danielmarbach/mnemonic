@@ -262,6 +262,11 @@ export function setSessionCachedNote(projectId: string, vaultPath: string, note:
  * reflect them or the current recall would exclude them and later recalls would
  * re-detect them as missing and re-embed. Upserts by id, preserving the existing
  * snapshot as the base so pre-existing embeddings are kept.
+ *
+ * When no complete vault cache exists yet, this is a no-op. Creating a partial
+ * cache with empty note collections here would make later cache reads interpret
+ * it as a valid empty corpus, so we defer to normal cache construction (via
+ * `getOrBuildVaultNoteList` / `getOrBuildVaultEmbeddings`).
  */
 export function setSessionCachedEmbeddings(
   projectId: string,
@@ -271,18 +276,15 @@ export function setSessionCachedEmbeddings(
   const cache = ensureActiveProjectCache(projectId);
   const existing = cache.vaultCaches.get(vaultPath);
   if (!existing) {
-    cache.vaultCaches.set(vaultPath, {
-      notesById: new Map(),
-      noteList: [],
-      embeddings: [...records],
-    });
     return;
   }
   const byId = new Map(existing.embeddings.map((e) => [e.id, e]));
   for (const record of records) {
     byId.set(record.id, record);
   }
-  existing.embeddings = [...byId.values()];
+  // Workers append rebuilt embeddings in completion order, so the merge is
+  // nondeterministic. Sort by id to preserve deterministic ranking for score ties.
+  existing.embeddings = [...byId.values()].sort((a, b) => a.id.localeCompare(b.id));
 }
 
 export function getRecentSessionAccessNote(

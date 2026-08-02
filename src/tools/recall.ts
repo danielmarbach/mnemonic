@@ -13,6 +13,7 @@ import {
   RetrievalEvidence,
   RelationshipPreview,
   ProjectRef,
+  type NoteProjection,
   type RecallRetrievalCoverage,
 } from "../structured-content.js";
 import {
@@ -47,7 +48,7 @@ import {
   getSessionCachedNote,
   setSessionCachedEmbeddings,
 } from "../cache.js";
-import { getOrBuildProjection } from "../projections.js";
+import { getOrBuildProjection, getProjection, isProjectionStale } from "../projections.js";
 import { embedMissingNotes } from "../helpers/embed.js";
 import {
   ensureBranchSynced,
@@ -252,6 +253,55 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
         return note;
       };
 
+      // Shared projection loader for this recall. Projections are the single
+      // source of body-derived structural signals (contentSignals + projection
+      // text). Loading one per candidate here lets the semantic context and the
+      // lexical reranking path reuse the same projection — and the same session
+      // cache — instead of re-reading each note body. Steady-state recalls
+      // (projections current) avoid full-body reads entirely; only genuinely
+      // stale or missing projections force a hydrate + rebuild.
+      const projectionsByKey = new Map<string, NoteProjection>();
+      const loadProjection = async (
+        vault: Vault,
+        id: string,
+      ): Promise<NoteProjection | undefined> => {
+        const identityKey = `${vault.storage.vaultPath}::${id}`;
+        const inFlight = projectionsByKey.get(identityKey);
+        if (inFlight) return inFlight;
+
+        const meta = project
+          ? getSessionCachedNote(project.id, vault.storage.vaultPath, id)
+          : await vault.storage.readNoteMetadata(memoryId(id)).catch(() => null);
+        if (!meta) return undefined;
+
+        if (project) {
+          const cached = getSessionCachedProjection(project.id, vault.storage.vaultPath, id);
+          if (cached && !isProjectionStale(meta, cached)) {
+            projectionsByKey.set(identityKey, cached);
+            return cached;
+          }
+        }
+        const stored = await getProjection(vault.storage, id).catch(() => null);
+        if (stored && !isProjectionStale(meta, stored)) {
+          projectionsByKey.set(identityKey, stored);
+          if (project) {
+            setSessionCachedProjection(project.id, vault.storage.vaultPath, id, stored);
+          }
+          return stored;
+        }
+
+        const fullNote = hasNoteContent(meta) ? meta : await readCachedNote(vault, id);
+        if (!fullNote) return undefined;
+        const rebuilt = await getOrBuildProjection(vault.storage, fullNote).catch(() => undefined);
+        if (rebuilt) {
+          projectionsByKey.set(identityKey, rebuilt);
+          if (project) {
+            setSessionCachedProjection(project.id, vault.storage.vaultPath, id, rebuilt);
+          }
+        }
+        return rebuilt;
+      };
+
       // Warm the vault caches (metadata + embeddings) so the lazy embedding
       // backfill below can determine stale/missing IDs from already-loaded
       // snapshots instead of re-reading the corpus. The scoring loop below
@@ -312,20 +362,22 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
           if (rawScore === undefined) continue;
           if (rawScore < minSimilarity) continue;
 
-          const note = await readCachedNote(vault, rec.id);
-          if (!note) continue;
+          const meta = project
+            ? getSessionCachedNote(project.id, vault.storage.vaultPath, rec.id)
+            : await vault.storage.readNoteMetadata(memoryId(rec.id)).catch(() => null);
+          if (!meta) continue;
 
           if (tags && tags.length > 0) {
-            const noteTags = new Set(note.tags);
+            const noteTags = new Set(meta.tags);
             if (!tags.every((t) => noteTags.has(t))) continue;
           }
 
-          if (lifecycle && note.lifecycle !== lifecycle) {
+          if (lifecycle && meta.lifecycle !== lifecycle) {
             continue;
           }
 
-          const isProjectNote = note.project !== undefined;
-          const isCurrentProject = project && note.project === project.id;
+          const isProjectNote = meta.project !== undefined;
+          const isCurrentProject = project && meta.project === project.id;
           const isAttachedVault = vault.provenance === "project-attached";
 
           if (scope === "project") {
@@ -337,14 +389,18 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
           if (
             applyTemporalFilter &&
             temporalFilterWindowDays !== undefined &&
-            !isWithinTemporalFilterWindow(note.updatedAt, temporalFilterWindowDays)
+            !isWithinTemporalFilterWindow(meta.updatedAt, temporalFilterWindowDays)
           ) {
             continue;
           }
 
-          const context = buildRecallCandidateContext(note);
+          // Build candidate context from metadata plus the projection's
+          // persisted content signals — no full-body read for steady-state
+          // recalls. Body hydration is deferred to the final selected results.
+          const projection = await loadProjection(vault, rec.id);
+          const context = buildRecallCandidateContext(meta, projection?.contentSignals);
           const temporalBoost = temporalQueryHint
-            ? computeTemporalRecencyBoost(note.updatedAt, temporalQueryHint)
+            ? computeTemporalRecencyBoost(meta.updatedAt, temporalQueryHint)
             : 0;
           const scopeBoost = isCurrentProject
             ? ctx.projectScopeBoost
@@ -380,34 +436,31 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
         Array<{ id: string; type: RelationshipType; vaultPath?: string }>
       >();
       for (const candidate of scored) {
-        const note = await readCachedNote(candidate.vault, candidate.id).catch(() => null);
-        if (!note) {
+        const identityKey = recallCandidateIdentity(candidate);
+        const meta = project
+          ? getSessionCachedNote(project.id, candidate.vault.storage.vaultPath, candidate.id)
+          : await candidate.vault.storage
+              .readNoteMetadata(memoryId(candidate.id))
+              .catch(() => null);
+        if (!meta) {
           continue;
         }
 
-        if (note.relatedTo && note.relatedTo.length > 0) {
+        if (meta.relatedTo && meta.relatedTo.length > 0) {
           noteRelationships.set(
-            recallCandidateIdentity(candidate),
-            note.relatedTo.map((r) => ({ id: r.id, type: r.type, vaultPath: r.vaultPath })),
+            identityKey,
+            meta.relatedTo.map((r) => ({ id: r.id, type: r.type, vaultPath: r.vaultPath })),
           );
         }
 
-        const projection = await getOrBuildProjection(candidate.vault.storage, note).catch(
-          () => undefined,
-        );
+        // Reuse the projection already loaded for semantic context (or load it
+        // now), avoiding a redundant full-body read for each scored candidate.
+        const projection = await loadProjection(candidate.vault, candidate.id);
         if (!projection) {
           continue;
         }
 
-        projectionTexts.set(recallCandidateIdentity(candidate), projection.projectionText);
-        if (project) {
-          setSessionCachedProjection(
-            project.id,
-            candidate.vault.storage.vaultPath,
-            candidate.id,
-            projection,
-          );
-        }
+        projectionTexts.set(identityKey, projection.projectionText);
       }
 
       // Apply lexical reranking over semantic candidates (fail-soft)

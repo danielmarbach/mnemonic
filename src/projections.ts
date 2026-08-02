@@ -238,6 +238,17 @@ export async function getOrBuildProjection(
 ): Promise<NoteProjection> {
   const existing = await storage.readProjection(note.id);
   if (existing && !isProjectionStale(note, existing)) {
+    // The projected content (text + signals) is unchanged, but the note's
+    // updatedAt may have advanced (e.g. a relationship-only change). Persist
+    // the existing projection with the new note timestamp so later
+    // metadata-only recalls don't treat it as stale and re-read the body.
+    if (existing.updatedAt !== note.updatedAt) {
+      const advanced = { ...existing, updatedAt: note.updatedAt };
+      await storage.writeProjection(advanced).catch(() => {
+        // Best-effort save; never block the caller
+      });
+      return advanced;
+    }
     return existing;
   }
   const fresh = buildProjection(note);

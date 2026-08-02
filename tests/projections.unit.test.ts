@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
-import type { Note } from "../src/storage.js";
+import type { Note, NoteStorage } from "../src/storage.js";
 import {
   buildProjection,
   buildProjectionText,
   extractHeadings,
   extractProjectionSummary,
+  getOrBuildProjection,
   isProjectionStale,
 } from "../src/projections.js";
 import { analyzeNoteContent } from "../src/role-suggestions.js";
@@ -380,6 +381,62 @@ describe("buildProjection contentSignals", () => {
     const proj = buildProjection(note);
     expect(proj.projectionText).not.toContain("headingCount");
     expect(proj.projectionText).not.toContain("hasSubheading");
+  });
+});
+
+describe("getOrBuildProjection relationship-only updates", () => {
+  function makeStorage(existing: NoteProjection | null, writes: NoteProjection[]): NoteStorage {
+    return {
+      vaultPath: "/vault",
+      readProjection: async () => existing,
+      writeProjection: async (p: NoteProjection) => {
+        writes.push(p);
+      },
+    } as unknown as NoteStorage;
+  }
+
+  it("advances and persists the projection timestamp when content is unchanged", async () => {
+    const note = makeNote({ content: "Stable body.", updatedAt: "2026-02-01T00:00:00.000Z" });
+    const fresh = buildProjection(note);
+    const staleTimestamp = { ...fresh, updatedAt: "2026-01-01T00:00:00.000Z" };
+    const writes: NoteProjection[] = [];
+    const storage = makeStorage(staleTimestamp, writes);
+
+    const result = await getOrBuildProjection(storage, note);
+
+    // Content unchanged => reuse the projection, but with the advanced timestamp
+    // so a later metadata-only recall does not treat it as stale and re-read the body.
+    expect(result.projectionText).toBe(fresh.projectionText);
+    expect(result.updatedAt).toBe(note.updatedAt);
+    expect(writes).toHaveLength(1);
+    expect(writes[0]!.updatedAt).toBe(note.updatedAt);
+  });
+
+  it("does not write when the projection timestamp already matches the note", async () => {
+    const note = makeNote({ content: "Stable body.", updatedAt: "2026-01-01T00:00:00.000Z" });
+    const fresh = buildProjection(note);
+    const writes: NoteProjection[] = [];
+    const storage = makeStorage(fresh, writes);
+
+    const result = await getOrBuildProjection(storage, note);
+    expect(result).toBe(fresh);
+    expect(writes).toHaveLength(0);
+  });
+
+  it("rebuilds the projection when projected content actually changed", async () => {
+    const oldNote = makeNote({ content: "Old body.", updatedAt: "2026-01-01T00:00:00.000Z" });
+    const staleProjection = buildProjection(oldNote);
+    const newNote = makeNote({
+      content: "Completely new body.",
+      updatedAt: "2026-02-01T00:00:00.000Z",
+    });
+    const writes: NoteProjection[] = [];
+    const storage = makeStorage(staleProjection, writes);
+
+    const result = await getOrBuildProjection(storage, newNote);
+    expect(result.projectionText).not.toBe(staleProjection.projectionText);
+    expect(result.updatedAt).toBe(newNote.updatedAt);
+    expect(writes).toHaveLength(1);
   });
 });
 

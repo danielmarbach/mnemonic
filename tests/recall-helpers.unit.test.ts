@@ -8,7 +8,11 @@ import {
 } from "../src/tools/recall-helpers.js";
 import { buildProjection } from "../src/projections.js";
 import { analyzeNoteContent } from "../src/role-suggestions.js";
-import { invalidateActiveProjectCache } from "../src/cache.js";
+import {
+  invalidateActiveProjectCache,
+  getSessionCachedProjection,
+  setSessionCachedProjection,
+} from "../src/cache.js";
 import type { Note, NoteLifecycle, NoteMetadata } from "../src/storage.js";
 import type { NoteContentSignals, NoteProjection } from "../src/structured-content.js";
 import type { Vault } from "../src/vault.js";
@@ -298,6 +302,56 @@ describe("collectLexicalCandidates projection I/O behavior", () => {
 
     expect(readNote).toHaveBeenCalledTimes(1);
     expect(writeProjection).toHaveBeenCalledTimes(1);
+  });
+
+  it("replaces a stale cached projection so the next recall avoids a body read", async () => {
+    const note = metadataNote("n1", "p");
+    // A projection whose updatedAt predates the note (e.g. after a
+    // relationship-only update bumps the note timestamp).
+    const staleFullNote = fullNote("n1", "p");
+    const freshProjection = buildProjection(staleFullNote);
+    const stale = { ...freshProjection, updatedAt: "2026-01-01T00:00:00.000Z" };
+
+    // Seed the session cache with the stale projection so the recall hits the
+    // "cached projection exists but is stale" path.
+    setSessionCachedProjection("p", "/vault/local", "n1", stale);
+
+    const { vault, readNote } = makeVault(
+      "/vault/local",
+      "project-local",
+      [note],
+      () => stale,
+      () => staleFullNote,
+    );
+
+    await collectLexicalCandidates(
+      [vault],
+      "shared test recall",
+      undefined,
+      { id: "p", name: "P" },
+      "project",
+      undefined,
+      undefined,
+      [],
+    );
+    await collectLexicalCandidates(
+      [vault],
+      "shared test recall",
+      undefined,
+      { id: "p", name: "P" },
+      "project",
+      undefined,
+      undefined,
+      [],
+    );
+
+    // First recall hydrates once to rebuild; the rebuilt projection is written
+    // back to the session cache so the second recall reuses it without a read.
+    expect(readNote).toHaveBeenCalledTimes(1);
+
+    const cached = getSessionCachedProjection("p", "/vault/local", "n1");
+    expect(cached).toBeDefined();
+    expect(cached!.updatedAt).toBe(note.updatedAt);
   });
 
   it("attached and local metadata produce identical candidate context with the same signals", async () => {
