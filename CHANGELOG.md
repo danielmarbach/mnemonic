@@ -6,9 +6,12 @@ The format is loosely based on Keep a Changelog and uses semver-style version he
 
 ## [Unreleased]
 
+## [0.42.0] - 2026-08-03
+
 ### Added
 
 - Document-source chunks are now available in recall after an MCP server restart without manually running `sync` first. A small manifest persisted during sync lets the generation be lazily rebuilt from git on the first recall or `get` that needs it — all local I/O, no network fetch.
+- `relate` and `unrelate` now accept an optional `allowProtectedBranch` parameter, matching `remember`, `update`, and `forget`. This enables cross-vault relationships for clients that don't implement MCP elicitation handling.
 
 ### Changed
 
