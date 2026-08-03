@@ -65,12 +65,29 @@ export function registerRelateTool(server: McpServer, ctx: ServerContext): void 
           .default(true)
           .describe("Add relationship in both directions (default: true)"),
         cwd: projectParam,
+        allowProtectedBranch: z
+          .boolean()
+          .optional()
+          .describe(
+            "One-time override for protected branch checks. " +
+              "When true, relate can commit on a protected branch without changing project policy.",
+          ),
       }),
       outputSchema: RelateResultSchema,
     },
-    async ({ fromId, toId, type, bidirectional, cwd }, requestCtx) => {
+    async (
+      {
+        fromId,
+        toId,
+        type,
+        bidirectional,
+        cwd,
+        allowProtectedBranch: allowProtectedBranchArg = false,
+      },
+      requestCtx,
+    ) => {
       const branchConsent = readProtectedBranchConsentState(requestCtx);
-      const allowProtectedBranch = branchConsent === "granted";
+      const allowProtectedBranch = allowProtectedBranchArg || branchConsent === "granted";
       await ensureBranchSynced(ctx, cwd);
       guardIdsAgainstDocumentSourceMutation([fromId, toId], "relate");
       const project = await resolveProject(ctx, cwd);

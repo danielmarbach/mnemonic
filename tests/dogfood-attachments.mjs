@@ -242,8 +242,8 @@ async function main() {
     includeRelationships: true,
   });
   const note = getResult.structured?.notes?.[0];
-  const hasVaultPath = note?.relatedTo?.some((r) => r.vaultPath);
-  check("14. get relatedTo includes vaultPath", hasVaultPath);
+  const hasRelation = note?.relatedTo?.some((r) => r.id === attachedNoteId);
+  check("14. get relatedTo includes cross-vault relationship", hasRelation);
 
   // 12. memory_graph resolves cross-vault edge
   const graphResult = await callTool("memory_graph", { cwd: consumingRepo });

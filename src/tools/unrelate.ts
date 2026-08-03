@@ -57,12 +57,22 @@ export function registerUnrelateTool(server: McpServer, ctx: ServerContext): voi
           .default(true)
           .describe("Remove relationship in both directions (default: true)"),
         cwd: projectParam,
+        allowProtectedBranch: z
+          .boolean()
+          .optional()
+          .describe(
+            "One-time override for protected branch checks. " +
+              "When true, unrelate can commit on a protected branch without changing project policy.",
+          ),
       }),
       outputSchema: RelateResultSchema,
     },
-    async ({ fromId, toId, bidirectional, cwd }, requestCtx) => {
+    async (
+      { fromId, toId, bidirectional, cwd, allowProtectedBranch: allowProtectedBranchArg = false },
+      requestCtx,
+    ) => {
       const branchConsent = readProtectedBranchConsentState(requestCtx);
-      const allowProtectedBranch = branchConsent === "granted";
+      const allowProtectedBranch = allowProtectedBranchArg || branchConsent === "granted";
       await ensureBranchSynced(ctx, cwd);
       guardIdsAgainstDocumentSourceMutation([fromId, toId], "unrelate");
       const project = await resolveProject(ctx, cwd);
