@@ -6,6 +6,10 @@ The format is loosely based on Keep a Changelog and uses semver-style version he
 
 ## [Unreleased]
 
+### Changed
+
+- Document-source attachments now store chunk embeddings in the main vault (namespaced by project ID) when the project has no `.mnemonic/` directory, so projects with global storage policy get full semantic retrieval instead of falling back to lexical-only. Previously, embeddings were silently skipped when the project vault didn't exist.
+
 ### Fixed
 
 - `get` no longer fails with a structured-content schema error when fetching a memory that has a relationship to a memory stored in a different vault. Those relationships carry an internal cross-vault location that is now kept out of the typed response, so fetching them returns results instead of an MCP validation error.
