@@ -8,11 +8,13 @@ tags:
   - retrieval
 lifecycle: permanent
 createdAt: '2026-03-08T14:12:45.006Z'
-updatedAt: '2026-03-08T14:12:45.006Z'
+updatedAt: '2026-08-03T10:44:58.391Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
   - id: mnemonic-key-design-decisions-3f2a6273
+    type: related-to
+  - id: duckdb-as-a-derived-retrieval-index-evaluation-and-recommend-6c4c32b9
     type: related-to
 memoryVersion: 1
 ---
