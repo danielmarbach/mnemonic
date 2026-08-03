@@ -630,15 +630,15 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
           // Chunk embeddings (and the lazy-load manifest) live under the
           // project vault's embeddings directory
           // (<gitRoot>/.mnemonic/embeddings/doc-source/<attachmentId>/) when a
-          // project vault exists, and under the main vault, namespaced by
-          // project ID
-          // (~/mnemonic-vault/embeddings/doc-source/<projectId>/<attachmentId>/)
-          // otherwise (global storage policy). Mirror sync.ts so the recall
+          // project vault exists, and under the main vault
+          // (~/mnemonic-vault/embeddings/doc-source/<attachmentId>/) otherwise
+          // (global storage policy). The attachmentId UUID is globally unique,
+          // so no project namespace is needed. Mirror sync.ts so the recall
           // path resolves the same base directory.
           const projectVault = cwd ? await ctx.vaultManager.getProjectVaultIfExists(cwd) : null;
           const docSourceBase = projectVault
             ? path.join(projectVault.storage.embeddingsDir, "doc-source")
-            : path.join(ctx.vaultManager.main.storage.embeddingsDir, "doc-source", project.id);
+            : path.join(ctx.vaultManager.main.storage.embeddingsDir, "doc-source");
 
           // Lazy-load any in-memory generation that was dropped by a server
           // restart. Only the persisted manifest + chunk embeddings survive

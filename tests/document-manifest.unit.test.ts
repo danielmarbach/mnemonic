@@ -133,18 +133,18 @@ describe("validateManifest", () => {
 
 describe("resolveDocSourceBase", () => {
   it("prefers the project vault embeddings dir", () => {
-    const result = resolveDocSourceBase("/proj/.mnemonic/embeddings", "/main/embeddings", "p1");
+    const result = resolveDocSourceBase("/proj/.mnemonic/embeddings", "/main/embeddings");
     expect(result).toBe(path.join("/proj/.mnemonic/embeddings", "doc-source"));
   });
 
-  it("falls back to the main vault namespaced by project id when no project vault", () => {
-    const result = resolveDocSourceBase(undefined, "/main/embeddings", "p1");
-    expect(result).toBe(path.join("/main/embeddings", "doc-source", "p1"));
+  it("falls back to the main vault when no project vault", () => {
+    const result = resolveDocSourceBase(undefined, "/main/embeddings");
+    expect(result).toBe(path.join("/main/embeddings", "doc-source"));
   });
 
   it("returns undefined when no vault dir is available", () => {
-    expect(resolveDocSourceBase(undefined, "", "p1")).toBeUndefined();
-    expect(resolveDocSourceBase("", "", "p1")).toBeUndefined();
+    expect(resolveDocSourceBase(undefined, "")).toBeUndefined();
+    expect(resolveDocSourceBase("", "")).toBeUndefined();
   });
 });
 

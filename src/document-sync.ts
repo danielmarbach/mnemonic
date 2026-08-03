@@ -465,9 +465,9 @@ export async function syncDocumentSource(
     // or the document-source embeddings base directory cannot be resolved, the
     // generation still publishes with lexical-only coverage — the spec's line-41
     // contract. `docSourceBase` is the directory that directly contains per-
-    // attachment subdirectories; the caller (sync.ts) constructs it, including
-    // the `doc-source` segment and any project-ID namespacing for the main-vault
-    // fallback when the project vault is missing.
+    // attachment subdirectories; the caller (sync.ts) constructs it, always
+    // ending at the `doc-source` segment (the attachmentId UUID is globally
+    // unique, so no project-ID namespacing is needed).
     if (docSourceBase) {
       const chunkStorage = new ChunkEmbeddingStorage(
         path.join(docSourceBase, config.attachmentId),

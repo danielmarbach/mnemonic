@@ -438,9 +438,9 @@ describe("document-source attachment integration", () => {
       expect(sync.text).not.toMatch(/embedding failure/);
 
       // Embeddings were persisted to the main-vault fallback path
-      // (~/mnemonic-vault/embeddings/doc-source/<projectId>/<attachmentId>/),
+      // (~/mnemonic-vault/embeddings/doc-source/<attachmentId>/),
       // because the consumer has no project vault.
-      const fallbackBase = path.join(env.mainVault, "embeddings", "doc-source", "consumer");
+      const fallbackBase = path.join(env.mainVault, "embeddings", "doc-source");
       const entries = await readdir(fallbackBase, { withFileTypes: true }).catch(() => []);
       expect(entries.some((e) => e.isDirectory())).toBe(true);
 

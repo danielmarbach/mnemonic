@@ -6,6 +6,12 @@ The format is loosely based on Keep a Changelog and uses semver-style version he
 
 ## [Unreleased]
 
+## [0.42.1] - 2026-08-03
+
+### Changed
+
+- Document-source chunk embeddings in the main-vault fallback path no longer include a `<projectId>` directory segment. The path is now `doc-source/<attachmentId>/` in all cases — the attachmentId UUID is globally unique, so the project namespace was redundant and added unnecessary path depth. **Breaking:** existing embeddings at the old `doc-source/<projectId>/<attachmentId>/` path are orphaned; run `sync` to re-index at the new flat path.
+
 ## [0.42.0] - 2026-08-03
 
 ### Added
@@ -15,7 +21,7 @@ The format is loosely based on Keep a Changelog and uses semver-style version he
 
 ### Changed
 
-- Document-source attachments now store chunk embeddings in the main vault (namespaced by project ID) when the project has no `.mnemonic/` directory, so projects with global storage policy get full semantic retrieval instead of falling back to lexical-only. Previously, embeddings were silently skipped when the project vault didn't exist.
+- Document-source attachments now store chunk embeddings in the main vault when the project has no `.mnemonic/` directory, so projects with global storage policy get full semantic retrieval instead of falling back to lexical-only. Previously, embeddings were silently skipped when the project vault didn't exist.
 - Removing or disabling a document-source attachment now immediately clears its in-memory index, so recall no longer returns stale chunks from a detached or disabled source.
 
 ### Fixed

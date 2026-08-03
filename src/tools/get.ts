@@ -60,7 +60,7 @@ async function ensureDocumentGeneration(
   const projectVault = cwd ? await ctx.vaultManager.getProjectVaultIfExists(cwd) : null;
   const docSourceBase = projectVault
     ? path.join(projectVault.storage.embeddingsDir, "doc-source")
-    : path.join(ctx.vaultManager.main.storage.embeddingsDir, "doc-source", project.id);
+    : path.join(ctx.vaultManager.main.storage.embeddingsDir, "doc-source");
 
   return withGenerationLock(project.id, attachmentId, async () => {
     const recheck = getCurrentGeneration(project.id, attachmentId);

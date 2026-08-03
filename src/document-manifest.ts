@@ -56,21 +56,20 @@ export const MANIFEST_SCHEMA_VERSION = "1" as const;
  *
  * Mirrors `sync.ts`'s docSourceBase construction:
  * - a project vault embeddings dir is preferred → `.../embeddings/doc-source`
- * - otherwise the main vault, namespaced by project id →
- *   `.../embeddings/doc-source/<projectId>`
+ * - otherwise the main vault → `.../embeddings/doc-source`
+ *   (the attachmentId UUID is globally unique, so no project namespace is needed)
  * - otherwise (no vault at all) → `undefined`, meaning no doc-source
  *   embeddings/manifest location is available.
  */
 export function resolveDocSourceBase(
   projectVaultEmbeddingsDir: string | undefined,
   mainVaultEmbeddingsDir: string,
-  projectId: string,
 ): string | undefined {
   if (projectVaultEmbeddingsDir && projectVaultEmbeddingsDir.length > 0) {
     return path.join(projectVaultEmbeddingsDir, "doc-source");
   }
   if (mainVaultEmbeddingsDir && mainVaultEmbeddingsDir.length > 0) {
-    return path.join(mainVaultEmbeddingsDir, "doc-source", projectId);
+    return path.join(mainVaultEmbeddingsDir, "doc-source");
   }
   return undefined;
 }
