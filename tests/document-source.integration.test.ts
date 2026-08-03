@@ -1,6 +1,6 @@
 import { describe, expect, it, beforeAll } from "vitest";
 import http from "node:http";
-import { mkdtemp, mkdir, rm, writeFile } from "fs/promises";
+import { mkdtemp, mkdir, rm, readdir, writeFile } from "fs/promises";
 import os from "os";
 import path from "path";
 import { execFile } from "child_process";
@@ -393,6 +393,70 @@ describe("document-source attachment integration", () => {
       const second = await session.callTool("sync", { cwd });
       expect(second.text).toMatch(/doc-source:.*No changes on/);
       expect(second.text).not.toMatch(/Indexed/);
+    } finally {
+      await session.close();
+      await embedding.close();
+      await rm(env.base, { recursive: true, force: true });
+    }
+  }, 60000);
+
+  it("semantic recall works without a project vault by falling back to main-vault embeddings", async () => {
+    const env = await setupDocSourceEnv();
+    // A doc whose content, heading, and path share no tokens with the query,
+    // but whose embedding (via the fake semantic embedder) sits on the query
+    // vector: the only channel that can surface it is the semantic one.
+    await writeFile(
+      path.join(env.docsource, "docs", "moonshadow.md"),
+      `# Moonshadow Vault\n\nThe moonshadow-vault subsystem coordinates durable state transitions across worker nodes.\n`,
+    );
+    await git(env.docsource, "add", ".");
+    await git(env.docsource, "commit", "-m", "moonshadow");
+    await git(env.docsource, "fetch", "origin");
+
+    const embedding = await startSemanticFakeEmbeddingServer();
+    const session = await createPersistentMcpSession(env.mainVault, {
+      ollamaUrl: embedding.url,
+      disableGit: false,
+    });
+    try {
+      const cwd = env.consumer;
+      // No remember(scope: project) here — the consumer has NO .mnemonic/
+      // project vault (global storage policy). Option A falls back to main-
+      // vault embeddings so document chunks still get semantic vectors.
+      await session.callTool("add_attachment", {
+        cwd,
+        localPath: env.docsource,
+        kind: "document-source",
+        root: ".",
+        include: ["**/*.md"],
+        acceptedMediaTypes: ["text/markdown"],
+      });
+
+      const sync = await session.callTool("sync", { cwd });
+      expect(sync.text).toMatch(/doc-source:.*Indexed \d+ documents, \d+ chunks/);
+      // The semantic fake embedder works, so sync must not report failures.
+      expect(sync.text).not.toMatch(/embedding failure/);
+
+      // Embeddings were persisted to the main-vault fallback path
+      // (~/mnemonic-vault/embeddings/doc-source/<projectId>/<attachmentId>/),
+      // because the consumer has no project vault.
+      const fallbackBase = path.join(env.mainVault, "embeddings", "doc-source", "consumer");
+      const entries = await readdir(fallbackBase, { withFileTypes: true }).catch(() => []);
+      expect(entries.some((e) => e.isDirectory())).toBe(true);
+
+      const recall = await session.callTool("recall", {
+        cwd,
+        query: "quicksilver-core reconciliation",
+        limit: 10,
+        scope: "all",
+      });
+      const chunks = asArr(recall.structuredContent?.documentChunks);
+      const semanticChunk = chunks.find(
+        (c) => (c as { sourcePath?: string }).sourcePath === "docs/moonshadow.md",
+      );
+      expect(semanticChunk).toBeDefined();
+      // Cosine of the marker vector against itself is 1: a semantic-only hit.
+      expect((semanticChunk as { semanticScore?: number }).semanticScore).toBeGreaterThan(0.9);
     } finally {
       await session.close();
       await embedding.close();

@@ -226,12 +226,18 @@ export function registerSyncTool(server: McpServer, ctx: ServerContext): void {
           );
           // Chunk embeddings live under the project vault's embeddings directory
           // (.mnemonic/embeddings/doc-source/<attachmentId>/). When the project
-          // vault is missing, sync falls back to lexical-only coverage.
+          // vault is missing (global storage policy), embeddings fall back to
+          // the main vault, namespaced by project ID
+          // (~/mnemonic-vault/embeddings/doc-source/<projectId>/<attachmentId>/).
           const projectVault = await ctx.vaultManager.getProjectVaultIfExists(cwd);
-          const projectEmbeddingsDir = projectVault?.storage.embeddingsDir;
+          const docSourceBase = projectVault
+            ? path.join(projectVault.storage.embeddingsDir, "doc-source")
+            : project
+              ? path.join(ctx.vaultManager.main.storage.embeddingsDir, "doc-source", project.id)
+              : undefined;
           for (const docConfig of documentSourceAttachments) {
             const label = `doc-source:${docConfig.projectSlug}`;
-            const result = await syncDocumentSource(docConfig, ctx, projectEmbeddingsDir);
+            const result = await syncDocumentSource(docConfig, ctx, docSourceBase);
             if (result.status === "indexed") {
               lines.push(`${label}: ${result.message}`);
               if (result.skippedFiles.length > 0) {

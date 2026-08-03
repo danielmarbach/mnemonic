@@ -290,7 +290,7 @@ function buildEmbeddingSummary(embedded: number, failed: number): string {
 export async function syncDocumentSource(
   config: DocumentSourceAttachmentConfig,
   ctx: ServerContext,
-  projectEmbeddingsDir: string | undefined,
+  docSourceBase: string | undefined,
 ): Promise<DocumentSyncResult> {
   const resolvedLocalPath = path.resolve(expandHomePath(config.localPath));
 
@@ -446,11 +446,15 @@ export async function syncDocumentSource(
   }
 
   // Embed chunk vectors (fail-soft). When the embedding provider is unavailable
-  // or the project embeddings directory cannot be resolved, the generation
-  // still publishes with lexical-only coverage — the spec's line-41 contract.
-  if (generation && projectEmbeddingsDir) {
+  // or the document-source embeddings base directory cannot be resolved, the
+  // generation still publishes with lexical-only coverage — the spec's line-41
+  // contract. `docSourceBase` is the directory that directly contains per-
+  // attachment subdirectories; the caller (sync.ts) constructs it, including
+  // the `doc-source` segment and any project-ID namespacing for the main-vault
+  // fallback when the project vault is missing.
+  if (generation && docSourceBase) {
     const chunkStorage = new ChunkEmbeddingStorage(
-      path.join(projectEmbeddingsDir, "doc-source", config.attachmentId),
+      path.join(docSourceBase, config.attachmentId),
       config.attachmentId,
     );
     const embedStep = await attempt("sync:doc-source-embed", async () => {

@@ -147,13 +147,31 @@ export function registerRemoveAttachmentTool(server: McpServer, ctx: ServerConte
         );
       }
 
-      // Clean up per-attachment chunk embeddings for document-source attachments
-      // (<gitRoot>/.mnemonic/embeddings/doc-source/<attachmentId>/).
+      // Clean up per-attachment chunk embeddings for document-source attachments.
+      // They live under the project vault's embeddings directory
+      // (<gitRoot>/.mnemonic/embeddings/doc-source/<attachmentId>/) when the
+      // project vault exists, and under the main vault, namespaced by project ID
+      // (~/mnemonic-vault/embeddings/doc-source/<projectId>/<attachmentId>/) when
+      // it does not (global storage policy). Try both locations so cleanup also
+      // works if the storage policy changed after embeddings were stored;
+      // `fs.rm` with `force: true` is a no-op for non-existent paths.
       if (removed.kind === "document-source") {
+        const dirs: string[] = [];
         const projectVault = cwd ? await ctx.vaultManager.getProjectVaultIfExists(cwd) : null;
-        const embeddingsDir = projectVault?.storage.embeddingsDir;
-        if (embeddingsDir) {
-          const dir = path.join(embeddingsDir, "doc-source", removed.attachmentId);
+        if (projectVault) {
+          dirs.push(
+            path.join(projectVault.storage.embeddingsDir, "doc-source", removed.attachmentId),
+          );
+        }
+        dirs.push(
+          path.join(
+            ctx.vaultManager.main.storage.embeddingsDir,
+            "doc-source",
+            project.id,
+            removed.attachmentId,
+          ),
+        );
+        for (const dir of dirs) {
           await attempt("remove-attachment:clean-chunk-embeddings", () =>
             fs.rm(dir, { recursive: true, force: true }),
           );
