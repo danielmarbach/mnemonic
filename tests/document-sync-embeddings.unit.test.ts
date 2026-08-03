@@ -10,7 +10,7 @@ import {
 import { ChunkEmbeddingStorage } from "../src/chunk-embedding-storage.js";
 import type { ChunkEmbeddingRecord } from "../src/chunk-embedding-storage.js";
 import { buildGenerationFromFiles } from "../src/document-source-index.js";
-import { clearAllGenerations, getCurrentGeneration } from "../src/generation-storage.js";
+import { clearAllGenerations } from "../src/generation-storage.js";
 import { markdownChunker } from "../src/markdown-chunker.js";
 import { markdownExtractor } from "../src/markdown-extractor.js";
 import type { DocumentGeneration } from "../src/retrieval-document.js";
@@ -86,12 +86,12 @@ function makeFile(filePath: string, content: string): { path: string; bytes: Uin
   return { path: filePath, bytes: new TextEncoder().encode(content) };
 }
 
-/** Build a real generation via buildGenerationFromFiles and return the published generation. */
+/** Build a real generation via buildGenerationFromFiles and return it directly. */
 function buildGeneration(
   attachmentId: string,
   files: Array<{ path: string; bytes: Uint8Array }>,
 ): DocumentGeneration {
-  buildGenerationFromFiles(
+  return buildGenerationFromFiles(
     attachmentId,
     files,
     ["text/markdown"],
@@ -99,11 +99,6 @@ function buildGeneration(
     markdownChunker,
     "abc123",
   );
-  const generation = getCurrentGeneration(attachmentId);
-  if (!generation) {
-    throw new Error(`generation for attachment '${attachmentId}' was not published`);
-  }
-  return generation;
 }
 
 /**

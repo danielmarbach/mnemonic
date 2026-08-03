@@ -237,7 +237,7 @@ export function registerSyncTool(server: McpServer, ctx: ServerContext): void {
               : undefined;
           for (const docConfig of documentSourceAttachments) {
             const label = `doc-source:${docConfig.projectSlug}`;
-            const result = await syncDocumentSource(docConfig, ctx, docSourceBase);
+            const result = await syncDocumentSource(docConfig, ctx, docSourceBase, project.id);
             if (result.status === "indexed") {
               lines.push(`${label}: ${result.message}`);
               if (result.skippedFiles.length > 0) {

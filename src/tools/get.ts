@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { performance } from "perf_hooks";
+import path from "path";
 import type { McpServer } from "@modelcontextprotocol/server";
 import type { ServerContext } from "../server-context.js";
 import type { Note } from "../storage.js";
@@ -26,12 +27,48 @@ import {
   isDocumentEntityRef,
   parseEntityRef as parseDocumentEntityRef,
 } from "../document-entity-ref.js";
-import { getCurrentGeneration } from "../generation-storage.js";
+import { getCurrentGeneration, withGenerationLock } from "../generation-storage.js";
+import { lazyLoadGeneration } from "../document-lazy-load.js";
+import type { DocumentGeneration } from "../retrieval-document.js";
 
 // Extract attachment ID from a document ID (format: attachmentId::normalizedPath)
 function extractAttachmentId(documentId: string): string {
   const sepIndex = documentId.indexOf("::");
   return sepIndex === -1 ? documentId : documentId.slice(0, sepIndex);
+}
+
+// Resolve a document-source generation for an attachment, lazy-loading it from
+// the persisted manifest + git when the in-memory generation was dropped by a
+// server restart (mirrors the recall path). Returns null when the project,
+// attachment config, or persisted manifest cannot be resolved.
+async function ensureDocumentGeneration(
+  ctx: ServerContext,
+  cwd: string | undefined,
+  project: { id: string } | null | undefined,
+  attachmentId: string,
+): Promise<DocumentGeneration | null> {
+  if (!project) return null;
+  const existing = getCurrentGeneration(project.id, attachmentId);
+  if (existing) return existing;
+
+  const attachmentConfigs = await ctx.configStore.getProjectAttachments(project.id);
+  const docConfig = attachmentConfigs.find(
+    (a) => a.attachmentId === attachmentId && a.kind === "document-source",
+  );
+  if (!docConfig || docConfig.kind !== "document-source") return null;
+
+  const projectVault = cwd ? await ctx.vaultManager.getProjectVaultIfExists(cwd) : null;
+  const docSourceBase = projectVault
+    ? path.join(projectVault.storage.embeddingsDir, "doc-source")
+    : path.join(ctx.vaultManager.main.storage.embeddingsDir, "doc-source", project.id);
+
+  return withGenerationLock(project.id, attachmentId, async () => {
+    const recheck = getCurrentGeneration(project.id, attachmentId);
+    if (recheck) return recheck;
+    return lazyLoadGeneration(project.id, attachmentId, docConfig, ctx, docSourceBase).catch(
+      () => null,
+    );
+  });
 }
 
 export function registerGetTool(server: McpServer, ctx: ServerContext): void {
@@ -103,7 +140,7 @@ export function registerGetTool(server: McpServer, ctx: ServerContext): void {
           if (parsed.kind === "document") {
             // Look up document in current generation
             const attachmentId = extractAttachmentId(parsed.documentId);
-            const generation = getCurrentGeneration(attachmentId);
+            const generation = await ensureDocumentGeneration(ctx, cwd, project, attachmentId);
             if (!generation) {
               itemErrors.push({
                 id,
@@ -148,7 +185,7 @@ export function registerGetTool(server: McpServer, ctx: ServerContext): void {
           } else if (parsed.kind === "chunk") {
             // Chunk reference — chunkId is always present on ChunkEntityRef
             const attachmentId = extractAttachmentId(parsed.documentId);
-            const generation = getCurrentGeneration(attachmentId);
+            const generation = await ensureDocumentGeneration(ctx, cwd, project, attachmentId);
             if (!generation) {
               itemErrors.push({
                 id,

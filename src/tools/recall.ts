@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { performance } from "perf_hooks";
+import path from "path";
 import type { McpServer } from "@modelcontextprotocol/server";
 import type { ServerContext } from "../server-context.js";
 import type { Vault } from "../vault.js";
@@ -86,7 +87,8 @@ import {
   collectDocumentChunkCandidates,
   getDocumentSourceAttachmentIds,
 } from "../document-recall.js";
-import { getCurrentGeneration } from "../generation-storage.js";
+import { getCurrentGeneration, withGenerationLock } from "../generation-storage.js";
+import { lazyLoadGeneration } from "../document-lazy-load.js";
 
 export function registerRecallTool(server: McpServer, ctx: ServerContext): void {
   server.registerTool(
@@ -625,14 +627,53 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
         const attachmentConfigs = await ctx.configStore.getProjectAttachments(project.id);
         const docSourceAttachmentIds = getDocumentSourceAttachmentIds(attachmentConfigs);
         if (docSourceAttachmentIds.length > 0) {
+          // Chunk embeddings (and the lazy-load manifest) live under the
+          // project vault's embeddings directory
+          // (<gitRoot>/.mnemonic/embeddings/doc-source/<attachmentId>/) when a
+          // project vault exists, and under the main vault, namespaced by
+          // project ID
+          // (~/mnemonic-vault/embeddings/doc-source/<projectId>/<attachmentId>/)
+          // otherwise (global storage policy). Mirror sync.ts so the recall
+          // path resolves the same base directory.
+          const projectVault = cwd ? await ctx.vaultManager.getProjectVaultIfExists(cwd) : null;
+          const docSourceBase = projectVault
+            ? path.join(projectVault.storage.embeddingsDir, "doc-source")
+            : path.join(ctx.vaultManager.main.storage.embeddingsDir, "doc-source", project.id);
+
+          // Lazy-load any in-memory generation that was dropped by a server
+          // restart. Only the persisted manifest + chunk embeddings survive
+          // across processes; the generation object itself is rebuilt from git
+          // on demand and republished. Guarded by the per-project/attachment
+          // lock so concurrent recalls do not rebuild the same generation.
+          await Promise.all(
+            docSourceAttachmentIds.map(async (attachmentId) => {
+              if (getCurrentGeneration(project.id, attachmentId)) return;
+              const docConfig = attachmentConfigs.find(
+                (a) => a.attachmentId === attachmentId && a.kind === "document-source",
+              );
+              if (!docConfig || docConfig.kind !== "document-source") return;
+              await withGenerationLock(project.id, attachmentId, async () => {
+                if (getCurrentGeneration(project.id, attachmentId)) return;
+                await lazyLoadGeneration(
+                  project.id,
+                  attachmentId,
+                  docConfig,
+                  ctx,
+                  docSourceBase,
+                ).catch(() => null);
+              });
+            }),
+          );
+
           const candidates = collectDocumentChunkCandidates(
+            project.id,
             docSourceAttachmentIds,
             query,
             limit,
             queryVec,
           );
           for (const candidate of candidates) {
-            const generation = getCurrentGeneration(candidate.attachmentId);
+            const generation = getCurrentGeneration(project.id, candidate.attachmentId);
             const doc = generation?.documents.get(candidate.documentId);
             documentChunks.push({
               kind: "document-chunk",

@@ -44,8 +44,8 @@ function scoreDocumentChunk(query: string, chunk: RetrievalChunk, sourcePath: st
 }
 
 // Helper to get all chunks from a generation
-function getAllChunks(attachmentId: string): RetrievalChunk[] {
-  const generation = getCurrentGeneration(attachmentId);
+function getAllChunks(projectId: string, attachmentId: string): RetrievalChunk[] {
+  const generation = getCurrentGeneration(projectId, attachmentId);
   if (!generation) return [];
   return Array.from(generation.chunks.values());
 }
@@ -106,6 +106,7 @@ function computeChunkFusedScore(candidate: ChunkCandidate): number {
  *
  * Applies a per-document chunk cap and a global result limit.
  *
+ * @param projectId - The consuming project's ID (for project-scoped routing)
  * @param attachmentIds - List of attachment IDs to search
  * @param query - The recall query
  * @param limit - Maximum number of results to return
@@ -113,6 +114,7 @@ function computeChunkFusedScore(candidate: ChunkCandidate): number {
  * @returns Scored document-chunk results
  */
 export function collectDocumentChunkCandidates(
+  projectId: string,
   attachmentIds: string[],
   query: string,
   limit: number,
@@ -123,10 +125,10 @@ export function collectDocumentChunkCandidates(
   const candidates: ChunkCandidate[] = [];
 
   for (const attachmentId of attachmentIds) {
-    const generation = getCurrentGeneration(attachmentId);
+    const generation = getCurrentGeneration(projectId, attachmentId);
     if (!generation) continue;
 
-    const chunks = getAllChunks(attachmentId);
+    const chunks = getAllChunks(projectId, attachmentId);
     for (const chunk of chunks) {
       // Score using composite lexical matching over content, heading ancestry,
       // and source path. A document's early chunks may have weak bigram-only

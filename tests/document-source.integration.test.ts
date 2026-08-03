@@ -463,4 +463,68 @@ describe("document-source attachment integration", () => {
       await rm(env.base, { recursive: true, force: true });
     }
   }, 60000);
+
+  it("recall lazily rebuilds a generation after a simulated server restart", async () => {
+    const env = await setupDocSourceEnv();
+    const embedding = await startFakeEmbeddingServer();
+
+    // Session 1 indexes the document source. Sync persists the generation
+    // manifest + chunk embeddings to disk (only these survive a restart).
+    const session1 = await createPersistentMcpSession(env.mainVault, {
+      ollamaUrl: embedding.url,
+      disableGit: false,
+    });
+    try {
+      const cwd = env.consumer;
+      await session1.callTool("add_attachment", {
+        cwd,
+        localPath: env.docsource,
+        kind: "document-source",
+        root: ".",
+        include: ["**/*.md"],
+        acceptedMediaTypes: ["text/markdown"],
+      });
+      const sync = await session1.callTool("sync", { cwd });
+      expect(sync.text).toMatch(/doc-source:.*Indexed \d+ documents, \d+ chunks/);
+
+      // Recall works while the generation is still in memory.
+      const before = await session1.callTool("recall", {
+        cwd,
+        query: ZETA,
+        limit: 10,
+        scope: "all",
+      });
+      expect(asArr(before.structuredContent?.documentChunks).length).toBeGreaterThan(0);
+    } finally {
+      await session1.close();
+    }
+
+    // Session 2 is a fresh server process: the in-memory generation is gone,
+    // leaving only the persisted manifest + embeddings. Recall must lazy-load
+    // the generation from the manifest (rebuilding from git at the indexed
+    // commit) and still surface document chunks without an explicit re-sync.
+    const session2 = await createPersistentMcpSession(env.mainVault, {
+      ollamaUrl: embedding.url,
+      disableGit: false,
+    });
+    try {
+      const cwd = env.consumer;
+      const recall = await session2.callTool("recall", {
+        cwd,
+        query: ZETA,
+        limit: 10,
+        scope: "all",
+      });
+      const chunks = asArr(recall.structuredContent?.documentChunks);
+      expect(chunks.length).toBeGreaterThan(0);
+      const first = chunks[0] as Record<string, unknown>;
+      expect(first["retrievalHandle"]).toMatch(/^chunk:/);
+      // The lazily rebuilt generation preserves the indexed commit reference.
+      expect(first["indexedCommit"]).toBeTruthy();
+    } finally {
+      await session2.close();
+      await embedding.close();
+      await rm(env.base, { recursive: true, force: true });
+    }
+  }, 60000);
 });

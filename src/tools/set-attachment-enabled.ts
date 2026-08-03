@@ -14,6 +14,7 @@ import {
   type SetAttachmentEnabledResult,
 } from "../structured-content.js";
 import { invalidateActiveProjectCache } from "../cache.js";
+import { evictGeneration } from "../generation-storage.js";
 
 export function registerSetAttachmentEnabledTool(server: McpServer, ctx: ServerContext): void {
   server.registerTool(
@@ -116,6 +117,16 @@ export function registerSetAttachmentEnabledTool(server: McpServer, ctx: ServerC
       const updatedAttachments = currentAttachments.map((att, i) =>
         i === attachmentIndex ? { ...att, enabled, updatedAt: new Date().toISOString() } : att,
       );
+
+      // Disabling a document-source attachment invalidates its in-memory
+      // generation (it will no longer be recalled). Re-enabling rebuilds it via
+      // the normal sync path, so only evict on the disable transition.
+      if (!enabled) {
+        const attachment = currentAttachments[attachmentIndex];
+        if (attachment && attachment.kind === "document-source") {
+          evictGeneration(project.id, attachment.attachmentId);
+        }
+      }
 
       await ctx.configStore.setProjectAttachments(project.id, updatedAttachments);
       ctx.vaultManager.clearAttachmentCaches();

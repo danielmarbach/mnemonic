@@ -1,4 +1,5 @@
 import type { DocumentGeneration } from "./retrieval-document.js";
+import { attempt } from "./error-utils.js";
 
 interface AttachmentGenerationState {
   current: DocumentGeneration | null;
@@ -9,8 +10,13 @@ interface AttachmentGenerationState {
 
 const stores = new Map<string, AttachmentGenerationState>();
 
-function getOrCreateState(attachmentId: string): AttachmentGenerationState {
-  let state = stores.get(attachmentId);
+function stateKey(projectId: string, attachmentId: string): string {
+  return `${projectId}::${attachmentId}`;
+}
+
+function getOrCreateState(projectId: string, attachmentId: string): AttachmentGenerationState {
+  const key = stateKey(projectId, attachmentId);
+  let state = stores.get(key);
   if (!state) {
     state = {
       current: null,
@@ -18,18 +24,25 @@ function getOrCreateState(attachmentId: string): AttachmentGenerationState {
       generations: new Map(),
       pinned: new Set(),
     };
-    stores.set(attachmentId, state);
+    stores.set(key, state);
   }
   return state;
 }
 
-export function getCurrentGeneration(attachmentId: string): DocumentGeneration | null {
-  const state = stores.get(attachmentId);
+export function getCurrentGeneration(
+  projectId: string,
+  attachmentId: string,
+): DocumentGeneration | null {
+  const state = stores.get(stateKey(projectId, attachmentId));
   return state?.current ?? null;
 }
 
-export function publishGeneration(attachmentId: string, generation: DocumentGeneration): void {
-  const state = getOrCreateState(attachmentId);
+export function publishGeneration(
+  projectId: string,
+  attachmentId: string,
+  generation: DocumentGeneration,
+): void {
+  const state = getOrCreateState(projectId, attachmentId);
 
   // Store the generation
   const genId = generation.manifest.generationId;
@@ -52,21 +65,30 @@ export function publishGeneration(attachmentId: string, generation: DocumentGene
   }
 }
 
+export function evictGeneration(projectId: string, attachmentId: string): void {
+  stores.delete(stateKey(projectId, attachmentId));
+}
+
 export function getGeneration(
+  projectId: string,
   attachmentId: string,
   generationId: string,
 ): DocumentGeneration | null {
-  const state = stores.get(attachmentId);
+  const state = stores.get(stateKey(projectId, attachmentId));
   return state?.generations.get(generationId) ?? null;
 }
 
-export function pinGeneration(attachmentId: string, generationId: string): void {
-  const state = getOrCreateState(attachmentId);
+export function pinGeneration(projectId: string, attachmentId: string, generationId: string): void {
+  const state = getOrCreateState(projectId, attachmentId);
   state.pinned.add(generationId);
 }
 
-export function unpinGeneration(attachmentId: string, generationId: string): void {
-  const state = stores.get(attachmentId);
+export function unpinGeneration(
+  projectId: string,
+  attachmentId: string,
+  generationId: string,
+): void {
+  const state = stores.get(stateKey(projectId, attachmentId));
   if (state) {
     state.pinned.delete(generationId);
   }
@@ -74,4 +96,40 @@ export function unpinGeneration(attachmentId: string, generationId: string): voi
 
 export function clearAllGenerations(): void {
   stores.clear();
+  inflight.clear();
+}
+
+/**
+ * Single-flight coordination for a given {projectId, attachmentId}.
+ *
+ * Prevents concurrent sync and lazy-load from racing on the same attachment by
+ * serializing work: if an operation is already in flight for the key, the
+ * caller waits for it to settle before proceeding. Callers should re-check
+ * `getCurrentGeneration` inside `fn` and short-circuit if the generation was
+ * already produced by a sibling operation.
+ */
+const inflight = new Map<string, Promise<unknown>>();
+
+export async function withGenerationLock<T>(
+  projectId: string,
+  attachmentId: string,
+  fn: () => Promise<T>,
+): Promise<T> {
+  const key = stateKey(projectId, attachmentId);
+  const existing = inflight.get(key);
+  if (existing) {
+    // A sibling operation is in flight for this key. Wait for it to settle so
+    // the caller can re-evaluate whether work is still needed (e.g. it may now
+    // find the generation already published and return early).
+    await existing.catch(() => {});
+  }
+  const promise = fn();
+  inflight.set(key, promise);
+  const result = await attempt("generation-lock:fn", () => promise);
+  // Only delete if still ours; a subsequent caller may have replaced it.
+  if (inflight.get(key) === promise) {
+    inflight.delete(key);
+  }
+  if (!result.ok) throw result.error;
+  return result.value;
 }

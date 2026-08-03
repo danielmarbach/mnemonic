@@ -5,7 +5,17 @@ import { expandHomePath } from "./paths.js";
 import { getExtractor } from "./document-extractor.js";
 import { markdownChunker } from "./markdown-chunker.js";
 import { buildGenerationFromFiles } from "./document-source-index.js";
-import { getCurrentGeneration } from "./generation-storage.js";
+import {
+  getCurrentGeneration,
+  publishGeneration,
+  withGenerationLock,
+} from "./generation-storage.js";
+import {
+  writeManifest,
+  computeAttachmentConfigHash,
+  MANIFEST_SCHEMA_VERSION,
+  type PersistedManifest,
+} from "./document-manifest.js";
 import { matchAnyGlob } from "./glob-match.js";
 import { DOCUMENT_SOURCE_LIMITS } from "./retrieval-document.js";
 import type { DocumentGeneration, RetrievalChunk } from "./retrieval-document.js";
@@ -285,12 +295,16 @@ function buildEmbeddingSummary(embedded: number, failed: number): string {
 
 /**
  * Sync a document-source attachment: fetch the remote commit, enumerate blobs,
- * build a generation, embed chunk vectors (fail-soft), and publish it.
+ * build a generation, embed chunk vectors (fail-soft), publish it, and persist
+ * the manifest alongside the on-disk chunk embeddings. Runs inside a
+ * single-flight lock keyed by {projectId, attachmentId} so a concurrent
+ * lazy-load (or a second sync) cannot race this publish.
  */
 export async function syncDocumentSource(
   config: DocumentSourceAttachmentConfig,
   ctx: ServerContext,
   docSourceBase: string | undefined,
+  projectId: string,
 ): Promise<DocumentSyncResult> {
   const resolvedLocalPath = path.resolve(expandHomePath(config.localPath));
 
@@ -353,159 +367,203 @@ export async function syncDocumentSource(
       message: `No extractor registered for media type '${mediaType}'`,
     };
   }
-  const currentGen = getCurrentGeneration(config.attachmentId) ?? undefined;
-  // Capture the pre-rebuild schema version before the `isGenerationCurrent`
-  // type guard narrows `currentGen`. Used later to decide whether the on-disk
-  // embedding naming scheme might have changed (and thus whether the more
-  // expensive rename-cleanup pass should run). `currentGen` is never reassigned.
-  const previousSchemaVersion = currentGen?.manifest.indexSchemaVersion;
-  if (isGenerationCurrent(currentGen, indexedCommit, extractor, markdownChunker)) {
-    return {
-      attachmentId: config.attachmentId,
-      projectSlug: config.projectSlug,
-      indexedCommit,
-      generationId: currentGen.manifest.generationId,
-      documentCount: currentGen.manifest.documentCount,
-      chunkCount: currentGen.manifest.chunkCount,
-      skippedFiles: [],
-      errors: [],
-      status: "unchanged",
-      message: `No changes on '${indexedCommit.substring(0, 8)}'.`,
-    };
-  }
 
-  // Enumerate blobs from the commit
-  const enumerateResult = await attempt("sync:doc-source-enumerate", async () => {
-    const git = simpleGit(resolvedLocalPath);
-    // List all tracked files at the commit
-    const lsTreeResult = await git.raw(["ls-tree", "-r", "--name-only", indexedCommit]);
-    const allFiles = lsTreeResult.trim().split("\n").filter(Boolean);
-
-    // Apply include/exclude patterns (path-aware globs relative to root)
-    const root = config.root || ".";
-    const includePatterns = config.include.length > 0 ? config.include : ["**/*.md"];
-    const excludePatterns = config.exclude || [];
-    const rootPrefix = root === "." ? "" : root + "/";
-
-    const matchedFiles = allFiles.filter((file) => {
-      if (rootPrefix && !file.startsWith(rootPrefix)) return false;
-      const rel = rootPrefix ? file.slice(rootPrefix.length) : file;
-      if (!matchAnyGlob(includePatterns, rel)) return false;
-      if (matchAnyGlob(excludePatterns, rel)) return false;
-      return true;
-    });
-
-    // Read blob contents
-    const files: Array<{ path: string; bytes: Uint8Array }> = [];
-    for (const filePath of matchedFiles) {
-      const showResult = await git.raw(["show", `${indexedCommit}:${filePath}`]);
-      const bytes = new TextEncoder().encode(showResult);
-      files.push({ path: filePath, bytes });
+  // Build, embed, publish, and persist under the single-flight lock. This
+  // coordinates sync against a concurrent lazy-load (or a second sync) on the
+  // same {projectId, attachmentId} so only one writer rebuilds/publishes.
+  return withGenerationLock(projectId, config.attachmentId, async () => {
+    const currentGen = getCurrentGeneration(projectId, config.attachmentId) ?? undefined;
+    // Capture the pre-rebuild schema version before the `isGenerationCurrent`
+    // type guard narrows `currentGen`. Used later to decide whether the on-disk
+    // embedding naming scheme might have changed (and thus whether the more
+    // expensive rename-cleanup pass should run). `currentGen` is never reassigned.
+    const previousSchemaVersion = currentGen?.manifest.indexSchemaVersion;
+    if (isGenerationCurrent(currentGen, indexedCommit, extractor, markdownChunker)) {
+      return {
+        attachmentId: config.attachmentId,
+        projectSlug: config.projectSlug,
+        indexedCommit,
+        generationId: currentGen.manifest.generationId,
+        documentCount: currentGen.manifest.documentCount,
+        chunkCount: currentGen.manifest.chunkCount,
+        skippedFiles: [],
+        errors: [],
+        status: "unchanged",
+        message: `No changes on '${indexedCommit.substring(0, 8)}'.`,
+      };
     }
 
-    return files;
-  });
+    // Enumerate blobs from the commit
+    const enumerateResult = await attempt("sync:doc-source-enumerate", async () => {
+      const git = simpleGit(resolvedLocalPath);
+      // List all tracked files at the commit
+      const lsTreeResult = await git.raw(["ls-tree", "-r", "--name-only", indexedCommit]);
+      const allFiles = lsTreeResult.trim().split("\n").filter(Boolean);
 
-  if (!enumerateResult.ok) {
-    return {
-      attachmentId: config.attachmentId,
-      projectSlug: config.projectSlug,
+      // Apply include/exclude patterns (path-aware globs relative to root)
+      const root = config.root || ".";
+      const includePatterns = config.include.length > 0 ? config.include : ["**/*.md"];
+      const excludePatterns = config.exclude || [];
+      const rootPrefix = root === "." ? "" : root + "/";
+
+      const matchedFiles = allFiles.filter((file) => {
+        if (rootPrefix && !file.startsWith(rootPrefix)) return false;
+        const rel = rootPrefix ? file.slice(rootPrefix.length) : file;
+        if (!matchAnyGlob(includePatterns, rel)) return false;
+        if (matchAnyGlob(excludePatterns, rel)) return false;
+        return true;
+      });
+
+      // Read blob contents
+      const files: Array<{ path: string; bytes: Uint8Array }> = [];
+      for (const filePath of matchedFiles) {
+        const showResult = await git.raw(["show", `${indexedCommit}:${filePath}`]);
+        const bytes = new TextEncoder().encode(showResult);
+        files.push({ path: filePath, bytes });
+      }
+
+      return files;
+    });
+
+    if (!enumerateResult.ok) {
+      return {
+        attachmentId: config.attachmentId,
+        projectSlug: config.projectSlug,
+        indexedCommit,
+        generationId: "",
+        documentCount: 0,
+        chunkCount: 0,
+        skippedFiles: [],
+        errors: [`enumerate-failed: ${getErrorMessage(enumerateResult.error)}`],
+        status: "failed",
+        message: `Enumerate failed: ${getErrorMessage(enumerateResult.error)}`,
+      };
+    }
+
+    const files = enumerateResult.value;
+
+    // Build the generation (returns a complete, unpublished generation).
+    const generation = buildGenerationFromFiles(
+      config.attachmentId,
+      files,
+      config.acceptedMediaTypes,
+      extractor,
+      markdownChunker,
       indexedCommit,
-      generationId: "",
-      documentCount: 0,
-      chunkCount: 0,
-      skippedFiles: [],
-      errors: [`enumerate-failed: ${getErrorMessage(enumerateResult.error)}`],
-      status: "failed",
-      message: `Enumerate failed: ${getErrorMessage(enumerateResult.error)}`,
-    };
-  }
+    );
 
-  const files = enumerateResult.value;
-
-  // Build the generation
-  const buildResult = buildGenerationFromFiles(
-    config.attachmentId,
-    files,
-    config.acceptedMediaTypes,
-    extractor,
-    markdownChunker,
-    indexedCommit,
-  );
-
-  // Override the embedding-compatibility identity so embedding-model changes
-  // invalidate the generation. `buildGenerationFromFiles` stays pure (it cannot
-  // import the embedding provider), so this happens here, before the generation
-  // is consumed.
-  const generation = getCurrentGeneration(config.attachmentId);
-  if (generation) {
+    // Override the embedding-compatibility identity so embedding-model changes
+    // invalidate the generation. `buildGenerationFromFiles` stays pure (it
+    // cannot import the embedding provider), so this happens here, before the
+    // generation is consumed.
     generation.manifest.embeddingCompatibilityIdentity = buildEmbeddingCompatibilityIdentity(
       extractor,
       markdownChunker,
     );
-  }
 
-  // Embed chunk vectors (fail-soft). When the embedding provider is unavailable
-  // or the document-source embeddings base directory cannot be resolved, the
-  // generation still publishes with lexical-only coverage — the spec's line-41
-  // contract. `docSourceBase` is the directory that directly contains per-
-  // attachment subdirectories; the caller (sync.ts) constructs it, including
-  // the `doc-source` segment and any project-ID namespacing for the main-vault
-  // fallback when the project vault is missing.
-  if (generation && docSourceBase) {
-    const chunkStorage = new ChunkEmbeddingStorage(
-      path.join(docSourceBase, config.attachmentId),
-      config.attachmentId,
-    );
-    const embedStep = await attempt("sync:doc-source-embed", async () => {
-      await chunkStorage.init();
-      const sourcePaths = Array.from(generation.documents.values(), (d) => d.sourcePath);
-      const lastModByPath = await computePerPathLastMod(
-        resolvedLocalPath,
-        indexedCommit,
-        sourcePaths,
-      );
-      await embedGenerationChunks(
-        generation,
-        ctx,
+    // Embed chunk vectors (fail-soft). When the embedding provider is unavailable
+    // or the document-source embeddings base directory cannot be resolved, the
+    // generation still publishes with lexical-only coverage — the spec's line-41
+    // contract. `docSourceBase` is the directory that directly contains per-
+    // attachment subdirectories; the caller (sync.ts) constructs it, including
+    // the `doc-source` segment and any project-ID namespacing for the main-vault
+    // fallback when the project vault is missing.
+    if (docSourceBase) {
+      const chunkStorage = new ChunkEmbeddingStorage(
+        path.join(docSourceBase, config.attachmentId),
         config.attachmentId,
-        chunkStorage,
-        lastModByPath,
       );
-      // Only pay for rename-cleanup when the on-disk naming scheme actually
-      // changed (previous manifest's schema version differs from this one);
-      // stale-chunkId removal still runs every sync.
-      const schemaChanged = previousSchemaVersion !== generation.manifest.indexSchemaVersion;
-      await sweepStaleChunkEmbeddings(
-        chunkStorage,
-        new Set(generation.chunks.keys()),
-        schemaChanged,
-      );
-    });
-    if (!embedStep.ok) {
-      generation.manifest.embeddingFailures = [
-        { chunkId: "", reason: `embed-step-failed: ${getErrorMessage(embedStep.error)}` },
-      ];
+      const embedStep = await attempt("sync:doc-source-embed", async () => {
+        await chunkStorage.init();
+        const sourcePaths = Array.from(generation.documents.values(), (d) => d.sourcePath);
+        const lastModByPath = await computePerPathLastMod(
+          resolvedLocalPath,
+          indexedCommit,
+          sourcePaths,
+        );
+        await embedGenerationChunks(
+          generation,
+          ctx,
+          config.attachmentId,
+          chunkStorage,
+          lastModByPath,
+        );
+        // Only pay for rename-cleanup when the on-disk naming scheme actually
+        // changed (previous manifest's schema version differs from this one);
+        // stale-chunkId removal still runs every sync.
+        const schemaChanged = previousSchemaVersion !== generation.manifest.indexSchemaVersion;
+        await sweepStaleChunkEmbeddings(
+          chunkStorage,
+          new Set(generation.chunks.keys()),
+          schemaChanged,
+        );
+      });
+      if (!embedStep.ok) {
+        generation.manifest.embeddingFailures = [
+          { chunkId: "", reason: `embed-step-failed: ${getErrorMessage(embedStep.error)}` },
+        ];
+      }
     }
-  }
 
-  const embeddingSummary = generation
-    ? buildEmbeddingSummary(
-        generation.manifest.embeddedChunkCount,
-        generation.manifest.embeddingFailures.length,
-      )
-    : "";
+    // Publish the generation with the project-scoped API, then persist the
+    // manifest alongside the on-disk chunk embeddings so a later lazy-load can
+    // rebuild the generation from git on demand.
+    publishGeneration(projectId, config.attachmentId, generation);
 
-  return {
-    attachmentId: config.attachmentId,
-    projectSlug: config.projectSlug,
-    indexedCommit,
-    generationId: buildResult.generationId,
-    documentCount: buildResult.documentCount,
-    chunkCount: buildResult.chunkCount,
-    skippedFiles: buildResult.skippedFiles,
-    errors: [],
-    status: "indexed",
-    message: `Indexed ${buildResult.documentCount} documents, ${buildResult.chunkCount} chunks from ${indexedCommit.substring(0, 8)}${embeddingSummary}.`,
-  };
+    if (docSourceBase) {
+      const manifest: PersistedManifest = {
+        manifestSchemaVersion: MANIFEST_SCHEMA_VERSION,
+        projectId,
+        attachmentId: config.attachmentId,
+        generationId: generation.manifest.generationId,
+        indexedCommit,
+        indexSchemaVersion: generation.manifest.indexSchemaVersion,
+        extractorId: generation.manifest.extractorId,
+        extractorVersion: generation.manifest.extractorVersion,
+        extractorOptionsHash: generation.manifest.extractorOptionsHash,
+        chunkerId: generation.manifest.chunkerId,
+        chunkerVersion: generation.manifest.chunkerVersion,
+        chunkerOptionsHash: generation.manifest.chunkerOptionsHash,
+        projectionSchemaVersion: generation.manifest.projectionSchemaVersion,
+        embeddingCompatibilityIdentity: generation.manifest.embeddingCompatibilityIdentity,
+        attachmentConfigHash: await computeAttachmentConfigHash(config),
+        sourceMediaTypeCounts: generation.manifest.sourceMediaTypeCounts,
+        documentCount: generation.manifest.documentCount,
+        chunkCount: generation.manifest.chunkCount,
+        embeddedChunkCount: generation.manifest.embeddedChunkCount,
+        builtAt: generation.manifest.builtAt,
+      };
+      const manifestDir = path.join(docSourceBase, config.attachmentId);
+      const manifestWriteResult = await attempt("sync:write-manifest", () =>
+        writeManifest(manifestDir, manifest),
+      );
+      if (!manifestWriteResult.ok) {
+        // Fail-soft: the generation is already published in-memory and
+        // embeddings are persisted. The manifest is only needed for
+        // cross-restart lazy-load, so a write failure should not fail the sync.
+        generation.manifest.embeddingFailures.push({
+          chunkId: "",
+          reason: `manifest-write-failed: ${getErrorMessage(manifestWriteResult.error)}`,
+        });
+      }
+    }
+
+    const embeddingSummary = buildEmbeddingSummary(
+      generation.manifest.embeddedChunkCount,
+      generation.manifest.embeddingFailures.length,
+    );
+
+    return {
+      attachmentId: config.attachmentId,
+      projectSlug: config.projectSlug,
+      indexedCommit,
+      generationId: generation.manifest.generationId,
+      documentCount: generation.manifest.documentCount,
+      chunkCount: generation.manifest.chunkCount,
+      skippedFiles: generation.manifest.skippedFiles,
+      errors: [],
+      status: "indexed",
+      message: `Indexed ${generation.manifest.documentCount} documents, ${generation.manifest.chunkCount} chunks from ${indexedCommit.substring(0, 8)}${embeddingSummary}.`,
+    };
+  });
 }

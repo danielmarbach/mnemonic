@@ -6,8 +6,7 @@ import {
 import "../src/init-extractors.js";
 import { markdownExtractor } from "../src/markdown-extractor.js";
 import { markdownChunker } from "../src/markdown-chunker.js";
-import { clearAllGenerations } from "../src/generation-storage.js";
-import { getCurrentGeneration } from "../src/generation-storage.js";
+import { clearAllGenerations, getCurrentGeneration } from "../src/generation-storage.js";
 
 function makeFile(path: string, content: string): { path: string; bytes: Uint8Array } {
   return { path, bytes: new TextEncoder().encode(content) };
@@ -29,15 +28,15 @@ describe("buildGenerationFromFiles", () => {
       "abc123",
     );
 
-    expect(result.documentCount).toBe(1);
-    expect(result.chunkCount).toBeGreaterThanOrEqual(1);
-    expect(result.skippedFiles).toEqual([]);
-    expect(result.generationId).toContain("att-1::gen::");
+    expect(result.manifest.documentCount).toBe(1);
+    expect(result.manifest.chunkCount).toBeGreaterThanOrEqual(1);
+    expect(result.manifest.skippedFiles).toEqual([]);
+    expect(result.manifest.generationId).toContain("att-1::gen::");
   });
 
-  it("publishes the generation so it can be retrieved", () => {
+  it("returns a complete generation with populated documents and chunks maps", () => {
     const files = [makeFile("docs/test.md", "# Test\n\nContent here.")];
-    buildGenerationFromFiles(
+    const generation = buildGenerationFromFiles(
       "att-2",
       files,
       ["text/markdown"],
@@ -46,10 +45,27 @@ describe("buildGenerationFromFiles", () => {
       "def456",
     );
 
-    const current = getCurrentGeneration("att-2");
-    expect(current).not.toBeNull();
-    expect(current?.manifest.documentCount).toBe(1);
-    expect(current?.manifest.indexedCommit).toBe("def456");
+    expect(generation.documents.size).toBe(1);
+    expect(generation.chunks.size).toBeGreaterThanOrEqual(1);
+    expect(generation.chunkEmbeddings.size).toBe(0);
+    const doc = generation.documents.values().next().value;
+    expect(doc?.sourcePath).toBe("docs/test.md");
+    expect(generation.manifest.attachmentId).toBe("att-2");
+    expect(generation.manifest.indexedCommit).toBe("def456");
+  });
+
+  it("does not publish the generation", () => {
+    buildGenerationFromFiles(
+      "att-3",
+      [makeFile("docs/test.md", "# Test\n\nContent.")],
+      ["text/markdown"],
+      markdownExtractor,
+      markdownChunker,
+      "def456",
+    );
+    // The generation is returned unpublished — nothing should be retrievable
+    // via the project-scoped storage.
+    expect(getCurrentGeneration("proj-1", "att-3")).toBeNull();
   });
 
   it("skips files that don't match the extractor detection", () => {
@@ -66,10 +82,10 @@ describe("buildGenerationFromFiles", () => {
       "abc123",
     );
 
-    expect(result.documentCount).toBe(1);
-    expect(result.skippedFiles).toHaveLength(1);
-    expect(result.skippedFiles[0].path).toBe("docs/data.json");
-    expect(result.skippedFiles[0].reason).toContain("detection failed");
+    expect(result.manifest.documentCount).toBe(1);
+    expect(result.manifest.skippedFiles).toHaveLength(1);
+    expect(result.manifest.skippedFiles[0].path).toBe("docs/data.json");
+    expect(result.manifest.skippedFiles[0].reason).toContain("detection failed");
   });
 
   it("skips oversized files exceeding maxBytesPerFile", () => {
@@ -85,9 +101,9 @@ describe("buildGenerationFromFiles", () => {
       "abc123",
     );
 
-    expect(result.documentCount).toBe(0);
-    expect(result.skippedFiles).toHaveLength(1);
-    expect(result.skippedFiles[0].reason).toContain("maxBytesPerFile");
+    expect(result.manifest.documentCount).toBe(0);
+    expect(result.manifest.skippedFiles).toHaveLength(1);
+    expect(result.manifest.skippedFiles[0].reason).toContain("maxBytesPerFile");
   });
 
   it("skips files exceeding maxTrackedFiles", () => {
@@ -104,9 +120,9 @@ describe("buildGenerationFromFiles", () => {
       "abc123",
     );
 
-    expect(result.documentCount).toBe(5000);
-    expect(result.skippedFiles).toHaveLength(1);
-    expect(result.skippedFiles[0].reason).toContain("maxTrackedFiles");
+    expect(result.manifest.documentCount).toBe(5000);
+    expect(result.manifest.skippedFiles).toHaveLength(1);
+    expect(result.manifest.skippedFiles[0].reason).toContain("maxTrackedFiles");
   });
 
   it("handles files with YAML frontmatter", () => {
@@ -125,8 +141,8 @@ describe("buildGenerationFromFiles", () => {
       "abc123",
     );
 
-    expect(result.documentCount).toBe(1);
-    expect(result.chunkCount).toBeGreaterThanOrEqual(1);
+    expect(result.manifest.documentCount).toBe(1);
+    expect(result.manifest.chunkCount).toBeGreaterThanOrEqual(1);
   });
 
   it("handles multiple markdown files", () => {
@@ -144,8 +160,8 @@ describe("buildGenerationFromFiles", () => {
       "abc123",
     );
 
-    expect(result.documentCount).toBe(3);
-    expect(result.chunkCount).toBeGreaterThanOrEqual(3);
+    expect(result.manifest.documentCount).toBe(3);
+    expect(result.manifest.chunkCount).toBeGreaterThanOrEqual(3);
   });
 
   it("generates a manifest with correct counts", () => {
@@ -159,14 +175,13 @@ describe("buildGenerationFromFiles", () => {
       "abc123",
     );
 
-    const current = getCurrentGeneration("att-1");
-    expect(current?.manifest.documentCount).toBe(1);
-    expect(current?.manifest.chunkCount).toBe(result.chunkCount);
-    expect(current?.manifest.attachmentId).toBe("att-1");
-    expect(current?.manifest.indexedCommit).toBe("abc123");
-    expect(current?.manifest.extractorId).toBe("markdown");
-    expect(current?.manifest.chunkerId).toBe("markdown-heading");
-    expect(current?.manifest.sourceMediaTypeCounts["text/markdown"]).toBe(1);
+    expect(result.manifest.documentCount).toBe(1);
+    expect(result.manifest.chunkCount).toBe(result.chunks.size);
+    expect(result.manifest.attachmentId).toBe("att-1");
+    expect(result.manifest.indexedCommit).toBe("abc123");
+    expect(result.manifest.extractorId).toBe("markdown");
+    expect(result.manifest.chunkerId).toBe("markdown-heading");
+    expect(result.manifest.sourceMediaTypeCounts["text/markdown"]).toBe(1);
   });
 
   it("handles empty file list", () => {
@@ -179,8 +194,8 @@ describe("buildGenerationFromFiles", () => {
       "abc123",
     );
 
-    expect(result.documentCount).toBe(0);
-    expect(result.chunkCount).toBe(0);
+    expect(result.manifest.documentCount).toBe(0);
+    expect(result.manifest.chunkCount).toBe(0);
   });
 });
 

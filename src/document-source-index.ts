@@ -9,18 +9,12 @@ import type {
 } from "./retrieval-document.js";
 import { DOCUMENT_SOURCE_LIMITS } from "./retrieval-document.js";
 import { deriveDocumentId } from "./retrieval-document.js";
-import { publishGeneration } from "./generation-storage.js";
-
-// Simple build result for document-sync.ts compatibility
-export interface SimpleBuildResult {
-  generationId: string;
-  documentCount: number;
-  chunkCount: number;
-  skippedFiles: Array<{ path: string; reason: string }>;
-}
 
 /**
  * Build a generation with positional parameters (used by document-sync.ts).
+ * Returns a complete, unpublished `DocumentGeneration`; the caller is
+ * responsible for publishing it (and persisting any manifest) once embedding
+ * and reconciliation complete.
  */
 export function buildGenerationFromFiles(
   attachmentId: string,
@@ -29,7 +23,7 @@ export function buildGenerationFromFiles(
   extractor: DocumentExtractor,
   chunker: DocumentChunker,
   indexedCommit: string,
-): SimpleBuildResult {
+): DocumentGeneration {
   const skipped: Array<{ path: string; reason: string }> = [];
   const documents = new Map<string, RetrievalDocument>();
   const chunks: RetrievalChunk[] = [];
@@ -126,14 +120,7 @@ export function buildGenerationFromFiles(
     extractedText,
   };
 
-  publishGeneration(attachmentId, generation);
-
-  return {
-    generationId,
-    documentCount: documents.size,
-    chunkCount: chunkMap.size,
-    skippedFiles: skipped,
-  };
+  return generation;
 }
 
 // Re-export for convenience

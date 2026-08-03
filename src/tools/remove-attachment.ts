@@ -19,6 +19,7 @@ import {
 import { invalidateActiveProjectCache } from "../cache.js";
 import { attempt } from "../error-utils.js";
 import { expandHomePath } from "../paths.js";
+import { evictGeneration } from "../generation-storage.js";
 
 export function registerRemoveAttachmentTool(server: McpServer, ctx: ServerContext): void {
   server.registerTool(
@@ -176,6 +177,8 @@ export function registerRemoveAttachmentTool(server: McpServer, ctx: ServerConte
             fs.rm(dir, { recursive: true, force: true }),
           );
         }
+        // Drop any in-memory generation so it is not served after removal.
+        evictGeneration(project.id, removed.attachmentId);
       }
 
       const updatedAttachments = currentAttachments.filter((_, i) => i !== attachmentIndex);
