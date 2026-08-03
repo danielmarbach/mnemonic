@@ -6,9 +6,14 @@ The format is loosely based on Keep a Changelog and uses semver-style version he
 
 ## [Unreleased]
 
+### Added
+
+- Document-source chunks are now available in recall after an MCP server restart without manually running `sync` first. A small manifest persisted during sync lets the generation be lazily rebuilt from git on the first recall or `get` that needs it — all local I/O, no network fetch.
+
 ### Changed
 
 - Document-source attachments now store chunk embeddings in the main vault (namespaced by project ID) when the project has no `.mnemonic/` directory, so projects with global storage policy get full semantic retrieval instead of falling back to lexical-only. Previously, embeddings were silently skipped when the project vault didn't exist.
+- Removing or disabling a document-source attachment now immediately clears its in-memory index, so recall no longer returns stale chunks from a detached or disabled source.
 
 ### Fixed
 
