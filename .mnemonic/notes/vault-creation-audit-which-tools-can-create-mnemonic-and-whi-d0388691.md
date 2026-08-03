@@ -8,11 +8,13 @@ tags:
   - testing
 lifecycle: permanent
 createdAt: '2026-03-12T15:41:29.294Z'
-updatedAt: '2026-03-14T00:24:21.751Z'
+updatedAt: '2026-08-03T09:57:46.884Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
   - id: project-memory-policy-defaults-storage-location-f563f634
+    type: related-to
+  - id: document-source-embeddings-for-global-policy-projects-main-v-ff2954f1
     type: related-to
 memoryVersion: 1
 ---
