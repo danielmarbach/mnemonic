@@ -10,13 +10,15 @@ tags:
   - document-source
 lifecycle: permanent
 createdAt: '2026-08-03T10:42:54.827Z'
-updatedAt: '2026-08-03T10:44:07.153Z'
+updatedAt: '2026-08-03T10:44:54.312Z'
 role: research
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
   - id: mnemonic-key-design-decisions-3f2a6273
+    type: related-to
+  - id: canonical-design-bounded-rrf-hybrid-recall-172a96ab
     type: related-to
 memoryVersion: 1
 ---

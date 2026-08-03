@@ -10,7 +10,7 @@ tags:
   - retrieval
 lifecycle: permanent
 createdAt: '2026-07-20T16:48:31.449Z'
-updatedAt: '2026-07-20T16:48:31.449Z'
+updatedAt: '2026-08-03T10:44:54.312Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
@@ -22,6 +22,8 @@ relatedTo:
     type: related-to
   - id: mnemonic-key-design-decisions-3f2a6273
     type: example-of
+  - id: duckdb-as-a-derived-retrieval-index-evaluation-and-recommend-6c4c32b9
+    type: related-to
 memoryVersion: 1
 ---
 Supersede fragmented RRF and hybrid-recall notes with the current implemented design and its product constraints.
