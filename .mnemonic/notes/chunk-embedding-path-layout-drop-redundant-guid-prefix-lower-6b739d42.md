@@ -9,7 +9,7 @@ tags:
   - embeddings
 lifecycle: permanent
 createdAt: '2026-08-01T22:39:23.145Z'
-updatedAt: '2026-08-02T06:16:01.222Z'
+updatedAt: '2026-08-03T15:21:34.929Z'
 role: decision
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -18,6 +18,8 @@ relatedTo:
   - id: plan-deliver-document-source-chunk-semantic-retrieval-embedd-dba90b71
     type: derives-from
   - id: document-source-chunk-embeddings-use-xxh128-for-filenames-an-e3e988b8
+    type: derives-from
+  - id: flatten-doc-source-embeddings-path-drop-redundant-projectid--c8c5824f
     type: derives-from
 memoryVersion: 1
 ---
