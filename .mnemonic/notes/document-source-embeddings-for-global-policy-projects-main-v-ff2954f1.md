@@ -12,7 +12,7 @@ tags:
   - decision
 lifecycle: permanent
 createdAt: '2026-08-03T09:57:33.038Z'
-updatedAt: '2026-08-03T10:08:13.894Z'
+updatedAt: '2026-08-03T15:21:30.680Z'
 role: decision
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -22,6 +22,8 @@ relatedTo:
     type: related-to
   - id: review-lazy-document-generation-loading-needs-concurrency-an-b49cd0cd
     type: follows
+  - id: flatten-doc-source-embeddings-path-drop-redundant-projectid--c8c5824f
+    type: supersedes
 memoryVersion: 1
 ---
 # Document-source embeddings for global-policy projects: main-vault fallback and lazy generation loading
