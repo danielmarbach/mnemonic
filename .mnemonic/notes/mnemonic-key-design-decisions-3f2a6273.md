@@ -7,7 +7,7 @@ tags:
   - rationale
 lifecycle: permanent
 createdAt: '2026-03-07T17:59:12.124Z'
-updatedAt: '2026-05-12T20:17:05.260Z'
+updatedAt: '2026-08-03T10:44:07.153Z'
 role: summary
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
@@ -41,6 +41,8 @@ relatedTo:
   - id: multi-vault-architecture-sub-vault-support-and-label-convent-d5e5840d
     type: related-to
   - id: protected-branch-policy-consistency-rollout-consolidated-d9892181
+    type: related-to
+  - id: duckdb-as-a-derived-retrieval-index-evaluation-and-recommend-6c4c32b9
     type: related-to
 memoryVersion: 1
 ---
