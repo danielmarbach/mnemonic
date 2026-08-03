@@ -4,6 +4,12 @@ All notable changes to `mnemonic` will be documented in this file.
 
 The format is loosely based on Keep a Changelog and uses semver-style version headings.
 
+## [Unreleased]
+
+### Fixed
+
+- `get` no longer fails with a structured-content schema error when fetching a memory that has a relationship to a memory stored in a different vault. Those relationships carry an internal cross-vault location that is now kept out of the typed response, so fetching them returns results instead of an MCP validation error.
+
 ## [0.41.0] - 2026-08-02
 
 ### Changed

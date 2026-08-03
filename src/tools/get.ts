@@ -242,6 +242,14 @@ export function registerGetTool(server: McpServer, ctx: ServerContext): void {
           );
         }
 
+        // Project relatedTo to the wire shape { id, type }. Persisted relations
+        // carry vaultPath for cross-vault resolution, but the structured-content
+        // schema (and the path-leak-avoidance abstraction used by vault labels)
+        // does not expose raw filesystem paths. Passing note.relatedTo verbatim
+        // leaks vaultPath, which fails the additionalProperties:false validation
+        // emitted by Zod v4 -> JSON Schema for both `notes` and the `items`
+        // discriminated union (oneOf), surfacing as an MCP -32602 error.
+        const relatedTo = note.relatedTo?.map((rel) => ({ id: rel.id, type: rel.type }));
         const noteResult = {
           id: note.id,
           title: note.title,
@@ -251,7 +259,7 @@ export function registerGetTool(server: McpServer, ctx: ServerContext): void {
           lifecycle: note.lifecycle,
           role: note.role,
           alwaysLoad: note.alwaysLoad,
-          relatedTo: note.relatedTo,
+          relatedTo,
           createdAt: note.createdAt,
           updatedAt: note.updatedAt,
           vault: storageLabel(vault),

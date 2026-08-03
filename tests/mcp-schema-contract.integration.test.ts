@@ -3,7 +3,12 @@ import { mkdtemp } from "fs/promises";
 import os from "os";
 import path from "path";
 
-import { extractRememberedId, startFakeEmbeddingServer, tempDirs } from "./helpers/mcp.js";
+import {
+  extractRememberedId,
+  initTestRepo,
+  startFakeEmbeddingServer,
+  tempDirs,
+} from "./helpers/mcp.js";
 import {
   createSchemaDrivenMcpClient,
   normalizeMcpToolContract,
@@ -55,6 +60,92 @@ describe("mcp schema-driven contract integration", () => {
       expect(
         parsedGet.items?.some((item) => item.kind === "note" && item.id === rememberedId),
       ).toBe(true);
+    } finally {
+      await client.close();
+      await embeddingServer.close();
+    }
+  }, 20000);
+
+  it("get outputSchema accepts notes whose persisted relatedTo carries cross-vault vaultPath", async () => {
+    // Regression: cross-vault relations persist `vaultPath` on a note's
+    // relatedTo entry (see relate.ts). The `get` handler must project relatedTo
+    // to the wire shape { id, type }; passing the persisted entry verbatim
+    // leaks vaultPath, which violates the additionalProperties:false emitted by
+    // Zod v4 -> JSON Schema. Under the real MCP SDK that surfaces as a -32602
+    // "Structured content does not match the tool's output schema" error for
+    // BOTH `notes[].relatedTo` and the `items` discriminated union oneOf. The
+    // schema-driven client below ajv-validates structuredContent against
+    // outputSchema, so a regression throws here instead of being silently
+    // stripped by Zod .parse().
+    //
+    // Genuine cross-vault setup: the main vault is `mainVaultDir` (VAULT_PATH),
+    // and `repoDir` is a git repo (initTestRepo) so a project-scoped note lives
+    // in `<repoDir>/.mnemonic`, a different vault. Relating the project note to
+    // a global note therefore crosses vaults and persists vaultPath on disk.
+    const mainVaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-main-"));
+    const repoDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-repo-"));
+    tempDirs.push(mainVaultDir, repoDir);
+    await initTestRepo(repoDir);
+    const embeddingServer = await startFakeEmbeddingServer();
+    const client = await createSchemaDrivenMcpClient(mainVaultDir, {
+      ollamaUrl: embeddingServer.url,
+    });
+
+    try {
+      const globalResponse = await client.callTool("remember", {
+        title: "Global design note",
+        content: "Global context for cross-vault relation.",
+        scope: "global",
+        lifecycle: "permanent",
+      });
+      const globalId = extractRememberedId(globalResponse.text);
+      expect(globalId).toBeTruthy();
+
+      const projectResponse = await client.callTool("remember", {
+        title: "Project note",
+        content: "Project-specific note that points at the global one.",
+        cwd: repoDir,
+        scope: "project",
+        lifecycle: "permanent",
+      });
+      const projectId = extractRememberedId(projectResponse.text);
+      expect(projectId).toBeTruthy();
+
+      // Cross-vault relate persists a relatedTo entry carrying vaultPath on the
+      // project note (project vault differs from the main vault).
+      await client.callTool("relate", {
+        fromId: projectId,
+        toId: globalId,
+        type: "related-to",
+        cwd: repoDir,
+      });
+
+      // Fetching the project note must produce outputSchema-valid content. The
+      // schema-driven client ajv-validates and throws on any vaultPath leak.
+      const getResponse = await client.callTool("get", { ids: [projectId], cwd: repoDir });
+      expect(getResponse.structuredContent).toBeDefined();
+
+      const notes = getResponse.structuredContent?.["notes"] as
+        Array<Record<string, unknown>> | undefined;
+      const note = notes?.find((entry) => entry["id"] === projectId);
+      expect(note).toBeDefined();
+      const relatedTo = note?.["relatedTo"] as Array<Record<string, unknown>> | undefined;
+      const crossVaultRel = relatedTo?.find((entry) => entry["id"] === globalId);
+      expect(crossVaultRel).toBeDefined();
+      expect(crossVaultRel?.["type"]).toBe("related-to");
+      // vaultPath must not leak into structured output.
+      expect(crossVaultRel?.["vaultPath"]).toBeUndefined();
+
+      // The discriminated items[] view of the same note must also validate and
+      // omit vaultPath.
+      const items = getResponse.structuredContent?.["items"] as
+        Array<Record<string, unknown>> | undefined;
+      const item = items?.find((entry) => entry["kind"] === "note" && entry["id"] === projectId);
+      expect(item).toBeDefined();
+      const itemRelatedTo = item?.["relatedTo"] as Array<Record<string, unknown>> | undefined;
+      expect(
+        itemRelatedTo?.find((entry) => entry["id"] === globalId)?.["vaultPath"],
+      ).toBeUndefined();
     } finally {
       await client.close();
       await embeddingServer.close();
