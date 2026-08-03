@@ -5935,6 +5935,10 @@ Typical next step:
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "properties": {
+        "allowProtectedBranch": {
+          "description": "One-time override for protected branch checks. When true, relate can commit on a protected branch without changing project policy.",
+          "type": "boolean",
+        },
         "bidirectional": {
           "default": true,
           "description": "Add relationship in both directions (default: true)",
@@ -8082,6 +8086,10 @@ Typical next step:
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "properties": {
+        "allowProtectedBranch": {
+          "description": "One-time override for protected branch checks. When true, unrelate can commit on a protected branch without changing project policy.",
+          "type": "boolean",
+        },
         "bidirectional": {
           "default": true,
           "description": "Remove relationship in both directions (default: true)",
