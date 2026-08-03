@@ -12,11 +12,14 @@ tags:
   - design
 lifecycle: permanent
 createdAt: '2026-08-03T10:08:07.644Z'
-updatedAt: '2026-08-03T10:08:07.644Z'
+updatedAt: '2026-08-03T10:08:13.894Z'
 role: review
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: document-source-embeddings-for-global-policy-projects-main-v-ff2954f1
+    type: follows
 memoryVersion: 1
 ---
 ## Verdict

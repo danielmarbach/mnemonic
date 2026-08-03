@@ -12,7 +12,7 @@ tags:
   - decision
 lifecycle: permanent
 createdAt: '2026-08-03T09:57:33.038Z'
-updatedAt: '2026-08-03T09:57:46.884Z'
+updatedAt: '2026-08-03T10:08:13.894Z'
 role: decision
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -20,6 +20,8 @@ projectName: mnemonic
 relatedTo:
   - id: vault-creation-audit-which-tools-can-create-mnemonic-and-whi-d0388691
     type: related-to
+  - id: review-lazy-document-generation-loading-needs-concurrency-an-b49cd0cd
+    type: follows
 memoryVersion: 1
 ---
 # Document-source embeddings for global-policy projects: main-vault fallback and lazy generation loading
