@@ -103,15 +103,24 @@ export class ChunkEmbeddingStorage {
       [] as string[],
     );
     const files = filesResult.ok ? filesResult.value : [];
+    // The per-attachment directory also holds the lazy-load manifest; it is not
+    // a chunk embedding file and must be excluded from the scan.
+    const jsonFiles = files.filter((file) => file.endsWith(".json") && file !== "manifest.json");
     // Read files directly rather than round-tripping the basename through
     // read()/pathFor(). The old slug scheme was idempotent (slug(slug(x)) ===
     // slug(x)), so the round-trip worked by coincidence; the xxh128 name is NOT
     // idempotent (hash(hash(x)) !== hash(x)), so pathFor(basename) would
     // re-hash the hex and miss every file. Mirrors reconcile()'s direct read.
-    const records = await Promise.all(
-      files
-        .filter((file) => file.endsWith(".json"))
-        .map(async (file) => {
+    //
+    // Bound concurrency: up to 50k chunks would otherwise open 50k file
+    // descriptors at once via Promise.all. Process in fixed-size batches so the
+    // lazy loader and reconcile sweeps stay within file-descriptor limits.
+    const BATCH_SIZE = 100;
+    const records: ChunkEmbeddingRecord[] = [];
+    for (let i = 0; i < jsonFiles.length; i += BATCH_SIZE) {
+      const batch = jsonFiles.slice(i, i + BATCH_SIZE);
+      const batchRecords = await Promise.all(
+        batch.map(async (file) => {
           const raw = await attempt("chunk-embedding:list", () =>
             fs.readFile(path.join(this.dir, file), "utf-8"),
           );
@@ -122,8 +131,12 @@ export class ChunkEmbeddingStorage {
           if (!parsed.ok) return null;
           return validateChunkEmbeddingRecord(parsed.value);
         }),
-    );
-    return records.filter((record): record is ChunkEmbeddingRecord => record !== null);
+      );
+      for (const record of batchRecords) {
+        if (record !== null) records.push(record);
+      }
+    }
+    return records;
   }
 
   async remove(chunkId: string): Promise<void> {

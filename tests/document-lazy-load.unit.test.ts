@@ -12,6 +12,8 @@ import {
 } from "../src/document-manifest.js";
 import { markdownExtractor } from "../src/markdown-extractor.js";
 import { markdownChunker } from "../src/markdown-chunker.js";
+import { ChunkEmbeddingStorage } from "../src/chunk-embedding-storage.js";
+import { embeddingModelId } from "../src/brands.js";
 import { clearAllGenerations, getCurrentGeneration } from "../src/generation-storage.js";
 import type { DocumentSourceAttachmentConfig } from "../src/vault.js";
 import type { ServerContext } from "../src/server-context.js";
@@ -225,5 +227,199 @@ describe("lazyLoadGeneration", () => {
       docSourceBase,
     );
     expect(second).toBe(first);
+  });
+
+  it("fails soft when manifest JSON is corrupt", async () => {
+    const repo = await makeGitRepo();
+    const config = makeConfig(repo);
+    const docSourceBase = path.join(
+      await mkdtemp(path.join(os.tmpdir(), "mnemonic-lazyload-")),
+      "doc-source",
+    );
+    tempDirs.push(docSourceBase);
+    const attachmentDir = path.join(docSourceBase, config.attachmentId);
+    await mkdir(attachmentDir, { recursive: true });
+    await writeFile(path.join(attachmentDir, "manifest.json"), "NOT VALID JSON{{{", "utf-8");
+
+    await expect(
+      lazyLoadGeneration("proj-1", config.attachmentId, config, makeContext(), docSourceBase),
+    ).resolves.toBeNull();
+    expect(getCurrentGeneration("proj-1", config.attachmentId)).toBeNull();
+  });
+
+  it("returns null when manifest projectId does not match the caller's project", async () => {
+    const repo = await makeGitRepo();
+    const commit = await headCommit(repo);
+    const config = makeConfig(repo);
+    const docSourceBase = path.join(
+      await mkdtemp(path.join(os.tmpdir(), "mnemonic-lazyload-")),
+      "doc-source",
+    );
+    tempDirs.push(docSourceBase);
+    const attachmentDir = path.join(docSourceBase, config.attachmentId);
+    await writeManifest(attachmentDir, await makeManifest(config, commit, { projectId: "other" }));
+
+    await expect(
+      lazyLoadGeneration("proj-1", config.attachmentId, config, makeContext(), docSourceBase),
+    ).resolves.toBeNull();
+  });
+
+  it("returns null when manifest attachmentId does not match the caller's attachment", async () => {
+    const repo = await makeGitRepo();
+    const commit = await headCommit(repo);
+    const config = makeConfig(repo);
+    const docSourceBase = path.join(
+      await mkdtemp(path.join(os.tmpdir(), "mnemonic-lazyload-")),
+      "doc-source",
+    );
+    tempDirs.push(docSourceBase);
+    const attachmentDir = path.join(docSourceBase, config.attachmentId);
+    await writeManifest(
+      attachmentDir,
+      await makeManifest(config, commit, { attachmentId: "att-wrong" }),
+    );
+
+    await expect(
+      lazyLoadGeneration("proj-1", config.attachmentId, config, makeContext(), docSourceBase),
+    ).resolves.toBeNull();
+  });
+
+  it("returns null when the extractor version drifted from the manifest", async () => {
+    const repo = await makeGitRepo();
+    const commit = await headCommit(repo);
+    const config = makeConfig(repo);
+    const docSourceBase = path.join(
+      await mkdtemp(path.join(os.tmpdir(), "mnemonic-lazyload-")),
+      "doc-source",
+    );
+    tempDirs.push(docSourceBase);
+    const attachmentDir = path.join(docSourceBase, config.attachmentId);
+    await writeManifest(
+      attachmentDir,
+      await makeManifest(config, commit, { extractorVersion: "99" }),
+    );
+
+    await expect(
+      lazyLoadGeneration("proj-1", config.attachmentId, config, makeContext(), docSourceBase),
+    ).resolves.toBeNull();
+  });
+
+  it("returns null when the chunker version drifted from the manifest", async () => {
+    const repo = await makeGitRepo();
+    const commit = await headCommit(repo);
+    const config = makeConfig(repo);
+    const docSourceBase = path.join(
+      await mkdtemp(path.join(os.tmpdir(), "mnemonic-lazyload-")),
+      "doc-source",
+    );
+    tempDirs.push(docSourceBase);
+    const attachmentDir = path.join(docSourceBase, config.attachmentId);
+    await writeManifest(
+      attachmentDir,
+      await makeManifest(config, commit, { chunkerVersion: "99" }),
+    );
+
+    await expect(
+      lazyLoadGeneration("proj-1", config.attachmentId, config, makeContext(), docSourceBase),
+    ).resolves.toBeNull();
+  });
+
+  it("returns null when the attachment config hash drifted from the manifest", async () => {
+    const repo = await makeGitRepo();
+    const commit = await headCommit(repo);
+    const config = makeConfig(repo);
+    const docSourceBase = path.join(
+      await mkdtemp(path.join(os.tmpdir(), "mnemonic-lazyload-")),
+      "doc-source",
+    );
+    tempDirs.push(docSourceBase);
+    const attachmentDir = path.join(docSourceBase, config.attachmentId);
+    await writeManifest(
+      attachmentDir,
+      await makeManifest(config, commit, { attachmentConfigHash: "deadbeef" }),
+    );
+
+    await expect(
+      lazyLoadGeneration("proj-1", config.attachmentId, config, makeContext(), docSourceBase),
+    ).resolves.toBeNull();
+  });
+
+  it("loads persisted chunk embeddings from disk into the rebuilt generation", async () => {
+    const repo = await makeGitRepo();
+    const commit = await headCommit(repo);
+    const config = makeConfig(repo);
+    const docSourceBase = path.join(
+      await mkdtemp(path.join(os.tmpdir(), "mnemonic-lazyload-")),
+      "doc-source",
+    );
+    tempDirs.push(docSourceBase);
+    const attachmentDir = path.join(docSourceBase, config.attachmentId);
+
+    // Persist the manifest and one embedding record for the first chunk of
+    // docs/alpha.md (documentId "att-1::docs-alpha-md", heading ancestry
+    // [Alpha], occurrence 0, split ordinal 0).
+    await writeManifest(
+      attachmentDir,
+      await makeManifest(config, commit, { embeddedChunkCount: 1 }),
+    );
+    const chunkStorage = new ChunkEmbeddingStorage(attachmentDir, config.attachmentId);
+    await chunkStorage.write({
+      chunkId: "att-1::docs-alpha-md::Alpha::0::0",
+      contentHash: "a".repeat(32),
+      model: embeddingModelId("test-model"),
+      embedding: [0.1, 0.2, 0.3],
+      updatedAt: new Date().toISOString(),
+    });
+
+    const generation = await lazyLoadGeneration(
+      "proj-1",
+      config.attachmentId,
+      config,
+      makeContext(),
+      docSourceBase,
+    );
+
+    expect(generation).not.toBeNull();
+    expect(generation!.chunkEmbeddings.size).toBe(1);
+    expect(generation!.chunkEmbeddings.has("att-1::docs-alpha-md::Alpha::0::0")).toBe(true);
+    expect(generation!.manifest.embeddedChunkCount).toBe(1);
+  });
+
+  it("lazily loads a generation from a large repository without breaking the file cap", async () => {
+    // Build a repo with 120 markdown files (beyond a trivial set, still well
+    // under MAX_LAZY_LOAD_FILES=5000 so every file is indexed).
+    const files: Record<string, string> = {};
+    for (let i = 0; i < 120; i++) {
+      files[`docs/file-${String(i).padStart(3, "0")}.md`] = `# Doc ${i}\n\nContent for file ${i}.`;
+    }
+    const repo = await makeGitRepo(files);
+    const commit = await headCommit(repo);
+    const config = makeConfig(repo);
+    const docSourceBase = path.join(
+      await mkdtemp(path.join(os.tmpdir(), "mnemonic-lazyload-")),
+      "doc-source",
+    );
+    tempDirs.push(docSourceBase);
+    const attachmentDir = path.join(docSourceBase, config.attachmentId);
+
+    await writeManifest(
+      attachmentDir,
+      await makeManifest(config, commit, {
+        documentCount: 120,
+        chunkCount: 120,
+        sourceMediaTypeCounts: { "text/markdown": 120 },
+      }),
+    );
+
+    const generation = await lazyLoadGeneration(
+      "proj-1",
+      config.attachmentId,
+      config,
+      makeContext(),
+      docSourceBase,
+    );
+    expect(generation).not.toBeNull();
+    expect(generation!.documents.size).toBe(120);
+    expect(generation!.chunks.size).toBe(120);
   });
 });

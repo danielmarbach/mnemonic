@@ -527,4 +527,214 @@ describe("document-source attachment integration", () => {
       await rm(env.base, { recursive: true, force: true });
     }
   }, 60000);
+
+  it("get(doc:) lazily rebuilds the generation after a server restart", async () => {
+    const env = await setupDocSourceEnv();
+    const embedding = await startFakeEmbeddingServer();
+
+    // Session 1 indexes the source and resolves a doc: handle while the
+    // generation is still in memory.
+    const session1 = await createPersistentMcpSession(env.mainVault, {
+      ollamaUrl: embedding.url,
+      disableGit: false,
+    });
+    let docHandle: string;
+    try {
+      const cwd = env.consumer;
+      await session1.callTool("add_attachment", {
+        cwd,
+        localPath: env.docsource,
+        kind: "document-source",
+        root: ".",
+        include: ["**/*.md"],
+        acceptedMediaTypes: ["text/markdown"],
+      });
+      const sync = await session1.callTool("sync", { cwd });
+      expect(sync.text).toMatch(/doc-source:.*Indexed \d+ documents, \d+ chunks/);
+
+      const recall = await session1.callTool("recall", {
+        cwd,
+        query: ZETA,
+        limit: 10,
+        scope: "all",
+      });
+      const chunks = asArr(recall.structuredContent?.documentChunks);
+      const documentId = (chunks[0] as { documentId?: string }).documentId as string;
+      docHandle = `doc:${documentId}`;
+
+      const before = await session1.callTool("get", { cwd, ids: [docHandle] });
+      const docs = asArr(before.structuredContent?.documents);
+      expect((docs[0] as { content?: string })?.content).toContain(ZETA);
+    } finally {
+      await session1.close();
+    }
+
+    // Session 2 is a fresh process: only the manifest + embeddings survive. The
+    // get(doc:) path must lazy-load the generation from the manifest.
+    const session2 = await createPersistentMcpSession(env.mainVault, {
+      ollamaUrl: embedding.url,
+      disableGit: false,
+    });
+    try {
+      const cwd = env.consumer;
+      const after = await session2.callTool("get", { cwd, ids: [docHandle] });
+      const docs = asArr(after.structuredContent?.documents);
+      expect(docs.length).toBeGreaterThan(0);
+      expect((docs[0] as { content?: string })?.content).toContain(ZETA);
+    } finally {
+      await session2.close();
+      await embedding.close();
+      await rm(env.base, { recursive: true, force: true });
+    }
+  }, 60000);
+
+  it("recall returns no document chunks after the attachment is disabled", async () => {
+    const env = await setupDocSourceEnv();
+    const embedding = await startFakeEmbeddingServer();
+    const session = await createPersistentMcpSession(env.mainVault, {
+      ollamaUrl: embedding.url,
+      disableGit: false,
+    });
+    try {
+      const cwd = env.consumer;
+      const added = await session.callTool("add_attachment", {
+        cwd,
+        localPath: env.docsource,
+        kind: "document-source",
+        root: ".",
+        include: ["**/*.md"],
+        acceptedMediaTypes: ["text/markdown"],
+      });
+      const attachmentId = (
+        added.structuredContent?.attachment as {
+          attachmentId?: string;
+        }
+      ).attachmentId as string;
+      await session.callTool("sync", { cwd });
+
+      const before = await session.callTool("recall", {
+        cwd,
+        query: ZETA,
+        limit: 10,
+        scope: "all",
+      });
+      expect(asArr(before.structuredContent?.documentChunks).length).toBeGreaterThan(0);
+
+      // Disabling a document-source attachment evicts its in-memory generation
+      // and excludes it from recall's attachment set.
+      await session.callTool("set_attachment_enabled", { cwd, attachmentId, enabled: false });
+      const after = await session.callTool("recall", {
+        cwd,
+        query: ZETA,
+        limit: 10,
+        scope: "all",
+      });
+      expect(asArr(after.structuredContent?.documentChunks).length).toBe(0);
+    } finally {
+      await session.close();
+      await embedding.close();
+      await rm(env.base, { recursive: true, force: true });
+    }
+  }, 60000);
+
+  it("recall returns no document chunks after the attachment is removed", async () => {
+    const env = await setupDocSourceEnv();
+    const embedding = await startFakeEmbeddingServer();
+    const session = await createPersistentMcpSession(env.mainVault, {
+      ollamaUrl: embedding.url,
+      disableGit: false,
+    });
+    try {
+      const cwd = env.consumer;
+      const added = await session.callTool("add_attachment", {
+        cwd,
+        localPath: env.docsource,
+        kind: "document-source",
+        root: ".",
+        include: ["**/*.md"],
+        acceptedMediaTypes: ["text/markdown"],
+      });
+      const attachmentId = (
+        added.structuredContent?.attachment as {
+          attachmentId?: string;
+        }
+      ).attachmentId as string;
+      await session.callTool("sync", { cwd });
+
+      const before = await session.callTool("recall", {
+        cwd,
+        query: ZETA,
+        limit: 10,
+        scope: "all",
+      });
+      expect(asArr(before.structuredContent?.documentChunks).length).toBeGreaterThan(0);
+
+      // Removal evicts the in-memory generation and deletes the attachment, so
+      // recall must not surface any document chunks from it.
+      await session.callTool("remove_attachment", { cwd, attachmentId });
+      const after = await session.callTool("recall", {
+        cwd,
+        query: ZETA,
+        limit: 10,
+        scope: "all",
+      });
+      expect(asArr(after.structuredContent?.documentChunks).length).toBe(0);
+    } finally {
+      await session.close();
+      await embedding.close();
+      await rm(env.base, { recursive: true, force: true });
+    }
+  }, 60000);
+
+  it("lazy-load rebuilds a generation when the embedding provider is unavailable after restart", async () => {
+    const env = await setupDocSourceEnv();
+    const embedding = await startFakeEmbeddingServer();
+
+    // Session 1 indexes with a working embedder, persisting chunk embeddings.
+    const session1 = await createPersistentMcpSession(env.mainVault, {
+      ollamaUrl: embedding.url,
+      disableGit: false,
+    });
+    try {
+      const cwd = env.consumer;
+      await session1.callTool("add_attachment", {
+        cwd,
+        localPath: env.docsource,
+        kind: "document-source",
+        root: ".",
+        include: ["**/*.md"],
+        acceptedMediaTypes: ["text/markdown"],
+      });
+      const sync = await session1.callTool("sync", { cwd });
+      expect(sync.text).toMatch(/doc-source:.*Indexed \d+ documents, \d+ chunks/);
+    } finally {
+      await session1.close();
+    }
+
+    // Stop the working embedder. A fresh process with a failing provider must
+    // still lazy-load the generation from the persisted manifest + embeddings
+    // on disk (no re-embedding needed), and recall must surface chunks.
+    await embedding.close();
+    const failing = await startFailingEmbeddingServer();
+    const session2 = await createPersistentMcpSession(env.mainVault, {
+      ollamaUrl: failing.url,
+      disableGit: false,
+    });
+    try {
+      const cwd = env.consumer;
+      const recall = await session2.callTool("recall", {
+        cwd,
+        query: ZETA,
+        limit: 10,
+        scope: "all",
+      });
+      const chunks = asArr(recall.structuredContent?.documentChunks);
+      expect(chunks.length).toBeGreaterThan(0);
+      expect((chunks[0] as { retrievalHandle?: string })?.retrievalHandle).toMatch(/^chunk:/);
+    } finally {
+      await session2.close();
+      await failing.close();
+      await rm(env.base, { recursive: true, force: true });
+    }
+  }, 60000);
 });
