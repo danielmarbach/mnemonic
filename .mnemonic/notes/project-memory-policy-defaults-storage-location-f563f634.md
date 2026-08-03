@@ -8,7 +8,7 @@ tags:
   - unadopted
 lifecycle: permanent
 createdAt: '2026-03-07T19:25:37.785Z'
-updatedAt: '2026-05-09T21:16:14.023Z'
+updatedAt: '2026-08-03T09:57:46.883Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
@@ -17,6 +17,8 @@ relatedTo:
   - id: vault-creation-audit-which-tools-can-create-mnemonic-and-whi-d0388691
     type: related-to
   - id: mutation-push-mode-defaults-for-project-vault-writes-ab095db1
+    type: related-to
+  - id: document-source-embeddings-for-global-policy-projects-main-v-ff2954f1
     type: related-to
 memoryVersion: 1
 ---
