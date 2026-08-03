@@ -7,13 +7,15 @@ tags:
   - attachments
 lifecycle: permanent
 createdAt: '2026-08-02T06:15:43.841Z'
-updatedAt: '2026-08-02T06:24:14.893Z'
+updatedAt: '2026-08-03T15:21:39.085Z'
 role: decision
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
   - id: chunk-embedding-path-layout-drop-redundant-guid-prefix-lower-6b739d42
+    type: derives-from
+  - id: flatten-doc-source-embeddings-path-drop-redundant-projectid--c8c5824f
     type: derives-from
 memoryVersion: 1
 ---
