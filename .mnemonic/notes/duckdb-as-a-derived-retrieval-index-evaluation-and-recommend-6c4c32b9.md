@@ -1,5 +1,5 @@
 ---
-title: DuckDB as a derived retrieval index — evaluation and recommendation
+title: 'Decision: do not adopt DuckDB for mnemonic retrieval'
 tags:
   - retrieval
   - embeddings
@@ -10,8 +10,8 @@ tags:
   - document-source
 lifecycle: permanent
 createdAt: '2026-08-03T10:42:54.827Z'
-updatedAt: '2026-08-03T10:44:58.391Z'
-role: research
+updatedAt: '2026-08-03T10:46:29.885Z'
+role: decision
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
@@ -36,6 +36,14 @@ Recommended direction:
 6. Never use one global authoritative DuckDB file.
 
 The strongest potential use case is persistent lexical indexing for larger document-source attachments. A wholesale retrieval rewrite is not justified yet.
+
+## Decision
+
+Do **not** adopt DuckDB or pursue the optional FTS proof of concept at this time. The likely retrieval benefit does not justify the native dependency, extension packaging, offline-onboarding cost, FTS rebuild lifecycle, multi-process locking constraints, experimental VSS persistence, schema-management burden, or additional recovery surface.
+
+Keep mnemonic's current file-first derived embedding/projection storage, in-process lexical ranking, exact cosine search, and TypeScript-owned RRF/graph fusion. This preserves the simpler mental model and the existing `delete generated files -> sync` recovery behavior.
+
+Reconsider DuckDB only if future measurements show a concrete retrieval bottleneck that cannot be addressed more simply, or if DuckDB's extension packaging, incremental FTS maintenance, concurrency, and VSS persistence improve materially.
 
 ## Non-negotiable invariants
 
@@ -327,20 +335,19 @@ Reject or roll back if corruption recovery requires more than delete and sync, F
 
 ## Final recommendation
 
-Do not adopt DuckDB as mnemonic's database of record or as a blanket replacement for TF-IDF, RRF, embeddings, and Ollama.
+Do not adopt DuckDB for mnemonic retrieval at this time.
 
-Run a measured, optional **per-vault FTS/BM25 proof of concept**, with document-source attachments as the likely highest-value target. Keep canonical data in Markdown/Git, fusion and graph semantics in mnemonic, exact vector search initially, and evaluate embedding inference independently.
+The evaluation found technically viable boundaries, but the overall tradeoff is unfavorable: the expected gains are speculative while the installation, packaging, indexing, concurrency, and maintenance costs are concrete. Preserve the current architecture and treat this research as a rejected option that can be revisited only with new evidence.
 
 ```text
 Markdown/YAML + Git          authoritative
 Relations in Markdown        authoritative
 Source documents             authoritative
-DuckDB FTS/BM25              optional disposable projection
-DuckDB vector storage        possible later
-Exact cosine search          keep initially
-HNSW/VSS                     defer pending evidence
-Embedding generation         separate provider concern
-Fusion and graph logic       keep in mnemonic
+Current derived files        retained
+In-process lexical ranking   retained
+Exact cosine search          retained
+TypeScript RRF/graph logic   retained
+DuckDB                       not adopted
 ```
 
 ## Research references
