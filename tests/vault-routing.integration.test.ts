@@ -375,4 +375,172 @@ describe("vault-routing", () => {
       await embeddingServer.close();
     }
   }, 15000);
+
+  it("scope: global returns project-tagged notes stored in the main vault", async () => {
+    const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-vault-"));
+    const repoDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-project-"));
+    tempDirs.push(vaultDir, repoDir);
+
+    await initTestRepo(repoDir);
+    await execFileAsync("git", ["remote", "add", "origin", "git@github.com:acme/myapp.git"], {
+      cwd: repoDir,
+    });
+
+    const embeddingServer = await startFakeEmbeddingServer();
+
+    try {
+      // Create a global-scoped note with cwd pointing to a project repo.
+      // This is the "repo you don't own" case: the note is personal infrastructure
+      // knowledge stored in the main vault, but carries a project tag for routing.
+      const rememberText = await callLocalMcp(
+        vaultDir,
+        "remember",
+        {
+          title: "Global note about a project",
+          content: "Personal setup notes for a repo I don't own.",
+          tags: ["global-project-test"],
+          scope: "global",
+          cwd: repoDir,
+          summary: "Create global note with project cwd",
+        },
+        embeddingServer.url,
+      );
+      const noteId = extractRememberedId(rememberText);
+
+      // The note should be in the main vault (not the project vault)
+      await expect(stat(path.join(vaultDir, "notes", `${noteId}.md`))).resolves.toBeDefined();
+      await expect(stat(path.join(repoDir, ".mnemonic"))).rejects.toThrow();
+
+      // list with scope: global must find the note despite its project tag
+      const listed = await callLocalMcpResponse(
+        vaultDir,
+        "list",
+        {
+          scope: "global",
+          storedIn: "main-vault",
+          tags: ["global-project-test"],
+        },
+        embeddingServer.url,
+      );
+      expect(listed.text).toContain("Global note about a project");
+      expect(listed.structuredContent?.["count"]).toBe(1);
+
+      // recall with scope: global must also find the note
+      const recalled = await callLocalMcp(
+        vaultDir,
+        "recall",
+        {
+          query: "personal setup notes repo",
+          scope: "global",
+          cwd: repoDir,
+          limit: 10,
+        },
+        embeddingServer.url,
+      );
+      expect(recalled).toContain(noteId);
+    } finally {
+      await embeddingServer.close();
+    }
+  }, 15000);
+
+  it("scope: global excludes notes from project-local vaults", async () => {
+    const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-vault-"));
+    const repoDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-project-"));
+    tempDirs.push(vaultDir, repoDir);
+
+    await initTestRepo(repoDir);
+    await execFileAsync("git", ["remote", "add", "origin", "git@github.com:acme/myapp.git"], {
+      cwd: repoDir,
+    });
+
+    const embeddingServer = await startFakeEmbeddingServer();
+
+    try {
+      // Create a project-scoped note (goes to the project vault)
+      const projectRemember = await callLocalMcp(
+        vaultDir,
+        "remember",
+        {
+          title: "Project vault note",
+          content: "This note lives in the project vault.",
+          tags: ["scope-exclusion-test"],
+          scope: "project",
+          cwd: repoDir,
+          summary: "Create project vault note",
+        },
+        embeddingServer.url,
+      );
+      const projectNoteId = extractRememberedId(projectRemember);
+
+      // Verify it's in the project vault
+      await expect(
+        stat(path.join(repoDir, ".mnemonic", "notes", `${projectNoteId}.md`)),
+      ).resolves.toBeDefined();
+
+      // list with scope: global must NOT find the project vault note
+      const listed = await callLocalMcpResponse(
+        vaultDir,
+        "list",
+        {
+          scope: "global",
+          tags: ["scope-exclusion-test"],
+        },
+        embeddingServer.url,
+      );
+      expect(listed.structuredContent?.["count"]).toBe(0);
+    } finally {
+      await embeddingServer.close();
+    }
+  }, 15000);
+
+  it("scope: project finds project-tagged notes in the main vault", async () => {
+    const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-vault-"));
+    const repoDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-project-"));
+    tempDirs.push(vaultDir, repoDir);
+
+    await initTestRepo(repoDir);
+    await execFileAsync("git", ["remote", "add", "origin", "git@github.com:acme/myapp.git"], {
+      cwd: repoDir,
+    });
+
+    const embeddingServer = await startFakeEmbeddingServer();
+
+    try {
+      // Create a global-scoped note with cwd (gets a project tag but stored in main vault)
+      const globalRemember = await callLocalMcp(
+        vaultDir,
+        "remember",
+        {
+          title: "Global note with project tag",
+          content: "Stored globally but tagged with the project.",
+          tags: ["project-main-vault-test"],
+          scope: "global",
+          cwd: repoDir,
+          summary: "Create global note with project tag",
+        },
+        embeddingServer.url,
+      );
+      const noteId = extractRememberedId(globalRemember);
+
+      // list with scope: project and matching cwd must find the note in the main vault
+      const listed = await callLocalMcpResponse(
+        vaultDir,
+        "list",
+        {
+          scope: "project",
+          cwd: repoDir,
+          storedIn: "main-vault",
+          tags: ["project-main-vault-test"],
+        },
+        embeddingServer.url,
+      );
+      expect(listed.text).toContain("Global note with project tag");
+      expect(listed.structuredContent?.["count"]).toBe(1);
+      const notes = listed.structuredContent?.["notes"] as Array<Record<string, unknown>>;
+      expect(notes[0]?.["id"]).toBe(noteId);
+      expect(notes[0]?.["vault"]).toBe("main-vault");
+    } finally {
+      await embeddingServer.close();
+    }
+  }, 15000);
 });

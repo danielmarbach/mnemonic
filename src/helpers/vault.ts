@@ -74,14 +74,22 @@ export async function collectVisibleNotes(
   const entries: NoteEntry[] = [];
 
   for (const vault of vaults) {
-    // Attached vaults are project-scoped; exclude them from global scope
-    if (scope === "global" && vault.provenance === "project-attached") continue;
+    // Global scope searches only the main vault; all notes in the main vault
+    // are returned regardless of project field (a project tag on a main-vault
+    // note is metadata, not a storage-location indicator).
+    if (scope === "global" && vault.provenance !== "main") continue;
 
     const includeAllForScope =
       vault.provenance === "project-attached" &&
       filterProject !== null &&
       filterProject !== undefined;
-    const effectiveFilter = includeAllForScope ? undefined : filterProject;
+    // For global scope in the main vault, don't filter by project field.
+    const effectiveFilter =
+      scope === "global" && vault.provenance === "main"
+        ? undefined
+        : includeAllForScope
+          ? undefined
+          : filterProject;
 
     let rawNotes: NoteMetadata[];
     if (sessionProjectId) {

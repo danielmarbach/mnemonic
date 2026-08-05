@@ -394,14 +394,17 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
             continue;
           }
 
-          const isProjectNote = meta.project !== undefined;
           const isCurrentProject = project && meta.project === project.id;
           const isAttachedVault = vault.provenance === "project-attached";
 
           if (scope === "project") {
             if (!isCurrentProject && !isAttachedVault) continue;
           } else if (scope === "global") {
-            if (isProjectNote && !isAttachedVault) continue;
+            // Global scope returns all notes in the main vault, regardless of
+            // project field. Notes in the main vault may carry a project tag
+            // (e.g., memories about a repo you don't own, stored globally).
+            // Skip only non-main vaults (project-local and project-attached).
+            if (vault.provenance !== "main") continue;
           }
 
           if (
