@@ -59,7 +59,8 @@ describe("Phase 4 relationship expansion", () => {
         cwd: vaultDir,
         scope: "project",
       });
-      const noteAId = noteAList.structuredContent?.notes?.[0]?.id;
+      const noteAId = (noteAList.structuredContent as { notes?: Array<{ id: string }> } | undefined)
+        ?.notes?.[0]?.id;
       if (!noteAId) throw new Error("Note A not found");
 
       await callLocalMcpTool(vaultDir, "relate", {
@@ -77,9 +78,9 @@ describe("Phase 4 relationship expansion", () => {
       });
 
       const parsed = GetResultSchema.parse(result.structuredContent);
-      expect(parsed.notes[0].relationships).toBeDefined();
-      expect(parsed.notes[0].relationships?.shown).toHaveLength(1);
-      expect(parsed.notes[0].relationships?.truncated).toBe(false);
+      expect(parsed.notes[0]!.relationships).toBeDefined();
+      expect(parsed.notes[0]!.relationships?.shown).toHaveLength(1);
+      expect(parsed.notes[0]!.relationships?.truncated).toBe(false);
     }, 30000);
 
     it("omits relationships field when includeRelationships is false", async () => {
@@ -101,7 +102,7 @@ describe("Phase 4 relationship expansion", () => {
       });
 
       const parsed = GetResultSchema.parse(result.structuredContent);
-      expect(parsed.notes[0].relationships).toBeUndefined();
+      expect(parsed.notes[0]!.relationships).toBeUndefined();
     }, 30000);
 
     it("accepts directional relationship types in relate", async () => {
@@ -138,7 +139,7 @@ describe("Phase 4 relationship expansion", () => {
       });
 
       const parsed = GetResultSchema.parse(result.structuredContent);
-      expect(parsed.notes[0].relationships?.shown[0]?.relationType).toBe("follows");
+      expect(parsed.notes[0]!.relationships?.shown[0]?.relationType).toBe("follows");
     }, 30000);
   });
 
@@ -206,7 +207,7 @@ describe("Phase 4 relationship expansion", () => {
         const parsed = RecallResultSchema.parse(result.structuredContent);
         expect(parsed.results).toHaveLength(1);
         // Top result should have relationships if it has any
-        expect(parsed.results[0].relationships).toBeDefined();
+        expect(parsed.results[0]!.relationships).toBeDefined();
       } finally {
         await embeddingServer.close();
       }
@@ -393,9 +394,9 @@ describe("Phase 4 relationship expansion", () => {
       });
 
       const parsed = GetResultSchema.parse(result.structuredContent);
-      expect(parsed.notes[0].relationships).toBeDefined();
-      expect(parsed.notes[0].relationships?.totalDirectRelations).toBe(1);
-      const shownIds = parsed.notes[0].relationships?.shown.map((r) => r.id);
+      expect(parsed.notes[0]!.relationships).toBeDefined();
+      expect(parsed.notes[0]!.relationships?.totalDirectRelations).toBe(1);
+      const shownIds = parsed.notes[0]!.relationships?.shown.map((r) => r.id);
       expect(shownIds).toContain(globalNote.structuredContent?.id);
     }, 30000);
 
@@ -464,12 +465,12 @@ describe("Phase 4 relationship expansion", () => {
       });
 
       const parsed = GetResultSchema.parse(result.structuredContent);
-      expect(parsed.notes[0].relationships).toBeDefined();
-      expect(parsed.notes[0].relationships?.totalDirectRelations).toBe(3);
+      expect(parsed.notes[0]!.relationships).toBeDefined();
+      expect(parsed.notes[0]!.relationships?.totalDirectRelations).toBe(3);
 
       // The shown entries (limit 3) should include both project notes; global note may be shown
       // but project notes must rank before global when limit < total
-      const shown = parsed.notes[0].relationships!.shown;
+      const shown = parsed.notes[0]!.relationships!.shown;
       const shownIds = shown.map((r) => r.id);
       // Both project notes should appear before the global note (same-project boost of 100)
       expect(shownIds).toContain(projectNote1.structuredContent?.id);

@@ -1,4 +1,4 @@
-import Ajv2020 from "ajv/dist/2020.js";
+import { Ajv2020 } from "ajv/dist/2020.js";
 import type { ValidateFunction } from "ajv";
 
 import { createPersistentMcpSession } from "./mcp.js";
@@ -89,7 +89,8 @@ export async function createSchemaDrivenMcpClient(
         arguments: arguments_,
       });
 
-      const text = result?.content?.[0]?.text as string | undefined;
+      const content = result?.content as Array<{ text?: string }> | undefined;
+      const text = content?.[0]?.text;
       if (!text) {
         throw new Error(`Missing tool response for ${toolName}`);
       }

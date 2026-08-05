@@ -4,6 +4,7 @@ import path from "path";
 import os from "os";
 
 import { MnemonicConfigStore } from "../src/config.js";
+import { attachmentSlug } from "../src/brands.js";
 import type { ProjectAttachmentConfig, MnemonicVaultAttachmentConfig } from "../src/vault.js";
 
 describe("normalizeProjectAttachments", () => {
@@ -84,14 +85,14 @@ describe("normalizeProjectAttachments", () => {
     });
     const result = await readConfigAttachments();
     expect(result["proj-1"]).toHaveLength(1);
-    expect(result["proj-1"][0].projectSlug).toBe("my-org/my-repo");
-    expect(result["proj-1"][0].projectName).toBe("My Repo");
-    expect(result["proj-1"][0].localPath).toBe("/home/user/projects/my-repo");
-    expect(result["proj-1"][0].vaultFolder).toBe(".mnemonic");
-    expect(result["proj-1"][0].enabled).toBe(true);
-    expect(result["proj-1"][0].branch).toBe("develop");
-    expect(result["proj-1"][0].kind).toBe("mnemonic-vault");
-    expect(result["proj-1"][0].attachmentId).toBeDefined();
+    expect(result["proj-1"]![0]!.projectSlug).toBe("my-org/my-repo");
+    expect(result["proj-1"]![0]!.projectName).toBe("My Repo");
+    expect(result["proj-1"]![0]!.localPath).toBe("/home/user/projects/my-repo");
+    expect((result["proj-1"]![0]! as MnemonicVaultAttachmentConfig).vaultFolder).toBe(".mnemonic");
+    expect(result["proj-1"]![0]!.enabled).toBe(true);
+    expect((result["proj-1"]![0]! as MnemonicVaultAttachmentConfig).branch).toBe("develop");
+    expect(result["proj-1"]![0]!.kind).toBe("mnemonic-vault");
+    expect(result["proj-1"]![0]!.attachmentId).toBeDefined();
   });
 
   it("filters out entries with missing projectSlug", async () => {
@@ -180,7 +181,7 @@ describe("normalizeProjectAttachments", () => {
     });
     const result = await readConfigAttachments();
     expect(result["proj-1"]).toHaveLength(1);
-    expect(result["proj-1"][0].projectSlug).toBe("org/repo");
+    expect(result["proj-1"]![0]!.projectSlug).toBe("org/repo");
   });
 
   it("skips project keys with no valid attachments after filtering", async () => {
@@ -204,7 +205,7 @@ describe("normalizeProjectAttachments", () => {
       },
     });
     const result = await readConfigAttachments();
-    expect(result["proj-1"][0].projectName).toBe("org/repo");
+    expect(result["proj-1"]![0]!.projectName).toBe("org/repo");
   });
 
   it("defaults projectName to projectSlug when non-string", async () => {
@@ -215,7 +216,7 @@ describe("normalizeProjectAttachments", () => {
       },
     });
     const result = await readConfigAttachments();
-    expect(result["proj-1"][0].projectName).toBe("org/repo");
+    expect(result["proj-1"]![0]!.projectName).toBe("org/repo");
   });
 
   it("trims projectName", async () => {
@@ -226,7 +227,7 @@ describe("normalizeProjectAttachments", () => {
       },
     });
     const result = await readConfigAttachments();
-    expect(result["proj-1"][0].projectName).toBe("My Repo");
+    expect(result["proj-1"]![0]!.projectName).toBe("My Repo");
   });
 
   it("defaults vaultFolder to .mnemonic when missing", async () => {
@@ -237,7 +238,7 @@ describe("normalizeProjectAttachments", () => {
       },
     });
     const result = await readConfigAttachments();
-    expect(result["proj-1"][0].vaultFolder).toBe(".mnemonic");
+    expect((result["proj-1"]![0]! as MnemonicVaultAttachmentConfig).vaultFolder).toBe(".mnemonic");
   });
 
   it("defaults vaultFolder to .mnemonic when empty string", async () => {
@@ -248,7 +249,7 @@ describe("normalizeProjectAttachments", () => {
       },
     });
     const result = await readConfigAttachments();
-    expect(result["proj-1"][0].vaultFolder).toBe(".mnemonic");
+    expect((result["proj-1"]![0]! as MnemonicVaultAttachmentConfig).vaultFolder).toBe(".mnemonic");
   });
 
   it("defaults vaultFolder to .mnemonic when whitespace-only", async () => {
@@ -259,7 +260,7 @@ describe("normalizeProjectAttachments", () => {
       },
     });
     const result = await readConfigAttachments();
-    expect(result["proj-1"][0].vaultFolder).toBe(".mnemonic");
+    expect((result["proj-1"]![0]! as MnemonicVaultAttachmentConfig).vaultFolder).toBe(".mnemonic");
   });
 
   it("defaults enabled to true when missing", async () => {
@@ -270,7 +271,7 @@ describe("normalizeProjectAttachments", () => {
       },
     });
     const result = await readConfigAttachments();
-    expect(result["proj-1"][0].enabled).toBe(true);
+    expect(result["proj-1"]![0]!.enabled).toBe(true);
   });
 
   it("defaults enabled to true when non-boolean", async () => {
@@ -281,7 +282,7 @@ describe("normalizeProjectAttachments", () => {
       },
     });
     const result = await readConfigAttachments();
-    expect(result["proj-1"][0].enabled).toBe(true);
+    expect(result["proj-1"]![0]!.enabled).toBe(true);
   });
 
   it("preserves enabled when false", async () => {
@@ -292,7 +293,7 @@ describe("normalizeProjectAttachments", () => {
       },
     });
     const result = await readConfigAttachments();
-    expect(result["proj-1"][0].enabled).toBe(false);
+    expect(result["proj-1"]![0]!.enabled).toBe(false);
   });
 
   it("defaults branch to main when missing", async () => {
@@ -303,7 +304,7 @@ describe("normalizeProjectAttachments", () => {
       },
     });
     const result = await readConfigAttachments();
-    expect(result["proj-1"][0].branch).toBe("main");
+    expect((result["proj-1"]![0]! as MnemonicVaultAttachmentConfig).branch).toBe("main");
   });
 
   it("defaults branch to main when non-string", async () => {
@@ -314,7 +315,7 @@ describe("normalizeProjectAttachments", () => {
       },
     });
     const result = await readConfigAttachments();
-    expect(result["proj-1"][0].branch).toBe("main");
+    expect((result["proj-1"]![0]! as MnemonicVaultAttachmentConfig).branch).toBe("main");
   });
 
   it("defaults addedAt to empty string when missing", async () => {
@@ -325,7 +326,7 @@ describe("normalizeProjectAttachments", () => {
       },
     });
     const result = await readConfigAttachments();
-    expect(result["proj-1"][0].addedAt).toBe("");
+    expect(result["proj-1"]![0]!.addedAt).toBe("");
   });
 
   it("defaults updatedAt to empty string when missing", async () => {
@@ -336,7 +337,7 @@ describe("normalizeProjectAttachments", () => {
       },
     });
     const result = await readConfigAttachments();
-    expect(result["proj-1"][0].updatedAt).toBe("");
+    expect(result["proj-1"]![0]!.updatedAt).toBe("");
   });
 
   it("defaults branchTipHash to empty string when missing", async () => {
@@ -347,7 +348,7 @@ describe("normalizeProjectAttachments", () => {
       },
     });
     const result = await readConfigAttachments();
-    expect(result["proj-1"][0].branchTipHash).toBe("");
+    expect((result["proj-1"]![0]! as MnemonicVaultAttachmentConfig).branchTipHash).toBe("");
   });
 
   it("trims projectSlug and localPath", async () => {
@@ -358,8 +359,8 @@ describe("normalizeProjectAttachments", () => {
       },
     });
     const result = await readConfigAttachments();
-    expect(result["proj-1"][0].projectSlug).toBe("org/repo");
-    expect(result["proj-1"][0].localPath).toBe("/path/to/repo");
+    expect(result["proj-1"]![0]!.projectSlug).toBe("org/repo");
+    expect(result["proj-1"]![0]!.localPath).toBe("/path/to/repo");
   });
 
   it("trims vaultFolder", async () => {
@@ -370,7 +371,7 @@ describe("normalizeProjectAttachments", () => {
       },
     });
     const result = await readConfigAttachments();
-    expect(result["proj-1"][0].vaultFolder).toBe(".custom");
+    expect((result["proj-1"]![0]! as MnemonicVaultAttachmentConfig).vaultFolder).toBe(".custom");
   });
 
   it("handles multiple projects with attachments", async () => {
@@ -590,7 +591,7 @@ describe("Schema migration for projectAttachments", () => {
     const attachment: MnemonicVaultAttachmentConfig = {
       kind: "mnemonic-vault",
       attachmentId: "test-id-123",
-      projectSlug: "org/repo",
+      projectSlug: attachmentSlug("org/repo"),
       projectName: "Repo",
       localPath: "/path/to/repo",
       vaultFolder: ".mnemonic",
@@ -632,7 +633,9 @@ describe("getProjectAttachments / setProjectAttachments", () => {
 
   it("sets and gets attachments for a project", async () => {
     const attachment: ProjectAttachmentConfig = {
-      projectSlug: "org/repo",
+      kind: "mnemonic-vault",
+      attachmentId: "att-1",
+      projectSlug: attachmentSlug("org/repo"),
       projectName: "My Repo",
       localPath: "/home/user/repo",
       vaultFolder: ".mnemonic",
@@ -653,7 +656,9 @@ describe("getProjectAttachments / setProjectAttachments", () => {
 
   it("overwrites existing attachments for a project", async () => {
     const att1: ProjectAttachmentConfig = {
-      projectSlug: "org/repo-a",
+      kind: "mnemonic-vault",
+      attachmentId: "att-a",
+      projectSlug: attachmentSlug("org/repo-a"),
       projectName: "Repo A",
       localPath: "/a",
       vaultFolder: ".mnemonic",
@@ -664,7 +669,9 @@ describe("getProjectAttachments / setProjectAttachments", () => {
       branchTipHash: "",
     };
     const att2: ProjectAttachmentConfig = {
-      projectSlug: "org/repo-b",
+      kind: "mnemonic-vault",
+      attachmentId: "att-b",
+      projectSlug: attachmentSlug("org/repo-b"),
       projectName: "Repo B",
       localPath: "/b",
       vaultFolder: ".mnemonic",
@@ -679,12 +686,14 @@ describe("getProjectAttachments / setProjectAttachments", () => {
     await configStore.setProjectAttachments("proj-1", [att2]);
     const result = await configStore.getProjectAttachments("proj-1");
     expect(result).toHaveLength(1);
-    expect(result[0].projectSlug).toBe("org/repo-b");
+    expect(result[0]!.projectSlug).toBe("org/repo-b");
   });
 
   it("persists attachments across cache invalidation", async () => {
     const attachment: ProjectAttachmentConfig = {
-      projectSlug: "org/repo",
+      kind: "mnemonic-vault",
+      attachmentId: "att-1",
+      projectSlug: attachmentSlug("org/repo"),
       projectName: "My Repo",
       localPath: "/path",
       vaultFolder: ".mnemonic",
@@ -699,12 +708,14 @@ describe("getProjectAttachments / setProjectAttachments", () => {
     configStore.invalidateCache();
     const result = await configStore.getProjectAttachments("proj-1");
     expect(result).toHaveLength(1);
-    expect(result[0].projectSlug).toBe("org/repo");
+    expect(result[0]!.projectSlug).toBe("org/repo");
   });
 
   it("handles multiple projects independently", async () => {
     const att1: ProjectAttachmentConfig = {
-      projectSlug: "org/a",
+      kind: "mnemonic-vault",
+      attachmentId: "att-1",
+      projectSlug: attachmentSlug("org/a"),
       projectName: "A",
       localPath: "/a",
       vaultFolder: ".mnemonic",
@@ -715,7 +726,9 @@ describe("getProjectAttachments / setProjectAttachments", () => {
       branchTipHash: "",
     };
     const att2: ProjectAttachmentConfig = {
-      projectSlug: "org/b",
+      kind: "mnemonic-vault",
+      attachmentId: "att-2",
+      projectSlug: attachmentSlug("org/b"),
       projectName: "B",
       localPath: "/b",
       vaultFolder: ".mnemonic",
@@ -733,15 +746,17 @@ describe("getProjectAttachments / setProjectAttachments", () => {
     const result2 = await configStore.getProjectAttachments("proj-2");
 
     expect(result1).toHaveLength(1);
-    expect(result1[0].projectSlug).toBe("org/a");
+    expect(result1[0]!.projectSlug).toBe("org/a");
     expect(result2).toHaveLength(1);
-    expect(result2[0].projectSlug).toBe("org/b");
+    expect(result2[0]!.projectSlug).toBe("org/b");
   });
 
   it("persists multiple attachments per project", async () => {
     const attachments: ProjectAttachmentConfig[] = [
       {
-        projectSlug: "org/a",
+        kind: "mnemonic-vault",
+        attachmentId: "att-a",
+        projectSlug: attachmentSlug("org/a"),
         projectName: "A",
         localPath: "/a",
         vaultFolder: ".mnemonic",
@@ -752,7 +767,9 @@ describe("getProjectAttachments / setProjectAttachments", () => {
         branchTipHash: "",
       },
       {
-        projectSlug: "org/b",
+        kind: "mnemonic-vault",
+        attachmentId: "att-b",
+        projectSlug: attachmentSlug("org/b"),
         projectName: "B",
         localPath: "/b",
         vaultFolder: ".mnemonic-lib",
@@ -767,13 +784,15 @@ describe("getProjectAttachments / setProjectAttachments", () => {
     await configStore.setProjectAttachments("proj-1", attachments);
     const result = await configStore.getProjectAttachments("proj-1");
     expect(result).toHaveLength(2);
-    expect(result[0].projectSlug).toBe("org/a");
-    expect(result[1].projectSlug).toBe("org/b");
+    expect(result[0]!.projectSlug).toBe("org/a");
+    expect(result[1]!.projectSlug).toBe("org/b");
   });
 
   it("returns empty array after setting empty array", async () => {
     const attachment: ProjectAttachmentConfig = {
-      projectSlug: "org/repo",
+      kind: "mnemonic-vault",
+      attachmentId: "att-1",
+      projectSlug: attachmentSlug("org/repo"),
       projectName: "My Repo",
       localPath: "/path",
       vaultFolder: ".mnemonic",
@@ -792,7 +811,9 @@ describe("getProjectAttachments / setProjectAttachments", () => {
 
   it("does not affect other project attachments when clearing one", async () => {
     const att: ProjectAttachmentConfig = {
-      projectSlug: "org/repo",
+      kind: "mnemonic-vault",
+      attachmentId: "att-main",
+      projectSlug: attachmentSlug("org/repo"),
       projectName: "Repo",
       localPath: "/path",
       vaultFolder: ".mnemonic",

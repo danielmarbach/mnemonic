@@ -4,96 +4,222 @@ describe("update no-op detection", () => {
   describe("hasActualChanges", () => {
     it("detects content change", async () => {
       const { hasActualChanges } = await import("../src/update-detect-changes.js");
-      expect(hasActualChanges({ content: "new", originalContent: "old" })).toBe(true);
+      expect(
+        hasActualChanges({
+          content: "new",
+          originalContent: "old",
+          originalTitle: "Same Title",
+          originalTags: [],
+          originalLifecycle: "temporary",
+        }),
+      ).toBe(true);
     });
 
     it("detects no content change when strings are identical", async () => {
       const { hasActualChanges } = await import("../src/update-detect-changes.js");
-      expect(hasActualChanges({ content: "same", originalContent: "same" })).toBe(false);
+      expect(
+        hasActualChanges({
+          content: "same",
+          originalContent: "same",
+          originalTitle: "Same Title",
+          originalTags: [],
+          originalLifecycle: "temporary",
+        }),
+      ).toBe(false);
     });
 
     it("detects title change", async () => {
       const { hasActualChanges } = await import("../src/update-detect-changes.js");
-      expect(hasActualChanges({ title: "New Title", originalTitle: "Old Title" })).toBe(true);
+      expect(
+        hasActualChanges({
+          title: "New Title",
+          originalTitle: "Old Title",
+          originalContent: "original",
+          originalTags: [],
+          originalLifecycle: "temporary",
+        }),
+      ).toBe(true);
     });
 
     it("detects no title change when strings are identical", async () => {
       const { hasActualChanges } = await import("../src/update-detect-changes.js");
-      expect(hasActualChanges({ title: "Same Title", originalTitle: "Same Title" })).toBe(false);
+      expect(
+        hasActualChanges({
+          title: "Same Title",
+          originalTitle: "Same Title",
+          originalContent: "original",
+          originalTags: [],
+          originalLifecycle: "temporary",
+        }),
+      ).toBe(false);
     });
 
     it("detects lifecycle change", async () => {
       const { hasActualChanges } = await import("../src/update-detect-changes.js");
-      expect(hasActualChanges({ lifecycle: "permanent", originalLifecycle: "temporary" })).toBe(
-        true,
-      );
+      expect(
+        hasActualChanges({
+          lifecycle: "permanent",
+          originalLifecycle: "temporary",
+          originalContent: "original",
+          originalTitle: "Same Title",
+          originalTags: [],
+        }),
+      ).toBe(true);
     });
 
     it("detects no lifecycle change when values are identical", async () => {
       const { hasActualChanges } = await import("../src/update-detect-changes.js");
-      expect(hasActualChanges({ lifecycle: "temporary", originalLifecycle: "temporary" })).toBe(
-        false,
-      );
+      expect(
+        hasActualChanges({
+          lifecycle: "temporary",
+          originalLifecycle: "temporary",
+          originalContent: "original",
+          originalTitle: "Same Title",
+          originalTags: [],
+        }),
+      ).toBe(false);
     });
 
     it("detects role change when explicitly set", async () => {
       const { hasActualChanges } = await import("../src/update-detect-changes.js");
       expect(
-        hasActualChanges({ role: "decision", originalRole: "research", roleExplicitlySet: true }),
+        hasActualChanges({
+          role: "decision",
+          originalRole: "research",
+          roleExplicitlySet: true,
+          originalContent: "original",
+          originalTitle: "Same Title",
+          originalTags: [],
+          originalLifecycle: "temporary",
+        }),
       ).toBe(true);
     });
 
     it("ignores role change when not explicitly set", async () => {
       const { hasActualChanges } = await import("../src/update-detect-changes.js");
       expect(
-        hasActualChanges({ role: "decision", originalRole: "research", roleExplicitlySet: false }),
+        hasActualChanges({
+          role: "decision",
+          originalRole: "research",
+          roleExplicitlySet: false,
+          originalContent: "original",
+          originalTitle: "Same Title",
+          originalTags: [],
+          originalLifecycle: "temporary",
+        }),
       ).toBe(false);
     });
 
     it("detects no role change when values are identical and explicitly set", async () => {
       const { hasActualChanges } = await import("../src/update-detect-changes.js");
       expect(
-        hasActualChanges({ role: "research", originalRole: "research", roleExplicitlySet: true }),
+        hasActualChanges({
+          role: "research",
+          originalRole: "research",
+          roleExplicitlySet: true,
+          originalContent: "original",
+          originalTitle: "Same Title",
+          originalTags: [],
+          originalLifecycle: "temporary",
+        }),
       ).toBe(false);
     });
 
     it("detects role change from undefined to value when explicitly set", async () => {
       const { hasActualChanges } = await import("../src/update-detect-changes.js");
       expect(
-        hasActualChanges({ role: "decision", originalRole: undefined, roleExplicitlySet: true }),
+        hasActualChanges({
+          role: "decision",
+          originalRole: undefined,
+          roleExplicitlySet: true,
+          originalContent: "original",
+          originalTitle: "Same Title",
+          originalTags: [],
+          originalLifecycle: "temporary",
+        }),
       ).toBe(true);
     });
 
     it("detects role change from value to undefined when explicitly set", async () => {
       const { hasActualChanges } = await import("../src/update-detect-changes.js");
       expect(
-        hasActualChanges({ role: undefined, originalRole: "research", roleExplicitlySet: true }),
+        hasActualChanges({
+          role: undefined,
+          originalRole: "research",
+          roleExplicitlySet: true,
+          originalContent: "original",
+          originalTitle: "Same Title",
+          originalTags: [],
+          originalLifecycle: "temporary",
+        }),
       ).toBe(true);
     });
 
     it("detects tags change", async () => {
       const { hasActualChanges } = await import("../src/update-detect-changes.js");
-      expect(hasActualChanges({ tags: ["a", "b"], originalTags: ["a"] })).toBe(true);
+      expect(
+        hasActualChanges({
+          tags: ["a", "b"],
+          originalTags: ["a"],
+          originalContent: "original",
+          originalTitle: "Same Title",
+          originalLifecycle: "temporary",
+        }),
+      ).toBe(true);
     });
 
     it("detects no tags change when arrays are identical", async () => {
       const { hasActualChanges } = await import("../src/update-detect-changes.js");
-      expect(hasActualChanges({ tags: ["a", "b"], originalTags: ["a", "b"] })).toBe(false);
+      expect(
+        hasActualChanges({
+          tags: ["a", "b"],
+          originalTags: ["a", "b"],
+          originalContent: "original",
+          originalTitle: "Same Title",
+          originalLifecycle: "temporary",
+        }),
+      ).toBe(false);
     });
 
     it("detects tags change with same elements different order", async () => {
       const { hasActualChanges } = await import("../src/update-detect-changes.js");
-      expect(hasActualChanges({ tags: ["b", "a"], originalTags: ["a", "b"] })).toBe(true);
+      expect(
+        hasActualChanges({
+          tags: ["b", "a"],
+          originalTags: ["a", "b"],
+          originalContent: "original",
+          originalTitle: "Same Title",
+          originalLifecycle: "temporary",
+        }),
+      ).toBe(true);
     });
 
     it("detects alwaysLoad change", async () => {
       const { hasActualChanges } = await import("../src/update-detect-changes.js");
-      expect(hasActualChanges({ alwaysLoad: true, originalAlwaysLoad: false })).toBe(true);
+      expect(
+        hasActualChanges({
+          alwaysLoad: true,
+          originalAlwaysLoad: false,
+          originalContent: "original",
+          originalTitle: "Same Title",
+          originalTags: [],
+          originalLifecycle: "temporary",
+        }),
+      ).toBe(true);
     });
 
     it("detects no alwaysLoad change when values are identical", async () => {
       const { hasActualChanges } = await import("../src/update-detect-changes.js");
-      expect(hasActualChanges({ alwaysLoad: false, originalAlwaysLoad: false })).toBe(false);
+      expect(
+        hasActualChanges({
+          alwaysLoad: false,
+          originalAlwaysLoad: false,
+          originalContent: "original",
+          originalTitle: "Same Title",
+          originalTags: [],
+          originalLifecycle: "temporary",
+        }),
+      ).toBe(false);
     });
 
     it("detects no changes at all (true no-op)", async () => {
@@ -153,6 +279,8 @@ describe("update no-op detection", () => {
           originalContent: "original",
           title: "Same Title",
           originalTitle: "Same Title",
+          originalTags: [],
+          originalLifecycle: "temporary",
           relatedToChanged: true,
         }),
       ).toBe(true);

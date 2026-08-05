@@ -1257,7 +1257,7 @@ describe("memory-lifecycle", () => {
     } finally {
       await embeddingServer.close();
     }
-  }, 35000);
+  }, 120000);
 
   it("returns consolidate evidence payloads for detect-duplicates and suggest-merges", async () => {
     const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-vault-"));

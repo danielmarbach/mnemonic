@@ -84,8 +84,8 @@ describe("buildGenerationFromFiles", () => {
 
     expect(result.manifest.documentCount).toBe(1);
     expect(result.manifest.skippedFiles).toHaveLength(1);
-    expect(result.manifest.skippedFiles[0].path).toBe("docs/data.json");
-    expect(result.manifest.skippedFiles[0].reason).toContain("detection failed");
+    expect(result.manifest.skippedFiles[0]!.path).toBe("docs/data.json");
+    expect(result.manifest.skippedFiles[0]!.reason).toContain("detection failed");
   });
 
   it("skips oversized files exceeding maxBytesPerFile", () => {
@@ -103,7 +103,7 @@ describe("buildGenerationFromFiles", () => {
 
     expect(result.manifest.documentCount).toBe(0);
     expect(result.manifest.skippedFiles).toHaveLength(1);
-    expect(result.manifest.skippedFiles[0].reason).toContain("maxBytesPerFile");
+    expect(result.manifest.skippedFiles[0]!.reason).toContain("maxBytesPerFile");
   });
 
   it("skips files exceeding maxTrackedFiles", () => {
@@ -122,7 +122,7 @@ describe("buildGenerationFromFiles", () => {
 
     expect(result.manifest.documentCount).toBe(5000);
     expect(result.manifest.skippedFiles).toHaveLength(1);
-    expect(result.manifest.skippedFiles[0].reason).toContain("maxTrackedFiles");
+    expect(result.manifest.skippedFiles[0]!.reason).toContain("maxTrackedFiles");
   });
 
   it("handles files with YAML frontmatter", () => {

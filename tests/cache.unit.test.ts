@@ -2,6 +2,7 @@ import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import type { NoteMetadata, EmbeddingRecord } from "../src/storage.js";
 import type { NoteProjection } from "../src/structured-content.js";
 import type { Vault } from "../src/vault.js";
+import { memoryId, embeddingModelId, isoDateString } from "../src/brands.js";
 
 import {
   invalidateActiveProjectCache,
@@ -18,13 +19,13 @@ import {
 
 // ── Test helpers ──────────────────────────────────────────────────────────────
 
-const NOW = "2026-01-01T00:00:00.000Z";
+const NOW = isoDateString("2026-01-01T00:00:00.000Z");
 
 // The vault cache is built from `listNotesMetadata`, which returns metadata-only
 // notes without any `content` property.
 function makeNoteMetadata(id: string, overrides: Partial<NoteMetadata> = {}): NoteMetadata {
   return {
-    id,
+    id: memoryId(id),
     title: `Note ${id}`,
     tags: [],
     lifecycle: "permanent",
@@ -35,7 +36,12 @@ function makeNoteMetadata(id: string, overrides: Partial<NoteMetadata> = {}): No
 }
 
 function makeEmbedding(id: string): EmbeddingRecord {
-  return { id, model: "nomic-embed-text", embedding: [0.1, 0.2, 0.3], updatedAt: NOW };
+  return {
+    id: memoryId(id),
+    model: embeddingModelId("nomic-embed-text"),
+    embedding: [0.1, 0.2, 0.3],
+    updatedAt: NOW,
+  };
 }
 
 function makeProjection(noteId: string): NoteProjection {
@@ -252,7 +258,10 @@ describe("setSessionCachedEmbeddings", () => {
     await getOrBuildVaultEmbeddings("test-project", vault);
 
     // Simulate a backfill that refreshed note "a" and rebuilt missing note "b".
-    const refreshed = { ...makeEmbedding("a"), updatedAt: "2026-02-01T00:00:00.000Z" };
+    const refreshed = {
+      ...makeEmbedding("a"),
+      updatedAt: isoDateString("2026-02-01T00:00:00.000Z"),
+    };
     setSessionCachedEmbeddings("test-project", "/vault/project", [refreshed, makeEmbedding("b")]);
 
     const embeddings = await getOrBuildVaultEmbeddings("test-project", vault);

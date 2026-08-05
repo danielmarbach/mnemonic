@@ -4,6 +4,7 @@ import type { ServerContext } from "../src/server-context.js";
 import type { Vault } from "../src/vault.js";
 import { resolveWriteVaultForRemember } from "../src/tools/remember.js";
 import type { ProjectInfo } from "../src/project.js";
+import { projectId } from "../src/brands.js";
 import { ELICITATION_KEYS } from "../src/helpers/mrtr.js";
 
 const CLIENT_CAPABILITIES_META_KEY = "io.modelcontextprotocol/clientCapabilities";
@@ -26,9 +27,9 @@ const attachedReadOnly = {
 } as unknown as Vault;
 
 const project: ProjectInfo = {
-  id: "project-id",
+  id: projectId("project-id"),
   name: "Project",
-  root: "/repo",
+  source: "folder",
 };
 
 function fakeCtx(options: { projectVault: Vault | null; attachments: Vault[] }): ServerContext {

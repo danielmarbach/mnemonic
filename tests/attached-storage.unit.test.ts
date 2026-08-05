@@ -49,8 +49,8 @@ function makeNote(id: string, overrides: Partial<Note> = {}): Note {
     content: `Content of ${id}`,
     tags: [],
     lifecycle: "permanent",
-    createdAt: now,
-    updatedAt: now,
+    createdAt: isoDateString(now),
+    updatedAt: isoDateString(now),
     ...overrides,
   };
 }
@@ -648,7 +648,7 @@ Branch note body`;
       await baseStorage.writeEmbedding(record);
       const list = await attached.listEmbeddings();
       expect(list).toHaveLength(1);
-      expect(list[0].id).toBe(memoryId("emb-list"));
+      expect(list[0]!.id).toBe(memoryId("emb-list"));
     });
 
     it("readProjection delegates to baseStorage", async () => {
@@ -806,7 +806,7 @@ Branch note body`;
 
       const alphaOnly = await attached.listNotes({ project: "alpha" });
       expect(alphaOnly).toHaveLength(1);
-      expect(alphaOnly[0].id).toBe(memoryId("proj-a"));
+      expect(alphaOnly[0]!.id).toBe(memoryId("proj-a"));
     });
   });
 });

@@ -108,10 +108,10 @@ describe("buildTemporalHistoryEntry", () => {
     const result = enrichTemporalHistory(entries);
 
     // The last entry is the oldest = create
-    expect(result.interpretedHistory[1].changeCategory).toBe("create");
+    expect(result.interpretedHistory[1]!.changeCategory).toBe("create");
     // The update entry — with stats it classifies as 'expand', not 'unknown'
-    expect(result.interpretedHistory[0].changeCategory).toBe("expand");
-    expect(result.interpretedHistory[0].changeDescription).toBe(
+    expect(result.interpretedHistory[0]!.changeCategory).toBe("expand");
+    expect(result.interpretedHistory[0]!.changeDescription).toBe(
       "Added substantial explanatory content.",
     );
     // historySummary reflects the expansion pattern, not generic fallback

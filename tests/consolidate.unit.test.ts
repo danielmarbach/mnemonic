@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
 
+import type { ISO8601DateString, MemoryId } from "../src/brands.js";
+import type { Relationship } from "../src/storage.js";
+
 import {
   aggregateMergeRisk,
   buildConsolidateNoteEvidence,
@@ -24,14 +27,14 @@ describe("consolidate helpers", () => {
       [
         {
           relatedTo: [
-            { id: "target-1", type: "related-to" },
-            { id: "source-2", type: "related-to" },
+            { id: "target-1" as MemoryId, type: "related-to" },
+            { id: "source-2" as MemoryId, type: "related-to" },
           ],
         },
         {
           relatedTo: [
-            { id: "target-1", type: "explains" },
-            { id: "target-2", type: "example-of" },
+            { id: "target-1" as MemoryId, type: "explains" },
+            { id: "target-2" as MemoryId, type: "example-of" },
           ],
         },
       ],
@@ -39,24 +42,28 @@ describe("consolidate helpers", () => {
     );
 
     expect(relationships).toEqual([
-      { id: "target-1", type: "related-to" },
-      { id: "target-1", type: "explains" },
-      { id: "target-2", type: "example-of" },
+      { id: "target-1" as MemoryId, type: "related-to" },
+      { id: "target-1" as MemoryId, type: "explains" },
+      { id: "target-2" as MemoryId, type: "example-of" },
     ]);
   });
 
   it("filters dangling relationships and removes the field when empty", () => {
     const original = [
-      { id: "keep", type: "related-to" as const },
-      { id: "drop", type: "supersedes" as const },
+      { id: "keep" as MemoryId, type: "related-to" as const },
+      { id: "drop" as MemoryId, type: "supersedes" as const },
     ];
 
-    expect(filterRelationships(original, ["drop"])).toEqual([{ id: "keep", type: "related-to" }]);
-    expect(filterRelationships([{ id: "drop", type: "supersedes" }], ["drop"])).toBeUndefined();
+    expect(filterRelationships(original, ["drop"])).toEqual([
+      { id: "keep" as MemoryId, type: "related-to" },
+    ]);
+    expect(
+      filterRelationships([{ id: "drop" as MemoryId, type: "supersedes" }], ["drop"]),
+    ).toBeUndefined();
   });
 
   it("returns the original relationship array when nothing changes", () => {
-    const original = [{ id: "keep", type: "related-to" as const }];
+    const original = [{ id: "keep" as MemoryId, type: "related-to" as const }];
     expect(filterRelationships(original, ["other"])).toBe(original);
   });
 
@@ -118,28 +125,28 @@ describe("consolidate helpers", () => {
 
   it("builds per-note warnings for temporary research, supersedes chain, lifecycle mismatch and stale target", () => {
     const noteA = {
-      id: "a",
+      id: "a" as MemoryId,
       title: "A",
       lifecycle: "temporary" as const,
       role: "research" as const,
-      updatedAt: "2026-04-10T00:00:00.000Z",
-      relatedTo: [{ id: "b", type: "supersedes" as const }],
+      updatedAt: "2026-04-10T00:00:00.000Z" as ISO8601DateString,
+      relatedTo: [{ id: "b" as MemoryId, type: "supersedes" as const }],
     };
     const noteB = {
-      id: "b",
+      id: "b" as MemoryId,
       title: "B",
       lifecycle: "permanent" as const,
       role: "research" as const,
-      updatedAt: "2026-04-12T00:00:00.000Z",
-      relatedTo: [] as Array<{ id: string; type: "supersedes" }>,
+      updatedAt: "2026-04-12T00:00:00.000Z" as ISO8601DateString,
+      relatedTo: [] as Relationship[],
     };
     const noteC = {
-      id: "c",
+      id: "c" as MemoryId,
       title: "C",
       lifecycle: "permanent" as const,
       role: "research" as const,
-      updatedAt: "2026-04-12T00:00:00.000Z",
-      relatedTo: [] as Array<{ id: string; type: "supersedes" }>,
+      updatedAt: "2026-04-12T00:00:00.000Z" as ISO8601DateString,
+      relatedTo: [] as Relationship[],
     };
     const allNotes = [noteA, noteB, noteC];
     const warningsA = buildNoteWarnings(noteA, allNotes, noteA);
@@ -156,20 +163,20 @@ describe("consolidate helpers", () => {
 
   it("builds group warnings with note prefixes", () => {
     const noteA = {
-      id: "a",
+      id: "a" as MemoryId,
       title: "A",
       lifecycle: "temporary" as const,
       role: "research" as const,
-      updatedAt: "2026-04-10T00:00:00.000Z",
-      relatedTo: [{ id: "b", type: "supersedes" as const }],
+      updatedAt: "2026-04-10T00:00:00.000Z" as ISO8601DateString,
+      relatedTo: [{ id: "b" as MemoryId, type: "supersedes" as const }],
     };
     const noteB = {
-      id: "b",
+      id: "b" as MemoryId,
       title: "B",
       lifecycle: "permanent" as const,
       role: "research" as const,
-      updatedAt: "2026-04-12T00:00:00.000Z",
-      relatedTo: [] as Array<{ id: string; type: "supersedes" }>,
+      updatedAt: "2026-04-12T00:00:00.000Z" as ISO8601DateString,
+      relatedTo: [] as Relationship[],
     };
     const groupWarnings = buildGroupWarnings([noteA, noteB], noteA);
     expect(groupWarnings.length).toBeGreaterThanOrEqual(1);
@@ -180,25 +187,26 @@ describe("consolidate helpers", () => {
 
   it("builds consolidate note evidence with per-note warnings and accurate risk", () => {
     const sourceNote = {
-      id: "source",
+      id: "source" as MemoryId,
       title: "Source",
       lifecycle: "permanent" as const,
       role: "decision" as const,
-      updatedAt: "2026-04-10T00:00:00.000Z",
-      relatedTo: [{ id: "target", type: "supersedes" as const }],
+      updatedAt: "2026-04-10T00:00:00.000Z" as ISO8601DateString,
+      relatedTo: [{ id: "target" as MemoryId, type: "supersedes" as const }],
     };
     const otherNote = {
-      id: "other",
+      id: "other" as MemoryId,
       title: "Other",
       lifecycle: "permanent" as const,
       role: undefined,
-      updatedAt: "2026-04-12T00:00:00.000Z",
-      relatedTo: [{ id: "source", type: "supersedes" as const }],
+      updatedAt: "2026-04-12T00:00:00.000Z" as ISO8601DateString,
+      relatedTo: [{ id: "source" as MemoryId, type: "supersedes" as const }],
     };
     const allNotes = [sourceNote, otherNote];
     const evidence = buildConsolidateNoteEvidence(
       sourceNote,
       allNotes,
+      undefined,
       new Date("2026-04-15T00:00:00.000Z"),
     );
 
@@ -216,120 +224,120 @@ describe("consolidate helpers", () => {
   describe("classifyConsolidationPair", () => {
     it("classifies lineage when notes have derives-from relationship", () => {
       const plan = {
-        id: "plan-1",
+        id: "plan-1" as MemoryId,
         title: "Implementation plan",
         lifecycle: "temporary" as const,
         role: "plan" as const,
-        updatedAt: "2026-04-10T00:00:00.000Z",
-        relatedTo: [{ id: "apply-1", type: "derives-from" as const }],
+        updatedAt: "2026-04-10T00:00:00.000Z" as ISO8601DateString,
+        relatedTo: [{ id: "apply-1" as MemoryId, type: "derives-from" as const }],
       };
       const apply = {
-        id: "apply-1",
+        id: "apply-1" as MemoryId,
         title: "Apply implementation",
         lifecycle: "temporary" as const,
         role: "context" as const,
-        updatedAt: "2026-04-12T00:00:00.000Z",
-        relatedTo: [] as Array<{ id: string; type: string }>,
+        updatedAt: "2026-04-12T00:00:00.000Z" as ISO8601DateString,
+        relatedTo: [] as Relationship[],
       };
       expect(classifyConsolidationPair(plan, apply)).toBe("lineage");
     });
 
     it("classifies lineage when notes have follows relationship", () => {
       const research = {
-        id: "research-1",
+        id: "research-1" as MemoryId,
         title: "Research findings",
         lifecycle: "temporary" as const,
         role: "research" as const,
-        updatedAt: "2026-04-10T00:00:00.000Z",
-        relatedTo: [{ id: "plan-1", type: "follows" as const }],
+        updatedAt: "2026-04-10T00:00:00.000Z" as ISO8601DateString,
+        relatedTo: [{ id: "plan-1" as MemoryId, type: "follows" as const }],
       };
       const plan = {
-        id: "plan-1",
+        id: "plan-1" as MemoryId,
         title: "Plan",
         lifecycle: "temporary" as const,
         role: "plan" as const,
-        updatedAt: "2026-04-12T00:00:00.000Z",
-        relatedTo: [] as Array<{ id: string; type: string }>,
+        updatedAt: "2026-04-12T00:00:00.000Z" as ISO8601DateString,
+        relatedTo: [] as Relationship[],
       };
       expect(classifyConsolidationPair(research, plan)).toBe("lineage");
     });
 
     it("classifies supersession-pressure when one note supersedes another", () => {
       const newer = {
-        id: "newer",
+        id: "newer" as MemoryId,
         title: "Newer decision",
         lifecycle: "permanent" as const,
         role: "decision" as const,
-        updatedAt: "2026-04-12T00:00:00.000Z",
-        relatedTo: [{ id: "older", type: "supersedes" as const }],
+        updatedAt: "2026-04-12T00:00:00.000Z" as ISO8601DateString,
+        relatedTo: [{ id: "older" as MemoryId, type: "supersedes" as const }],
       };
       const older = {
-        id: "older",
+        id: "older" as MemoryId,
         title: "Older decision",
         lifecycle: "permanent" as const,
         role: "decision" as const,
-        updatedAt: "2026-04-10T00:00:00.000Z",
-        relatedTo: [] as Array<{ id: string; type: string }>,
+        updatedAt: "2026-04-10T00:00:00.000Z" as ISO8601DateString,
+        relatedTo: [] as Relationship[],
       };
       expect(classifyConsolidationPair(newer, older)).toBe("supersession-pressure");
     });
 
     it("classifies unique-evidence-risk for research notes without lineage", () => {
       const researchA = {
-        id: "r1",
+        id: "r1" as MemoryId,
         title: "Research A",
         lifecycle: "temporary" as const,
         role: "research" as const,
-        updatedAt: "2026-04-10T00:00:00.000Z",
-        relatedTo: [] as Array<{ id: string; type: string }>,
+        updatedAt: "2026-04-10T00:00:00.000Z" as ISO8601DateString,
+        relatedTo: [] as Relationship[],
       };
       const researchB = {
-        id: "r2",
+        id: "r2" as MemoryId,
         title: "Research B",
         lifecycle: "temporary" as const,
         role: "research" as const,
-        updatedAt: "2026-04-12T00:00:00.000Z",
-        relatedTo: [] as Array<{ id: string; type: string }>,
+        updatedAt: "2026-04-12T00:00:00.000Z" as ISO8601DateString,
+        relatedTo: [] as Relationship[],
       };
       expect(classifyConsolidationPair(researchA, researchB)).toBe("unique-evidence-risk");
     });
 
     it("classifies lineage over research role when both apply", () => {
       const researchWithLineage = {
-        id: "r1",
+        id: "r1" as MemoryId,
         title: "Research with lineage",
         lifecycle: "temporary" as const,
         role: "research" as const,
-        updatedAt: "2026-04-10T00:00:00.000Z",
-        relatedTo: [{ id: "r2", type: "derives-from" as const }],
+        updatedAt: "2026-04-10T00:00:00.000Z" as ISO8601DateString,
+        relatedTo: [{ id: "r2" as MemoryId, type: "derives-from" as const }],
       };
       const researchB = {
-        id: "r2",
+        id: "r2" as MemoryId,
         title: "Related research",
         lifecycle: "temporary" as const,
         role: "research" as const,
-        updatedAt: "2026-04-12T00:00:00.000Z",
-        relatedTo: [] as Array<{ id: string; type: string }>,
+        updatedAt: "2026-04-12T00:00:00.000Z" as ISO8601DateString,
+        relatedTo: [] as Relationship[],
       };
       expect(classifyConsolidationPair(researchWithLineage, researchB)).toBe("lineage");
     });
 
     it("classifies duplicate-pressure for similar permanent notes without special conditions", () => {
       const decisionA = {
-        id: "d1",
+        id: "d1" as MemoryId,
         title: "Decision A",
         lifecycle: "permanent" as const,
         role: "decision" as const,
-        updatedAt: "2026-04-10T00:00:00.000Z",
-        relatedTo: [] as Array<{ id: string; type: string }>,
+        updatedAt: "2026-04-10T00:00:00.000Z" as ISO8601DateString,
+        relatedTo: [] as Relationship[],
       };
       const decisionB = {
-        id: "d2",
+        id: "d2" as MemoryId,
         title: "Decision B",
         lifecycle: "permanent" as const,
         role: "decision" as const,
-        updatedAt: "2026-04-12T00:00:00.000Z",
-        relatedTo: [] as Array<{ id: string; type: string }>,
+        updatedAt: "2026-04-12T00:00:00.000Z" as ISO8601DateString,
+        relatedTo: [] as Relationship[],
       };
       expect(classifyConsolidationPair(decisionA, decisionB)).toBe("duplicate-pressure");
     });
@@ -338,12 +346,12 @@ describe("consolidate helpers", () => {
   describe("classifyConsolidationNote", () => {
     it("returns supersession-pressure for a note that supersedes another", () => {
       const note = {
-        id: "newer",
+        id: "newer" as MemoryId,
         title: "Newer decision",
         lifecycle: "permanent" as const,
         role: "decision" as const,
-        updatedAt: "2026-04-12T00:00:00.000Z",
-        relatedTo: [{ id: "older", type: "supersedes" as const }],
+        updatedAt: "2026-04-12T00:00:00.000Z" as ISO8601DateString,
+        relatedTo: [{ id: "older" as MemoryId, type: "supersedes" as const }],
       };
       const allNotes = [note];
       const contextIds = new Set([note.id, "older"]);
@@ -352,20 +360,20 @@ describe("consolidate helpers", () => {
 
     it("returns supersession-pressure for a note that is superseded", () => {
       const note = {
-        id: "older",
+        id: "older" as MemoryId,
         title: "Older decision",
         lifecycle: "permanent" as const,
         role: "decision" as const,
-        updatedAt: "2026-04-10T00:00:00.000Z",
-        relatedTo: [] as Array<{ id: string; type: string }>,
+        updatedAt: "2026-04-10T00:00:00.000Z" as ISO8601DateString,
+        relatedTo: [] as Relationship[],
       };
       const newer = {
-        id: "newer",
+        id: "newer" as MemoryId,
         title: "Newer decision",
         lifecycle: "permanent" as const,
         role: "decision" as const,
-        updatedAt: "2026-04-12T00:00:00.000Z",
-        relatedTo: [{ id: "older", type: "supersedes" as const }],
+        updatedAt: "2026-04-12T00:00:00.000Z" as ISO8601DateString,
+        relatedTo: [{ id: "older" as MemoryId, type: "supersedes" as const }],
       };
       const allNotes = [note, newer];
       const contextIds = new Set([note.id, newer.id]);
@@ -374,12 +382,12 @@ describe("consolidate helpers", () => {
 
     it("returns lineage for a note with derives-from to a context note", () => {
       const note = {
-        id: "apply-1",
+        id: "apply-1" as MemoryId,
         title: "Apply plan",
         lifecycle: "temporary" as const,
         role: "context" as const,
-        updatedAt: "2026-04-12T00:00:00.000Z",
-        relatedTo: [{ id: "plan-1", type: "derives-from" as const }],
+        updatedAt: "2026-04-12T00:00:00.000Z" as ISO8601DateString,
+        relatedTo: [{ id: "plan-1" as MemoryId, type: "derives-from" as const }],
       };
       const allNotes = [note];
       const contextIds = new Set([note.id, "plan-1"]);
@@ -388,12 +396,12 @@ describe("consolidate helpers", () => {
 
     it("returns unique-evidence-risk for research notes without lineage", () => {
       const note = {
-        id: "r1",
+        id: "r1" as MemoryId,
         title: "Research findings",
         lifecycle: "temporary" as const,
         role: "research" as const,
-        updatedAt: "2026-04-10T00:00:00.000Z",
-        relatedTo: [] as Array<{ id: string; type: string }>,
+        updatedAt: "2026-04-10T00:00:00.000Z" as ISO8601DateString,
+        relatedTo: [] as Relationship[],
       };
       const allNotes = [note];
       const contextIds = new Set([note.id]);
@@ -402,12 +410,12 @@ describe("consolidate helpers", () => {
 
     it("returns undefined for plain permanent notes without special conditions", () => {
       const note = {
-        id: "d1",
+        id: "d1" as MemoryId,
         title: "Decision",
         lifecycle: "permanent" as const,
         role: "decision" as const,
-        updatedAt: "2026-04-10T00:00:00.000Z",
-        relatedTo: [] as Array<{ id: string; type: string }>,
+        updatedAt: "2026-04-10T00:00:00.000Z" as ISO8601DateString,
+        relatedTo: [] as Relationship[],
       };
       const allNotes = [note];
       const contextIds = new Set([note.id]);
@@ -416,12 +424,12 @@ describe("consolidate helpers", () => {
 
     it("prefers lineage over research role when both conditions apply", () => {
       const note = {
-        id: "r1",
+        id: "r1" as MemoryId,
         title: "Research with lineage",
         lifecycle: "temporary" as const,
         role: "research" as const,
-        updatedAt: "2026-04-10T00:00:00.000Z",
-        relatedTo: [{ id: "plan-1", type: "derives-from" as const }],
+        updatedAt: "2026-04-10T00:00:00.000Z" as ISO8601DateString,
+        relatedTo: [{ id: "plan-1" as MemoryId, type: "derives-from" as const }],
       };
       const allNotes = [note];
       const contextIds = new Set([note.id, "plan-1"]);

@@ -254,7 +254,7 @@ export function extractRememberedId(text: string): string {
     throw new Error(`Could not parse remembered id from: ${text}`);
   }
 
-  return match[1];
+  return match[1]!;
 }
 
 export async function callLocalMcpMethod(
@@ -364,7 +364,8 @@ export async function callLocalMcpResponse(
     },
     resolvedOptions,
   );
-  const text = response?.result?.content?.[0]?.text;
+  const content = response?.result?.content as Array<{ text?: string }> | undefined;
+  const text = content?.[0]?.text;
   if (!text) {
     throw new Error(`Missing tool response for ${toolName}`);
   }
@@ -500,7 +501,8 @@ export async function createPersistentMcpSession(
     callMethod,
     callTool: async (toolName, arguments_) => {
       const result = await callMethod("tools/call", { name: toolName, arguments: arguments_ });
-      const text = result?.content?.[0]?.text as string | undefined;
+      const content = result?.content as Array<{ text?: string }> | undefined;
+      const text = content?.[0]?.text;
       if (!text) {
         throw new Error(`Missing tool response for ${toolName}`);
       }
@@ -698,7 +700,7 @@ export async function createModernMcpSession(
       if (result?.resultType !== "input_required") {
         return result;
       }
-      const responses = respond(result.inputRequests ?? {});
+      const responses = respond((result.inputRequests ?? {}) as Record<string, unknown>);
       if (Object.keys(responses).length === 0) {
         throw new Error(`input_required from '${toolName}' but responder produced no responses`);
       }

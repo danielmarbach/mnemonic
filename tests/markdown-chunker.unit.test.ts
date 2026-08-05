@@ -1,7 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { markdownChunker } from "../src/markdown-chunker.js";
+import type { DocumentId } from "../src/retrieval-document.js";
 
-const DOC_ID = "test-attachment::readme";
+const DOC_ID = "test-attachment::readme" as DocumentId;
 
 describe("markdownChunker", () => {
   describe("identity", () => {

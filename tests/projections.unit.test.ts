@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { isoDateString, memoryId } from "../src/brands.js";
 import type { Note, NoteStorage } from "../src/storage.js";
 import {
   buildProjection,
@@ -15,9 +16,9 @@ import { validateNoteProjection } from "../src/validation.js";
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function makeNote(overrides: Partial<Note> = {}): Note {
-  const now = "2026-01-01T00:00:00.000Z";
+  const now = isoDateString("2026-01-01T00:00:00.000Z");
   return {
-    id: "test-note-abc123",
+    id: memoryId("test-note-abc123"),
     title: "Test Note",
     content: "",
     tags: [],
@@ -193,7 +194,7 @@ describe("buildProjectionText", () => {
 
 describe("buildProjection", () => {
   it("produces a projection with correct noteId and title", () => {
-    const note = makeNote({ id: "abc-123", title: "Design Decision" });
+    const note = makeNote({ id: memoryId("abc-123"), title: "Design Decision" });
     const proj = buildProjection(note);
     expect(proj.noteId).toBe("abc-123");
     expect(proj.title).toBe("Design Decision");
@@ -207,7 +208,7 @@ describe("buildProjection", () => {
   });
 
   it("sets updatedAt from note.updatedAt", () => {
-    const note = makeNote({ updatedAt: "2026-03-01T12:00:00.000Z" });
+    const note = makeNote({ updatedAt: isoDateString("2026-03-01T12:00:00.000Z") });
     const proj = buildProjection(note);
     expect(proj.updatedAt).toBe("2026-03-01T12:00:00.000Z");
   });
@@ -247,7 +248,7 @@ describe("buildProjection", () => {
 // ── isProjectionStale ─────────────────────────────────────────────────────────
 
 describe("isProjectionStale", () => {
-  const updatedAt = "2026-01-15T00:00:00.000Z";
+  const updatedAt = isoDateString("2026-01-15T00:00:00.000Z");
 
   function makeProjection(
     overrides: Partial<NoteProjection> = {},
@@ -301,13 +302,13 @@ describe("isProjectionStale", () => {
   });
 
   it("returns true when updatedAt differs", () => {
-    const note = makeNote({ updatedAt: "2026-02-01T00:00:00.000Z" });
+    const note = makeNote({ updatedAt: isoDateString("2026-02-01T00:00:00.000Z") });
     const proj = makeProjection({ updatedAt: "2026-01-01T00:00:00.000Z" });
     expect(isProjectionStale(note, proj)).toBe(true);
   });
 
   it("returns true when note was updated after projection was built", () => {
-    const note = makeNote({ updatedAt: "2026-01-20T00:00:00.000Z" });
+    const note = makeNote({ updatedAt: isoDateString("2026-01-20T00:00:00.000Z") });
     const proj = makeProjection({ updatedAt: "2026-01-15T00:00:00.000Z" });
     expect(isProjectionStale(note, proj)).toBe(true);
   });
@@ -315,7 +316,7 @@ describe("isProjectionStale", () => {
   it("returns false when updatedAt differs but projectionText and contentSignals are unchanged", () => {
     // Relationship-only changes bump updatedAt without affecting projected content.
     // Build the actual projection text and signals for the default note so they match.
-    const note = makeNote({ updatedAt: "2026-02-01T00:00:00.000Z" });
+    const note = makeNote({ updatedAt: isoDateString("2026-02-01T00:00:00.000Z") });
     const fresh = buildProjection(note);
     const proj = makeProjection({
       updatedAt: "2026-01-01T00:00:00.000Z",
@@ -330,7 +331,7 @@ describe("isProjectionStale", () => {
     // but leaves the summary and headings in projectionText untouched.
     const note = makeNote({
       content: "Plain paragraph of text that remains identical.",
-      updatedAt: "2026-02-01T00:00:00.000Z",
+      updatedAt: isoDateString("2026-02-01T00:00:00.000Z"),
     });
     const fresh = buildProjection(note);
     const proj = makeProjection({
@@ -346,7 +347,7 @@ describe("isProjectionStale", () => {
     // Relationship-only updates are non-stale when projection text and signals match.
     const note = makeNote({
       content: "Body content that does not change.",
-      updatedAt: "2026-02-01T00:00:00.000Z",
+      updatedAt: isoDateString("2026-02-01T00:00:00.000Z"),
     });
     const fresh = buildProjection(note);
     const proj = makeProjection({
@@ -396,7 +397,10 @@ describe("getOrBuildProjection relationship-only updates", () => {
   }
 
   it("advances and persists the projection timestamp when content is unchanged", async () => {
-    const note = makeNote({ content: "Stable body.", updatedAt: "2026-02-01T00:00:00.000Z" });
+    const note = makeNote({
+      content: "Stable body.",
+      updatedAt: isoDateString("2026-02-01T00:00:00.000Z"),
+    });
     const fresh = buildProjection(note);
     const staleTimestamp = { ...fresh, updatedAt: "2026-01-01T00:00:00.000Z" };
     const writes: NoteProjection[] = [];
@@ -413,7 +417,10 @@ describe("getOrBuildProjection relationship-only updates", () => {
   });
 
   it("does not write when the projection timestamp already matches the note", async () => {
-    const note = makeNote({ content: "Stable body.", updatedAt: "2026-01-01T00:00:00.000Z" });
+    const note = makeNote({
+      content: "Stable body.",
+      updatedAt: isoDateString("2026-01-01T00:00:00.000Z"),
+    });
     const fresh = buildProjection(note);
     const writes: NoteProjection[] = [];
     const storage = makeStorage(fresh, writes);
@@ -424,11 +431,14 @@ describe("getOrBuildProjection relationship-only updates", () => {
   });
 
   it("rebuilds the projection when projected content actually changed", async () => {
-    const oldNote = makeNote({ content: "Old body.", updatedAt: "2026-01-01T00:00:00.000Z" });
+    const oldNote = makeNote({
+      content: "Old body.",
+      updatedAt: isoDateString("2026-01-01T00:00:00.000Z"),
+    });
     const staleProjection = buildProjection(oldNote);
     const newNote = makeNote({
       content: "Completely new body.",
-      updatedAt: "2026-02-01T00:00:00.000Z",
+      updatedAt: isoDateString("2026-02-01T00:00:00.000Z"),
     });
     const writes: NoteProjection[] = [];
     const storage = makeStorage(staleProjection, writes);

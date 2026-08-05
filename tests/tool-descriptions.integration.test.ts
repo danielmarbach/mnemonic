@@ -108,14 +108,17 @@ describe("tool-descriptions", () => {
       "Suggest canonical tags for a note before `remember` when tag choice is ambiguous.",
     );
 
-    const listTool = tools.find((t) => t.name === "list");
+    // listLocalMcpTools types tools without inputSchema; the wire response does
+    // carry it, so widen the found tool's shape for the schema assertions below.
+    const listTool = tools.find((t) => t.name === "list") as
+      { name: string; description?: string; inputSchema?: Record<string, unknown> } | undefined;
     expect(listTool?.inputSchema).toBeDefined();
-    const listSchema = listTool!.inputSchema as Record<string, unknown>;
+    const listSchema = listTool!.inputSchema!;
     const listProps = (listSchema["properties"] ?? {}) as Record<string, Record<string, unknown>>;
     const storedInProp = listProps["storedIn"];
     expect(storedInProp).toBeDefined();
-    expect(storedInProp["description"]).toContain("attached");
-    expect(storedInProp["enum"]).toContain("attached");
+    expect(storedInProp!["description"]).toContain("attached");
+    expect(storedInProp!["enum"]).toContain("attached");
   }, 15000);
 
   it("suggests note-oriented canonical tags by default", async () => {

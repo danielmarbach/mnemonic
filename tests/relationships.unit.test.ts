@@ -9,18 +9,19 @@ import {
 } from "../src/relationships.js";
 import type { EffectiveNoteMetadata } from "../src/role-suggestions.js";
 import type { Note } from "../src/storage.js";
+import type { ISO8601DateString, MemoryId } from "../src/brands.js";
 import type { Vault } from "../src/vault.js";
 
 // ── Test fixtures ─────────────────────────────────────────────────────────────
 
 const createNote = (overrides: Partial<Note>): Note => ({
-  id: "test-note",
+  id: "test-note" as MemoryId,
   title: "Test Note",
   content: "Test content",
   tags: [],
   lifecycle: "permanent",
-  createdAt: "2026-03-20T00:00:00.000Z",
-  updatedAt: "2026-03-20T00:00:00.000Z",
+  createdAt: "2026-03-20T00:00:00.000Z" as ISO8601DateString,
+  updatedAt: "2026-03-20T00:00:00.000Z" as ISO8601DateString,
   relatedTo: [],
   ...overrides,
 });
@@ -73,14 +74,14 @@ describe("isRecentlyUpdated", () => {
   it("returns true for notes updated within 5 days", () => {
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
-    const note = createNote({ updatedAt: yesterday.toISOString() });
+    const note = createNote({ updatedAt: yesterday.toISOString() as ISO8601DateString });
     expect(isRecentlyUpdated(note)).toBe(true);
   });
 
   it("returns false for notes older than 5 days", () => {
     const oldDate = new Date();
     oldDate.setDate(oldDate.getDate() - 13);
-    const note = createNote({ updatedAt: oldDate.toISOString() });
+    const note = createNote({ updatedAt: oldDate.toISOString() as ISO8601DateString });
     expect(isRecentlyUpdated(note)).toBe(false);
   });
 
@@ -89,7 +90,7 @@ describe("isRecentlyUpdated", () => {
     // Using setDate alone creates a timestamp at the same millisecond, so Math.floor
     // may yield 4 (not 5) when isRecentlyUpdated computes `now - updatedDate` moments later.
     const boundaryDate = new Date(Date.now() - 5 * 24 * 60 * 60 * 1000 - 60_000);
-    const note = createNote({ updatedAt: boundaryDate.toISOString() });
+    const note = createNote({ updatedAt: boundaryDate.toISOString() as ISO8601DateString });
     expect(isRecentlyUpdated(note)).toBe(false);
   });
 });
@@ -122,8 +123,8 @@ describe("scoreRelatedNote", () => {
     recentDate.setDate(recentDate.getDate() - 1);
     const oldDate = new Date();
     oldDate.setDate(oldDate.getDate() - 13);
-    const recentNote = createNote({ updatedAt: recentDate.toISOString() });
-    const oldNote = createNote({ updatedAt: oldDate.toISOString() });
+    const recentNote = createNote({ updatedAt: recentDate.toISOString() as ISO8601DateString });
+    const oldNote = createNote({ updatedAt: oldDate.toISOString() as ISO8601DateString });
     expect(scoreRelatedNote(recentNote, undefined)).toBeGreaterThan(
       scoreRelatedNote(oldNote, undefined),
     );
@@ -137,15 +138,15 @@ describe("scoreRelatedNote", () => {
     const highConfNote = createNote({
       lifecycle: "permanent",
       relatedTo: Array.from({ length: 5 }, (_, i) => ({
-        id: `rel-${i}`,
+        id: `rel-${i}` as MemoryId,
         type: "related-to" as const,
       })),
-      updatedAt: recentDate.toISOString(),
+      updatedAt: recentDate.toISOString() as ISO8601DateString,
     });
     const lowConfNote = createNote({
       lifecycle: "temporary",
       relatedTo: [],
-      updatedAt: oldDate.toISOString(),
+      updatedAt: oldDate.toISOString() as ISO8601DateString,
     });
     expect(scoreRelatedNote(highConfNote, undefined)).toBeGreaterThan(
       scoreRelatedNote(lowConfNote, undefined),
@@ -160,10 +161,10 @@ describe("scoreRelatedNote", () => {
       lifecycle: "permanent",
       alwaysLoad: true,
       relatedTo: Array.from({ length: 5 }, (_, i) => ({
-        id: `rel-${i}`,
+        id: `rel-${i}` as MemoryId,
         type: "related-to" as const,
       })),
-      updatedAt: recentDate.toISOString(),
+      updatedAt: recentDate.toISOString() as ISO8601DateString,
     });
     const baseNote = createNote({});
     const perfectScore = scoreRelatedNote(perfectNote, "test-project");
@@ -173,7 +174,7 @@ describe("scoreRelatedNote", () => {
   });
 
   it("prefers summary and decision metadata when other factors are comparable", () => {
-    const baseNote = createNote({ updatedAt: "2026-01-01T00:00:00.000Z" });
+    const baseNote = createNote({ updatedAt: "2026-01-01T00:00:00.000Z" as ISO8601DateString });
     const summaryMetadata: EffectiveNoteMetadata = {
       role: "summary",
       roleSource: "suggested",
@@ -196,7 +197,7 @@ describe("scoreRelatedNote", () => {
   });
 
   it("gives an explicit alwaysLoad boost", () => {
-    const note = createNote({ updatedAt: "2026-01-01T00:00:00.000Z" });
+    const note = createNote({ updatedAt: "2026-01-01T00:00:00.000Z" as ISO8601DateString });
     const alwaysLoadMetadata: EffectiveNoteMetadata = {
       roleSource: "none",
       importanceSource: "none",
@@ -211,11 +212,14 @@ describe("scoreRelatedNote", () => {
 
   it("keeps same-project priority above metadata-only global notes", () => {
     const projectNote = createNote({
-      id: "project",
+      id: "project" as MemoryId,
       project: "test-project",
-      updatedAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z" as ISO8601DateString,
     });
-    const globalNote = createNote({ id: "global", updatedAt: "2026-01-01T00:00:00.000Z" });
+    const globalNote = createNote({
+      id: "global" as MemoryId,
+      updatedAt: "2026-01-01T00:00:00.000Z" as ISO8601DateString,
+    });
     const richMetadata: EffectiveNoteMetadata = {
       role: "summary",
       roleSource: "suggested",
@@ -242,25 +246,25 @@ describe("buildRelationshipPreview", () => {
   it("respects limit parameter", () => {
     const scored = [
       {
-        note: createNote({ id: "1", title: "First" }),
+        note: createNote({ id: "1" as MemoryId, title: "First" }),
         vault: mockVault(),
         relationType: "related-to" as const,
         score: 100,
       },
       {
-        note: createNote({ id: "2", title: "Second" }),
+        note: createNote({ id: "2" as MemoryId, title: "Second" }),
         vault: mockVault(),
         relationType: "related-to" as const,
         score: 90,
       },
       {
-        note: createNote({ id: "3", title: "Third" }),
+        note: createNote({ id: "3" as MemoryId, title: "Third" }),
         vault: mockVault(),
         relationType: "related-to" as const,
         score: 80,
       },
       {
-        note: createNote({ id: "4", title: "Fourth" }),
+        note: createNote({ id: "4" as MemoryId, title: "Fourth" }),
         vault: mockVault(),
         relationType: "related-to" as const,
         score: 70,
@@ -275,7 +279,7 @@ describe("buildRelationshipPreview", () => {
 
   it("enforces hard max of 5", () => {
     const scored = Array.from({ length: 10 }, (_, i) => ({
-      note: createNote({ id: `${i}`, title: `Note ${i}` }),
+      note: createNote({ id: `${i}` as MemoryId, title: `Note ${i}` }),
       vault: mockVault(),
       relationType: "related-to" as const,
       score: 100 - i,
@@ -289,7 +293,7 @@ describe("buildRelationshipPreview", () => {
   it("includes theme in preview", () => {
     const scored = [
       {
-        note: createNote({ id: "1", title: "Design Decision", tags: ["design"] }),
+        note: createNote({ id: "1" as MemoryId, title: "Design Decision", tags: ["design"] }),
         vault: mockVault(),
         relationType: "related-to" as const,
         score: 100,
@@ -297,13 +301,13 @@ describe("buildRelationshipPreview", () => {
     ];
 
     const result = buildRelationshipPreview(scored, { activeProjectId: "test-project" });
-    expect(result?.shown[0].theme).toBe("decisions");
+    expect(result?.shown[0]!.theme).toBe("decisions");
   });
 
   it("omits theme when classified as other", () => {
     const scored = [
       {
-        note: createNote({ id: "1", title: "Random Note" }),
+        note: createNote({ id: "1" as MemoryId, title: "Random Note" }),
         vault: mockVault(),
         relationType: "related-to" as const,
         score: 100,
@@ -311,52 +315,52 @@ describe("buildRelationshipPreview", () => {
     ];
 
     const result = buildRelationshipPreview(scored, { activeProjectId: "test-project" });
-    expect(result?.shown[0].theme).toBeUndefined();
+    expect(result?.shown[0]!.theme).toBeUndefined();
   });
 });
 
 describe("getDirectRelatedNotes", () => {
   it("uses visible relationship graph context to infer metadata during scoring", async () => {
     const source = createNote({
-      id: "source",
+      id: "source" as MemoryId,
       relatedTo: [
-        { id: "summary", type: "related-to" },
-        { id: "plain", type: "related-to" },
+        { id: "summary" as MemoryId, type: "related-to" },
+        { id: "plain" as MemoryId, type: "related-to" },
       ],
     });
     const summary = createNote({
-      id: "summary",
+      id: "summary" as MemoryId,
       title: "Summary note",
-      updatedAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z" as ISO8601DateString,
       content: ["# Overview", "## Details", "- first", "- second", "- third", "- fourth"].join(
         "\n",
       ),
     });
     const plain = createNote({
-      id: "plain",
+      id: "plain" as MemoryId,
       title: "Plain note",
-      updatedAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z" as ISO8601DateString,
       content: "Just a regular note.",
     });
     const inboundA = createNote({
-      id: "inbound-a",
+      id: "inbound-a" as MemoryId,
       lifecycle: "permanent",
-      relatedTo: [{ id: "summary", type: "related-to" }],
+      relatedTo: [{ id: "summary" as MemoryId, type: "related-to" }],
     });
     const inboundB = createNote({
-      id: "inbound-b",
+      id: "inbound-b" as MemoryId,
       lifecycle: "permanent",
-      relatedTo: [{ id: "summary", type: "related-to" }],
+      relatedTo: [{ id: "summary" as MemoryId, type: "related-to" }],
     });
     const inboundC = createNote({
-      id: "inbound-c",
+      id: "inbound-c" as MemoryId,
       lifecycle: "temporary",
-      relatedTo: [{ id: "summary", type: "related-to" }],
+      relatedTo: [{ id: "summary" as MemoryId, type: "related-to" }],
     });
     const inboundD = createNote({
-      id: "inbound-d",
+      id: "inbound-d" as MemoryId,
       lifecycle: "temporary",
-      relatedTo: [{ id: "summary", type: "related-to" }],
+      relatedTo: [{ id: "summary" as MemoryId, type: "related-to" }],
     });
 
     const vault = createVault([source, summary, plain, inboundA, inboundB, inboundC, inboundD]);
@@ -370,11 +374,16 @@ describe("getDirectRelatedNotes", () => {
     const vaultPathA = "/tmp/vault-a";
     const vaultPathB = "/tmp/vault-b";
 
-    const targetNote = createNote({ id: "cross-vault-target", title: "Cross Vault Target" });
+    const targetNote = createNote({
+      id: "cross-vault-target" as MemoryId,
+      title: "Cross Vault Target",
+    });
 
     const source = createNote({
-      id: "source",
-      relatedTo: [{ id: "cross-vault-target", type: "related-to", vaultPath: vaultPathB }],
+      id: "source" as MemoryId,
+      relatedTo: [
+        { id: "cross-vault-target" as MemoryId, type: "related-to", vaultPath: vaultPathB },
+      ],
     });
 
     const vaultA = mockVault({
@@ -396,19 +405,22 @@ describe("getDirectRelatedNotes", () => {
     const result = await getDirectRelatedNotes(source, [vaultA, vaultB]);
 
     expect(result).toHaveLength(1);
-    expect(result[0].note.id).toBe("cross-vault-target");
-    expect(result[0].vault).toBe(vaultB);
+    expect(result[0]!.note.id).toBe("cross-vault-target");
+    expect(result[0]!.vault).toBe(vaultB);
   });
 
   it("uses the source vault for legacy unqualified duplicate ids", async () => {
     const vaultPathA = "/tmp/vault-a-source";
     const vaultPathB = "/tmp/vault-b-source";
     const source = createNote({
-      id: "source",
-      relatedTo: [{ id: "duplicate-target", type: "related-to" }],
+      id: "source" as MemoryId,
+      relatedTo: [{ id: "duplicate-target" as MemoryId, type: "related-to" }],
     });
-    const targetA = createNote({ id: "duplicate-target", title: "Source Vault Target" });
-    const targetB = createNote({ id: "duplicate-target", title: "Other Vault Target" });
+    const targetA = createNote({
+      id: "duplicate-target" as MemoryId,
+      title: "Source Vault Target",
+    });
+    const targetB = createNote({ id: "duplicate-target" as MemoryId, title: "Other Vault Target" });
     const vaultA = mockVault({
       storage: {
         vaultPath: vaultPathA,
@@ -436,18 +448,22 @@ describe("getDirectRelatedNotes", () => {
 describe("Phase 4 acceptance criteria", () => {
   it("1-hop expansion only (no transitive relations)", () => {
     const sourceNote = createNote({
-      relatedTo: [{ id: "direct", type: "related-to" }],
+      relatedTo: [{ id: "direct" as MemoryId, type: "related-to" }],
     });
 
     // getDirectRelatedNotes only follows sourceNote.relatedTo, not direct.relatedTo
     // This is validated by the function signature - it takes sourceNote.relatedTo as input
     expect(sourceNote.relatedTo?.length).toBe(1);
-    expect(sourceNote.relatedTo![0].id).toBe("direct");
+    expect(sourceNote.relatedTo![0]!.id).toBe("direct");
   });
 
   it("same-project notes prioritized", () => {
-    const projectNote = createNote({ id: "proj", project: "test-project", title: "Project" });
-    const globalNote = createNote({ id: "global", title: "Global" });
+    const projectNote = createNote({
+      id: "proj" as MemoryId,
+      project: "test-project",
+      title: "Project",
+    });
+    const globalNote = createNote({ id: "global" as MemoryId, title: "Global" });
 
     const scored = [
       {
@@ -465,12 +481,12 @@ describe("Phase 4 acceptance criteria", () => {
     ];
     scored.sort((a, b) => b.score - a.score);
 
-    expect(scored[0].note.id).toBe("proj");
+    expect(scored[0]!.note.id).toBe("proj");
   });
 
   it("output stays compact (max 3 shown by default)", () => {
     const scored = Array.from({ length: 10 }, (_, i) => ({
-      note: createNote({ id: `${i}`, title: `Note ${i}` }),
+      note: createNote({ id: `${i}` as MemoryId, title: `Note ${i}` }),
       vault: mockVault(),
       relationType: "related-to" as const,
       score: 100 - i,
@@ -482,7 +498,7 @@ describe("Phase 4 acceptance criteria", () => {
 
   it("truncated flag set when more relations exist", () => {
     const scored = Array.from({ length: 5 }, (_, i) => ({
-      note: createNote({ id: `${i}`, title: `Note ${i}` }),
+      note: createNote({ id: `${i}` as MemoryId, title: `Note ${i}` }),
       vault: mockVault(),
       relationType: "related-to" as const,
       score: 100 - i,

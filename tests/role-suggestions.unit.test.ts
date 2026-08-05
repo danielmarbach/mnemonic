@@ -1,18 +1,19 @@
 import { describe, expect, it } from "vitest";
 
 import { getEffectiveMetadata, suggestImportance, suggestRole } from "../src/role-suggestions.js";
+import { memoryId, isoDateString } from "../src/brands.js";
 import type { Note, Relationship } from "../src/storage.js";
 
 function makeNote(overrides: Partial<Note> = {}): Note {
   return {
-    id: overrides.id ?? "note-1",
+    id: memoryId(overrides.id ?? "note-1"),
     title: overrides.title ?? "Untitled",
     content: overrides.content ?? "Body",
     tags: overrides.tags ?? [],
     lifecycle: overrides.lifecycle ?? "permanent",
     relatedTo: overrides.relatedTo ?? [],
-    createdAt: overrides.createdAt ?? "2026-03-20T10:00:00.000Z",
-    updatedAt: overrides.updatedAt ?? "2026-03-20T10:00:00.000Z",
+    createdAt: isoDateString(overrides.createdAt ?? "2026-03-20T10:00:00.000Z"),
+    updatedAt: isoDateString(overrides.updatedAt ?? "2026-03-20T10:00:00.000Z"),
     role: overrides.role,
     importance: overrides.importance,
     alwaysLoad: overrides.alwaysLoad,
@@ -23,7 +24,7 @@ function makeNote(overrides: Partial<Note> = {}): Note {
 }
 
 function rel(id: string, type: Relationship["type"]): Relationship {
-  return { id, type };
+  return { id: memoryId(id), type };
 }
 
 describe("role suggestions", () => {

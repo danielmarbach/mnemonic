@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { embedMissingNotes } from "../src/helpers/embed.js";
 import type { NoteStorage, Note, NoteMetadata } from "../src/storage.js";
 import type { ServerContext } from "../src/server-context.js";
-import { memoryId } from "../src/brands.js";
+import { memoryId, embeddingModelId, isoDateString } from "../src/brands.js";
 
 // Mock the embedding call so the helper never hits a real model endpoint; keep
 // the metadata/compatibility helpers real so records are shaped correctly.
@@ -33,8 +33,8 @@ function makeNoteMetadata(id: string): NoteMetadata {
     title: `Note ${id}`,
     tags: [],
     lifecycle: "permanent",
-    createdAt: "2026-01-01T00:00:00.000Z",
-    updatedAt: "2026-01-01T00:00:00.000Z",
+    createdAt: isoDateString("2026-01-01T00:00:00.000Z"),
+    updatedAt: isoDateString("2026-01-01T00:00:00.000Z"),
   };
 }
 
@@ -103,9 +103,9 @@ describe("embedMissingNotes", () => {
       embeddings: [
         {
           id: memoryId("current"),
-          model: "test-model",
+          model: embeddingModelId("test-model"),
           embedding: [0.1, 0.2, 0.3],
-          updatedAt: now,
+          updatedAt: isoDateString(now),
         },
       ],
     });

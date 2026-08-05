@@ -1,6 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { VaultManager, type ProjectAttachmentConfig } from "../src/vault.js";
+import {
+  VaultManager,
+  type MnemonicVaultAttachmentConfig,
+  type ProjectAttachmentConfig,
+} from "../src/vault.js";
 import { Storage, type Note } from "../src/storage.js";
+import type { MemoryId, ISO8601DateString } from "../src/brands.js";
 import * as fs from "fs/promises";
 import * as path from "path";
 import os from "os";
@@ -176,13 +181,13 @@ describe("VaultManager", () => {
 
       // Write note to project vault
       const note: Note = {
-        id: "project-note",
+        id: "project-note" as MemoryId,
         title: "Project Note",
         content: "Note in project vault",
         tags: [],
         lifecycle: "permanent",
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+        createdAt: new Date().toISOString() as ISO8601DateString,
+        updatedAt: new Date().toISOString() as ISO8601DateString,
       };
       await projectVault!.storage.writeNote(note);
 
@@ -204,13 +209,13 @@ describe("VaultManager", () => {
 
       // Write note to main vault instead
       const note: Note = {
-        id: "main-only-note",
+        id: "main-only-note" as MemoryId,
         title: "Main Only Note",
         content: "Note only in main vault",
         tags: [],
         lifecycle: "permanent",
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+        createdAt: new Date().toISOString() as ISO8601DateString,
+        updatedAt: new Date().toISOString() as ISO8601DateString,
       };
       await vaultManager.main.storage.writeNote(note);
 
@@ -224,13 +229,13 @@ describe("VaultManager", () => {
     it("should find note without cwd (search all vaults)", async () => {
       // Write note to main
       const mainNote: Note = {
-        id: "main-note",
+        id: "main-note" as MemoryId,
         title: "Main Note",
         content: "In main",
         tags: [],
         lifecycle: "permanent",
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+        createdAt: new Date().toISOString() as ISO8601DateString,
+        updatedAt: new Date().toISOString() as ISO8601DateString,
       };
       await vaultManager.main.storage.writeNote(mainNote);
 
@@ -254,13 +259,13 @@ describe("VaultManager", () => {
 
       // Write same ID to both vaults
       const note: Note = {
-        id: "duplicate-id",
+        id: "duplicate-id" as MemoryId,
         title: "Duplicate ID",
         content: "Different content",
         tags: [],
         lifecycle: "permanent",
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+        createdAt: new Date().toISOString() as ISO8601DateString,
+        updatedAt: new Date().toISOString() as ISO8601DateString,
       };
 
       await projectVault!.storage.writeNote({ ...note, content: "Project version" });
@@ -541,13 +546,13 @@ describe("VaultManager", () => {
       expect(subVault).toBeTruthy();
 
       const note: Note = {
-        id: "sub-note-abc",
+        id: "sub-note-abc" as MemoryId,
         title: "Sub Note",
         content: "Note in submodule vault",
         tags: [],
         lifecycle: "permanent",
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+        createdAt: new Date().toISOString() as ISO8601DateString,
+        updatedAt: new Date().toISOString() as ISO8601DateString,
       };
       await subVault!.storage.writeNote(note);
 
@@ -588,7 +593,9 @@ describe("VaultManager", () => {
     });
 
     function makeAttachmentConfig(
-      overrides: Partial<ProjectAttachmentConfig> & { projectSlug: string },
+      overrides: Partial<Omit<MnemonicVaultAttachmentConfig, "projectSlug" | "kind">> & {
+        projectSlug: string;
+      },
     ): ProjectAttachmentConfig {
       return {
         kind: "mnemonic-vault",
@@ -602,7 +609,7 @@ describe("VaultManager", () => {
         updatedAt: new Date().toISOString(),
         branchTipHash: "abc123",
         ...overrides,
-      };
+      } as MnemonicVaultAttachmentConfig;
     }
 
     async function setupAttachedVault(localPath: string): Promise<void> {
@@ -626,8 +633,8 @@ describe("VaultManager", () => {
 
       const attached = vaultManager.getAttachmentsForProject("attach-project");
       expect(attached).toHaveLength(1);
-      expect(attached[0].provenance).toBe("project-attached");
-      expect(attached[0].writable).toBe(false);
+      expect(attached[0]!.provenance).toBe("project-attached");
+      expect(attached[0]!.writable).toBe(false);
     });
 
     it("should have writable=true for project-local provenance", async () => {
@@ -767,13 +774,13 @@ describe("VaultManager", () => {
       await baseStorage.init();
 
       const note: Note = {
-        id: "attached-note-mutable",
+        id: "attached-note-mutable" as MemoryId,
         title: "Attached Mutable Note",
         content: "Read-only content",
         tags: [],
         lifecycle: "permanent",
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+        createdAt: new Date().toISOString() as ISO8601DateString,
+        updatedAt: new Date().toISOString() as ISO8601DateString,
       };
       await baseStorage.writeNote(note);
 
@@ -841,7 +848,7 @@ describe("VaultManager", () => {
 
       const remaining = vaultManager.getAttachmentsForProject("attach-project");
       expect(remaining).toHaveLength(1);
-      expect(remaining[0].attachmentRef?.projectSlug).toBe("slug-b");
+      expect(remaining[0]!.attachmentRef?.projectSlug).toBe("slug-b");
     });
 
     it("should not throw when removing a non-existent attachment", () => {
@@ -913,13 +920,13 @@ describe("VaultManager", () => {
       await baseStorage.init();
 
       const note: Note = {
-        id: "writable-attached-note",
+        id: "writable-attached-note" as MemoryId,
         title: "Writable Attached Note",
         content: "Writable content",
         tags: [],
         lifecycle: "permanent",
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+        createdAt: new Date().toISOString() as ISO8601DateString,
+        updatedAt: new Date().toISOString() as ISO8601DateString,
       };
       await baseStorage.writeNote(note);
 
@@ -948,8 +955,8 @@ describe("VaultManager", () => {
 
       const attached = vaultManager.getAttachmentsForProject("attach-project");
       expect(attached).toHaveLength(1);
-      expect(attached[0].writable).toBe(true);
-      expect(attached[0].attachmentRef?.writable).toBe(true);
+      expect(attached[0]!.writable).toBe(true);
+      expect(attached[0]!.attachmentRef?.writable).toBe(true);
     });
   });
 
@@ -967,13 +974,13 @@ describe("VaultManager", () => {
 
       // Write a note
       const note: Note = {
-        id: "test-note",
+        id: "test-note" as MemoryId,
         title: "Test Note",
         content: "Test content",
         tags: [],
         lifecycle: "permanent",
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+        createdAt: new Date().toISOString() as ISO8601DateString,
+        updatedAt: new Date().toISOString() as ISO8601DateString,
       };
       await projectVault!.storage.writeNote(note);
 
@@ -1001,13 +1008,13 @@ describe("VaultManager", () => {
 
       // Write and commit a note first
       const note: Note = {
-        id: "test-note-mod",
+        id: "test-note-mod" as MemoryId,
         title: "Test Note",
         content: "Original content",
         tags: [],
         lifecycle: "permanent",
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+        createdAt: new Date().toISOString() as ISO8601DateString,
+        updatedAt: new Date().toISOString() as ISO8601DateString,
       };
       await projectVault!.storage.writeNote(note);
       const git = simpleGit(projectDir);
@@ -1062,13 +1069,13 @@ describe("VaultManager", () => {
       // Write multiple notes and stage them
       for (let i = 1; i <= 2; i++) {
         const note: Note = {
-          id: `note-${i}`,
+          id: `note-${i}` as MemoryId,
           title: `Note ${i}`,
           content: `Content ${i}`,
           tags: [],
           lifecycle: "permanent",
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
+          createdAt: new Date().toISOString() as ISO8601DateString,
+          updatedAt: new Date().toISOString() as ISO8601DateString,
         };
         await projectVault!.storage.writeNote(note);
       }

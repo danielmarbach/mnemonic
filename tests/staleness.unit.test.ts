@@ -1,8 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { VaultManager, type ProjectAttachmentConfig } from "../src/vault.js";
+import {
+  VaultManager,
+  type MnemonicVaultAttachmentConfig,
+  type ProjectAttachmentConfig,
+} from "../src/vault.js";
 import { Storage, type Note, type EmbeddingRecord } from "../src/storage.js";
 import { removeStaleEmbeddings } from "../src/helpers/embed.js";
-import { memoryId } from "../src/brands.js";
+import { memoryId, type AttachmentSlug } from "../src/brands.js";
 import * as fs from "fs/promises";
 import * as path from "path";
 import os from "os";
@@ -93,7 +97,7 @@ describe("VaultManager staleness detection", () => {
   }
 
   function makeAttachmentConfig(
-    overrides: Partial<ProjectAttachmentConfig> & { projectSlug: string },
+    overrides: Partial<MnemonicVaultAttachmentConfig> & { projectSlug: string },
   ): ProjectAttachmentConfig {
     return {
       kind: "mnemonic-vault",
@@ -127,7 +131,7 @@ describe("VaultManager staleness detection", () => {
     const currentHash = await getHeadHash(attachedPath);
 
     const config = makeAttachmentConfig({
-      projectSlug: "stale-test",
+      projectSlug: "stale-test" as AttachmentSlug,
       localPath: attachedPath,
       branchTipHash: "outdated-hash-that-is-not-current",
     });
@@ -155,7 +159,7 @@ describe("VaultManager staleness detection", () => {
     const currentHash = await getHeadHash(attachedPath);
 
     const config = makeAttachmentConfig({
-      projectSlug: "current-test",
+      projectSlug: "current-test" as AttachmentSlug,
       localPath: attachedPath,
       branchTipHash: currentHash,
     });
@@ -180,7 +184,7 @@ describe("VaultManager staleness detection", () => {
     await setupAttachedVault(attachedPath);
 
     const config = makeAttachmentConfig({
-      projectSlug: "working-tree-test",
+      projectSlug: "working-tree-test" as AttachmentSlug,
       localPath: attachedPath,
       branch: "",
       branchTipHash: "should-not-change",
@@ -209,7 +213,7 @@ describe("VaultManager staleness detection", () => {
     const initialHash = await getHeadHash(attachedPath);
 
     const config = makeAttachmentConfig({
-      projectSlug: "evolving-test",
+      projectSlug: "evolving-test" as AttachmentSlug,
       localPath: attachedPath,
       branchTipHash: initialHash,
     });
@@ -229,7 +233,7 @@ describe("VaultManager staleness detection", () => {
 
     vaultManager.clearAttachmentCaches();
     const updatedConfig = makeAttachmentConfig({
-      projectSlug: "evolving-test",
+      projectSlug: "evolving-test" as AttachmentSlug,
       localPath: attachedPath,
       branchTipHash: initialHash,
     });
@@ -379,7 +383,7 @@ describe("VaultManager clearAttachmentCaches and reload", () => {
   }
 
   function makeAttachmentConfig(
-    overrides: Partial<ProjectAttachmentConfig> & { projectSlug: string },
+    overrides: Partial<MnemonicVaultAttachmentConfig> & { projectSlug: string },
   ): ProjectAttachmentConfig {
     return {
       kind: "mnemonic-vault",
@@ -418,7 +422,7 @@ describe("VaultManager clearAttachmentCaches and reload", () => {
     const initialHash = await getHeadHash(attachedPath);
 
     const config = makeAttachmentConfig({
-      projectSlug: "reload-test",
+      projectSlug: "reload-test" as AttachmentSlug,
       localPath: attachedPath,
       branchTipHash: initialHash,
     });
@@ -432,7 +436,7 @@ describe("VaultManager clearAttachmentCaches and reload", () => {
     expect(vaultManager.getAttachmentsForProject("project-reload")).toHaveLength(0);
 
     const updatedConfig = makeAttachmentConfig({
-      projectSlug: "reload-test",
+      projectSlug: "reload-test" as AttachmentSlug,
       localPath: attachedPath,
       branchTipHash: initialHash,
     });
@@ -457,7 +461,7 @@ describe("VaultManager clearAttachmentCaches and reload", () => {
     await vaultManager.getOrCreateProjectVault(projectDir);
 
     const config = makeAttachmentConfig({
-      projectSlug: "clear-test",
+      projectSlug: "clear-test" as AttachmentSlug,
       localPath: attachedPath,
     });
 

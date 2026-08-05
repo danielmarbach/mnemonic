@@ -11,17 +11,18 @@ import {
   anchorScore,
   buildThemeCache,
 } from "../src/project-introspection.js";
+import { memoryId, isoDateString } from "../src/brands.js";
 import type { Note } from "../src/storage.js";
 
 function makeNote(title: string, tags: string[]): Note {
   return {
-    id: "note-1",
+    id: memoryId("note-1"),
     title,
     content: "content",
     tags,
     lifecycle: "permanent",
-    createdAt: "2026-03-07T00:00:00.000Z",
-    updatedAt: "2026-03-07T00:00:00.000Z",
+    createdAt: isoDateString("2026-03-07T00:00:00.000Z"),
+    updatedAt: isoDateString("2026-03-07T00:00:00.000Z"),
     memoryVersion: 1,
   };
 }
@@ -90,15 +91,15 @@ describe("centralityBonus", () => {
 describe("withinThemeScore", () => {
   it("combines recency and centrality", () => {
     const note: Note = {
-      id: "test-1",
+      id: memoryId("test-1"),
       title: "Test",
       content: "Content",
       tags: [],
       lifecycle: "permanent",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      createdAt: isoDateString(new Date().toISOString()),
+      updatedAt: isoDateString(new Date().toISOString()),
       memoryVersion: 1,
-      relatedTo: [{ id: "other-1", type: "related-to" }],
+      relatedTo: [{ id: memoryId("other-1"), type: "related-to" }],
     };
 
     const score = withinThemeScore(note);
@@ -110,13 +111,13 @@ describe("withinThemeScore", () => {
 describe("anchorScore", () => {
   it("returns -Infinity for temporary notes", () => {
     const note: Note = {
-      id: "temp-1",
+      id: memoryId("temp-1"),
       title: "Temp",
       content: "Content",
       tags: [],
       lifecycle: "temporary",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      createdAt: isoDateString(new Date().toISOString()),
+      updatedAt: isoDateString(new Date().toISOString()),
       memoryVersion: 1,
     };
 
@@ -126,17 +127,17 @@ describe("anchorScore", () => {
 
   it("scores permanent notes with connections", () => {
     const note: Note = {
-      id: "anchor-1",
+      id: memoryId("anchor-1"),
       title: "Anchor",
       content: "Content",
       tags: [],
       lifecycle: "permanent",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      createdAt: isoDateString(new Date().toISOString()),
+      updatedAt: isoDateString(new Date().toISOString()),
       memoryVersion: 1,
       relatedTo: [
-        { id: "note-1", type: "related-to" },
-        { id: "note-2", type: "related-to" },
+        { id: memoryId("note-1"), type: "related-to" },
+        { id: memoryId("note-2"), type: "related-to" },
       ],
     };
 
@@ -153,13 +154,13 @@ describe("anchorScore", () => {
 describe("classifyTheme", () => {
   it("classifies overview notes", () => {
     const note: Note = {
-      id: "test",
+      id: memoryId("test"),
       title: "Project Overview",
       content: "",
       tags: ["overview"],
       lifecycle: "permanent",
-      createdAt: "",
-      updatedAt: "",
+      createdAt: isoDateString(""),
+      updatedAt: isoDateString(""),
       memoryVersion: 1,
     };
     expect(classifyTheme(note)).toBe("overview");
@@ -167,13 +168,13 @@ describe("classifyTheme", () => {
 
   it("classifies by tags", () => {
     const note: Note = {
-      id: "test",
+      id: memoryId("test"),
       title: "Some Decision",
       content: "",
       tags: ["decisions"],
       lifecycle: "permanent",
-      createdAt: "",
-      updatedAt: "",
+      createdAt: isoDateString(""),
+      updatedAt: isoDateString(""),
       memoryVersion: 1,
     };
     expect(classifyTheme(note)).toBe("decisions");
@@ -181,13 +182,13 @@ describe("classifyTheme", () => {
 
   it("defaults to other", () => {
     const note: Note = {
-      id: "test",
+      id: memoryId("test"),
       title: "Random Note",
       content: "",
       tags: [],
       lifecycle: "permanent",
-      createdAt: "",
-      updatedAt: "",
+      createdAt: isoDateString(""),
+      updatedAt: isoDateString(""),
       memoryVersion: 1,
     };
     expect(classifyTheme(note)).toBe("other");
@@ -198,23 +199,23 @@ describe("buildThemeCache", () => {
   it("maps note ids to themes", () => {
     const notes: Note[] = [
       {
-        id: "a",
+        id: memoryId("a"),
         title: "Overview",
         content: "",
         tags: ["overview"],
         lifecycle: "permanent",
-        createdAt: "",
-        updatedAt: "",
+        createdAt: isoDateString(""),
+        updatedAt: isoDateString(""),
         memoryVersion: 1,
       },
       {
-        id: "b",
+        id: memoryId("b"),
         title: "Bug Fix",
         content: "",
         tags: ["bugs"],
         lifecycle: "permanent",
-        createdAt: "",
-        updatedAt: "",
+        createdAt: isoDateString(""),
+        updatedAt: isoDateString(""),
         memoryVersion: 1,
       },
     ];

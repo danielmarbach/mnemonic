@@ -12,6 +12,7 @@ import {
   workingStateScore,
 } from "../src/project-introspection.js";
 import type { Note } from "../src/storage.js";
+import type { ISO8601DateString, MemoryId } from "../src/brands.js";
 
 const noMetadata = {
   roleSource: "none",
@@ -20,9 +21,9 @@ const noMetadata = {
 } as const;
 
 function makeNote(overrides: Partial<Note> = {}): Note {
-  const now = new Date().toISOString();
+  const now = new Date().toISOString() as ISO8601DateString;
   return {
-    id: overrides.id ?? "note",
+    id: overrides.id ?? ("note" as MemoryId),
     title: overrides.title ?? "Note",
     content: overrides.content ?? "",
     tags: overrides.tags ?? [],
@@ -40,40 +41,42 @@ describe("project summary scoring helpers", () => {
   describe("withinThemeScore", () => {
     it("prefers a more recent note when connectivity is the same", () => {
       const recent = makeNote({
-        id: "recent",
-        updatedAt: new Date().toISOString(),
-        relatedTo: [{ id: "other", type: "related-to" }],
+        id: "recent" as MemoryId,
+        updatedAt: new Date().toISOString() as ISO8601DateString,
+        relatedTo: [{ id: "other" as MemoryId, type: "related-to" }],
       });
       const stale = makeNote({
-        id: "stale",
-        updatedAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
-        relatedTo: [{ id: "other", type: "related-to" }],
+        id: "stale" as MemoryId,
+        updatedAt: new Date(
+          Date.now() - 30 * 24 * 60 * 60 * 1000,
+        ).toISOString() as ISO8601DateString,
+        relatedTo: [{ id: "other" as MemoryId, type: "related-to" }],
       });
 
       expect(withinThemeScore(recent)).toBeGreaterThan(withinThemeScore(stale));
     });
 
     it("prefers a more connected note when recency is the same", () => {
-      const now = new Date().toISOString();
+      const now = new Date().toISOString() as ISO8601DateString;
       const hub = makeNote({
-        id: "hub",
+        id: "hub" as MemoryId,
         updatedAt: now,
         relatedTo: [
-          { id: "a", type: "related-to" },
-          { id: "b", type: "related-to" },
-          { id: "c", type: "related-to" },
+          { id: "a" as MemoryId, type: "related-to" },
+          { id: "b" as MemoryId, type: "related-to" },
+          { id: "c" as MemoryId, type: "related-to" },
         ],
       });
-      const isolated = makeNote({ id: "isolated", updatedAt: now, relatedTo: [] });
+      const isolated = makeNote({ id: "isolated" as MemoryId, updatedAt: now, relatedTo: [] });
 
       expect(withinThemeScore(hub)).toBeGreaterThan(withinThemeScore(isolated));
     });
 
     it("prefers summary notes over comparable context notes", () => {
       const note = makeNote({
-        id: "scored-note",
-        updatedAt: "2026-03-20T10:00:00.000Z",
-        relatedTo: [{ id: "other", type: "related-to" }],
+        id: "scored-note" as MemoryId,
+        updatedAt: "2026-03-20T10:00:00.000Z" as ISO8601DateString,
+        relatedTo: [{ id: "other" as MemoryId, type: "related-to" }],
       });
 
       const summaryScore = withinThemeScore(note, {
@@ -94,9 +97,9 @@ describe("project summary scoring helpers", () => {
 
     it("gives suggested summary metadata a smaller within-theme boost", () => {
       const note = makeNote({
-        id: "suggested-summary-note",
-        updatedAt: "2026-03-20T10:00:00.000Z",
-        relatedTo: [{ id: "other", type: "related-to" }],
+        id: "suggested-summary-note" as MemoryId,
+        updatedAt: "2026-03-20T10:00:00.000Z" as ISO8601DateString,
+        relatedTo: [{ id: "other" as MemoryId, type: "related-to" }],
       });
 
       expect(
@@ -111,9 +114,9 @@ describe("project summary scoring helpers", () => {
 
     it("keeps explicit metadata stronger than suggested metadata within a theme", () => {
       const note = makeNote({
-        id: "metadata-precedence-note",
-        updatedAt: "2026-03-20T10:00:00.000Z",
-        relatedTo: [{ id: "other", type: "related-to" }],
+        id: "metadata-precedence-note" as MemoryId,
+        updatedAt: "2026-03-20T10:00:00.000Z" as ISO8601DateString,
+        relatedTo: [{ id: "other" as MemoryId, type: "related-to" }],
       });
 
       const explicitScore = withinThemeScore(note, {
@@ -137,21 +140,23 @@ describe("project summary scoring helpers", () => {
 
     it("keeps metadata-free notes driven by graph and recency rather than wording", () => {
       const hub = makeNote({
-        id: "metadata-free-hub",
+        id: "metadata-free-hub" as MemoryId,
         title: "Plain implementation note",
         content: "Ordinary content without special structure.",
-        updatedAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString() as ISO8601DateString,
         relatedTo: [
-          { id: "a", type: "related-to" },
-          { id: "b", type: "related-to" },
-          { id: "c", type: "related-to" },
+          { id: "a" as MemoryId, type: "related-to" },
+          { id: "b" as MemoryId, type: "related-to" },
+          { id: "c" as MemoryId, type: "related-to" },
         ],
       });
       const wordyIsolated = makeNote({
-        id: "wordy-isolated",
+        id: "wordy-isolated" as MemoryId,
         title: "Summary decision overview architecture plan",
         content: "These are just words, not metadata.",
-        updatedAt: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000).toISOString(),
+        updatedAt: new Date(
+          Date.now() - 20 * 24 * 60 * 60 * 1000,
+        ).toISOString() as ISO8601DateString,
         relatedTo: [],
       });
 
@@ -164,12 +169,12 @@ describe("project summary scoring helpers", () => {
   describe("anchorScore", () => {
     it("rejects temporary notes even when they are highly connected", () => {
       const temporaryHub = makeNote({
-        id: "temporary-hub",
+        id: "temporary-hub" as MemoryId,
         lifecycle: "temporary",
         relatedTo: [
-          { id: "a", type: "related-to" },
-          { id: "b", type: "related-to" },
-          { id: "c", type: "related-to" },
+          { id: "a" as MemoryId, type: "related-to" },
+          { id: "b" as MemoryId, type: "related-to" },
+          { id: "c" as MemoryId, type: "related-to" },
         ],
       });
       const themeCache = new Map([
@@ -183,11 +188,11 @@ describe("project summary scoring helpers", () => {
 
     it("keeps temporary plan notes rejected even with metadata boosts", () => {
       const temporaryPlan = makeNote({
-        id: "temporary-plan",
+        id: "temporary-plan" as MemoryId,
         lifecycle: "temporary",
         relatedTo: [
-          { id: "a", type: "related-to" },
-          { id: "b", type: "related-to" },
+          { id: "a" as MemoryId, type: "related-to" },
+          { id: "b" as MemoryId, type: "related-to" },
         ],
       });
       const themeCache = new Map([
@@ -209,19 +214,19 @@ describe("project summary scoring helpers", () => {
 
     it("prefers notes that connect multiple themes over same-count single-theme hubs", () => {
       const diverseHub = makeNote({
-        id: "diverse-hub",
+        id: "diverse-hub" as MemoryId,
         relatedTo: [
-          { id: "a", type: "related-to" },
-          { id: "b", type: "related-to" },
-          { id: "c", type: "related-to" },
+          { id: "a" as MemoryId, type: "related-to" },
+          { id: "b" as MemoryId, type: "related-to" },
+          { id: "c" as MemoryId, type: "related-to" },
         ],
       });
       const narrowHub = makeNote({
-        id: "narrow-hub",
+        id: "narrow-hub" as MemoryId,
         relatedTo: [
-          { id: "x", type: "related-to" },
-          { id: "y", type: "related-to" },
-          { id: "z", type: "related-to" },
+          { id: "x" as MemoryId, type: "related-to" },
+          { id: "y" as MemoryId, type: "related-to" },
+          { id: "z" as MemoryId, type: "related-to" },
         ],
       });
 
@@ -243,8 +248,8 @@ describe("project summary scoring helpers", () => {
 
     it("boosts explicit alwaysLoad and importance metadata when scoring anchors", () => {
       const note = makeNote({
-        id: "metadata-anchor",
-        relatedTo: [{ id: "other", type: "related-to" }],
+        id: "metadata-anchor" as MemoryId,
+        relatedTo: [{ id: "other" as MemoryId, type: "related-to" }],
       });
 
       expect(
@@ -260,8 +265,8 @@ describe("project summary scoring helpers", () => {
 
     it("gives suggested role and importance metadata a smaller anchor boost", () => {
       const note = makeNote({
-        id: "suggested-anchor",
-        relatedTo: [{ id: "other", type: "related-to" }],
+        id: "suggested-anchor" as MemoryId,
+        relatedTo: [{ id: "other" as MemoryId, type: "related-to" }],
       });
 
       expect(
@@ -277,8 +282,8 @@ describe("project summary scoring helpers", () => {
 
     it("keeps explicit anchor metadata stronger than suggested metadata", () => {
       const note = makeNote({
-        id: "explicit-beats-suggested-anchor",
-        relatedTo: [{ id: "other", type: "related-to" }],
+        id: "explicit-beats-suggested-anchor" as MemoryId,
+        relatedTo: [{ id: "other" as MemoryId, type: "related-to" }],
       });
 
       const explicitScore = anchorScore(note, new Map(), {
@@ -304,7 +309,7 @@ describe("project summary scoring helpers", () => {
   describe("workingStateScore", () => {
     it("rejects permanent notes from working-state ranking", () => {
       const permanent = makeNote({
-        id: "permanent-note",
+        id: "permanent-note" as MemoryId,
         lifecycle: "permanent",
       });
 
@@ -313,15 +318,17 @@ describe("project summary scoring helpers", () => {
 
     it("prefers recent structured temporary notes", () => {
       const recentWithNextStep = makeNote({
-        id: "recent-next",
+        id: "recent-next" as MemoryId,
         lifecycle: "temporary",
-        updatedAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString() as ISO8601DateString,
         content: "## Status\n\nCurrent progress.\n\n- run the integration check",
       });
       const staleWithoutSignal = makeNote({
-        id: "stale-note",
+        id: "stale-note" as MemoryId,
         lifecycle: "temporary",
-        updatedAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(),
+        updatedAt: new Date(
+          Date.now() - 10 * 24 * 60 * 60 * 1000,
+        ).toISOString() as ISO8601DateString,
         content: "Old scratch note.",
       });
 
@@ -331,16 +338,16 @@ describe("project summary scoring helpers", () => {
     });
 
     it("keeps identical structure language-independent", () => {
-      const sharedUpdatedAt = "2026-03-20T10:00:00.000Z";
+      const sharedUpdatedAt = "2026-03-20T10:00:00.000Z" as ISO8601DateString;
       const english = makeNote({
-        id: "english-structure",
+        id: "english-structure" as MemoryId,
         lifecycle: "temporary",
         updatedAt: sharedUpdatedAt,
         content:
           "## Status\n\nBlocked on one issue.\n\n- verify integration path\n- capture checkpoint",
       });
       const german = makeNote({
-        id: "german-structure",
+        id: "german-structure" as MemoryId,
         lifecycle: "temporary",
         updatedAt: sharedUpdatedAt,
         content:
@@ -355,9 +362,9 @@ describe("project summary scoring helpers", () => {
 
     it("gives plan metadata a boost for temporary checkpoints", () => {
       const note = makeNote({
-        id: "temporary-plan",
+        id: "temporary-plan" as MemoryId,
         lifecycle: "temporary",
-        updatedAt: "2026-03-20T10:00:00.000Z",
+        updatedAt: "2026-03-20T10:00:00.000Z" as ISO8601DateString,
       });
 
       expect(
@@ -400,12 +407,12 @@ describe("project summary scoring helpers", () => {
   describe("computeConnectionDiversity", () => {
     it("counts unique themes, not raw relationship count", () => {
       const note = makeNote({
-        id: "diversity-check",
+        id: "diversity-check" as MemoryId,
         relatedTo: [
-          { id: "a", type: "related-to" },
-          { id: "b", type: "related-to" },
-          { id: "c", type: "related-to" },
-          { id: "d", type: "related-to" },
+          { id: "a" as MemoryId, type: "related-to" },
+          { id: "b" as MemoryId, type: "related-to" },
+          { id: "c" as MemoryId, type: "related-to" },
+          { id: "d" as MemoryId, type: "related-to" },
         ],
       });
 
@@ -421,10 +428,10 @@ describe("project summary scoring helpers", () => {
 
     it("ignores related ids missing from the cache", () => {
       const note = makeNote({
-        id: "partial-cache",
+        id: "partial-cache" as MemoryId,
         relatedTo: [
-          { id: "known", type: "related-to" },
-          { id: "unknown", type: "related-to" },
+          { id: "known" as MemoryId, type: "related-to" },
+          { id: "unknown" as MemoryId, type: "related-to" },
         ],
       });
 
@@ -445,9 +452,9 @@ describe("project summary scoring helpers", () => {
 
     it("builds a theme cache that can drive diversity scoring", () => {
       const cache = buildThemeCache([
-        makeNote({ id: "overview-note", title: "Overview", tags: ["overview"] }),
-        makeNote({ id: "decision-note", title: "Decision", tags: ["design"] }),
-        makeNote({ id: "tool-note", title: "Tool", tags: ["mcp"] }),
+        makeNote({ id: "overview-note" as MemoryId, title: "Overview", tags: ["overview"] }),
+        makeNote({ id: "decision-note" as MemoryId, title: "Decision", tags: ["design"] }),
+        makeNote({ id: "tool-note" as MemoryId, title: "Tool", tags: ["mcp"] }),
       ]);
 
       expect(cache).toEqual(
@@ -463,10 +470,10 @@ describe("project summary scoring helpers", () => {
   describe("computeThemesWithGraduation", () => {
     it("returns promoted themes sorted by frequency then alphabetically", () => {
       const notes = [
-        makeNote({ id: "a", title: "PostgreSQL configuration", tags: [] }),
-        makeNote({ id: "b", title: "PostgreSQL setup", tags: [] }),
-        makeNote({ id: "c", title: "PostgreSQL tuning", tags: [] }),
-        makeNote({ id: "d", title: "Redis cache settings", tags: [] }),
+        makeNote({ id: "a" as MemoryId, title: "PostgreSQL configuration", tags: [] }),
+        makeNote({ id: "b" as MemoryId, title: "PostgreSQL setup", tags: [] }),
+        makeNote({ id: "c" as MemoryId, title: "PostgreSQL tuning", tags: [] }),
+        makeNote({ id: "d" as MemoryId, title: "Redis cache settings", tags: [] }),
       ];
 
       const result = computeThemesWithGraduation(notes, { minKeywordFrequency: 2 });
@@ -479,10 +486,10 @@ describe("project summary scoring helpers", () => {
 
     it("assigns tag-based themes first, then falls back to keywords", () => {
       const notes = [
-        makeNote({ id: "tagged", title: "Some note", tags: ["overview"] }),
-        makeNote({ id: "keyword1", title: "PostgreSQL configuration", tags: [] }),
-        makeNote({ id: "keyword2", title: "PostgreSQL tuning", tags: [] }),
-        makeNote({ id: "fallback", title: "Misc entry", tags: [] }),
+        makeNote({ id: "tagged" as MemoryId, title: "Some note", tags: ["overview"] }),
+        makeNote({ id: "keyword1" as MemoryId, title: "PostgreSQL configuration", tags: [] }),
+        makeNote({ id: "keyword2" as MemoryId, title: "PostgreSQL tuning", tags: [] }),
+        makeNote({ id: "fallback" as MemoryId, title: "Misc entry", tags: [] }),
       ];
 
       const result = computeThemesWithGraduation(notes, { minKeywordFrequency: 2 });
@@ -495,9 +502,9 @@ describe("project summary scoring helpers", () => {
 
     it("excludes generic terms from promotion", () => {
       const notes = [
-        makeNote({ id: "a", title: "System note", tags: [] }),
-        makeNote({ id: "b", title: "Another system note", tags: [] }),
-        makeNote({ id: "c", title: "System config", tags: [] }),
+        makeNote({ id: "a" as MemoryId, title: "System note", tags: [] }),
+        makeNote({ id: "b" as MemoryId, title: "Another system note", tags: [] }),
+        makeNote({ id: "c" as MemoryId, title: "System config", tags: [] }),
       ];
 
       const result = computeThemesWithGraduation(notes, { minKeywordFrequency: 2 });

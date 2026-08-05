@@ -13,7 +13,7 @@ import {
 import { markdownExtractor } from "../src/markdown-extractor.js";
 import { markdownChunker } from "../src/markdown-chunker.js";
 import { ChunkEmbeddingStorage } from "../src/chunk-embedding-storage.js";
-import { embeddingModelId } from "../src/brands.js";
+import { embeddingModelId, isoDateString } from "../src/brands.js";
 import { clearAllGenerations, getCurrentGeneration } from "../src/generation-storage.js";
 import type { DocumentSourceAttachmentConfig } from "../src/vault.js";
 import type { ServerContext } from "../src/server-context.js";
@@ -368,7 +368,7 @@ describe("lazyLoadGeneration", () => {
       contentHash: "a".repeat(32),
       model: embeddingModelId("test-model"),
       embedding: [0.1, 0.2, 0.3],
-      updatedAt: new Date().toISOString(),
+      updatedAt: isoDateString(new Date().toISOString()),
     });
 
     const generation = await lazyLoadGeneration(

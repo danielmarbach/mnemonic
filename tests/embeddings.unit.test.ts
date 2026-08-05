@@ -4,7 +4,14 @@ import os from "os";
 import path from "path";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { Storage, type Note } from "../src/storage.js";
+import {
+  embeddingCompatibilityKey,
+  embeddingModelId,
+  embeddingProviderId,
+  isoDateString,
+  memoryId,
+} from "../src/brands.js";
+import { Storage, type EmbeddingRecord, type Note } from "../src/storage.js";
 import {
   checkEmbeddingCompatibility,
   createEmbeddingProvider,
@@ -157,13 +164,13 @@ async function createTempStorage(): Promise<Storage> {
 function createTestNote(id: string, title: string, content: string): Note {
   const now = new Date().toISOString();
   return {
-    id,
+    id: memoryId(id),
     title,
     content,
     tags: ["test"],
     lifecycle: "permanent",
-    createdAt: now,
-    updatedAt: now,
+    createdAt: isoDateString(now),
+    updatedAt: isoDateString(now),
   };
 }
 
@@ -174,12 +181,12 @@ describe("Storage embedding lifecycle", () => {
 
     await storage.writeNote(note);
 
-    const retrieved = await storage.readNote("test-note");
+    const retrieved = await storage.readNote(memoryId("test-note"));
     expect(retrieved).not.toBeNull();
     expect(retrieved?.title).toBe("Test Title");
 
     // Embedding is optional
-    const embedding = await storage.readEmbedding("test-note");
+    const embedding = await storage.readEmbedding(memoryId("test-note"));
     expect(embedding).toBeNull();
   });
 
@@ -189,13 +196,13 @@ describe("Storage embedding lifecycle", () => {
 
     await storage.writeNote(note);
     await storage.writeEmbedding({
-      id: "test-note",
-      model: "test-model",
+      id: memoryId("test-note"),
+      model: embeddingModelId("test-model"),
       embedding: [0.1, 0.2, 0.3],
-      updatedAt: new Date().toISOString(),
+      updatedAt: isoDateString(new Date().toISOString()),
     });
 
-    const retrieved = await storage.readEmbedding("test-note");
+    const retrieved = await storage.readEmbedding(memoryId("test-note"));
     expect(retrieved).not.toBeNull();
     expect(retrieved?.model).toBe("test-model");
     expect(retrieved?.embedding).toEqual([0.1, 0.2, 0.3]);
@@ -206,13 +213,13 @@ describe("Storage embedding lifecycle", () => {
     const vector = [0.1, 0.2, 0.3];
 
     await storage.writeEmbedding({
-      id: "test-note",
+      id: memoryId("test-note"),
       ...embeddingMetadata(vector),
       embedding: vector,
-      updatedAt: new Date().toISOString(),
+      updatedAt: isoDateString(new Date().toISOString()),
     });
 
-    const retrieved = await storage.readEmbedding("test-note");
+    const retrieved = await storage.readEmbedding(memoryId("test-note"));
     expect(retrieved).not.toBeNull();
     expect(retrieved?.provider).toBe("ollama");
     expect(retrieved?.dimensions).toBe(3);
@@ -226,27 +233,27 @@ describe("Storage embedding lifecycle", () => {
 
     await storage.writeNote(note);
     await storage.writeEmbedding({
-      id: "test-note",
-      model: "test-model",
+      id: memoryId("test-note"),
+      model: embeddingModelId("test-model"),
       embedding: [0.1, 0.2, 0.3],
-      updatedAt: new Date().toISOString(),
+      updatedAt: isoDateString(new Date().toISOString()),
     });
 
-    const deleted = await storage.deleteNote("test-note");
+    const deleted = await storage.deleteNote(memoryId("test-note"));
     expect(deleted).toBe(true);
 
     // Both note and embedding should be gone
-    const retrievedNote = await storage.readNote("test-note");
+    const retrievedNote = await storage.readNote(memoryId("test-note"));
     expect(retrievedNote).toBeNull();
 
-    const retrievedEmbedding = await storage.readEmbedding("test-note");
+    const retrievedEmbedding = await storage.readEmbedding(memoryId("test-note"));
     expect(retrievedEmbedding).toBeNull();
   });
 
   it("deleteNote returns false for non-existent note", async () => {
     const storage = await createTempStorage();
 
-    const deleted = await storage.deleteNote("non-existent");
+    const deleted = await storage.deleteNote(memoryId("non-existent"));
     expect(deleted).toBe(false);
   });
 
@@ -257,10 +264,10 @@ describe("Storage embedding lifecycle", () => {
     await storage.writeNote(note);
     // No embedding written
 
-    const deleted = await storage.deleteNote("test-note");
+    const deleted = await storage.deleteNote(memoryId("test-note"));
     expect(deleted).toBe(true);
 
-    const retrieved = await storage.readNote("test-note");
+    const retrieved = await storage.readNote(memoryId("test-note"));
     expect(retrieved).toBeNull();
   });
 
@@ -271,10 +278,10 @@ describe("Storage embedding lifecycle", () => {
     const note1 = createTestNote("note-1", "Title 1", "Content 1");
     await storage.writeNote(note1);
     await storage.writeEmbedding({
-      id: "note-1",
-      model: "test-model",
+      id: memoryId("note-1"),
+      model: embeddingModelId("test-model"),
       embedding: [0.1, 0.2],
-      updatedAt: new Date().toISOString(),
+      updatedAt: isoDateString(new Date().toISOString()),
     });
 
     // Create note without embedding
@@ -295,21 +302,21 @@ describe("Storage embedding lifecycle", () => {
 
     await storage.writeNote(note);
     await storage.writeEmbedding({
-      id: "test-note",
-      model: "model-v1",
+      id: memoryId("test-note"),
+      model: embeddingModelId("model-v1"),
       embedding: [0.1, 0.2],
-      updatedAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: isoDateString("2026-01-01T00:00:00.000Z"),
     });
 
     // Update embedding with new model
     await storage.writeEmbedding({
-      id: "test-note",
-      model: "model-v2",
+      id: memoryId("test-note"),
+      model: embeddingModelId("model-v2"),
       embedding: [0.3, 0.4],
-      updatedAt: "2026-01-02T00:00:00.000Z",
+      updatedAt: isoDateString("2026-01-02T00:00:00.000Z"),
     });
 
-    const retrieved = await storage.readEmbedding("test-note");
+    const retrieved = await storage.readEmbedding(memoryId("test-note"));
     expect(retrieved?.model).toBe("model-v2");
     expect(retrieved?.embedding).toEqual([0.3, 0.4]);
   });
@@ -336,7 +343,7 @@ describe("embedding provider configuration", () => {
     expect(config.kind).toBe("openai-compatible");
     expect(config.baseUrl).toBe("http://127.0.0.1:4000");
     expect(config.model).toBe("local-embedding-model");
-    expect(config.dimensions).toBe(768);
+    expect(config.kind === "openai-compatible" ? config.dimensions : undefined).toBe(768);
   });
 
   it("requires a model for OpenAI-compatible providers", () => {
@@ -457,26 +464,28 @@ describe("Gemini embedding provider", () => {
 
 describe("embedding compatibility", () => {
   it("treats legacy Ollama records with the current model as compatible", () => {
-    const compatibility = checkEmbeddingCompatibility({
-      id: "legacy-note",
+    const record: EmbeddingRecord = {
+      id: memoryId("legacy-note"),
       model: currentEmbeddingIdentity.model,
       embedding: [0.1, 0.2, 0.3],
-      updatedAt: new Date().toISOString(),
-    });
+      updatedAt: isoDateString(new Date().toISOString()),
+    };
+    const compatibility = checkEmbeddingCompatibility(record);
 
     expect(compatibility.status).toBe("compatible");
   });
 
   it("skips records from incompatible vector spaces", () => {
     const vector = [0.1, 0.2, 0.3];
-    const record = {
-      id: "other-note",
+    const record: EmbeddingRecord = {
+      id: memoryId("other-note"),
       ...embeddingMetadata(vector),
-      provider: "openai",
-      compatibilityKey:
+      provider: embeddingProviderId("openai"),
+      compatibilityKey: embeddingCompatibilityKey(
         "provider=openai|model=text-embedding-3-small|dimensions=3|metric=cosine|inputMode=default",
+      ),
       embedding: vector,
-      updatedAt: new Date().toISOString(),
+      updatedAt: isoDateString(new Date().toISOString()),
     };
 
     expect(checkEmbeddingCompatibility(record).status).toBe("skipped");
@@ -512,10 +521,10 @@ describe("Embedding consistency scenarios", () => {
     const note = createTestNote("evolving-note", "Version 1", "Initial content");
     await storage.writeNote(note);
     await storage.writeEmbedding({
-      id: "evolving-note",
-      model: "test-model",
+      id: memoryId("evolving-note"),
+      model: embeddingModelId("test-model"),
       embedding: [0.1, 0.2, 0.3],
-      updatedAt: new Date().toISOString(),
+      updatedAt: isoDateString(new Date().toISOString()),
     });
 
     // Update note (simulating update command)
@@ -523,17 +532,17 @@ describe("Embedding consistency scenarios", () => {
       ...note,
       title: "Version 2",
       content: "Updated content",
-      updatedAt: new Date().toISOString(),
+      updatedAt: isoDateString(new Date().toISOString()),
     };
     await storage.writeNote(updatedNote);
 
     // Note should be updated
-    const retrievedNote = await storage.readNote("evolving-note");
+    const retrievedNote = await storage.readNote(memoryId("evolving-note"));
     expect(retrievedNote?.title).toBe("Version 2");
     expect(retrievedNote?.content).toBe("Updated content");
 
     // Embedding should still exist (update command would regenerate it)
-    const retrievedEmbedding = await storage.readEmbedding("evolving-note");
+    const retrievedEmbedding = await storage.readEmbedding(memoryId("evolving-note"));
     expect(retrievedEmbedding).not.toBeNull();
     expect(retrievedEmbedding?.embedding).toEqual([0.1, 0.2, 0.3]);
   });
@@ -552,30 +561,30 @@ describe("Embedding consistency scenarios", () => {
     const note = createTestNote("moved-note", "Moved Note", "Content to move");
     await sourceStorage.writeNote(note);
     await sourceStorage.writeEmbedding({
-      id: "moved-note",
-      model: "test-model",
+      id: memoryId("moved-note"),
+      model: embeddingModelId("test-model"),
       embedding: [0.5, 0.6, 0.7],
-      updatedAt: new Date().toISOString(),
+      updatedAt: isoDateString(new Date().toISOString()),
     });
 
     // Move to target vault (simulating move_memory)
-    const embedding = await sourceStorage.readEmbedding("moved-note");
+    const embedding = await sourceStorage.readEmbedding(memoryId("moved-note"));
     await targetStorage.writeNote(note);
     if (embedding) {
       await targetStorage.writeEmbedding(embedding);
     }
-    await sourceStorage.deleteNote("moved-note");
+    await sourceStorage.deleteNote(memoryId("moved-note"));
 
     // Verify target has both
-    const targetNote = await targetStorage.readNote("moved-note");
-    const targetEmbedding = await targetStorage.readEmbedding("moved-note");
+    const targetNote = await targetStorage.readNote(memoryId("moved-note"));
+    const targetEmbedding = await targetStorage.readEmbedding(memoryId("moved-note"));
     expect(targetNote).not.toBeNull();
     expect(targetEmbedding).not.toBeNull();
     expect(targetEmbedding?.embedding).toEqual([0.5, 0.6, 0.7]);
 
     // Verify source is clean
-    const sourceNote = await sourceStorage.readNote("moved-note");
-    const sourceEmbedding = await sourceStorage.readEmbedding("moved-note");
+    const sourceNote = await sourceStorage.readNote(memoryId("moved-note"));
+    const sourceEmbedding = await sourceStorage.readEmbedding(memoryId("moved-note"));
     expect(sourceNote).toBeNull();
     expect(sourceEmbedding).toBeNull();
   });

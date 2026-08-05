@@ -520,7 +520,7 @@ describe("enrichTemporalHistory", () => {
     const result = enrichTemporalHistory(entries);
 
     expect(result.interpretedHistory).toHaveLength(1);
-    expect(result.interpretedHistory[0].changeCategory).toBe("create");
+    expect(result.interpretedHistory[0]!.changeCategory).toBe("create");
     expect(result.historySummary).toBe("This note was created and has not been modified since.");
   });
 
@@ -533,10 +533,10 @@ describe("enrichTemporalHistory", () => {
     const result = enrichTemporalHistory(entries);
 
     expect(result.interpretedHistory).toHaveLength(3);
-    expect(result.interpretedHistory[0].commitHash).toBe("newest");
-    expect(result.interpretedHistory[1].commitHash).toBe("middle");
-    expect(result.interpretedHistory[2].commitHash).toBe("oldest");
-    expect(result.interpretedHistory[2].changeCategory).toBe("create");
+    expect(result.interpretedHistory[0]!.commitHash).toBe("newest");
+    expect(result.interpretedHistory[1]!.commitHash).toBe("middle");
+    expect(result.interpretedHistory[2]!.commitHash).toBe("oldest");
+    expect(result.interpretedHistory[2]!.changeCategory).toBe("create");
   });
 
   it("interprets entries without stats as unknown (when not first commit)", () => {
@@ -555,8 +555,8 @@ describe("enrichTemporalHistory", () => {
     const result = enrichTemporalHistory(entries);
 
     // First entry (oldest) is "create", second entry (newer) without stats is "unknown"
-    expect(result.interpretedHistory[0].changeCategory).toBe("unknown");
-    expect(result.interpretedHistory[0].changeDescription).toBe("Updated the note.");
+    expect(result.interpretedHistory[0]!.changeCategory).toBe("unknown");
+    expect(result.interpretedHistory[0]!.changeDescription).toBe("Updated the note.");
   });
 
   it("handles substantial history with multiple patterns", () => {
@@ -595,7 +595,7 @@ describe("enrichTemporalHistory", () => {
     const result = enrichTemporalHistory(entries);
 
     expect(result.interpretedHistory).toHaveLength(5);
-    expect(result.interpretedHistory[4].changeCategory).toBe("create");
+    expect(result.interpretedHistory[4]!.changeCategory).toBe("create");
     expect(result.historySummary).toBeTruthy();
     expect(result.historySummary?.length).toBeGreaterThan(0);
   });
@@ -817,8 +817,8 @@ describe("language-independent classification", () => {
       }),
     ];
     const result = enrichTemporalHistory(entries);
-    expect(result.interpretedHistory[1].changeCategory).toBe("create");
-    expect(result.interpretedHistory[0].changeCategory).toBe("expand");
+    expect(result.interpretedHistory[1]!.changeCategory).toBe("create");
+    expect(result.interpretedHistory[0]!.changeCategory).toBe("expand");
   });
 });
 
@@ -841,7 +841,7 @@ describe("enrichTemporalHistory relationship detection", () => {
       }),
     ];
     const result = enrichTemporalHistory(entries);
-    expect(result.interpretedHistory[0].changeCategory).toBe("connect");
+    expect(result.interpretedHistory[0]!.changeCategory).toBe("connect");
   });
 
   it("detects unrelate: prefix and sets connect category", () => {
@@ -860,7 +860,7 @@ describe("enrichTemporalHistory relationship detection", () => {
       }),
     ];
     const result = enrichTemporalHistory(entries);
-    expect(result.interpretedHistory[0].changeCategory).toBe("connect");
+    expect(result.interpretedHistory[0]!.changeCategory).toBe("connect");
   });
 
   it("does not set relationshipChanged for non-relationship prefixes", () => {
@@ -880,6 +880,6 @@ describe("enrichTemporalHistory relationship detection", () => {
     ];
     const result = enrichTemporalHistory(entries);
     // No relationshipChanged, zero-change → unknown
-    expect(result.interpretedHistory[0].changeCategory).toBe("unknown");
+    expect(result.interpretedHistory[0]!.changeCategory).toBe("unknown");
   });
 });

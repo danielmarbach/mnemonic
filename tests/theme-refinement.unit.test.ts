@@ -5,17 +5,25 @@ import {
   normalizeKeyword,
 } from "../src/project-introspection.js";
 import type { Note } from "../src/storage.js";
+import { isoDateString, memoryId } from "../src/brands.js";
+
+/** Fixture overrides: id/createdAt/updatedAt are branded in Note but plain strings in tests. */
+type NoteOverrides = Partial<Omit<Note, "id" | "createdAt" | "updatedAt">> & {
+  id?: string;
+  createdAt?: string;
+  updatedAt?: string;
+};
 
 describe("extractKeywords", () => {
   it("extracts keywords from title and tags", () => {
     const note = {
-      id: "test",
+      id: memoryId("test"),
       title: "JWT authentication bug fix",
       content: "",
       tags: ["auth", "security"],
       lifecycle: "permanent" as const,
-      createdAt: "",
-      updatedAt: "",
+      createdAt: isoDateString(""),
+      updatedAt: isoDateString(""),
       memoryVersion: 1,
     };
     const keywords = extractKeywords(note);
@@ -27,13 +35,13 @@ describe("extractKeywords", () => {
 
   it("filters stopwords", () => {
     const note = {
-      id: "test",
+      id: memoryId("test"),
       title: "The system for note data",
       content: "",
       tags: [],
       lifecycle: "permanent" as const,
-      createdAt: "",
-      updatedAt: "",
+      createdAt: isoDateString(""),
+      updatedAt: isoDateString(""),
       memoryVersion: 1,
     };
     const keywords = extractKeywords(note);
@@ -44,13 +52,13 @@ describe("extractKeywords", () => {
 
   it("extracts from content summary when available", () => {
     const note = {
-      id: "test",
+      id: memoryId("test"),
       title: "Decision",
       content: "We decided to use PostgreSQL for persistence because of ACID requirements.",
       tags: [],
       lifecycle: "permanent" as const,
-      createdAt: "",
-      updatedAt: "",
+      createdAt: isoDateString(""),
+      updatedAt: isoDateString(""),
       memoryVersion: 1,
     };
     const keywords = extractKeywords(note);
@@ -71,15 +79,15 @@ describe("normalizeKeyword", () => {
 });
 
 describe("computeThemesWithGraduation", () => {
-  function makeNote(overrides: Partial<Note>): Note {
+  function makeNote(overrides: NoteOverrides): Note {
     return {
-      id: overrides.id ?? "test",
+      id: memoryId(overrides.id ?? "test"),
       title: overrides.title ?? "Test note",
       content: overrides.content ?? "",
       tags: overrides.tags ?? [],
       lifecycle: overrides.lifecycle ?? "permanent",
-      createdAt: overrides.createdAt ?? "",
-      updatedAt: overrides.updatedAt ?? "",
+      createdAt: isoDateString(overrides.createdAt ?? ""),
+      updatedAt: isoDateString(overrides.updatedAt ?? ""),
       memoryVersion: overrides.memoryVersion ?? 1,
     };
   }
@@ -104,7 +112,7 @@ describe("computeThemesWithGraduation", () => {
       makeNote({ id: "b", title: "Random" }),
     ];
 
-    const result = computeThemesWithGraduation(notes, { minClusterSize: 3 });
+    const result = computeThemesWithGraduation(notes, { minKeywordFrequency: 3 });
     expect(result.promotedThemes).toHaveLength(0);
   });
 

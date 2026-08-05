@@ -120,47 +120,47 @@ describe("sortNotesByPriority", () => {
     const design = makeNote("Design Note", ["design", "architecture"]);
     const bug = makeNote("Bug Fix", ["bug", "fix"]);
     const sorted = sortNotesByPriority([design, bug]);
-    expect(sorted[0].frontmatter.title).toBe("Bug Fix");
-    expect(sorted[1].frontmatter.title).toBe("Design Note");
+    expect(sorted[0]!.frontmatter.title).toBe("Bug Fix");
+    expect(sorted[1]!.frontmatter.title).toBe("Design Note");
   });
 
   it("places enhancement-tagged notes before design notes", () => {
     const design = makeNote("Design Note", ["decision"]);
     const enhancement = makeNote("New Feature", ["enhancement"]);
     const sorted = sortNotesByPriority([design, enhancement]);
-    expect(sorted[0].frontmatter.title).toBe("New Feature");
-    expect(sorted[1].frontmatter.title).toBe("Design Note");
+    expect(sorted[0]!.frontmatter.title).toBe("New Feature");
+    expect(sorted[1]!.frontmatter.title).toBe("Design Note");
   });
 
   it("places bug notes before enhancement notes", () => {
     const enhancement = makeNote("New Feature", ["feature"]);
     const bug = makeNote("Bug Fix", ["bugs"]);
     const sorted = sortNotesByPriority([enhancement, bug]);
-    expect(sorted[0].frontmatter.title).toBe("Bug Fix");
-    expect(sorted[1].frontmatter.title).toBe("New Feature");
+    expect(sorted[0]!.frontmatter.title).toBe("Bug Fix");
+    expect(sorted[1]!.frontmatter.title).toBe("New Feature");
   });
 
   it("preserves original order within the same priority tier", () => {
     const bug1 = makeNote("Bug A", ["bug"]);
     const bug2 = makeNote("Bug B", ["fix"]);
     const sorted = sortNotesByPriority([bug1, bug2]);
-    expect(sorted[0].frontmatter.title).toBe("Bug A");
-    expect(sorted[1].frontmatter.title).toBe("Bug B");
+    expect(sorted[0]!.frontmatter.title).toBe("Bug A");
+    expect(sorted[1]!.frontmatter.title).toBe("Bug B");
   });
 
   it("handles notes with no recognised tags (lowest priority)", () => {
     const untagged = makeNote("Misc Note", ["internal"]);
     const bug = makeNote("Bug Fix", ["hotfix"]);
     const sorted = sortNotesByPriority([untagged, bug]);
-    expect(sorted[0].frontmatter.title).toBe("Bug Fix");
-    expect(sorted[1].frontmatter.title).toBe("Misc Note");
+    expect(sorted[0]!.frontmatter.title).toBe("Bug Fix");
+    expect(sorted[1]!.frontmatter.title).toBe("Misc Note");
   });
 
   it("does not mutate the original array", () => {
     const notes = [makeNote("Design", ["design"]), makeNote("Bug", ["bug"])];
     const original = [...notes];
     sortNotesByPriority(notes);
-    expect(notes[0].frontmatter.title).toBe(original[0].frontmatter.title);
+    expect(notes[0]!.frontmatter.title).toBe(original[0]!.frontmatter.title);
   });
 });
 

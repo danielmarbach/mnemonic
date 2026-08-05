@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { isoDateString, memoryId } from "../src/brands.js";
 import { suggestAutoRelationships } from "../src/auto-relate.js";
 import type { Note } from "../src/storage.js";
 
@@ -13,8 +14,8 @@ function makeNote(overrides: Partial<Note> & Pick<Note, "id" | "title" | "conten
     project: overrides.project ?? "project-1",
     projectName: overrides.projectName ?? "Test Project",
     relatedTo: overrides.relatedTo,
-    createdAt: overrides.createdAt ?? "2026-04-05T00:00:00.000Z",
-    updatedAt: overrides.updatedAt ?? "2026-04-05T00:00:00.000Z",
+    createdAt: overrides.createdAt ?? isoDateString("2026-04-05T00:00:00.000Z"),
+    updatedAt: overrides.updatedAt ?? isoDateString("2026-04-05T00:00:00.000Z"),
     memoryVersion: 1,
   };
 }
@@ -22,14 +23,14 @@ function makeNote(overrides: Partial<Note> & Pick<Note, "id" | "title" | "conten
 describe("suggestAutoRelationships", () => {
   it("links to recently inspected permanent notes explicitly mentioned by title", () => {
     const source = makeNote({
-      id: "result",
+      id: memoryId("result"),
       title: "Investigation results",
       content: "Follow-up on Architecture anchor. The result confirms the prior design.",
       tags: ["investigation"],
     });
 
     const candidate = makeNote({
-      id: "architecture",
+      id: memoryId("architecture"),
       title: "Architecture anchor",
       content: "Stable architecture guidance.",
       tags: ["architecture"],
@@ -44,20 +45,20 @@ describe("suggestAutoRelationships", () => {
 
   it("does not link temporary or cross-project notes", () => {
     const source = makeNote({
-      id: "result",
+      id: memoryId("result"),
       title: "Investigation results",
       content: "Follow-up on Architecture anchor.",
     });
 
     const temporary = makeNote({
-      id: "temp",
+      id: memoryId("temp"),
       title: "Architecture anchor",
       content: "temporary",
       lifecycle: "temporary",
     });
 
     const otherProject = makeNote({
-      id: "other",
+      id: memoryId("other"),
       title: "Architecture anchor",
       content: "other project",
       project: "project-2",

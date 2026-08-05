@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { CommitResult, PushResult, SyncGitError } from "../src/git.js";
 
 function deferred<T>() {
   let resolve!: (value: T | PromiseLike<T>) => void;
@@ -126,7 +127,7 @@ describe("GitOps", () => {
 
     const result = await git.pushWithStatus();
     expect(result.status).toBe("failed");
-    expect(result.error).toContain("network down");
+    expect((result as Extract<PushResult, { status: "failed" }>).error).toContain("network down");
   });
 
   it("retries git.add() on transient index.lock errors", async () => {
@@ -157,8 +158,9 @@ describe("GitOps", () => {
     const result = await git.commitWithStatus("remember: test", ["notes/test.md"]);
 
     expect(result.status).toBe("failed");
-    expect(result.operation).toBe("add");
-    expect(result.error).toContain("index.lock");
+    const failedResult = result as Extract<CommitResult, { status: "failed" }>;
+    expect(failedResult.operation).toBe("add");
+    expect(failedResult.error).toContain("index.lock");
     expect(commit).not.toHaveBeenCalled();
   });
 
@@ -174,8 +176,9 @@ describe("GitOps", () => {
     const result = await git.commitWithStatus("remember: test", ["notes/test.md"]);
 
     expect(result.status).toBe("failed");
-    expect(result.operation).toBe("commit");
-    expect(result.error).toContain("signing failed");
+    const failedResult = result as Extract<CommitResult, { status: "failed" }>;
+    expect(failedResult.operation).toBe("commit");
+    expect(failedResult.error).toContain("signing failed");
   });
 
   it("serializes concurrent same-repo commit mutations", async () => {
@@ -407,7 +410,9 @@ describe("GitOps", () => {
 
       expect(result.gitError?.phase).toBe("pull");
       expect(result.gitError?.isConflict).toBe(true);
-      expect(result.gitError?.conflictFiles).toEqual(["notes/foo.md", "notes/bar.md"]);
+      expect(
+        (result.gitError as Extract<SyncGitError, { isConflict: true }> | undefined)?.conflictFiles,
+      ).toEqual(["notes/foo.md", "notes/bar.md"]);
     });
 
     it("returns gitError with isConflict:true when git state files indicate rebase in progress", async () => {

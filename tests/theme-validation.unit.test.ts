@@ -1,16 +1,24 @@
 import { describe, expect, it } from "vitest";
 import { analyzeThemeQuality } from "../src/theme-validation.js";
 import type { Note } from "../src/storage.js";
+import { isoDateString, memoryId } from "../src/brands.js";
 
-function makeNote(overrides: Partial<Note> = {}): Note {
+/** Fixture overrides: id/createdAt/updatedAt are branded in Note but plain strings in tests. */
+type NoteOverrides = Partial<Omit<Note, "id" | "createdAt" | "updatedAt">> & {
+  id?: string;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+function makeNote(overrides: NoteOverrides = {}): Note {
   return {
-    id: overrides.id ?? "note",
+    id: memoryId(overrides.id ?? "note"),
     title: overrides.title ?? "Note",
     content: overrides.content ?? "",
     tags: overrides.tags ?? [],
     lifecycle: overrides.lifecycle ?? "permanent",
-    createdAt: overrides.createdAt ?? new Date().toISOString(),
-    updatedAt: overrides.updatedAt ?? new Date().toISOString(),
+    createdAt: isoDateString(overrides.createdAt ?? new Date().toISOString()),
+    updatedAt: isoDateString(overrides.updatedAt ?? new Date().toISOString()),
     memoryVersion: overrides.memoryVersion ?? 1,
   };
 }

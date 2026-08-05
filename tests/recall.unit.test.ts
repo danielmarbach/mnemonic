@@ -372,8 +372,8 @@ describe("applyLexicalReranking", () => {
       projectionTexts.get(id),
     );
 
-    expect(reranked[0].lexicalScore).toBeGreaterThan(reranked[1].lexicalScore!);
-    expect(reranked[0].id).toBe("a");
+    expect(reranked[0]!.lexicalScore).toBeGreaterThan(reranked[1]!.lexicalScore!);
+    expect(reranked[0]!.id).toBe("a");
   });
 
   it("prefers candidates covering rarer query tokens when semantic scores are close", () => {
@@ -394,8 +394,8 @@ describe("applyLexicalReranking", () => {
       projectionTexts.get(id),
     );
 
-    expect(reranked[0].id).toBe("canonical");
-    expect(reranked[0].coverageScore).toBeGreaterThan(reranked[1].coverageScore ?? 0);
+    expect(reranked[0]!.id).toBe("canonical");
+    expect(reranked[0]!.coverageScore).toBeGreaterThan(reranked[1]!.coverageScore ?? 0);
   });
 
   it("rewards contiguous significant-token phrase matches", () => {
@@ -416,9 +416,9 @@ describe("applyLexicalReranking", () => {
       projectionTexts.get(id),
     );
 
-    expect(reranked[0].id).toBe("canonical");
-    expect(reranked[0].phraseScore).toBe(1);
-    expect(reranked[1].phraseScore ?? 0).toBe(0);
+    expect(reranked[0]!.id).toBe("canonical");
+    expect(reranked[0]!.phraseScore).toBe(1);
+    expect(reranked[1]!.phraseScore ?? 0).toBe(0);
   });
 
   it("handles missing projection text gracefully", () => {
@@ -428,7 +428,7 @@ describe("applyLexicalReranking", () => {
 
     const reranked = applyLexicalReranking(candidates, "test", () => undefined);
 
-    expect(reranked[0].lexicalScore).toBeUndefined();
+    expect(reranked[0]!.lexicalScore).toBeUndefined();
   });
 
   it("does not assign ranks past the RRF rank window", () => {
@@ -442,8 +442,8 @@ describe("applyLexicalReranking", () => {
 
     applyLexicalReranking(candidates, "test", (id) => `projection ${id}`);
 
-    expect(candidates[99].semanticRank).toBe(100);
-    expect(candidates[100].semanticRank).toBeUndefined();
+    expect(candidates[99]!.semanticRank).toBe(100);
+    expect(candidates[100]!.semanticRank).toBeUndefined();
   });
 
   it("keeps rank window inactive for smaller candidate sets", () => {
@@ -552,10 +552,10 @@ describe("enrichRescueCandidateScores", () => {
 
     enrichRescueCandidateScores(candidates, "design decisions", (id) => projectionTexts.get(id));
 
-    expect(candidates[0].coverageScore).toBe(0.5);
-    expect(candidates[0].phraseScore).toBe(0);
-    expect(candidates[1].coverageScore).toBeGreaterThan(0);
-    expect(candidates[1].phraseScore).toBeDefined();
+    expect(candidates[0]!.coverageScore).toBe(0.5);
+    expect(candidates[0]!.phraseScore).toBe(0);
+    expect(candidates[1]!.coverageScore).toBeGreaterThan(0);
+    expect(candidates[1]!.phraseScore).toBeDefined();
   });
 
   it("skips candidates that already have coverageScore", () => {
@@ -574,8 +574,8 @@ describe("enrichRescueCandidateScores", () => {
 
     enrichRescueCandidateScores(candidates, "test query", (id) => `text for ${id}`);
 
-    expect(candidates[0].coverageScore).toBe(0.5);
-    expect(candidates[0].phraseScore).toBe(1);
+    expect(candidates[0]!.coverageScore).toBe(0.5);
+    expect(candidates[0]!.phraseScore).toBe(1);
   });
 
   it("handles missing projection text gracefully", () => {
@@ -592,8 +592,8 @@ describe("enrichRescueCandidateScores", () => {
 
     enrichRescueCandidateScores(candidates, "test query", () => undefined);
 
-    expect(candidates[0].coverageScore).toBeUndefined();
-    expect(candidates[0].phraseScore).toBeUndefined();
+    expect(candidates[0]!.coverageScore).toBeUndefined();
+    expect(candidates[0]!.phraseScore).toBeUndefined();
   });
 
   it("returns early when there are no rescue candidates to enrich", () => {
@@ -612,7 +612,7 @@ describe("enrichRescueCandidateScores", () => {
 
     enrichRescueCandidateScores(candidates, "test query", (id) => `text for ${id}`);
 
-    expect(candidates[0].coverageScore).toBe(0.5);
+    expect(candidates[0]!.coverageScore).toBe(0.5);
   });
 
   it("eliminates lexicalRankSignal asymmetry between semantic and rescue candidates with same lexicalScore", () => {
@@ -645,16 +645,16 @@ describe("enrichRescueCandidateScores", () => {
 
     enrichRescueCandidateScores(candidates, "design decisions", (id) => projectionTexts.get(id));
 
-    expect(candidates[1].coverageScore).toBeDefined();
-    expect(candidates[1].phraseScore).toBeDefined();
+    expect(candidates[1]!.coverageScore).toBeDefined();
+    expect(candidates[1]!.phraseScore).toBeDefined();
     const signalA =
-      (candidates[0].lexicalScore ?? 0) +
-      (candidates[0].coverageScore ?? 0) * 0.3 +
-      (candidates[0].phraseScore ?? 0) * 0.5;
+      (candidates[0]!.lexicalScore ?? 0) +
+      (candidates[0]!.coverageScore ?? 0) * 0.3 +
+      (candidates[0]!.phraseScore ?? 0) * 0.5;
     const signalB =
-      (candidates[1].lexicalScore ?? 0) +
-      (candidates[1].coverageScore ?? 0) * 0.3 +
-      (candidates[1].phraseScore ?? 0) * 0.5;
+      (candidates[1]!.lexicalScore ?? 0) +
+      (candidates[1]!.coverageScore ?? 0) * 0.3 +
+      (candidates[1]!.phraseScore ?? 0) * 0.5;
     expect(signalB).toBeGreaterThan(0);
     expect(signalB).toBeGreaterThanOrEqual(signalA);
   });
@@ -704,9 +704,9 @@ describe("canonical explanation promotion", () => {
     ];
 
     const promoted = applyCanonicalExplanationPromotion(candidates);
-    expect(promoted[0].id).toBe("canonical");
-    expect(promoted[0].canonicalExplanationScore).toBeGreaterThan(
-      promoted[1].canonicalExplanationScore ?? 0,
+    expect(promoted[0]!.id).toBe("canonical");
+    expect(promoted[0]!.canonicalExplanationScore).toBeGreaterThan(
+      promoted[1]!.canonicalExplanationScore ?? 0,
     );
   });
 
@@ -801,7 +801,7 @@ describe("canonical explanation promotion", () => {
       },
     ]);
 
-    expect(promoted[0].id).toBe("durable");
+    expect(promoted[0]!.id).toBe("durable");
   });
 
   it("does not let a low-semantic canonical note beat a much stronger semantic match", () => {
@@ -841,7 +841,7 @@ describe("canonical explanation promotion", () => {
       },
     ]);
 
-    expect(promoted[0].id).toBe("semantically-stronger");
+    expect(promoted[0]!.id).toBe("semantically-stronger");
   });
 
   it("uses wording only as a weak tiebreaker", () => {
@@ -887,7 +887,7 @@ describe("canonical explanation promotion", () => {
       },
     ]);
 
-    expect(promoted[0].id).toBe("canonical");
+    expect(promoted[0]!.id).toBe("canonical");
   });
 
   it("can promote a wording-light explanatory note from graph and role evidence", () => {
@@ -934,7 +934,7 @@ describe("canonical explanation promotion", () => {
       },
     ]);
 
-    expect(promoted[0].id).toBe("canonical-structural");
+    expect(promoted[0]!.id).toBe("canonical-structural");
   });
 });
 
@@ -1271,10 +1271,10 @@ describe("resolveDiscoveredVaults", () => {
 
     await resolveDiscoveredVaults(candidates, originalIds, resolveVault);
 
-    expect(candidates[0].vault).toBe(projectVault);
-    expect(candidates[0].isCurrentProject).toBe(true);
-    expect(candidates[1].vault).toBe(mainVault);
-    expect(candidates[1].isCurrentProject).toBe(false);
+    expect(candidates[0]!.vault).toBe(projectVault);
+    expect(candidates[0]!.isCurrentProject).toBe(true);
+    expect(candidates[1]!.vault).toBe(mainVault);
+    expect(candidates[1]!.isCurrentProject).toBe(false);
   });
 
   it("leaves existing candidates unchanged", async () => {
@@ -1288,8 +1288,8 @@ describe("resolveDiscoveredVaults", () => {
       throw new Error("should not be called for existing candidates");
     });
 
-    expect(candidates[0].vault).toBe(projectVault);
-    expect(candidates[0].isCurrentProject).toBe(true);
+    expect(candidates[0]!.vault).toBe(projectVault);
+    expect(candidates[0]!.isCurrentProject).toBe(true);
   });
 
   it("does not change vault when resolver returns undefined", async () => {
@@ -1308,7 +1308,7 @@ describe("resolveDiscoveredVaults", () => {
 
     await resolveDiscoveredVaults(candidates, originalIds, async () => undefined);
 
-    expect(candidates[1].vault).toBe(projectVault);
-    expect(candidates[1].isCurrentProject).toBe(true);
+    expect(candidates[1]!.vault).toBe(projectVault);
+    expect(candidates[1]!.isCurrentProject).toBe(true);
   });
 });

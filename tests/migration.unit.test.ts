@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { Migrator } from "../src/migration.js";
 import { Storage } from "../src/storage.js";
 import { GitOps } from "../src/git.js";
+import type { ISO8601DateString, MemoryId } from "../src/brands.js";
 import type { Vault, VaultManager } from "../src/vault.js";
 import { assertMigrationIdempotent } from "./migration-helpers.js";
 import * as fs from "fs/promises";
@@ -67,6 +68,8 @@ describe("Migrator", () => {
       storage,
       git: new GitOps(tempDir, "notes"),
       notesRelDir: "notes",
+      vaultFolderName: "",
+      writable: true,
       provenance: "main",
     };
 
@@ -190,7 +193,7 @@ Content of ${title}`;
 
       expect(result.notesModified).toBe(1);
 
-      const note = await storage.readNote("old-note");
+      const note = await storage.readNote("old-note" as MemoryId);
       expect(note?.memoryVersion).toBe(0);
     });
 
@@ -205,7 +208,7 @@ Content of ${title}`;
 
       expect(result.notesModified).toBe(1);
 
-      const note = await storage.readNote("old-note");
+      const note = await storage.readNote("old-note" as MemoryId);
       expect(note?.memoryVersion).toBe(1);
     });
 
@@ -234,7 +237,7 @@ Content of ${title}`;
       expect(result.notesProcessed).toBe(1);
       expect(result.notesModified).toBe(1);
 
-      const note = await storage.readNote("bad-note");
+      const note = await storage.readNote("bad-note" as MemoryId);
       expect(note?.memoryVersion).toBe(1);
     });
 
@@ -346,7 +349,7 @@ Content of ${title}`;
       expect(result.notesProcessed).toBe(1);
       expect(result.notesModified).toBe(1);
 
-      const note = await storage.readNote("old-note");
+      const note = await storage.readNote("old-note" as MemoryId);
       expect(note?.lifecycle).toBe("permanent");
     });
 
@@ -398,6 +401,8 @@ Test content`;
         storage: otherStorage,
         git: new GitOps(otherDir, "notes"),
         notesRelDir: "notes",
+        vaultFolderName: "",
+        writable: true,
         provenance: "project-local",
       };
 
@@ -463,7 +468,7 @@ Second note`,
       expect(commitSpy).not.toHaveBeenCalled();
       expect(pushSpy).not.toHaveBeenCalled();
 
-      const note = await storage.readNote("note-1");
+      const note = await storage.readNote("note-1" as MemoryId);
       expect(note?.content).toBe("Original content");
     });
   });
@@ -547,6 +552,8 @@ Test content`;
         storage: otherStorage,
         git: new GitOps(otherDir, "notes"),
         notesRelDir: "notes",
+        vaultFolderName: "",
+        writable: true,
         provenance: "project-local",
       };
 
@@ -606,7 +613,7 @@ Second note`,
       expect(commitSpy).not.toHaveBeenCalled();
       expect(pushSpy).not.toHaveBeenCalled();
 
-      const note = await storage.readNote("note-1");
+      const note = await storage.readNote("note-1" as MemoryId);
       expect(note?.content).toBe("Original content");
 
       const config = JSON.parse(await fs.readFile(path.join(tempDir, "config.json"), "utf-8")) as {
@@ -693,13 +700,13 @@ Broken content`,
 
       // Fix the underlying issue
       await vault.storage.writeNote({
-        id: "note-2",
+        id: "note-2" as MemoryId,
         title: "Note 2",
         content: "Fixed content",
         tags: [],
         lifecycle: "permanent",
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+        createdAt: new Date().toISOString() as ISO8601DateString,
+        updatedAt: new Date().toISOString() as ISO8601DateString,
       });
 
       // Retry should succeed
@@ -806,19 +813,21 @@ Main content 2`,
         storage: otherStorage,
         git: new GitOps(otherTempDir, "notes"),
         notesRelDir: "notes",
+        vaultFolderName: "",
+        writable: true,
         provenance: "main",
       };
 
       try {
         // Write different notes to other vault
         await otherStorage.writeNote({
-          id: "other-1",
+          id: "other-1" as MemoryId,
           title: "Other Note 1",
           content: "Other content 1",
           tags: [],
           lifecycle: "permanent",
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
+          createdAt: new Date().toISOString() as ISO8601DateString,
+          updatedAt: new Date().toISOString() as ISO8601DateString,
         });
 
         // Other vault starts at version 0.0
@@ -874,19 +883,21 @@ Main content 2`,
           storage: newStorage,
           git: new GitOps(newTempDir, "notes"),
           notesRelDir: "notes",
+          vaultFolderName: "",
+          writable: true,
           provenance: "main",
         };
         vaults.push(newVault);
 
         // Add notes
         await newStorage.writeNote({
-          id: `vault${i}-note`,
+          id: `vault${i}-note` as MemoryId,
           title: `Vault ${i} Note`,
           content: `Content ${i}`,
           tags: [],
           lifecycle: "permanent",
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
+          createdAt: new Date().toISOString() as ISO8601DateString,
+          updatedAt: new Date().toISOString() as ISO8601DateString,
         });
       }
 
@@ -951,7 +962,7 @@ Main content 2`,
       } finally {
         // Cleanup
         for (let i = 1; i < tempDirs.length; i++) {
-          await fs.rm(tempDirs[i], { recursive: true, force: true });
+          await fs.rm(tempDirs[i]!, { recursive: true, force: true });
         }
       }
     });
@@ -1008,6 +1019,8 @@ Project content`,
         storage: projectStorage,
         git: new GitOps(projectDir, "notes"),
         notesRelDir: "notes",
+        vaultFolderName: "",
+        writable: true,
         provenance: "project-local",
       };
 

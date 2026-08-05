@@ -3,6 +3,7 @@ import {
   deriveDocumentId,
   deriveChunkId,
   DOCUMENT_SOURCE_LIMITS,
+  type DocumentId,
 } from "../src/retrieval-document.js";
 
 describe("deriveDocumentId", () => {
@@ -50,7 +51,7 @@ describe("deriveDocumentId", () => {
 });
 
 describe("deriveChunkId", () => {
-  const docId = "att-1::docs-readme-md";
+  const docId = "att-1::docs-readme-md" as DocumentId;
 
   it("produces deterministic IDs with same inputs", () => {
     const ancestry = [{ depth: 1, text: "Introduction" }];

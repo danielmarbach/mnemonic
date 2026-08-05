@@ -195,7 +195,7 @@ describe("mcp schema-driven contract integration", () => {
     const parsedRecall = RecallResultSchema.parse(recallResult);
     expect(parsedRecall.documentChunks).toBeDefined();
     expect(parsedRecall.documentChunks).toHaveLength(1);
-    expect(parsedRecall.documentChunks![0].kind).toBe("document-chunk");
+    expect(parsedRecall.documentChunks![0]!.kind).toBe("document-chunk");
 
     // Construct a valid get result with documents, items, and itemErrors
     const getResult = {
@@ -255,10 +255,10 @@ describe("mcp schema-driven contract integration", () => {
     expect(parsedGet.documents).toHaveLength(1);
     expect(parsedGet.items).toBeDefined();
     expect(parsedGet.items).toHaveLength(2);
-    expect(parsedGet.items![0].kind).toBe("note");
-    expect(parsedGet.items![1].kind).toBe("document");
+    expect(parsedGet.items![0]!.kind).toBe("note");
+    expect(parsedGet.items![1]!.kind).toBe("document");
     expect(parsedGet.itemErrors).toBeDefined();
     expect(parsedGet.itemErrors).toHaveLength(1);
-    expect(parsedGet.itemErrors![0].code).toBe("unknown-document");
+    expect(parsedGet.itemErrors![0]!.code).toBe("unknown-document");
   });
 });

@@ -5,6 +5,7 @@ import {
   validateEmbeddingRecord,
   validateNoteProjection,
 } from "../src/validation.js";
+import type { EmbeddingModelId, ISO8601DateString, MemoryId } from "../src/brands.js";
 import * as fs from "fs/promises";
 import * as path from "path";
 import os from "os";
@@ -26,11 +27,11 @@ vi.mock("fs/promises", async (importOriginal) => {
     open: (async (...args: Parameters<typeof actual.open>) => {
       const handle = await actual.open(...args);
       const originalRead = handle.read.bind(handle);
-      handle.read = (buffer: Buffer, offset: number, length: number, position: number) =>
-        originalRead(buffer, offset, length, position).then((result) => {
+      handle.read = ((...args: Parameters<typeof handle.read>) =>
+        originalRead(...args).then((result) => {
           frontmatterReadBytes.total += result.bytesRead;
           return result;
-        });
+        })) as typeof handle.read;
       return handle;
     }) as typeof actual.open,
     readFile: ((...args: Parameters<typeof actual.readFile>) => {
@@ -59,16 +60,16 @@ describe("Storage", () => {
 
   describe("Note Operations", () => {
     it("should write and read a complete note with all fields", async () => {
-      const now = new Date().toISOString();
+      const now = new Date().toISOString() as ISO8601DateString;
       const note: Note = {
-        id: "test-note-1",
+        id: "test-note-1" as MemoryId,
         title: "Test Note",
         content: "This is a test note.",
         tags: ["test", "unit"],
         lifecycle: "permanent",
         project: "test-project",
         projectName: "Test Project",
-        relatedTo: [{ id: "related-1", type: "related-to" }],
+        relatedTo: [{ id: "related-1" as MemoryId, type: "related-to" }],
         createdAt: now,
         updatedAt: now,
         memoryVersion: 1,
@@ -82,13 +83,13 @@ describe("Storage", () => {
 
     it("should handle backward compatibility with old schema versions", async () => {
       const oldNote = {
-        id: "old-note",
+        id: "old-note" as MemoryId,
         title: "Old Note",
         content: "Legacy note without memoryVersion",
         tags: ["legacy"],
         project: "old-project",
         createdAt: "2023-01-01T00:00:00.000Z",
-        updatedAt: "2023-01-01T00:00:00.000Z",
+        updatedAt: "2023-01-01T00:00:00.000Z" as ISO8601DateString,
         // memoryVersion intentionally missing
       };
 
@@ -130,7 +131,7 @@ Body`;
 
       await fs.writeFile(path.join(notesDir, "invalid-lifecycle.md"), content, "utf-8");
 
-      const read = await storage.readNote("invalid-lifecycle");
+      const read = await storage.readNote("invalid-lifecycle" as MemoryId);
       expect(read?.lifecycle).toBe("permanent");
     });
 
@@ -151,7 +152,7 @@ Body`;
 
       await fs.writeFile(path.join(notesDir, "metadata-note.md"), content, "utf-8");
 
-      const read = await storage.readNote("metadata-note");
+      const read = await storage.readNote("metadata-note" as MemoryId);
 
       expect(read?.role).toBe("decision");
       expect(read?.importance).toBe("high");
@@ -175,7 +176,7 @@ Body`;
 
       await fs.writeFile(path.join(notesDir, "invalid-metadata-note.md"), content, "utf-8");
 
-      const read = await storage.readNote("invalid-metadata-note");
+      const read = await storage.readNote("invalid-metadata-note" as MemoryId);
 
       expect(read).toBeTruthy();
       expect(read?.role).toBeUndefined();
@@ -184,9 +185,9 @@ Body`;
     });
 
     it("should round-trip explicit metadata and only serialize explicitly present values", async () => {
-      const now = new Date().toISOString();
+      const now = new Date().toISOString() as ISO8601DateString;
       const note: Note = {
-        id: "metadata-round-trip",
+        id: "metadata-round-trip" as MemoryId,
         title: "Metadata Round Trip",
         content: "Round trip body",
         tags: ["metadata"],
@@ -216,7 +217,7 @@ Body`;
       });
 
       const noteWithoutMetadata: Note = {
-        id: "metadata-absent",
+        id: "metadata-absent" as MemoryId,
         title: "Metadata Absent",
         content: "No metadata body",
         tags: [],
@@ -237,9 +238,9 @@ Body`;
     });
 
     it("should round-trip explicit alwaysLoad false metadata", async () => {
-      const now = new Date().toISOString();
+      const now = new Date().toISOString() as ISO8601DateString;
       const note: Note = {
-        id: "metadata-alwaysload-false",
+        id: "metadata-alwaysload-false" as MemoryId,
         title: "AlwaysLoad False",
         content: "Explicit false body",
         tags: [],
@@ -268,21 +269,21 @@ Body`;
     });
 
     it("should return null for non-existent note", async () => {
-      const read = await storage.readNote("non-existent");
+      const read = await storage.readNote("non-existent" as MemoryId);
       expect(read).toBeNull();
     });
 
     it("should round-trip relationships with vaultPath for cross-vault links", async () => {
-      const now = new Date().toISOString();
+      const now = new Date().toISOString() as ISO8601DateString;
       const note: Note = {
-        id: "cross-vault-note",
+        id: "cross-vault-note" as MemoryId,
         title: "Cross Vault Note",
         content: "Has a cross-vault relationship.",
         tags: [],
         lifecycle: "permanent",
         relatedTo: [
-          { id: "other-note", type: "related-to", vaultPath: "/other/vault/path" },
-          { id: "same-vault-note", type: "explains" },
+          { id: "other-note" as MemoryId, type: "related-to", vaultPath: "/other/vault/path" },
+          { id: "same-vault-note" as MemoryId, type: "explains" },
         ],
         createdAt: now,
         updatedAt: now,
@@ -294,25 +295,25 @@ Body`;
       expect(read).toBeTruthy();
       expect(read!.relatedTo).toHaveLength(2);
       expect(read!.relatedTo![0]).toEqual({
-        id: "other-note",
+        id: "other-note" as MemoryId,
         type: "related-to",
         vaultPath: "/other/vault/path",
       });
-      expect(read!.relatedTo![1]).toEqual({ id: "same-vault-note", type: "explains" });
+      expect(read!.relatedTo![1]).toEqual({ id: "same-vault-note" as MemoryId, type: "explains" });
       expect(read!.relatedTo![1]).not.toHaveProperty("vaultPath");
     });
 
     it("should remove cross-vault relationships by filtering relatedTo", async () => {
-      const now = new Date().toISOString();
+      const now = new Date().toISOString() as ISO8601DateString;
       const note: Note = {
-        id: "remove-rel-note",
+        id: "remove-rel-note" as MemoryId,
         title: "Remove Relationship Note",
         content: "Testing relationship removal.",
         tags: [],
         lifecycle: "permanent",
         relatedTo: [
-          { id: "target-a", type: "related-to", vaultPath: "/other/vault" },
-          { id: "target-b", type: "explains" },
+          { id: "target-a" as MemoryId, type: "related-to", vaultPath: "/other/vault" },
+          { id: "target-b" as MemoryId, type: "explains" },
         ],
         createdAt: now,
         updatedAt: now,
@@ -324,19 +325,19 @@ Body`;
       await storage.writeNote({
         ...note,
         relatedTo: filtered,
-        updatedAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString() as ISO8601DateString,
       });
 
       const read = await storage.readNote(note.id);
       expect(read!.relatedTo).toHaveLength(1);
-      expect(read!.relatedTo![0]).toEqual({ id: "target-b", type: "explains" });
+      expect(read!.relatedTo![0]).toEqual({ id: "target-b" as MemoryId, type: "explains" });
     });
 
     it("should list all notes without filter", async () => {
-      const now = new Date().toISOString();
+      const now = new Date().toISOString() as ISO8601DateString;
       const notes: Note[] = [
         {
-          id: "note-1",
+          id: "note-1" as MemoryId,
           title: "Note 1",
           content: "Content 1",
           tags: [],
@@ -345,7 +346,7 @@ Body`;
           updatedAt: now,
         },
         {
-          id: "note-2",
+          id: "note-2" as MemoryId,
           title: "Note 2",
           content: "Content 2",
           tags: [],
@@ -366,10 +367,10 @@ Body`;
     });
 
     it("should filter notes by project", async () => {
-      const now = new Date().toISOString();
+      const now = new Date().toISOString() as ISO8601DateString;
       const notes: Note[] = [
         {
-          id: "note-1",
+          id: "note-1" as MemoryId,
           title: "Note 1",
           content: "Content 1",
           tags: [],
@@ -379,7 +380,7 @@ Body`;
           updatedAt: now,
         },
         {
-          id: "note-2",
+          id: "note-2" as MemoryId,
           title: "Note 2",
           content: "Content 2",
           tags: [],
@@ -389,7 +390,7 @@ Body`;
           updatedAt: now,
         },
         {
-          id: "note-3",
+          id: "note-3" as MemoryId,
           title: "Note 3",
           content: "Content 3",
           tags: [],
@@ -409,13 +410,13 @@ Body`;
       const global = await storage.listNotes({ project: null });
 
       expect(projectA).toHaveLength(1);
-      expect(projectA[0].id).toBe("note-1");
+      expect(projectA[0]!.id).toBe("note-1");
 
       expect(projectB).toHaveLength(1);
-      expect(projectB[0].id).toBe("note-2");
+      expect(projectB[0]!.id).toBe("note-2");
 
       expect(global).toHaveLength(1);
-      expect(global[0].id).toBe("note-3");
+      expect(global[0]!.id).toBe("note-3");
     });
 
     it("should handle malformed markdown gracefully", async () => {
@@ -425,7 +426,7 @@ Body`;
       await fs.writeFile(path.join(notesDir, "malformed.md"), "This has no frontmatter");
 
       // Should not throw, just return null or skip
-      const read = await storage.readNote("malformed");
+      const read = await storage.readNote("malformed" as MemoryId);
       // The implementation returns null for notes without proper frontmatter
       expect(read).toBeNull();
     });
@@ -439,14 +440,14 @@ Body`;
         `---\ninvalid: yaml: here:::\n---\n\nContent`,
       );
 
-      const read = await storage.readNote("invalid-yaml");
+      const read = await storage.readNote("invalid-yaml" as MemoryId);
       expect(read).toBeNull(); // Should handle gracefully
     });
 
     it("should delete a note", async () => {
-      const now = new Date().toISOString();
+      const now = new Date().toISOString() as ISO8601DateString;
       const note: Note = {
-        id: "note-to-delete",
+        id: "note-to-delete" as MemoryId,
         title: "Delete Me",
         content: "This will be deleted",
         tags: [],
@@ -465,14 +466,14 @@ Body`;
     });
 
     it("should return false when deleting non-existent note", async () => {
-      const deleted = await storage.deleteNote("non-existent");
+      const deleted = await storage.deleteNote("non-existent" as MemoryId);
       expect(deleted).toBe(false);
     });
 
     it("should update an existing note", async () => {
-      const now = new Date().toISOString();
+      const now = new Date().toISOString() as ISO8601DateString;
       const note: Note = {
-        id: "note-to-update",
+        id: "note-to-update" as MemoryId,
         title: "Original Title",
         content: "Original content",
         tags: ["original"],
@@ -488,7 +489,7 @@ Body`;
         title: "Updated Title",
         content: "Updated content",
         tags: ["updated"],
-        updatedAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString() as ISO8601DateString,
       };
 
       await storage.writeNote(updated);
@@ -506,9 +507,9 @@ Body`;
 
   describe("Metadata-only reads", () => {
     it("should return frontmatter metadata without a content field", async () => {
-      const now = new Date().toISOString();
+      const now = new Date().toISOString() as ISO8601DateString;
       const note: Note = {
-        id: "meta-note-1",
+        id: "meta-note-1" as MemoryId,
         title: "Meta Note",
         content: "This is the full body that metadata reads must skip.",
         tags: ["meta"],
@@ -516,7 +517,7 @@ Body`;
         role: "decision",
         project: "project-a",
         projectName: "Project A",
-        relatedTo: [{ id: "related-1", type: "related-to" }],
+        relatedTo: [{ id: "related-1" as MemoryId, type: "related-to" }],
         createdAt: now,
         updatedAt: now,
       };
@@ -540,21 +541,21 @@ Body`;
     });
 
     it("should return null for non-existent note", async () => {
-      expect(await storage.readNoteMetadata("non-existent")).toBeNull();
+      expect(await storage.readNoteMetadata("non-existent" as MemoryId)).toBeNull();
     });
 
     it("should return null for notes without frontmatter", async () => {
       const notesDir = path.join(tempDir, "notes");
       await fs.writeFile(path.join(notesDir, "malformed-meta.md"), "This has no frontmatter");
 
-      expect(await storage.readNoteMetadata("malformed-meta")).toBeNull();
+      expect(await storage.readNoteMetadata("malformed-meta" as MemoryId)).toBeNull();
     });
 
     it("should parse metadata correctly for notes with bodies larger than the read window", async () => {
-      const now = new Date().toISOString();
+      const now = new Date().toISOString() as ISO8601DateString;
       const largeBody = "x".repeat(100_000);
       const note: Note = {
-        id: "large-body-note",
+        id: "large-body-note" as MemoryId,
         title: "Large Body Note",
         content: largeBody,
         tags: ["big"],
@@ -596,7 +597,7 @@ Body`;
 
       await fs.writeFile(path.join(notesDir, "long-frontmatter.md"), content, "utf-8");
 
-      const read = await storage.readNoteMetadata("long-frontmatter");
+      const read = await storage.readNoteMetadata("long-frontmatter" as MemoryId);
       expect(read).not.toBeNull();
       expect(read!.title).toBe("Long Frontmatter");
       expect(read!.tags).toEqual(["edge"]);
@@ -614,14 +615,14 @@ Body`;
 
       await fs.writeFile(path.join(notesDir, "utf8-boundary.md"), content, "utf-8");
 
-      const read = await storage.readNoteMetadata("utf8-boundary");
+      const read = await storage.readNoteMetadata("utf8-boundary" as MemoryId);
       expect(read).not.toBeNull();
       expect(read!.title).toBe(title);
       expect(read!.tags).toEqual(["boundary", "ümlaut"]);
       expect("content" in read!).toBe(false);
 
       // Full read must still return the complete body.
-      const full = await storage.readNote("utf8-boundary");
+      const full = await storage.readNote("utf8-boundary" as MemoryId);
       expect(full!.content).toBe(body);
     });
 
@@ -634,20 +635,20 @@ Body`;
 
       await fs.writeFile(path.join(notesDir, "small-frontmatter.md"), content, "utf-8");
 
-      const read = await storage.readNoteMetadata("small-frontmatter");
+      const read = await storage.readNoteMetadata("small-frontmatter" as MemoryId);
       expect(read).not.toBeNull();
       expect(read!.title).toBe("Small Frontmatter");
       expect("content" in read!).toBe(false);
 
-      const full = await storage.readNote("small-frontmatter");
+      const full = await storage.readNote("small-frontmatter" as MemoryId);
       expect(full!.content).toBe(body);
     });
 
     it("should list metadata for all notes without filter", async () => {
-      const now = new Date().toISOString();
+      const now = new Date().toISOString() as ISO8601DateString;
       const notes: Note[] = [
         {
-          id: "meta-list-1",
+          id: "meta-list-1" as MemoryId,
           title: "Meta List 1",
           content: "Body 1",
           tags: [],
@@ -656,7 +657,7 @@ Body`;
           updatedAt: now,
         },
         {
-          id: "meta-list-2",
+          id: "meta-list-2" as MemoryId,
           title: "Meta List 2",
           content: "Body 2",
           tags: [],
@@ -679,10 +680,10 @@ Body`;
     });
 
     it("should filter metadata notes by project like listNotes", async () => {
-      const now = new Date().toISOString();
+      const now = new Date().toISOString() as ISO8601DateString;
       const notes: Note[] = [
         {
-          id: "meta-proj-a",
+          id: "meta-proj-a" as MemoryId,
           title: "Proj A",
           content: "Body A",
           tags: [],
@@ -692,7 +693,7 @@ Body`;
           updatedAt: now,
         },
         {
-          id: "meta-proj-b",
+          id: "meta-proj-b" as MemoryId,
           title: "Proj B",
           content: "Body B",
           tags: [],
@@ -702,7 +703,7 @@ Body`;
           updatedAt: now,
         },
         {
-          id: "meta-global",
+          id: "meta-global" as MemoryId,
           title: "Global",
           content: "Body G",
           tags: [],
@@ -720,21 +721,21 @@ Body`;
       const global = await storage.listNotesMetadata({ project: null });
 
       expect(projectA).toHaveLength(1);
-      expect(projectA[0].id).toBe("meta-proj-a");
-      expect("content" in projectA[0]).toBe(false);
+      expect(projectA[0]!.id).toBe("meta-proj-a");
+      expect("content" in projectA[0]!).toBe(false);
 
       expect(global).toHaveLength(1);
-      expect(global[0].id).toBe("meta-global");
+      expect(global[0]!.id).toBe("meta-global");
     });
   });
 
   describe("Embedding Operations", () => {
     it("should write and read embedding", async () => {
       const embedding: EmbeddingRecord = {
-        id: "note-1",
-        model: "nomic-embed-text",
+        id: "note-1" as MemoryId,
+        model: "nomic-embed-text" as EmbeddingModelId,
         embedding: [0.1, 0.2, 0.3, 0.4],
-        updatedAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString() as ISO8601DateString,
       };
 
       await storage.writeEmbedding(embedding);
@@ -744,24 +745,24 @@ Body`;
     });
 
     it("should return null for missing embedding", async () => {
-      const read = await storage.readEmbedding("non-existent");
+      const read = await storage.readEmbedding("non-existent" as MemoryId);
       expect(read).toBeNull();
     });
 
     it("should overwrite existing embedding", async () => {
-      const id = "embedding-to-update";
+      const id = "embedding-to-update" as MemoryId;
       const embedding1: EmbeddingRecord = {
         id,
-        model: "nomic-embed-text",
+        model: "nomic-embed-text" as EmbeddingModelId,
         embedding: [0.1, 0.2],
-        updatedAt: "2023-01-01T00:00:00.000Z",
+        updatedAt: "2023-01-01T00:00:00.000Z" as ISO8601DateString,
       };
 
       const embedding2: EmbeddingRecord = {
         id,
-        model: "nomic-embed-text-v1.5",
+        model: "nomic-embed-text-v1.5" as EmbeddingModelId,
         embedding: [0.3, 0.4, 0.5],
-        updatedAt: "2023-01-02T00:00:00.000Z",
+        updatedAt: "2023-01-02T00:00:00.000Z" as ISO8601DateString,
       };
 
       await storage.writeEmbedding(embedding1);
@@ -774,9 +775,9 @@ Body`;
 
   describe("Tag Filtering", () => {
     it("should handle notes with empty tags", async () => {
-      const now = new Date().toISOString();
+      const now = new Date().toISOString() as ISO8601DateString;
       const note: Note = {
-        id: "no-tags",
+        id: "no-tags" as MemoryId,
         title: "No Tags",
         content: "No tags here",
         tags: [],
@@ -792,9 +793,9 @@ Body`;
     });
 
     it("should handle notes with multiple tags", async () => {
-      const now = new Date().toISOString();
+      const now = new Date().toISOString() as ISO8601DateString;
       const note: Note = {
-        id: "multi-tags",
+        id: "multi-tags" as MemoryId,
         title: "Multi Tags",
         content: "Many tags here",
         tags: ["tag1", "tag2", "tag3", "tag4"],
@@ -812,20 +813,20 @@ Body`;
 
   describe("RelatedTo Relationships", () => {
     it("should persist relationships", async () => {
-      const now = new Date().toISOString();
+      const now = new Date().toISOString() as ISO8601DateString;
       const note: Note = {
-        id: "note-with-rels",
+        id: "note-with-rels" as MemoryId,
         title: "Note with Relationships",
         content: "Has related notes",
         tags: [],
         lifecycle: "permanent",
         relatedTo: [
-          { id: "rel-1", type: "related-to" },
-          { id: "rel-2", type: "explains" },
-          { id: "rel-3", type: "example-of" },
-          { id: "rel-4", type: "supersedes" },
-          { id: "rel-5", type: "derives-from" },
-          { id: "rel-6", type: "follows" },
+          { id: "rel-1" as MemoryId, type: "related-to" },
+          { id: "rel-2" as MemoryId, type: "explains" },
+          { id: "rel-3" as MemoryId, type: "example-of" },
+          { id: "rel-4" as MemoryId, type: "supersedes" },
+          { id: "rel-5" as MemoryId, type: "derives-from" },
+          { id: "rel-6" as MemoryId, type: "follows" },
         ],
         createdAt: now,
         updatedAt: now,
@@ -839,9 +840,9 @@ Body`;
     });
 
     it("should handle notes without relationships", async () => {
-      const now = new Date().toISOString();
+      const now = new Date().toISOString() as ISO8601DateString;
       const note: Note = {
-        id: "note-no-rels",
+        id: "note-no-rels" as MemoryId,
         title: "No Relationships",
         content: "Standalone note",
         tags: [],
@@ -863,14 +864,14 @@ Body`;
       await fs.rm(path.join(tempDir, "notes"), { recursive: true });
 
       // Should not throw when reading non-existent note
-      const read = await storage.readNote("any");
+      const read = await storage.readNote("any" as MemoryId);
       expect(read).toBeNull();
     });
 
     it("should handle file system errors during write", async () => {
-      const now = new Date().toISOString();
+      const now = new Date().toISOString() as ISO8601DateString;
       const note: Note = {
-        id: "test-note",
+        id: "test-note" as MemoryId,
         title: "Test",
         content: "Test content",
         tags: [],
@@ -908,7 +909,7 @@ Body`;
         "utf-8",
       );
 
-      const read = await storage.readEmbedding("corrupt-emb");
+      const read = await storage.readEmbedding("corrupt-emb" as MemoryId);
       expect(read).toBeNull();
     });
 
@@ -922,7 +923,7 @@ Body`;
         "utf-8",
       );
 
-      const read = await storage.readProjection("corrupt-proj");
+      const read = await storage.readProjection("corrupt-proj" as MemoryId);
       expect(read).toBeNull();
     });
 
@@ -941,7 +942,7 @@ Body`;
 
       await fs.writeFile(path.join(notesDir, "bad-related-to.md"), content, "utf-8");
 
-      const read = await storage.readNote("bad-related-to");
+      const read = await storage.readNote("bad-related-to" as MemoryId);
       expect(read).toBeTruthy();
       expect(read!.relatedTo).toBeUndefined();
     });
@@ -966,11 +967,11 @@ Body`;
 
       await fs.writeFile(path.join(notesDir, "mixed-related-to.md"), content, "utf-8");
 
-      const read = await storage.readNote("mixed-related-to");
+      const read = await storage.readNote("mixed-related-to" as MemoryId);
       expect(read).toBeTruthy();
       expect(read!.relatedTo).toHaveLength(1);
-      expect(read!.relatedTo![0].id).toBe("valid-rel");
-      expect(read!.relatedTo![0].type).toBe("related-to");
+      expect(read!.relatedTo![0]!.id).toBe("valid-rel");
+      expect(read!.relatedTo![0]!.type).toBe("related-to");
     });
 
     it("should handle non-string project/projectName in frontmatter", async () => {
@@ -989,7 +990,7 @@ Body`;
 
       await fs.writeFile(path.join(notesDir, "bad-project.md"), content, "utf-8");
 
-      const read = await storage.readNote("bad-project");
+      const read = await storage.readNote("bad-project" as MemoryId);
       expect(read).toBeTruthy();
       expect(read!.project).toBeUndefined();
       expect(read!.projectName).toBeUndefined();
@@ -1015,38 +1016,43 @@ describe("Validation functions", () => {
 
     it("should validate valid relationship entries", () => {
       const result = validateRelatedTo([
-        { id: "rel-1", type: "related-to" },
-        { id: "rel-2", type: "explains" },
+        { id: "rel-1" as MemoryId, type: "related-to" },
+        { id: "rel-2" as MemoryId, type: "explains" },
       ]);
       expect(result).toEqual([
-        { id: "rel-1", type: "related-to" },
-        { id: "rel-2", type: "explains" },
+        { id: "rel-1" as MemoryId, type: "related-to" },
+        { id: "rel-2" as MemoryId, type: "explains" },
       ]);
     });
 
     it("should filter out entries with invalid type", () => {
       const result = validateRelatedTo([
-        { id: "valid", type: "related-to" },
-        { id: "invalid", type: "not-a-type" },
+        { id: "valid" as MemoryId, type: "related-to" },
+        { id: "invalid" as MemoryId, type: "not-a-type" },
       ]);
-      expect(result).toEqual([{ id: "valid", type: "related-to" }]);
+      expect(result).toEqual([{ id: "valid" as MemoryId, type: "related-to" }]);
     });
 
     it("should return undefined when all entries are invalid", () => {
-      const result = validateRelatedTo([{ id: "x", type: "bad" }, { not: "an object" }]);
+      const result = validateRelatedTo([
+        { id: "x" as MemoryId, type: "bad" },
+        { not: "an object" },
+      ]);
       expect(result).toBeUndefined();
     });
 
     it("should preserve vaultPath when present", () => {
       const result = validateRelatedTo([
-        { id: "rel-1", type: "related-to", vaultPath: "/path/to/vault" },
+        { id: "rel-1" as MemoryId, type: "related-to", vaultPath: "/path/to/vault" },
       ]);
-      expect(result).toEqual([{ id: "rel-1", type: "related-to", vaultPath: "/path/to/vault" }]);
+      expect(result).toEqual([
+        { id: "rel-1" as MemoryId, type: "related-to", vaultPath: "/path/to/vault" },
+      ]);
     });
 
     it("should omit vaultPath when absent (no undefined in object)", () => {
-      const result = validateRelatedTo([{ id: "rel-1", type: "related-to" }]);
-      expect(result).toEqual([{ id: "rel-1", type: "related-to" }]);
+      const result = validateRelatedTo([{ id: "rel-1" as MemoryId, type: "related-to" }]);
+      expect(result).toEqual([{ id: "rel-1" as MemoryId, type: "related-to" }]);
       expect(result![0]).not.toHaveProperty("vaultPath");
     });
   });
@@ -1054,16 +1060,16 @@ describe("Validation functions", () => {
   describe("validateEmbeddingRecord", () => {
     it("should validate a valid embedding record", () => {
       const result = validateEmbeddingRecord({
-        id: "note-1",
-        model: "nomic-embed-text",
+        id: "note-1" as MemoryId,
+        model: "nomic-embed-text" as EmbeddingModelId,
         embedding: [0.1, 0.2],
-        updatedAt: "2023-01-01T00:00:00.000Z",
+        updatedAt: "2023-01-01T00:00:00.000Z" as ISO8601DateString,
       });
       expect(result).toEqual({
-        id: "note-1",
-        model: "nomic-embed-text",
+        id: "note-1" as MemoryId,
+        model: "nomic-embed-text" as EmbeddingModelId,
         embedding: [0.1, 0.2],
-        updatedAt: "2023-01-01T00:00:00.000Z",
+        updatedAt: "2023-01-01T00:00:00.000Z" as ISO8601DateString,
       });
     });
 
@@ -1071,7 +1077,12 @@ describe("Validation functions", () => {
       expect(validateEmbeddingRecord({ id: 42 })).toBeNull();
       expect(validateEmbeddingRecord(null)).toBeNull();
       expect(
-        validateEmbeddingRecord({ id: "x", model: "x", embedding: "bad", updatedAt: "x" }),
+        validateEmbeddingRecord({
+          id: "x" as MemoryId,
+          model: "x",
+          embedding: "bad",
+          updatedAt: "x",
+        }),
       ).toBeNull();
     });
   });
@@ -1099,7 +1110,7 @@ describe("Validation functions", () => {
         headings: ["H1"],
         tags: ["tag1"],
         lifecycle: "permanent",
-        updatedAt: "2023-01-02T00:00:00.000Z",
+        updatedAt: "2023-01-02T00:00:00.000Z" as ISO8601DateString,
         projectionText: "full text",
         generatedAt: "2023-01-01T00:00:00.000Z",
       };

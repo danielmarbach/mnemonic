@@ -1,5 +1,6 @@
 import { describe, expect, it, beforeEach, vi } from "vitest";
 
+import { isoDateString, memoryId } from "../src/brands.js";
 import {
   buildRecallCandidateContext,
   collectLexicalCandidates,
@@ -19,13 +20,13 @@ import type { NoteContentSignals, NoteProjection } from "../src/structured-conte
 import type { Vault } from "../src/vault.js";
 
 describe("buildRecallCandidateContext equivalence", () => {
-  const NOW = "2026-04-20T00:00:00.000Z";
+  const NOW = isoDateString("2026-04-20T00:00:00.000Z");
 
   // A rich full note exercising inferred role + importance, headings, lists,
   // body length >= 400, and relationships.
   function richNote(): Note {
     return {
-      id: "n1",
+      id: memoryId("n1"),
       title: "Recall signal persistence",
       tags: ["recall", "projections"],
       lifecycle: "permanent",
@@ -59,8 +60,8 @@ recall ranking entirely.
 - Con: derived projections must be kept in sync with the body
 `.trim(),
       relatedTo: [
-        { id: "r1", type: "explains" as const },
-        { id: "r2", type: "supersedes" as const },
+        { id: memoryId("r1"), type: "explains" as const },
+        { id: memoryId("r2"), type: "supersedes" as const },
       ],
       createdAt: NOW,
       updatedAt: NOW,
@@ -110,7 +111,7 @@ recall ranking entirely.
 });
 
 describe("collectLexicalCandidates projection I/O behavior", () => {
-  const NOW = "2026-04-20T00:00:00.000Z";
+  const NOW = isoDateString("2026-04-20T00:00:00.000Z");
 
   const signals: NoteContentSignals = {
     headingCount: 2,
@@ -147,12 +148,12 @@ describe("collectLexicalCandidates projection I/O behavior", () => {
 
   function metadataNote(id: string, project: string): NoteMetadata {
     return {
-      id,
+      id: memoryId(id),
       title: "Shared Note",
       tags: [],
       lifecycle: "permanent",
       project,
-      relatedTo: [{ id: "r1", type: "explains" as const }],
+      relatedTo: [{ id: memoryId("r1"), type: "explains" as const }],
       createdAt: NOW,
       updatedAt: NOW,
     };
@@ -381,8 +382,8 @@ describe("collectLexicalCandidates projection I/O behavior", () => {
       [],
     );
 
-    const localCandidate = results.find((c) => c.identityKey.startsWith("/vault/local::"));
-    const attachedCandidate = results.find((c) => c.identityKey.startsWith("/vault/attached::"));
+    const localCandidate = results.find((c) => c.identityKey!.startsWith("/vault/local::"));
+    const attachedCandidate = results.find((c) => c.identityKey!.startsWith("/vault/attached::"));
     expect(localCandidate).toBeDefined();
     expect(attachedCandidate).toBeDefined();
     expect(localCandidate!.metadata).toEqual(attachedCandidate!.metadata);

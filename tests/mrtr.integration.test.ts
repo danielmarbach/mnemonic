@@ -17,6 +17,18 @@ import {
 } from "./helpers/mcp.js";
 
 /**
+ * Shape of a modern MCP `tools/call` result. The raw `Record<string, unknown>`
+ * envelope is narrowed here so elicitation requests and content parts can be
+ * indexed without `unknown`-typed optional element access.
+ */
+interface ToolCallResult {
+  resultType?: string;
+  inputRequests?: Record<string, unknown>;
+  isError?: boolean;
+  content?: Array<{ text?: string }>;
+}
+
+/**
  * End-to-end tests of the native MRTR (2026-07-28) flow through a real
  * modern client against the built server. The legacy test helpers cannot
  * exercise `input_required` results, so these cover the round-trip mechanics
@@ -96,14 +108,14 @@ describe("MRTR native round-trips (modern 2026-07-28 client)", () => {
 
       try {
         // Round 1: the protected-branch check blocks and returns input_required.
-        const raw = await session.callToolRaw("remember", {
+        const raw = (await session.callToolRaw("remember", {
           title: "MRTR protected branch note",
           content: "Should be committed after branch consent.",
           tags: ["integration", "mrtr"],
           summary: "Protected branch MRTR consent test",
           cwd: repoDir,
           scope: "project",
-        });
+        })) as ToolCallResult;
 
         expect(raw.resultType).toBe("input_required");
         const branchRequest = raw.inputRequests?.["protectedBranch"] as {
@@ -114,7 +126,7 @@ describe("MRTR native round-trips (modern 2026-07-28 client)", () => {
         expect(branchRequest?.params?.message).toContain("main");
 
         // Round 2: accept the consent; the note must be written and committed.
-        const accepted = await session.callTool(
+        const accepted = (await session.callTool(
           "remember",
           {
             title: "MRTR protected branch note",
@@ -130,7 +142,7 @@ describe("MRTR native round-trips (modern 2026-07-28 client)", () => {
               protectedBranch: elicitAccept({ allowProtectedBranch: true }),
             };
           },
-        );
+        )) as ToolCallResult;
 
         const acceptedId = extractRememberedId(accepted.content?.[0]?.text ?? "");
         await expect(
@@ -160,7 +172,7 @@ describe("MRTR native round-trips (modern 2026-07-28 client)", () => {
       });
 
       try {
-        const declined = await session.callTool(
+        const declined = (await session.callTool(
           "remember",
           {
             title: "MRTR declined note",
@@ -173,7 +185,7 @@ describe("MRTR native round-trips (modern 2026-07-28 client)", () => {
           () => ({
             protectedBranch: elicitDecline(),
           }),
-        );
+        )) as ToolCallResult;
 
         expect(declined.isError).toBe(true);
         expect(declined.content?.[0]?.text).toContain("Protected branch check");
@@ -204,13 +216,13 @@ describe("MRTR native round-trips (modern 2026-07-28 client)", () => {
       });
 
       try {
-        const raw = await session.callToolRaw("remember", {
+        const raw = (await session.callToolRaw("remember", {
           title: "MRTR scope choice note",
           content: "Stored where the user picks.",
           tags: ["integration", "mrtr"],
           summary: "MRTR scope selection test",
           cwd: repoDir,
-        });
+        })) as ToolCallResult;
 
         expect(raw.resultType).toBe("input_required");
         const scopeRequest = raw.inputRequests?.["writeScope"] as {
@@ -220,7 +232,7 @@ describe("MRTR native round-trips (modern 2026-07-28 client)", () => {
           { enum?: string[] } | undefined;
         expect(scopeProp?.enum).toEqual(["project", "global"]);
 
-        const chosen = await session.callTool(
+        const chosen = (await session.callTool(
           "remember",
           {
             title: "MRTR scope choice note",
@@ -232,7 +244,7 @@ describe("MRTR native round-trips (modern 2026-07-28 client)", () => {
           () => ({
             writeScope: elicitAccept({ scope: "global" }),
           }),
-        );
+        )) as ToolCallResult;
 
         const chosenId = extractRememberedId(chosen.content?.[0]?.text ?? "");
         expect(chosen.content?.[0]?.text).toContain("stored=global");
@@ -256,7 +268,7 @@ describe("MRTR native round-trips (modern 2026-07-28 client)", () => {
       });
 
       try {
-        const addResult = await session.callTool(
+        const addResult = (await session.callTool(
           "add_attachment",
           {
             cwd: repoDir,
@@ -265,21 +277,21 @@ describe("MRTR native round-trips (modern 2026-07-28 client)", () => {
             pushBranch: "main",
           },
           () => ({}),
-        );
+        )) as ToolCallResult;
         const slugMatch = (addResult.content?.[0]?.text ?? "").match(/\(([^)]+)\) at /);
         expect(slugMatch).not.toBeNull();
         const attachedSlug = slugMatch?.[1];
         expect(attachedSlug).toBeTruthy();
         const attachedKey = `attached:${attachedSlug}`;
 
-        const raw = await session.callToolRaw("remember", {
+        const raw = (await session.callToolRaw("remember", {
           title: "MRTR vault picker note",
           content: "Should land in the writable attached vault.",
           tags: ["integration", "mrtr"],
           summary: "MRTR vault selection test",
           cwd: repoDir,
           scope: "project",
-        });
+        })) as ToolCallResult;
 
         expect(raw.resultType).toBe("input_required");
         const vaultRequest = raw.inputRequests?.["vault"] as {
@@ -290,7 +302,7 @@ describe("MRTR native round-trips (modern 2026-07-28 client)", () => {
         expect(vaultProp?.enum).toContain("project");
         expect(vaultProp?.enum).toContain(attachedKey);
 
-        const chosen = await session.callTool(
+        const chosen = (await session.callTool(
           "remember",
           {
             title: "MRTR vault picker note",
@@ -303,7 +315,7 @@ describe("MRTR native round-trips (modern 2026-07-28 client)", () => {
           () => ({
             vault: elicitAccept({ vault: attachedKey }),
           }),
-        );
+        )) as ToolCallResult;
 
         const chosenId = extractRememberedId(chosen.content?.[0]?.text ?? "");
         expect(chosen.content?.[0]?.text).toContain(attachedKey);
@@ -334,18 +346,18 @@ describe("MRTR native round-trips (modern 2026-07-28 client)", () => {
       });
 
       try {
-        const raw = await session.callToolRaw("remember", {
+        const raw = (await session.callToolRaw("remember", {
           title: "MRTR chained rounds note",
           content: "Exercises scope then branch consent across rounds.",
           tags: ["integration", "mrtr"],
           summary: "MRTR chained elicitation test",
           cwd: repoDir,
-        });
+        })) as ToolCallResult;
 
         expect(raw.resultType).toBe("input_required");
         expect(raw.inputRequests?.["writeScope"]).toBeDefined();
 
-        const result = await session.callTool(
+        const result = (await session.callTool(
           "remember",
           {
             title: "MRTR chained rounds note",
@@ -364,7 +376,7 @@ describe("MRTR native round-trips (modern 2026-07-28 client)", () => {
             }
             return responses;
           },
-        );
+        )) as ToolCallResult;
 
         const resultId = extractRememberedId(result.content?.[0]?.text ?? "");
         await expect(

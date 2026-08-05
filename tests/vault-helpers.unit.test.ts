@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { attachmentSlug } from "../src/brands.js";
 import type { Vault } from "../src/vault.js";
 import {
   storageLabel,
@@ -39,7 +40,7 @@ describe("storageLabel", () => {
       provenance: "project-attached",
       vaultFolderName: ".mnemonic",
       attachmentRef: {
-        projectSlug: "my-project",
+        projectSlug: attachmentSlug("my-project"),
         projectName: "My Project",
         localPath: "/tmp/my-project",
         branch: "main",
@@ -71,7 +72,7 @@ describe("vaultMatchesStorageScope", () => {
     vaultFolderName: ".mnemonic",
     writable: false,
     attachmentRef: {
-      projectSlug: "other-project",
+      projectSlug: attachmentSlug("other-project"),
       projectName: "Other Project",
       localPath: "/tmp/other",
       branch: "main",
@@ -111,7 +112,7 @@ describe("attachedVaultErrorMessage", () => {
       vaultFolderName: ".mnemonic",
       writable: false,
       attachmentRef: {
-        projectSlug: "my-project",
+        projectSlug: attachmentSlug("my-project"),
         projectName: "My Project",
         localPath: "/tmp/my-project",
         branch: "main",
@@ -130,7 +131,7 @@ describe("attachedVaultErrorMessage", () => {
       vaultFolderName: ".mnemonic",
       writable: true,
       attachmentRef: {
-        projectSlug: "my-project",
+        projectSlug: attachmentSlug("my-project"),
         projectName: "My Project",
         localPath: "/tmp/my-project",
         branch: "main",

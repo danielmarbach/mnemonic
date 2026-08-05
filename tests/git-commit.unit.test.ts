@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import path from "node:path";
+import type { AttachmentSlug } from "../src/brands.js";
 import type { Vault } from "../src/vault.js";
 import type { ServerContext } from "../src/server-context.js";
 import type { CommitResult } from "../src/git.js";
@@ -162,7 +163,7 @@ describe("commitVaultWithProtection", () => {
     const vault = makeFakeVault("project-attached", {
       writable: true,
       attachmentRef: {
-        projectSlug: "attached-slug",
+        projectSlug: "attached-slug" as AttachmentSlug,
         projectName: "Attached Project",
         localPath: "/attached/path",
         branch: "main",
@@ -200,7 +201,7 @@ describe("commitVaultWithProtection", () => {
     const vault = makeFakeVault("project-attached", {
       writable: true,
       attachmentRef: {
-        projectSlug: "attached-slug",
+        projectSlug: "attached-slug" as AttachmentSlug,
         projectName: "Attached Project",
         localPath: "/attached/path",
         branch: "main",
