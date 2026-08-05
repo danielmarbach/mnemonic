@@ -164,7 +164,7 @@ export function registerAddAttachmentTool(server: McpServer, ctx: ServerContext)
       const effectiveKind = kind ?? "mnemonic-vault";
       const expandedPath = expandHomePath(localPath);
       const resolvedPath = path.resolve(expandedPath);
-      if (!resolvedPath.startsWith("/")) {
+      if (!path.isAbsolute(resolvedPath)) {
         return {
           content: [
             { type: "text", text: `Invalid path: ${localPath}. Must resolve to an absolute path.` },
