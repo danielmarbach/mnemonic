@@ -31,7 +31,7 @@ function printUsage() {
       "  mnemonic-install-skills --target all --mode copy",
       "  mnemonic-install-skills --target claude --update",
       "  mnemonic-install-skills --target-dir ~/.config/my-client/skills --mode symlink",
-    ].join("\n")
+    ].join("\n"),
   );
 }
 

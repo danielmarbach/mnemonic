@@ -9,5 +9,3 @@ export function getRecentMemoryNotes(recent) {
 export function getWorkingStateNotes(summary) {
   return summary?.workingState?.notes ?? [];
 }
-
-

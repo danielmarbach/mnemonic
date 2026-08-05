@@ -203,9 +203,13 @@ function fetchCurrentPrData(prNumber, repo, cwd) {
   const result = spawnSync(
     "gh",
     [
-      "pr", "view", prNumber,
-      "--repo", repo,
-      "--json", "files,additions,deletions,changedFiles,commits",
+      "pr",
+      "view",
+      prNumber,
+      "--repo",
+      repo,
+      "--json",
+      "files,additions,deletions,changedFiles,commits",
       "--jq",
       "{paths: [.files[].path], additions, deletions, changedFiles, commits: (.commits | length)}",
     ],
@@ -590,9 +594,7 @@ export function generateDescription(notes) {
   const lines = [];
 
   // Classify notes into permanent decisions vs RPIR workflow artifacts.
-  const sortedPermanent = sortNotesByPriority(
-    notes.filter((n) => classifyNote(n) === "permanent"),
-  );
+  const sortedPermanent = sortNotesByPriority(notes.filter((n) => classifyNote(n) === "permanent"));
   const researchNotes = notes.filter((n) => classifyNote(n) === "research");
   const planNotes = notes.filter((n) => classifyNote(n) === "plan");
   const reviewNotes = notes.filter((n) => classifyNote(n) === "review");
@@ -677,11 +679,7 @@ export function generateDescription(notes) {
     const content = extractNamedSection(note.body, "open questions?|risks?");
     if (content) {
       const title = note.frontmatter.title ?? baseName(note.file);
-      openQFragments.push(
-        openQFragments.length > 0
-          ? `**${title}:**\n\n${content}`
-          : content,
-      );
+      openQFragments.push(openQFragments.length > 0 ? `**${title}:**\n\n${content}` : content);
     }
   }
   if (openQFragments.length > 0) {
@@ -740,7 +738,10 @@ export function buildSummaryIntro(hasBugs, hasEnhancements) {
  * to use as a one-paragraph PR summary.
  */
 function extractLeadingSummary(body) {
-  const paragraphs = body.split(/\n{2,}/).map((p) => p.trim()).filter(Boolean);
+  const paragraphs = body
+    .split(/\n{2,}/)
+    .map((p) => p.trim())
+    .filter(Boolean);
   // Skip heading-only paragraphs; return first paragraph with actual prose
   for (const para of paragraphs) {
     if (!para.startsWith("#")) {
@@ -802,9 +803,8 @@ function parseSimpleYaml(yaml) {
 
   function flushBlock() {
     if (currentKey === null || blockMode === null) return;
-    const text = blockMode === "folded"
-      ? blockLines.join(" ").trim()
-      : blockLines.join("\n").trimEnd();
+    const text =
+      blockMode === "folded" ? blockLines.join(" ").trim() : blockLines.join("\n").trimEnd();
     result[currentKey] = text;
     blockMode = null;
     blockLines = [];

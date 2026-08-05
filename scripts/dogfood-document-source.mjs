@@ -170,9 +170,14 @@ async function call(name, args, env) {
 }
 
 function git(repo, ...args) {
-  return execSync(`git -C ${JSON.stringify(repo)} ${args.map((a) => JSON.stringify(a)).join(" ")}`, {
-    stdio: ["ignore", "pipe", "pipe"],
-  }).toString().trim();
+  return execSync(
+    `git -C ${JSON.stringify(repo)} ${args.map((a) => JSON.stringify(a)).join(" ")}`,
+    {
+      stdio: ["ignore", "pipe", "pipe"],
+    },
+  )
+    .toString()
+    .trim();
 }
 
 async function setupDocumentSourceRepo(base) {
@@ -180,9 +185,16 @@ async function setupDocumentSourceRepo(base) {
   await mkdir(path.join(docsource, "docs"), { recursive: true });
   await writeFile(path.join(docsource, "docs", "zeta.md"), bigZetaDoc);
   await writeFile(path.join(docsource, "docs", "florgnart.md"), florgnartDoc);
-  await writeFile(path.join(docsource, "README.md"), "# docsource\nNot under docs/, excluded by include glob.\n");
+  await writeFile(
+    path.join(docsource, "README.md"),
+    "# docsource\nNot under docs/, excluded by include glob.\n",
+  );
   git(docsource, "init", "-b", "main");
-  for (const [k, v] of [["user.email", "dogfood@example.com"], ["user.name", "dogfood"], ["commit.gpgsign", "false"]])
+  for (const [k, v] of [
+    ["user.email", "dogfood@example.com"],
+    ["user.name", "dogfood"],
+    ["commit.gpgsign", "false"],
+  ])
     git(docsource, "config", k, v);
   git(docsource, "add", ".");
   git(docsource, "commit", "-m", "docs");
@@ -196,7 +208,11 @@ async function setupDocumentSourceRepo(base) {
 async function setupTempMainVault() {
   const mainVault = await mkdtemp(path.join(tmpdir(), "mnemonic-docsource-main-"));
   git(mainVault, "init", "-b", "main");
-  for (const [k, v] of [["user.email", "dogfood@example.com"], ["user.name", "dogfood"], ["commit.gpgsign", "false"]])
+  for (const [k, v] of [
+    ["user.email", "dogfood@example.com"],
+    ["user.name", "dogfood"],
+    ["commit.gpgsign", "false"],
+  ])
     git(mainVault, "config", k, v);
   return mainVault;
 }
@@ -215,11 +231,15 @@ async function main() {
   // consistent across all tool calls in this session.
   try {
     git(cwd, "remote", "remove", "origin");
-  } catch {}
+  } catch {
+    // origin may not exist yet
+  }
   // Keep the workspace hermetic from the host's git signing agent.
   try {
     git(cwd, "config", "commit.gpgsign", "false");
-  } catch {}
+  } catch {
+    // option may already be unset
+  }
 
   const mainVault = await setupTempMainVault();
   const docsource = await setupDocumentSourceRepo(cwd);
@@ -244,7 +264,14 @@ async function main() {
     // D1 — add_attachment
     const add = await call(
       "add_attachment",
-      { ...cwdArg, localPath: docsource, kind: "document-source", root: ".", include: ["**/*.md"], acceptedMediaTypes: ["text/markdown"] },
+      {
+        ...cwdArg,
+        localPath: docsource,
+        kind: "document-source",
+        root: ".",
+        include: ["**/*.md"],
+        acceptedMediaTypes: ["text/markdown"],
+      },
       env,
     );
     const added = add.structured?.attachment;
@@ -269,8 +296,15 @@ async function main() {
 
     // D2 — list_attachments
     const list = await call("list_attachments", cwdArg, env);
-    const listed = (list.structured?.attachments ?? []).find((a) => a.attachmentId === added?.attachmentId);
-    record("D2", "list_attachments shows the document-source (enabled)", listed?.kind === "document-source" && listed?.enabled === true, { listed });
+    const listed = (list.structured?.attachments ?? []).find(
+      (a) => a.attachmentId === added?.attachmentId,
+    );
+    record(
+      "D2",
+      "list_attachments shows the document-source (enabled)",
+      listed?.kind === "document-source" && listed?.enabled === true,
+      { listed },
+    );
 
     // D3 — sync indexes documents
     const sync = await call("sync", cwdArg, env);
@@ -280,7 +314,11 @@ async function main() {
       "D3",
       "sync indexes documents/chunks from pinned revision",
       Boolean(indexedMatch) && Number(indexedMatch[1]) >= 2 && Number(indexedMatch[2]) >= 2,
-      { docSyncLine, structuredKeys: sync.structured ? Object.keys(sync.structured) : [], fullText: sync.text },
+      {
+        docSyncLine,
+        structuredKeys: sync.structured ? Object.keys(sync.structured) : [],
+        fullText: sync.text,
+      },
     );
 
     // D4 — recall surfaces document chunks (lexical channel)
@@ -300,53 +338,119 @@ async function main() {
             Array.isArray(d.headingAncestry) &&
             typeof d.excerpt === "string",
         ),
-      { count: dcs.length, sample: dcs.slice(0, 2), sourcePaths: [...new Set(dcs.map((d) => d.sourcePath))], textHasDocumentChunks: (recall.structured?.documentChunks?.length ?? 0) > 0, textHasChunkHandles: recall.text.includes("chunk:") },
+      {
+        count: dcs.length,
+        sample: dcs.slice(0, 2),
+        sourcePaths: [...new Set(dcs.map((d) => d.sourcePath))],
+        textHasDocumentChunks: (recall.structured?.documentChunks?.length ?? 0) > 0,
+        textHasChunkHandles: recall.text.includes("chunk:"),
+      },
     );
 
     // D5 — get resolves chunk: and doc: handles
     const chunkHandle = dcs[0]?.retrievalHandle;
     const getChunk = await call("get", { ...cwdArg, ids: [chunkHandle] }, env);
     const gotDoc = getChunk.structured?.documents?.[0];
-    record("D5a", "get(chunk:) resolves to exact document source text", Boolean(gotDoc) && typeof gotDoc.content === "string" && gotDoc.content.includes(ZETA), { retrievalHandle: chunkHandle, document: gotDoc, isError: getChunk.isError, text: getChunk.text.slice(0, 200) });
+    record(
+      "D5a",
+      "get(chunk:) resolves to exact document source text",
+      Boolean(gotDoc) && typeof gotDoc.content === "string" && gotDoc.content.includes(ZETA),
+      {
+        retrievalHandle: chunkHandle,
+        document: gotDoc,
+        isError: getChunk.isError,
+        text: getChunk.text.slice(0, 200),
+      },
+    );
 
     const docHandle = dcs[0] ? `doc:${dcs[0].documentId}` : null;
     const getDoc = await call("get", { ...cwdArg, ids: [docHandle] }, env);
     const gotFull = getDoc.structured?.documents?.[0];
-    record("D5b", "get(doc:) resolves to document-level source", Boolean(gotFull) && typeof gotFull.content === "string" && gotFull.content.includes(ZETA), { docHandle, document: gotFull, isError: getDoc.isError, text: getDoc.text.slice(0, 200) });
+    record(
+      "D5b",
+      "get(doc:) resolves to document-level source",
+      Boolean(gotFull) && typeof gotFull.content === "string" && gotFull.content.includes(ZETA),
+      { docHandle, document: gotFull, isError: getDoc.isError, text: getDoc.text.slice(0, 200) },
+    );
 
     // D6 — mutation rejection on doc: and chunk: handles
     const forgetDoc = await call("forget", { ...cwdArg, id: docHandle }, env);
     const forgetChunk = await call("forget", { ...cwdArg, id: chunkHandle }, env);
     const rejectPattern = /immutable|document|read-only|cannot be mutated/i;
-    record("D6", "mutation tools reject doc:/chunk: handles", forgetDoc.isError && rejectPattern.test(forgetDoc.text) && forgetChunk.isError && rejectPattern.test(forgetChunk.text), { forgetDocText: forgetDoc.text.slice(0, 300), forgetChunkText: forgetChunk.text.slice(0, 300) });
+    record(
+      "D6",
+      "mutation tools reject doc:/chunk: handles",
+      forgetDoc.isError &&
+        rejectPattern.test(forgetDoc.text) &&
+        forgetChunk.isError &&
+        rejectPattern.test(forgetChunk.text),
+      {
+        forgetDocText: forgetDoc.text.slice(0, 300),
+        forgetChunkText: forgetChunk.text.slice(0, 300),
+      },
+    );
 
     // D7 — scope guard (global excludes document chunks)
-    const recallGlobal = await call("recall", { ...cwdArg, query: ZETA, limit: 10, scope: "global" }, env);
-    record("D7", "scope guard: document chunks excluded from scope: global", !recallGlobal.structured?.documentChunks || recallGlobal.structured.documentChunks.length === 0, { count: recallGlobal.structured?.documentChunks?.length ?? 0 });
+    const recallGlobal = await call(
+      "recall",
+      { ...cwdArg, query: ZETA, limit: 10, scope: "global" },
+      env,
+    );
+    record(
+      "D7",
+      "scope guard: document chunks excluded from scope: global",
+      !recallGlobal.structured?.documentChunks ||
+        recallGlobal.structured.documentChunks.length === 0,
+      { count: recallGlobal.structured?.documentChunks?.length ?? 0 },
+    );
 
     // D8 — mode/filter guard
-    const recallTemporal = await call("recall", { ...cwdArg, query: ZETA, limit: 10, mode: "temporal" }, env);
-    const recallTagged = await call("recall", { ...cwdArg, query: ZETA, limit: 10, tags: ["dogfooding"] }, env);
+    const recallTemporal = await call(
+      "recall",
+      { ...cwdArg, query: ZETA, limit: 10, mode: "temporal" },
+      env,
+    );
+    const recallTagged = await call(
+      "recall",
+      { ...cwdArg, query: ZETA, limit: 10, tags: ["dogfooding"] },
+      env,
+    );
     record(
       "D8",
       "mode/filter guard: document chunks excluded from temporal mode + tag filters",
-      (!recallTemporal.structured?.documentChunks || recallTemporal.structured.documentChunks.length === 0) &&
-        (!recallTagged.structured?.documentChunks || recallTagged.structured.documentChunks.length === 0),
-      { temporalCount: recallTemporal.structured?.documentChunks?.length ?? 0, tagCount: recallTagged.structured?.documentChunks?.length ?? 0 },
+      (!recallTemporal.structured?.documentChunks ||
+        recallTemporal.structured.documentChunks.length === 0) &&
+        (!recallTagged.structured?.documentChunks ||
+          recallTagged.structured.documentChunks.length === 0),
+      {
+        temporalCount: recallTemporal.structured?.documentChunks?.length ?? 0,
+        tagCount: recallTagged.structured?.documentChunks?.length ?? 0,
+      },
     );
 
     // D9 — per-document chunk cap
     const perDoc = new Map();
     for (const d of dcs) perDoc.set(d.documentId, (perDoc.get(d.documentId) ?? 0) + 1);
     const maxPerDoc = Math.max(0, ...perDoc.values());
-    record("D9", "per-document chunk cap enforced (<= 5 per documentId)", maxPerDoc <= 5, { perDoc: Object.fromEntries(perDoc), maxPerDoc, totalChunks: dcs.length });
+    record("D9", "per-document chunk cap enforced (<= 5 per documentId)", maxPerDoc <= 5, {
+      perDoc: Object.fromEntries(perDoc),
+      maxPerDoc,
+      totalChunks: dcs.length,
+    });
 
     // D11 — regression: directory-prefixed include glob must scope by path
     //   `docs/**/*.md` should index the two docs/ files and exclude README.md.
     //   Current parser (document-sync.ts) corrupts ext -> "docs/md" and indexes 0.
     const addGlob = await call(
       "add_attachment",
-      { ...cwdArg, localPath: docsource, kind: "document-source", root: ".", include: ["docs/**/*.md"], acceptedMediaTypes: ["text/markdown"] },
+      {
+        ...cwdArg,
+        localPath: docsource,
+        kind: "document-source",
+        root: ".",
+        include: ["docs/**/*.md"],
+        acceptedMediaTypes: ["text/markdown"],
+      },
       env,
     );
     const syncGlob = await call("sync", cwdArg, env);
@@ -363,8 +467,15 @@ async function main() {
     const slug = addGlob.structured?.attachment?.projectSlug ?? added?.projectSlug;
     const remove = await call("remove_attachment", { ...cwdArg, projectSlug: slug }, env);
     const listAfter = await call("list_attachments", cwdArg, env);
-    const stillThere = (listAfter.structured?.attachments ?? []).some((a) => a.attachmentId === added?.attachmentId);
-    record("D10", "remove_attachment detaches the document-source", !remove.isError && !stillThere, { isError: remove.isError, text: remove.text.slice(0, 200) });
+    const stillThere = (listAfter.structured?.attachments ?? []).some(
+      (a) => a.attachmentId === added?.attachmentId,
+    );
+    record(
+      "D10",
+      "remove_attachment detaches the document-source",
+      !remove.isError && !stillThere,
+      { isError: remove.isError, text: remove.text.slice(0, 200) },
+    );
   } finally {
     await cleanup();
   }

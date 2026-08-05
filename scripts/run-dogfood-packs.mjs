@@ -10,7 +10,10 @@ import {
 import { createIsolatedDogfoodVault } from "./dogfooding-isolated-vault.mjs";
 
 const useIsolated = process.argv.includes("--isolated");
-let cwd = process.argv[2] && !process.argv[2].startsWith("--") ? new URL(`file://${process.argv[2]}`).pathname : process.cwd();
+let cwd =
+  process.argv[2] && !process.argv[2].startsWith("--")
+    ? new URL(`file://${process.argv[2]}`).pathname
+    : process.cwd();
 const today = new Date().toISOString().slice(0, 10);
 const mnemonicEntrypoint = process.env.MNEMONIC_ENTRYPOINT;
 let sessionChild;
@@ -51,16 +54,18 @@ function ensureSession() {
   sessionChild.stderr.on("data", () => {
     // best-effort for the dogfood runner
   });
-  sessionChild.stdin.write(JSON.stringify({
-    jsonrpc: "2.0",
-    id: 0,
-    method: "initialize",
-    params: {
-      protocolVersion: "2024-11-05",
-      capabilities: {},
-      clientInfo: { name: "dogfood-runner", version: "1.0" },
-    },
-  }) + "\n");
+  sessionChild.stdin.write(
+    JSON.stringify({
+      jsonrpc: "2.0",
+      id: 0,
+      method: "initialize",
+      params: {
+        protocolVersion: "2024-11-05",
+        capabilities: {},
+        clientInfo: { name: "dogfood-runner", version: "1.0" },
+      },
+    }) + "\n",
+  );
   return sessionChild;
 }
 
@@ -128,11 +133,9 @@ async function upsertNote({ title, content, tags }) {
 let _isolated = null;
 
 async function main() {
-  let isolated = null;
-
   if (useIsolated) {
     const sourceVault = path.join(cwd, ".mnemonic");
-    isolated = await createIsolatedDogfoodVault(sourceVault);
+    const isolated = await createIsolatedDogfoodVault(sourceVault);
     _isolated = isolated;
     cwd = path.dirname(isolated.vaultPath);
     console.error(`[isolated] vault at ${isolated.vaultPath}`);
@@ -145,17 +148,76 @@ async function main() {
   const workingStateNotes = getWorkingStateNotes(summary1.structured);
   const recent = summary1.structured?.recent ?? [];
 
-  const recallEmbeddings = await callTool("recall", { query: "Why are embeddings gitignored?", cwd, limit: 20, scope: "all" });
-  const recallTemporal = await callTool("recall", { query: "temporal interpretation design decisions", cwd, limit: 5, scope: "all", mode: "temporal" });
-  const recallTemporalVerbose = await callTool("recall", { query: "mnemonic key design decisions", cwd, limit: 3, scope: "all", mode: "temporal", verbose: true });
-  const recallHybrid = await callTool("recall", { query: "hybrid reranking rescue projections", cwd, limit: 3, scope: "all" });
-  const recallReadFirst = await callTool("recall", { query: "what should I read first to understand temporal interpretation", cwd, limit: 5, scope: "all" });
-  const recallArchitecture = await callTool("recall", { query: "projections enrichment layer design", cwd, limit: 5, scope: "all" });
-  const recallRecentWeek = await callTool("recall", { query: "recent changes this week", cwd, limit: 5, scope: "all" });
-  const recallDiagnostics = await callTool("recall", { query: "key design decisions", cwd, limit: 5, scope: "all" });
-  const recentTemporary = await callTool("recent_memories", { cwd, scope: "all", storedIn: "any", limit: 5, lifecycle: "temporary" });
-  const recalledTemporary = await callTool("recall", { query: "phase 2 working-state continuity", cwd, limit: 5, scope: "all", lifecycle: "temporary" });
-  const consolidateDupes = await callTool("consolidate", { cwd, strategy: "detect-duplicates", evidence: true });
+  const recallEmbeddings = await callTool("recall", {
+    query: "Why are embeddings gitignored?",
+    cwd,
+    limit: 20,
+    scope: "all",
+  });
+  const recallTemporal = await callTool("recall", {
+    query: "temporal interpretation design decisions",
+    cwd,
+    limit: 5,
+    scope: "all",
+    mode: "temporal",
+  });
+  const recallTemporalVerbose = await callTool("recall", {
+    query: "mnemonic key design decisions",
+    cwd,
+    limit: 3,
+    scope: "all",
+    mode: "temporal",
+    verbose: true,
+  });
+  const recallHybrid = await callTool("recall", {
+    query: "hybrid reranking rescue projections",
+    cwd,
+    limit: 3,
+    scope: "all",
+  });
+  const recallReadFirst = await callTool("recall", {
+    query: "what should I read first to understand temporal interpretation",
+    cwd,
+    limit: 5,
+    scope: "all",
+  });
+  const recallArchitecture = await callTool("recall", {
+    query: "projections enrichment layer design",
+    cwd,
+    limit: 5,
+    scope: "all",
+  });
+  const recallRecentWeek = await callTool("recall", {
+    query: "recent changes this week",
+    cwd,
+    limit: 5,
+    scope: "all",
+  });
+  const recallDiagnostics = await callTool("recall", {
+    query: "key design decisions",
+    cwd,
+    limit: 5,
+    scope: "all",
+  });
+  const recentTemporary = await callTool("recent_memories", {
+    cwd,
+    scope: "all",
+    storedIn: "any",
+    limit: 5,
+    lifecycle: "temporary",
+  });
+  const recalledTemporary = await callTool("recall", {
+    query: "phase 2 working-state continuity",
+    cwd,
+    limit: 5,
+    scope: "all",
+    lifecycle: "temporary",
+  });
+  const consolidateDupes = await callTool("consolidate", {
+    cwd,
+    strategy: "detect-duplicates",
+    evidence: true,
+  });
   const consolidateDryRun = await callTool("consolidate", { cwd, strategy: "dry-run" });
 
   const recentNotes = getRecentMemoryNotes(recentTemporary.structured);
@@ -164,10 +226,7 @@ async function main() {
   // consolidation) in addition to the most recent notes, so the check measures
   // graph reachability rather than fragility of the recent→architecture path.
   const anchorId = summary1.structured?.orientation?.primaryEntry?.id;
-  const navSeedIds = [
-    ...(anchorId ? [anchorId] : []),
-    ...recent.slice(0, 3).map((n) => n.id),
-  ];
+  const navSeedIds = [...(anchorId ? [anchorId] : []), ...recent.slice(0, 3).map((n) => n.id)];
   for (const seedId of navSeedIds) {
     const got = await callTool("get", { ids: [seedId], cwd, includeRelationships: true });
     const note = got.structured?.notes?.[0];
@@ -193,7 +252,10 @@ async function main() {
       const note1 = hop1.structured?.notes?.[0];
       if (!note1) continue;
       const hop2Titles = note1.relationships?.shown?.map((r) => r.title) ?? [];
-      if (architectureOrDecision.test(note1.title) || hop2Titles.some((title) => architectureOrDecision.test(title))) {
+      if (
+        architectureOrDecision.test(note1.title) ||
+        hop2Titles.some((title) => architectureOrDecision.test(title))
+      ) {
         reachesArchitectureWithinThreeSteps = true;
         break;
       }
@@ -228,7 +290,9 @@ async function main() {
   const diagHasScopeCount = typeof diagStructured?.recallScopeNoteCount === "number";
   const diagHasDiversity = diagStructured?.diversity != null;
   const diagHasRetrievalCoverage = diagStructured?.retrievalCoverage != null;
-  const diagResultsHaveSignalStrength = diagResults.some((r) => typeof r.signalStrength === "number");
+  const diagResultsHaveSignalStrength = diagResults.some(
+    (r) => typeof r.signalStrength === "number",
+  );
   const diagResultsHaveConfidence = diagResults.some((r) => typeof r.confidence === "string");
   const diagConfidenceTiers = [...new Set(diagResults.map((r) => r.confidence).filter(Boolean))];
   const diagDiversityThemeCount = diagStructured?.diversity?.themeCount ?? null;
@@ -237,8 +301,12 @@ async function main() {
   const summaryMaintenanceWarnings = Array.isArray(summary1.structured?.maintenanceWarnings);
   const summaryHasMaintenanceField = "maintenanceWarnings" in (summary1.structured ?? {});
   const summaryMaintenanceTextSection = summary1.text.includes("Maintenance:");
-  const consolidateDryRunHasMaintenanceKey = consolidateDryRun.structured?.maintenanceWarnings !== undefined || consolidateDryRun.text.includes("Maintenance:");
-  const consolidatePairsHaveClassification = (consolidateDupes.structured?.duplicatePairs ?? []).some((p) => typeof (p.noteA?.classification ?? p.noteB?.classification) === "string");
+  const consolidateDryRunHasMaintenanceKey =
+    consolidateDryRun.structured?.maintenanceWarnings !== undefined ||
+    consolidateDryRun.text.includes("Maintenance:");
+  const consolidatePairsHaveClassification = (
+    consolidateDupes.structured?.duplicatePairs ?? []
+  ).some((p) => typeof (p.noteA?.classification ?? p.noteB?.classification) === "string");
   const recallNoDecayInfo = diagResults.every((r) => r.decayInfo === undefined);
 
   const packA = {
@@ -255,7 +323,8 @@ async function main() {
       // This is expected behavior — the field only appears when warnings exist.
       // Integration tests verify the positive path (warnings present when conditions trigger).
       // consolidate classification is verified by consolidatePairsHaveClassification.
-      !recallNoDecayInfo && "decayInfo should not appear in recall structured output (internal-only)",
+      !recallNoDecayInfo &&
+        "decayInfo should not appear in recall structured output (internal-only)",
     ].filter(Boolean),
     themeCount: themeEntries.length,
     topEmbeddingResult: b1Top?.title,
@@ -289,7 +358,8 @@ async function main() {
   const packB = {
     advisory: [
       recentNotes.length === 0 && "`recent_memories(lifecycle: temporary)` is useful",
-      (recentNotes.length === 0 || workingStateNotes.length === 0) && "end-to-end resume flow feels coherent",
+      (recentNotes.length === 0 || workingStateNotes.length === 0) &&
+        "end-to-end resume flow feels coherent",
     ].filter(Boolean),
     recentTemporaryTitles: recentNotes.map((note) => note.title),
     recalledTemporaryTitles: tempRecallResults.map((note) => note.title),
@@ -315,8 +385,16 @@ async function main() {
   const packTitleSuffix = useIsolated ? ` (${today}) (isolated vault)` : ` (${today})`;
 
   report.stored = {
-    packA: await upsertNote({ title: `Dogfooding results: core enrichment/orientation pack${packTitleSuffix}`, content: packAContent, tags: ["dogfooding", "testing", "scorecard", "regression"] }),
-    packB: await upsertNote({ title: `Dogfooding results: working-state continuity pack${packTitleSuffix}`, content: packBContent, tags: ["dogfooding", "testing", "scorecard", "workflow", "temporary-notes"] }),
+    packA: await upsertNote({
+      title: `Dogfooding results: core enrichment/orientation pack${packTitleSuffix}`,
+      content: packAContent,
+      tags: ["dogfooding", "testing", "scorecard", "regression"],
+    }),
+    packB: await upsertNote({
+      title: `Dogfooding results: working-state continuity pack${packTitleSuffix}`,
+      content: packBContent,
+      tags: ["dogfooding", "testing", "scorecard", "workflow", "temporary-notes"],
+    }),
   };
 
   console.log(JSON.stringify(report, null, 2));
@@ -326,15 +404,17 @@ async function main() {
   }
 }
 
-main().catch((error) => {
-  console.error(error.stack || error.message || String(error));
-  process.exit(1);
-}).finally(async () => {
-  if (sessionChild) {
-    sessionChild.stdin.end();
-  }
-  if (_isolated) {
-    await _isolated.cleanup();
-    console.error("[isolated] cleaned up");
-  }
-});
+main()
+  .catch((error) => {
+    console.error(error.stack || error.message || String(error));
+    process.exit(1);
+  })
+  .finally(async () => {
+    if (sessionChild) {
+      sessionChild.stdin.end();
+    }
+    if (_isolated) {
+      await _isolated.cleanup();
+      console.error("[isolated] cleaned up");
+    }
+  });

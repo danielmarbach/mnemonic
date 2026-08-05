@@ -23,22 +23,23 @@
  *   - `git commit --no-verify`  – skip hooks for this commit
  *   - `SKIP_SIMPLE_GIT_HOOKS=1` – skip hooks for this environment
  */
-import { spawnSync } from 'node:child_process';
-import { basename, extname } from 'node:path';
+import { spawnSync } from "node:child_process";
+import { basename, extname } from "node:path";
 
 // File types the gates can fail on: anything tsc compiles, eslint or prettier
 // checks, or a config they read.
-const SOURCE_EXTENSIONS = new Set([
-  '.ts', '.tsx', '.mts', '.cts',
-  '.js', '.jsx', '.mjs', '.cjs',
-]);
+const SOURCE_EXTENSIONS = new Set([".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs"]);
 const TOOLCHAIN_CONFIGS = [
-  'package.json', 'package-lock.json', 'npm-shrinkwrap.json',
-  'pnpm-lock.yaml', 'pnpm-workspace.yaml', 'yarn.lock',
-  'tsconfig', // tsconfig.json, tsconfig.build.json, ...
-  'eslint.config', // eslint.config.js/.mjs/.cjs
-  '.prettierrc', // .prettierrc, .prettierrc.json, ...
-  '.prettierignore',
+  "package.json",
+  "package-lock.json",
+  "npm-shrinkwrap.json",
+  "pnpm-lock.yaml",
+  "pnpm-workspace.yaml",
+  "yarn.lock",
+  "tsconfig", // tsconfig.json, tsconfig.build.json, ...
+  "eslint.config", // eslint.config.js/.mjs/.cjs
+  ".prettierrc", // .prettierrc, .prettierrc.json, ...
+  ".prettierignore",
 ];
 
 function affectsGates(stagedPath) {
@@ -49,31 +50,31 @@ function affectsGates(stagedPath) {
 
 // Staged paths relative to the repo root (git runs hooks from the top level).
 function stagedPaths() {
-  const result = spawnSync('git', ['diff', '--cached', '--name-only', '-z'], { encoding: 'utf8' });
+  const result = spawnSync("git", ["diff", "--cached", "--name-only", "-z"], { encoding: "utf8" });
   if (result.status !== 0) return null;
-  return result.stdout.split('\0').filter(Boolean);
+  return result.stdout.split("\0").filter(Boolean);
 }
 
 const staged = stagedPaths();
 if (staged !== null && staged.length > 0 && staged.every((path) => !affectsGates(path))) {
   process.stdout.write(
-    'ℹ Staged changes only touch files outside the CI gates (markdown, docs, workflows) — ' +
-      'skipping typecheck, lint, and format:check.\n',
+    "ℹ Staged changes only touch files outside the CI gates (markdown, docs, workflows) — " +
+      "skipping typecheck, lint, and format:check.\n",
   );
   process.exit(0);
 }
 
 const steps = [
-  { name: 'lint-staged (auto-fix staged files)', command: 'npx lint-staged' },
-  { name: 'typecheck', command: 'npm run typecheck' },
-  { name: 'lint', command: 'npm run lint' },
-  { name: 'format:check', command: 'npm run format:check' },
+  { name: "lint-staged (auto-fix staged files)", command: "npx lint-staged" },
+  { name: "typecheck", command: "npm run typecheck" },
+  { name: "lint", command: "npm run lint" },
+  { name: "format:check", command: "npm run format:check" },
 ];
 
 for (const { name, command } of steps) {
   process.stdout.write(`\n▶ ${name}\n`);
   const result = spawnSync(command, {
-    stdio: 'inherit',
+    stdio: "inherit",
     shell: true,
   });
 
@@ -87,4 +88,4 @@ for (const { name, command } of steps) {
   }
 }
 
-process.stdout.write('\n✔ All pre-commit checks passed.\n');
+process.stdout.write("\n✔ All pre-commit checks passed.\n");
