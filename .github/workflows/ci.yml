@@ -33,7 +33,14 @@ jobs:
 
   build-and-test:
     needs: check-toolchain-sync
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os:
+          - { name: ubuntu, runner: ubuntu-latest }
+          - { name: windows, runner: windows-latest }
+      fail-fast: false
+    runs-on: ${{ matrix.os.runner }}
+    name: build-and-test (${{ matrix.os.name }})
 
     steps:
       - name: Check out repository
@@ -49,12 +56,15 @@ jobs:
         run: npm ci
 
       - name: Typecheck
+        if: matrix.os.name == 'ubuntu'
         run: npm run typecheck
 
       - name: Lint
+        if: matrix.os.name == 'ubuntu'
         run: npm run lint
 
       - name: Format check
+        if: matrix.os.name == 'ubuntu'
         run: npm run format:check
 
       - name: Clean and build
@@ -79,7 +89,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v7
         with:
-          name: ci-learning
+          name: ci-learning-${{ matrix.os.name }}
           path: artifacts/ci-learning
 
   docker-build:
