@@ -27,7 +27,11 @@ afterEach(async () => {
 });
 
 beforeAll(async () => {
-  await execFileAsync("npm", ["run", "build"], { cwd: repoRoot });
+  await execFileAsync("npm", ["run", "build"], {
+    cwd: repoRoot,
+    // On Windows `npm` is npm.cmd; execFile can't resolve it without a shell.
+    shell: process.platform === "win32",
+  });
 }, 120000);
 
 const callLocalMcpTool = callLocalMcpResponse;

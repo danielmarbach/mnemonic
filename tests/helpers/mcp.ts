@@ -48,7 +48,12 @@ async function ensureBuiltEntryPointReadyInternal(options?: {
   const lockDir = options?.lockDir ?? buildLockDir;
   const runBuild =
     options?.runBuild ??
-    (() => execFileAsync("npm", ["run", "build"], { cwd: repoRoot }).then(() => undefined));
+    (() =>
+      execFileAsync("npm", ["run", "build"], {
+        cwd: repoRoot,
+        // On Windows `npm` is npm.cmd; execFile can't resolve it without a shell.
+        shell: process.platform === "win32",
+      }).then(() => undefined));
   const timeoutMs = options?.timeoutMs ?? 120_000;
   const pollIntervalMs = options?.pollIntervalMs ?? 100;
   const deadline = Date.now() + timeoutMs;

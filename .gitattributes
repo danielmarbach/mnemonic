@@ -1,0 +1,24 @@
+# Normalize line endings to LF on checkout for all text files.
+#
+# Windows runners default to core.autocrlf=true, which converts source files to
+# CRLF. CRLF breaks esbuild's parse of the `#!/usr/bin/env node` shebang in .mjs
+# files that are imported by unit tests under vitest (the import fails with
+# "SyntaxError: Invalid or unexpected token"). Forcing LF keeps shebanged .mjs
+# modules importable on every platform.
+* text=auto eol=lf
+
+# Preserve CRLF for cmd.exe batch files (PowerShell is cross-platform and
+# handles LF, so .ps1 intentionally inherits the LF default above).
+*.bat   text eol=crlf
+*.cmd   text eol=crlf
+
+# Binary files: never normalize or merge.
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.webp binary
+*.ico  binary
+*.icns binary
+*.pdf  binary
+*.zip  binary

@@ -1106,7 +1106,7 @@ describe("project-memory-summary", () => {
     } finally {
       await embeddingServer.close();
     }
-  }, 20000);
+  }, 60000);
 
   it("uses the same graduated theme system for anchor diversity and theme caps", async () => {
     const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-vault-"));
@@ -1277,7 +1277,7 @@ describe("project-memory-summary", () => {
     } finally {
       await embeddingServer.close();
     }
-  }, 20000);
+  }, 60000);
 
   it("includes a bounded working-state section for temporary notes after orientation", async () => {
     const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-vault-"));

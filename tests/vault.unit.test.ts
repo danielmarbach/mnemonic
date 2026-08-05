@@ -340,9 +340,14 @@ describe("VaultManager", () => {
       const vault = await vaultManager.getOrCreateProjectVault(submoduleCwd);
       expect(vault).toBeTruthy();
       expect(vault!.provenance).toBe("project-local");
-      // The vault storage path must be inside the parent repo, not the submodule
-      expect(vault!.storage.vaultPath).toContain(parentDir);
-      expect(vault!.storage.vaultPath).not.toContain("vendor/submodule");
+      // The vault storage path must be inside the parent repo, not the submodule.
+      // Compare canonical (realpath) forms: on Windows, os.tmpdir() can return the
+      // 8.3 short form (e.g. RUNNER~1) while the resolved vault path uses the long
+      // form (runneradmin), which would make a raw string comparison fail.
+      const realParentDir = await fs.realpath(parentDir);
+      const realVaultPath = await fs.realpath(vault!.storage.vaultPath);
+      expect(realVaultPath).toContain(realParentDir);
+      expect(realVaultPath).not.toContain("vendor/submodule");
     });
 
     it("should return the same project vault whether cwd is in the superproject or its submodule", async () => {
