@@ -2,19 +2,18 @@ import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { mkdtemp } from "fs/promises";
 import os from "os";
 import path from "path";
-import { execFile } from "child_process";
-import { promisify } from "util";
-import { fileURLToPath } from "url";
 
 import {
   GetResultSchema,
   ProjectSummaryResultSchema,
   RecallResultSchema,
 } from "../src/structured-content.js";
-import { callLocalMcpResponse, startFakeEmbeddingServer, tempDirs } from "./helpers/mcp.js";
-
-const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const execFileAsync = promisify(execFile);
+import {
+  callLocalMcpResponse,
+  ensureBuiltEntryPointReady,
+  startFakeEmbeddingServer,
+  tempDirs,
+} from "./helpers/mcp.js";
 
 afterEach(async () => {
   await Promise.all(
@@ -27,11 +26,7 @@ afterEach(async () => {
 });
 
 beforeAll(async () => {
-  await execFileAsync("npm", ["run", "build"], {
-    cwd: repoRoot,
-    // On Windows `npm` is npm.cmd; execFile can't resolve it without a shell.
-    shell: process.platform === "win32",
-  });
+  await ensureBuiltEntryPointReady();
 }, 120000);
 
 const callLocalMcpTool = callLocalMcpResponse;

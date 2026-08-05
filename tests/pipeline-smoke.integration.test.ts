@@ -2,12 +2,11 @@ import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { mkdtemp, rm } from "fs/promises";
 import os from "os";
 import path from "path";
-import { fileURLToPath } from "url";
 import {
   callLocalMcp,
   callLocalMcpResponse,
   callLocalMcpPrompt,
-  execFileAsync,
+  ensureBuiltEntryPointReady,
   extractRememberedId,
   initTestRepo,
   startFakeEmbeddingServer,
@@ -16,18 +15,12 @@ import {
 
 import { RecallResultSchema } from "../src/structured-content.js";
 
-const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-
 afterEach(async () => {
   await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })));
 });
 
 beforeAll(async () => {
-  await execFileAsync("npm", ["run", "build"], {
-    cwd: repoRoot,
-    // On Windows `npm` is npm.cmd; execFile can't resolve it without a shell.
-    shell: process.platform === "win32",
-  });
+  await ensureBuiltEntryPointReady();
 }, 120000);
 
 describe("pipeline smoke assertions", () => {

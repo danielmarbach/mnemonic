@@ -2,23 +2,18 @@ import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { mkdtemp, mkdir, readFile, writeFile } from "fs/promises";
 import os from "os";
 import path from "path";
-import { execFile } from "child_process";
-import { promisify } from "util";
-import { fileURLToPath } from "url";
 
 import { RecallResultSchema } from "../src/structured-content.js";
 import { embedModel } from "../src/embeddings.js";
 import {
   callLocalMcp,
   callLocalMcpResponse,
+  ensureBuiltEntryPointReady,
   extractRememberedId,
   initTestRepo,
   startFakeEmbeddingServer,
   tempDirs,
 } from "./helpers/mcp.js";
-
-const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const execFileAsync = promisify(execFile);
 
 afterEach(async () => {
   await Promise.all(
@@ -31,11 +26,7 @@ afterEach(async () => {
 });
 
 beforeAll(async () => {
-  await execFileAsync("npm", ["run", "build"], {
-    cwd: repoRoot,
-    // On Windows `npm` is npm.cmd; execFile can't resolve it without a shell.
-    shell: process.platform === "win32",
-  });
+  await ensureBuiltEntryPointReady();
 }, 120000);
 
 async function writeSeedNote(
