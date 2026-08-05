@@ -6,6 +6,16 @@ The format is loosely based on Keep a Changelog and uses semver-style version he
 
 ## [Unreleased]
 
+## [0.42.2] - 2026-08-05
+
+### Fixed
+
+- Path normalization fixes for Windows: `collapseHomePath` now handles forward-slash inputs when the platform separator is a backslash, and `findGitRoot` resolves git roots to canonical form so 8.3 short names don't cause path mismatches.
+
+### Changed
+
+- CI now runs tests on Windows in addition to Linux.
+
 ## [0.42.1] - 2026-08-03
 
 ### Changed
