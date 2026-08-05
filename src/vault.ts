@@ -529,8 +529,15 @@ export async function findGitRoot(
   const trimmedRoot = rootResult.value.trim();
   if (!trimmedRoot) return null;
 
-  if (visited.has(trimmedRoot)) return trimmedRoot;
-  visited.add(trimmedRoot);
+  // Resolve to canonical form so 8.3 short names (Windows) and symlinks
+  // don't cause mismatches with paths from other sources.
+  const resolved = await attempt("vault:find-git-root:realpath", () =>
+    fs.realpath(path.resolve(trimmedRoot)),
+  );
+  const canonical = resolved.ok ? resolved.value : path.resolve(trimmedRoot);
+
+  if (visited.has(canonical)) return canonical;
+  visited.add(canonical);
 
   const superResult = await attempt("vault:find-git-root:superproject", () =>
     git.revparse(["--show-superproject-working-tree"]),
@@ -547,7 +554,7 @@ export async function findGitRoot(
     );
   }
 
-  return trimmedRoot;
+  return canonical;
 }
 
 export async function ensureGitignore(ignorePath: string): Promise<void> {

@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import path from "node:path";
 import type { Vault } from "../src/vault.js";
 import type { ServerContext } from "../src/server-context.js";
 import type { CommitResult } from "../src/git.js";
@@ -91,7 +92,7 @@ describe("commitVaultWithProtection", () => {
     expect(result.status).toBe("failed");
     expect((result as any).error).toContain("blocked");
     expect(vault.git.commitWithStatus).not.toHaveBeenCalled();
-    expect(getCurrentGitBranchMock).toHaveBeenCalledWith("/project");
+    expect(getCurrentGitBranchMock).toHaveBeenCalledWith(path.resolve("/project"));
   });
 
   it("includes branch, patterns and behavior in the blocked message", async () => {

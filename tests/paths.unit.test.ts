@@ -44,7 +44,7 @@ describe("path resolution", () => {
 describe("collapseHomePath", () => {
   it("collapses paths under home directory to tilde notation", () => {
     expect(collapseHomePath("/tmp/home/projects/repo", { HOME: "/tmp/home" })).toBe(
-      "~/projects/repo",
+      path.join("~", "projects", "repo"),
     );
   });
 

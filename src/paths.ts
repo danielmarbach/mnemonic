@@ -33,12 +33,16 @@ export function collapseHomePath(absPath: string, env: PathEnv = process.env): s
     return absPath;
   }
 
-  if (absPath === home) {
+  // Normalize both paths so cross-platform separators don't break the prefix check.
+  const normalized = path.normalize(absPath);
+  const normalizedHome = path.normalize(home);
+
+  if (normalized === normalizedHome) {
     return "~";
   }
 
-  if (absPath.startsWith(home + path.sep)) {
-    return path.join("~", absPath.slice(home.length + 1));
+  if (normalized.startsWith(normalizedHome + path.sep)) {
+    return path.join("~", normalized.slice(normalizedHome.length + 1));
   }
 
   return absPath;
