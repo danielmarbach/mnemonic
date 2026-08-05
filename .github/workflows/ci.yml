@@ -71,26 +71,7 @@ jobs:
         run: npm run build:clean
 
       - name: Run tests
-        shell: bash
-        run: |
-          set -o pipefail
-          mkdir -p artifacts/ci-learning
-          npm test 2>&1 | tee artifacts/ci-learning/test-output.log
-
-      - name: Summarize failed test run
-        if: failure()
-        run: |
-          node scripts/ci/collect-test-failure.mjs \
-            --input artifacts/ci-learning/test-output.log \
-            --outdir artifacts/ci-learning \
-            --command "npm test"
-
-      - name: Upload CI learning artifact
-        if: failure()
-        uses: actions/upload-artifact@v7
-        with:
-          name: ci-learning-${{ matrix.os.name }}
-          path: artifacts/ci-learning
+        run: npm test
 
   docker-build:
     needs: check-toolchain-sync

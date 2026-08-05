@@ -285,7 +285,6 @@ Every attachment now has a persisted opaque `attachmentId`, separate from reposi
 
 - Local dogfooding should use `scripts/mcp-local.sh` so the built server matches the current source tree.
 - CI-safe MCP integration tests use the real local entrypoint with `DISABLE_GIT=true`, a temp `VAULT_PATH`, and a fake `OLLAMA_URL` endpoint.
-- CI failure learnings are artifact-first and promoted manually into memory through MCP rather than auto-written on every failed run.
 
 ## Areas to watch
 

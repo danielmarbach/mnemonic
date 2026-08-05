@@ -449,14 +449,10 @@ npm test -- <file>          # specific test file
 npm test -- --reporter=verbose  # detailed output
 ```
 
-**CI-safe MCP testing and learning**:
+**CI-safe MCP testing**:
 - `tests/mcp.integration.test.ts` should remain CI-safe: use the real `scripts/mcp-local.sh` entrypoint, `DISABLE_GIT=true`, a temp `VAULT_PATH`, and a fake local `OLLAMA_URL` endpoint
 - If you add more MCP integration tests, prefer the same hermetic pattern unless you explicitly need end-to-end Ollama verification
 - When changing a tool's `structuredContent` shape or zod `outputSchema`, add or update a schema-audit test that parses the real MCP response with the exported schema. Treat handler/schema drift as a regression class to guard explicitly.
-- CI failure learnings are artifact-first: a failing run should produce normalized artifacts before anything is promoted into memory
-- Promotion into mnemonic is manual via `workflow_dispatch`, not automatic on every failed run
-- Avoid fixed notes for CI learnings; prefer one note per promoted incident or failure pattern with a stable `failure_signature`
-- Do not make CI failure learning depend on a real Ollama daemon unless semantic clustering becomes a proven need
 
 **Coverage expectations**:
 - Migration code: 100% (users can't fix corrupt vaults easily)
