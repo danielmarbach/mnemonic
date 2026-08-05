@@ -7,6 +7,13 @@ on:
 
 jobs:
   build-and-test:
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os:
+          - { name: ubuntu, runner: ubuntu-latest }
+          - { name: windows, runner: windows-latest }
+      fail-fast: false
+    runs-on: ${{ matrix.os.runner }}
+    name: build-and-test (${{ matrix.os.name }})
     steps:
       - run: echo "Formula-only change — skipping build and tests"
