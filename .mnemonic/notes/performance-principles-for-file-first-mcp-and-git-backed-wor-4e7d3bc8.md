@@ -9,7 +9,7 @@ tags:
   - completed
 lifecycle: permanent
 createdAt: '2026-03-14T22:14:46.759Z'
-updatedAt: '2026-05-09T21:10:39.020Z'
+updatedAt: '2026-08-06T04:42:02.005Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
@@ -27,6 +27,8 @@ relatedTo:
     type: derives-from
   - id: sync-redesign-decouple-embedding-from-git-force-flag-remove--6f2c1517
     type: related-to
+  - id: bounded-concurrency-and-single-source-of-truth-principles-52e1d1c6
+    type: derives-from
 memoryVersion: 1
 ---
 ## Durable Performance Principles
