@@ -9,11 +9,14 @@ tags:
   - performance
 lifecycle: permanent
 createdAt: '2026-08-06T04:41:54.769Z'
-updatedAt: '2026-08-06T04:41:54.769Z'
+updatedAt: '2026-08-06T04:42:02.005Z'
 role: reference
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: performance-principles-for-file-first-mcp-and-git-backed-wor-4e7d3bc8
+    type: derives-from
 memoryVersion: 1
 ---
 Two reusable-component principles extracted from a duplication audit of the mnemonic TypeScript codebase, now enforced via shared primitives. Captured through the mnemonic remember tool — an earlier hand-written .mnemonic/notes/ file for this same principle was illegitimate and removed; notes must be created via MCP, never by writing .mnemonic/ files directly.
