@@ -18,6 +18,7 @@ import {
 } from "./brands.js";
 import { attempt } from "./error-utils.js";
 import { xxh128 } from "./hashing.js";
+import { mapWithConcurrency } from "./concurrency.js";
 
 /**
  * A persisted embedding record for a single retrieval chunk.
@@ -112,31 +113,24 @@ export class ChunkEmbeddingStorage {
     // idempotent (hash(hash(x)) !== hash(x)), so pathFor(basename) would
     // re-hash the hex and miss every file. Mirrors reconcile()'s direct read.
     //
-    // Bound concurrency: up to 50k chunks would otherwise open 50k file
-    // descriptors at once via Promise.all. Process in fixed-size batches so the
-    // lazy loader and reconcile sweeps stay within file-descriptor limits.
-    const BATCH_SIZE = 100;
-    const records: ChunkEmbeddingRecord[] = [];
-    for (let i = 0; i < jsonFiles.length; i += BATCH_SIZE) {
-      const batch = jsonFiles.slice(i, i + BATCH_SIZE);
-      const batchRecords = await Promise.all(
-        batch.map(async (file) => {
-          const raw = await attempt("chunk-embedding:list", () =>
-            fs.readFile(path.join(this.dir, file), "utf-8"),
-          );
-          if (!raw.ok) return null;
-          const parsed = await attempt("chunk-embedding:list", (): unknown =>
-            JSON.parse(raw.value),
-          );
-          if (!parsed.ok) return null;
-          return validateChunkEmbeddingRecord(parsed.value);
-        }),
+    // Bound concurrent file reads so a large attachment (up to ~50k chunks)
+    // does not open a descriptor for every file at once. `mapWithConcurrency`
+    // keeps at most `READ_CONCURRENCY` reads in flight (the cap IS the
+    // file-descriptor bound) with no sync barrier between batches, so it is
+    // strictly better than fixed-size `Promise.all` batching for the same
+    // descriptor limit. Input order is preserved, matching the prior batched
+    // behavior; corrupt/missing files fail-soft to `null` and are filtered.
+    const READ_CONCURRENCY = 100;
+    const records = await mapWithConcurrency(jsonFiles, READ_CONCURRENCY, async (file) => {
+      const raw = await attempt("chunk-embedding:list", () =>
+        fs.readFile(path.join(this.dir, file), "utf-8"),
       );
-      for (const record of batchRecords) {
-        if (record !== null) records.push(record);
-      }
-    }
-    return records;
+      if (!raw.ok) return null;
+      const parsed = await attempt("chunk-embedding:list", (): unknown => JSON.parse(raw.value));
+      if (!parsed.ok) return null;
+      return validateChunkEmbeddingRecord(parsed.value);
+    });
+    return records.filter((r): r is ChunkEmbeddingRecord => r !== null);
   }
 
   async remove(chunkId: string): Promise<void> {
