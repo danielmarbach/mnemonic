@@ -9,13 +9,15 @@ tags:
   - type-safety
 lifecycle: permanent
 createdAt: '2026-05-25T17:29:36.356Z'
-updatedAt: '2026-05-25T17:29:36.356Z'
+updatedAt: '2026-08-06T04:42:02.934Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
   - id: git-mutation-coordination-per-repo-mutex-plus-retry-fallback-56264a36
     type: related-to
   - id: parallel-consolidate-operations-can-leave-staged-local-only--e8c33780
+    type: related-to
+  - id: bounded-concurrency-and-single-source-of-truth-principles-52e1d1c6
     type: related-to
 memoryVersion: 1
 ---

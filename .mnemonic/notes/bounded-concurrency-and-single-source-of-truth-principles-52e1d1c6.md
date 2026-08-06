@@ -9,7 +9,7 @@ tags:
   - performance
 lifecycle: permanent
 createdAt: '2026-08-06T04:41:54.769Z'
-updatedAt: '2026-08-06T04:42:02.383Z'
+updatedAt: '2026-08-06T04:42:02.934Z'
 role: reference
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -18,6 +18,8 @@ relatedTo:
   - id: performance-principles-for-file-first-mcp-and-git-backed-wor-4e7d3bc8
     type: derives-from
   - id: implementation-principles-for-mnemonic-mcp-2e178bba
+    type: related-to
+  - id: typescript-code-review-mnemonic-project-4136d9a2
     type: related-to
 memoryVersion: 1
 ---
