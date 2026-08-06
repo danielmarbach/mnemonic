@@ -19,11 +19,15 @@
  *    domain-specific: bulk file reads, embedding backfills, note hydration all
  *    want different limits).
  *
- * Reserve a hand-rolled side-effect worker pool only when the per-item body has
- * an intrinsic side effect on a shared structure that cannot be expressed as a
+ * Reserve a hand-rolled (or serial) loop only when the per-item body has an
+ * intrinsic side effect on a shared structure that cannot be expressed as a
  * return value without a tagged-union dispatch that obscures the real axis of
- * change. Do not conflate this with fixed-size `Promise.all` batching, which
- * bounds file descriptors rather than worker count.
+ * change (e.g. `reconcile` unlinking files mid-loop, or a worker mutating a
+ * shared `Map` while iterating). The concurrency parameter IS the file-
+ * descriptor bound for file reads: N in-flight `fs.readFile` calls means at
+ * most N open descriptors. Fixed-size `Promise.all` batching is the SAME bound
+ * with sync barriers between batches (worse throughput for the same cap) —
+ * prefer `mapWithConcurrency` over hand-rolled batching for bulk file reads.
  */
 export async function mapWithConcurrency<T, R>(
   items: readonly T[],
