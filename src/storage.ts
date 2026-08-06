@@ -19,6 +19,7 @@ import type {
 } from "./brands.js";
 import { memoryId, isoDateString, isValidMemoryId } from "./brands.js";
 import { attempt } from "./error-utils.js";
+import { mapWithConcurrency } from "./concurrency.js";
 import {
   AtomicWriteInProgressError,
   MalformedNoteError,
@@ -108,34 +109,6 @@ export function hasNoteContent(note: NoteMetadata): note is Note {
 
 /** Maximum number of file descriptors opened at once during bulk listings. */
 const LIST_CONCURRENCY = 32;
-
-/**
- * Map over an array with a bounded number of concurrent async operations while
- * preserving input order in the result (each result is placed at its source
- * index). Used by bulk listings so we never open a descriptor for every note or
- * embedding at once when a vault grows large.
- */
-async function mapWithConcurrency<T, R>(
-  items: readonly T[],
-  concurrency: number,
-  fn: (item: T, index: number) => Promise<R>,
-): Promise<R[]> {
-  if (items.length === 0) return [];
-  const results = new Array<R>(items.length);
-  let next = 0;
-  const workerCount = Math.min(concurrency, items.length);
-  const workers = Array.from({ length: workerCount }, async () => {
-    while (true) {
-      const index = next++;
-      if (index >= items.length) return;
-      const item = items[index];
-      if (item === undefined) return;
-      results[index] = await fn(item, index);
-    }
-  });
-  await Promise.all(workers);
-  return results;
-}
 
 export interface EmbeddingRecord {
   id: MemoryId;

@@ -10,7 +10,6 @@ import { NOTE_LIFECYCLES, NOTE_ROLES, type Note } from "../storage.js";
 import type { Vault } from "../vault.js";
 import { isoDateString } from "../brands.js";
 import { getErrorMessage, attempt } from "../error-utils.js";
-import { embed, embeddingMetadata } from "../embeddings.js";
 import {
   invalidateActiveProjectCache,
   getRecentSessionNoteAccesses,
@@ -38,7 +37,7 @@ import {
   vaultSelectionDecision,
   type VaultChoiceOption,
 } from "../helpers/mrtr.js";
-import { embedTextForNote } from "../helpers/embed.js";
+import { embedNote } from "../helpers/embed.js";
 import {
   buildPersistenceStatus,
   formatPersistenceSummary,
@@ -389,16 +388,9 @@ export function registerRememberTool(server: McpServer, ctx: ServerContext): voi
         status: "written",
       };
 
-      const embedResult = await attempt("remember:embed", async () => {
-        const text = await embedTextForNote(vault.storage, note);
-        const vector = await embed(text);
-        await vault.storage.writeEmbedding({
-          id,
-          ...embeddingMetadata(vector),
-          embedding: vector,
-          updatedAt: now,
-        });
-      });
+      const embedResult = await attempt("remember:embed", () =>
+        embedNote(vault.storage, note, now),
+      );
       if (!embedResult.ok) {
         embeddingStatus = { status: "skipped", reason: getErrorMessage(embedResult.error) };
         console.error(`[embedding] Skipped for '${id}': ${embedResult.error}`);

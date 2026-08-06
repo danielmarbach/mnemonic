@@ -5,7 +5,8 @@ import {
   embed,
   embeddingMetadata,
 } from "../embeddings.js";
-import { memoryId, isoDateString } from "../brands.js";
+import { memoryId, isoDateString, type ISO8601DateString } from "../brands.js";
+import { mapWithConcurrency } from "../concurrency.js";
 import { getOrBuildProjection } from "../projections.js";
 import { attempt, getErrorMessage } from "../error-utils.js";
 import type { NoteStorage, Note, NoteMetadata, EmbeddingRecord } from "../storage.js";
@@ -32,6 +33,30 @@ export async function embedTextForNote(storage: NoteStorage, note: Note): Promis
   const result = await attempt("projection:build", () => getOrBuildProjection(storage, note));
   if (!result.ok) return `${note.title}\n\n${note.content}`;
   return result.value.projectionText;
+}
+
+/**
+ * Build a note's projection text, embed it, persist the embedding, and return
+ * the record. Shared by every note-embedding call site (remember / update /
+ * consolidate / backfill) so the embed -> metadata -> write sequence is defined
+ * once. Callers keep their own `attempt("scope:...", ...)` fail-soft wrapper and
+ * scope label; this is the inner body.
+ */
+export async function embedNote(
+  storage: NoteStorage,
+  note: Note,
+  now: ISO8601DateString,
+): Promise<EmbeddingRecord> {
+  const text = await embedTextForNote(storage, note);
+  const vector = await embed(text);
+  const record: EmbeddingRecord = {
+    id: note.id,
+    ...embeddingMetadata(vector),
+    embedding: vector,
+    updatedAt: now,
+  };
+  await storage.writeEmbedding(record);
+  return record;
 }
 
 export async function embedMissingNotes(
@@ -72,52 +97,34 @@ export async function embedMissingNotes(
   // Only notes that actually need (re)embedding are hydrated, and the full-body
   // read happens inside the worker pool below so concurrent reads stay bounded
   // by `reindexEmbedConcurrency` and no worker retains every full note at once.
-  let rebuilt = 0;
-  const failed: FailedEmbedding[] = [];
-  const rebuiltEmbeddings: EmbeddingRecord[] = [];
-  let index = 0;
-
-  const workerCount = Math.min(
+  const workResults = await mapWithConcurrency(
+    needsEmbedding,
     ctx.config.reindexEmbedConcurrency,
-    Math.max(needsEmbedding.length, 1),
-  );
-  const workers = Array.from({ length: workerCount }, async () => {
-    while (true) {
-      const meta = needsEmbedding[index++];
-      if (!meta) return;
-
+    async (meta) => {
       const note = await storage.readNote(meta.id);
-      if (!note) continue;
+      if (!note) return null;
 
-      const embedResult = await attempt("embed:note", async () => {
-        const text = await embedTextForNote(storage, note);
-        const vector = await embed(text);
-        const record: EmbeddingRecord = {
-          id: note.id,
-          ...embeddingMetadata(vector),
-          embedding: vector,
-          updatedAt: isoDateString(new Date().toISOString()),
-        };
-        await storage.writeEmbedding(record);
-        return record;
-      });
-      if (embedResult.ok) {
-        rebuilt++;
-        rebuiltEmbeddings.push(embedResult.value);
-      } else {
-        failed.push({ id: meta.id, error: getErrorMessage(embedResult.error) });
-      }
-    }
-  });
+      const embedResult = await attempt("embed:note", () =>
+        embedNote(storage, note, isoDateString(new Date().toISOString())),
+      );
+      if (embedResult.ok) return { kind: "ok" as const, record: embedResult.value };
+      return { kind: "failed" as const, id: meta.id, error: getErrorMessage(embedResult.error) };
+    },
+  );
 
-  await Promise.all(workers);
-
+  const rebuiltEmbeddings: EmbeddingRecord[] = [];
+  const failed: FailedEmbedding[] = [];
+  for (const r of workResults) {
+    if (r === null) continue;
+    if (r.kind === "ok") rebuiltEmbeddings.push(r.record);
+    else failed.push({ id: r.id, error: r.error });
+  }
   failed.sort((a, b) => a.id.localeCompare(b.id));
-  // Workers append records in completion order, which is nondeterministic.
-  // Sort by id so rebuilt embeddings preserve deterministic ranking for score ties.
+  // mapWithConcurrency preserves input order, but keep the id sort so the
+  // returned embeddings array keeps its existing deterministic ordering.
   rebuiltEmbeddings.sort((a, b) => a.id.localeCompare(b.id));
 
-  return { rebuilt, failed, embeddings: rebuiltEmbeddings };
+  return { rebuilt: rebuiltEmbeddings.length, failed, embeddings: rebuiltEmbeddings };
 }
 
 export async function backfillEmbeddingsAfterSync(

@@ -24,8 +24,6 @@ import type { EffectiveNoteMetadata } from "../role-suggestions.js";
 import {
   checkEmbeddingCompatibility,
   currentEmbeddingIdentity,
-  embed,
-  embeddingMetadata,
   safeCosineSimilarity,
 } from "../embeddings.js";
 import { classifyTheme, titleCaseTheme } from "../project-introspection.js";
@@ -52,8 +50,8 @@ import {
   removeRelationshipsToNoteIds as removeRelationshipsToNoteIdsFromModule,
 } from "../helpers/vault.js";
 import { toProjectRef } from "../helpers/project.js";
-import { embedTextForNote as embedTextForNoteFromModule } from "../helpers/embed.js";
-import type { EmbeddingRecord, Note, NoteStorage } from "../storage.js";
+import { embedNote } from "../helpers/embed.js";
+import type { EmbeddingRecord, Note } from "../storage.js";
 import { hasNoteContent } from "../storage.js";
 import type { Vault } from "../vault.js";
 import type { ConsolidationMode, ProjectMemoryPolicy } from "../project-memory-policy.js";
@@ -96,10 +94,6 @@ async function pushAfterMutation(ctx: ServerContext, vault: Vault) {
 
 async function removeRelationshipsToNoteIds(ctx: ServerContext, noteIds: string[]) {
   return removeRelationshipsToNoteIdsFromModule(ctx, noteIds);
-}
-
-async function embedTextForNote(storage: NoteStorage, note: Note) {
-  return embedTextForNoteFromModule(storage, note);
 }
 
 /**
@@ -585,16 +579,9 @@ export async function executeMerge(
 
   // Embed consolidated note
   let embeddingStatus: { status: "written" | "skipped"; reason?: string } = { status: "written" };
-  const embedResult = await attempt("consolidate:embed", async () => {
-    const text = await embedTextForNote(targetVault.storage, consolidatedNote);
-    const vector = await embed(text);
-    await targetVault.storage.writeEmbedding({
-      id: targetId,
-      ...embeddingMetadata(vector),
-      embedding: vector,
-      updatedAt: now,
-    });
-  });
+  const embedResult = await attempt("consolidate:embed", () =>
+    embedNote(targetVault.storage, consolidatedNote, now),
+  );
   if (!embedResult.ok) {
     embeddingStatus = { status: "skipped", reason: getErrorMessage(embedResult.error) };
     console.error(`[embedding] Failed for consolidated note '${targetId}': ${embedResult.error}`);

@@ -4,6 +4,7 @@ import type { ServerContext } from "../server-context.js";
 import { performance } from "perf_hooks";
 
 import { memoryId } from "../brands.js";
+import { mapWithConcurrency } from "../concurrency.js";
 import {
   checkEmbeddingCompatibility,
   currentEmbeddingIdentity,
@@ -65,42 +66,27 @@ const HYDRATION_CONCURRENCY = 16;
  * their source index to preserve the caller's ordering.
  */
 async function hydrateEntries(projectId: string, raw: NoteEntry[]): Promise<HydratedNoteEntry[]> {
-  const results = new Array<HydratedNoteEntry>(raw.length);
-  let next = 0;
-  const workerCount = Math.min(HYDRATION_CONCURRENCY, Math.max(raw.length, 1));
-  const workers = Array.from({ length: workerCount }, async () => {
-    while (true) {
-      const i = next++;
-      if (i >= raw.length) return;
-      const entry = raw[i];
-      if (entry === undefined) return;
-
-      if (hasNoteContent(entry.note)) {
-        results[i] = { note: entry.note, vault: entry.vault };
-        continue;
-      }
-
-      const cached = getSessionCachedNote(projectId, entry.vault.storage.vaultPath, entry.note.id);
-      if (cached !== undefined && hasNoteContent(cached)) {
-        results[i] = { note: cached, vault: entry.vault };
-        continue;
-      }
-
-      const full = await attempt("project-summary:read-note", () =>
-        entry.vault.storage.readNote(memoryId(entry.note.id)),
-      );
-      if (full.ok && full.value) {
-        setSessionCachedNote(projectId, entry.vault.storage.vaultPath, full.value);
-        results[i] = { note: full.value, vault: entry.vault };
-      } else {
-        // Full read failed — keep the note visible with empty content
-        // (matches prior behavior where metadata notes carried content: "").
-        results[i] = { note: { ...entry.note, content: "" }, vault: entry.vault };
-      }
+  return mapWithConcurrency(raw, HYDRATION_CONCURRENCY, async (entry) => {
+    if (hasNoteContent(entry.note)) {
+      return { note: entry.note, vault: entry.vault };
     }
+
+    const cached = getSessionCachedNote(projectId, entry.vault.storage.vaultPath, entry.note.id);
+    if (cached !== undefined && hasNoteContent(cached)) {
+      return { note: cached, vault: entry.vault };
+    }
+
+    const full = await attempt("project-summary:read-note", () =>
+      entry.vault.storage.readNote(memoryId(entry.note.id)),
+    );
+    if (full.ok && full.value) {
+      setSessionCachedNote(projectId, entry.vault.storage.vaultPath, full.value);
+      return { note: full.value, vault: entry.vault };
+    }
+    // Full read failed — keep the note visible with empty content
+    // (matches prior behavior where metadata notes carried content: "").
+    return { note: { ...entry.note, content: "" }, vault: entry.vault };
   });
-  await Promise.all(workers);
-  return results;
 }
 
 function sampleWarningNotes(entries: NoteEntry[]): Array<{ id: string; title: string }> {

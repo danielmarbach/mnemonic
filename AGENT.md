@@ -399,6 +399,14 @@ Let TypeScript infer when obvious; explicit types for function boundaries and pu
 ### Unknown for dynamic data
 Use `unknown` instead of `any` for external data (APIs, user input). Forces type checking before use.
 
+### Bounded concurrency
+Use the shared `mapWithConcurrency` (`src/concurrency.ts`) for "map independent async work over a collection without unbounded concurrency". It preserves input order in the result by construction. Return a value per item and reduce post-loop; express a skip as a sentinel (`null`) filtered after. Do NOT hand-roll `Array.from({ length }, async () => { while (true) { ... } })` worker pools, and do NOT mutate shared arrays/Maps from inside the per-item function — that reintroduces nondeterministic completion order.
+
+Keep a hand-rolled side-effect worker pool only when the per-item body has an intrinsic side effect on a shared structure that cannot be returned as a value without a tagged-union dispatch that obscures the real axis of change (see `embedGenerationChunks` in `src/document-sync.ts`). Fixed-size `Promise.all` batching (e.g. `BATCH_SIZE` in `src/chunk-embedding-storage.ts`) is a different axis — file-descriptor bounding, not worker count — and must not be conflated. Each call site keeps its own concurrency constant/knob; the bound is domain-specific.
+
+### Single source of truth for repeated sequences
+When an exact operation sequence is duplicated verbatim across ≥3 call sites, extract one helper that owns the sequence and reuse it (see `embedNote` in `src/helpers/embed.ts` for the embed → metadata → write sequence). Callers keep their own `attempt("scope:...")` fail-soft wrapper and scope label; the helper is the inner body. Do NOT extract if the sites diverge along their real axis of change — prefer duplication over a parameterized wrapper that hides per-site differences.
+
 ## Testing Requirements
 
 ### Data format changes MUST have tests

@@ -19,11 +19,11 @@ import {
   formatPersistenceSummary,
   pushAfterMutation,
 } from "../helpers/persistence.js";
-import { embedTextForNote } from "../helpers/embed.js";
+import { embedNote } from "../helpers/embed.js";
 import { memoryId, isoDateString } from "../brands.js";
 import { cleanMarkdown, MarkdownLintError } from "../markdown.js";
 import { getErrorMessage, attempt, attemptSync } from "../error-utils.js";
-import { embed, embedModel, embeddingMetadata } from "../embeddings.js";
+import { embedModel } from "../embeddings.js";
 import { applySemanticPatches, type SemanticPatch } from "../semantic-patch.js";
 import { hasActualChanges, computeFieldsModified } from "../update-detect-changes.js";
 import { suggestAutoRelationships } from "../auto-relate.js";
@@ -213,7 +213,6 @@ export function registerUpdateTool(server: McpServer, ctx: ServerContext): void 
       const allowProtectedBranch = allowProtectedBranchArg || branchConsent === "granted";
       await ensureBranchSynced(ctx, cwd);
       guardIdsAgainstDocumentSourceMutation([id], "update");
-      const noteId = memoryId(id);
       const project = await resolveProject(ctx, cwd);
       const projectId = project?.id;
       if (projectId) await ensureAttachmentsLoaded(ctx, projectId);
@@ -462,16 +461,9 @@ export function registerUpdateTool(server: McpServer, ctx: ServerContext): void 
       };
 
       if (shouldReembed) {
-        const embedResult = await attempt("update:re-embed", async () => {
-          const text = await embedTextForNote(vault.storage, updated);
-          const vector = await embed(text);
-          await vault.storage.writeEmbedding({
-            id: noteId,
-            ...embeddingMetadata(vector),
-            embedding: vector,
-            updatedAt: now,
-          });
-        });
+        const embedResult = await attempt("update:re-embed", () =>
+          embedNote(vault.storage, updated, now),
+        );
         if (embedResult.ok) {
           embeddingStatus = { status: "written" };
         } else {
