@@ -14,7 +14,13 @@
  *   D - very complex (>p90 or high semantic): deterministic + AI with premium fallback
  *
  * All AI calls are optional — the script degrades to deterministic output if the
- * GitHub Models API is unavailable or returns a weak result.
+ * AI API is unavailable or returns a weak result. AI enhancement uses the GitHub
+ * Copilot chat completions API with `model: "auto"` (Copilot picks the best model).
+ * GitHub Models was retired on 2026-07-30, so the old models.inference.ai.azure.com
+ * endpoint is gone. The Copilot API needs a fine-grained PAT with the "Copilot
+ * Requests" permission from a Copilot-subscribed account, passed via the
+ * GH_COPILOT_TOKEN secret (the Actions GITHUB_TOKEN has no Copilot entitlements).
+ * Without that secret the script still produces full deterministic output.
  *
  * Usage:
  *   node scripts/ci/update-pr-description.mjs --pr <number> --repo <owner/repo> [--head-sha <sha>] [--cwd <path>] [--dry-run]
@@ -51,10 +57,28 @@ const THRESHOLDS = {
   commits: { p75: 8, p90: 25 },
 };
 
-// GitHub Models API endpoint and model names.
-const MODELS_API = "https://models.inference.ai.azure.com/chat/completions";
-const MODEL_CHEAP = "gpt-4o-mini";
-const MODEL_PREMIUM = "gpt-4o";
+// GitHub Copilot chat completions API.
+// GitHub Models (models.inference.ai.azure.com / models.github.ai) was fully
+// retired on 2026-07-30, so AI enhancement now uses the Copilot API.
+// `model: "auto"` lets Copilot route each request to the best available model
+// (fast/low-cost for simple tasks), so no model names need pinning to this file.
+// Enterprise Copilot hosts use a different base URL (api.<org>.githubcopilot.com) —
+// override via COPILOT_API_URL when needed.
+const COPILOT_API = process.env.COPILOT_API_URL ?? "https://api.githubcopilot.com/chat/completions";
+const MODEL_CHEAP = process.env.PR_DESC_AI_MODEL_CHEAP ?? "auto";
+const MODEL_PREMIUM = process.env.PR_DESC_AI_MODEL_PREMIUM ?? "auto";
+
+// Copilot API requires these client headers; missing Copilot-Integration-Id
+// yields 403 "token not authorized for this integration". `x-initiator: user`
+// is correct for plain (non-tool) chat completions.
+const COPILOT_HEADERS = {
+  "User-Agent": "update-pr-description/1.0",
+  "Editor-Version": "vscode/1.104.1",
+  "Editor-Plugin-Version": "copilot-chat/0.35.0",
+  "Copilot-Integration-Id": "vscode-chat",
+  "Openai-Intent": "conversation-edits",
+  "x-initiator": "user",
+};
 
 // System prompt for AI summary enhancement.
 const AI_SYSTEM_PROMPT =
@@ -383,26 +407,36 @@ export function isWeakSummary(text) {
 // =============================================================================
 
 /**
- * Calls the GitHub Models API with the given prompt and model.
+ * Calls the GitHub Copilot chat completions API with the given prompt and model.
  * Returns the generated text or null on any error (network, auth, rate-limit).
  *
- * Uses `fetch` (Node 18+ built-in). Token comes from GH_TOKEN / GITHUB_TOKEN,
- * which GitHub Actions sets automatically — no extra secrets needed.
+ * Uses `fetch` (Node 18+ built-in). Token resolution:
+ *   1. GH_COPILOT_TOKEN — fine-grained PAT with the "Copilot Requests" permission
+ *      from a Copilot-subscribed account, stored as a repo/org secret.
+ *   2. GH_TOKEN / GITHUB_TOKEN fallback (e.g. local runs against a PAT already on
+ *      the PATH). Note the Actions-built-in GITHUB_TOKEN has NO Copilot
+ *      entitlements, so the workflow must pass GH_COPILOT_TOKEN for AI to work.
+ *
+ * `max_tokens` and `temperature` are intentionally omitted: `model: "auto"` may
+ * route to reasoning models (GPT-5 family) that reject those fields. The prompt
+ * already constrains the output to 2-4 sentences.
  *
  * @param {string} prompt
- * @param {string} model  GitHub Models model identifier
+ * @param {string} model  Copilot model identifier or "auto"
  * @returns {Promise<string|null>}
  */
 async function fetchAiEnhancement(prompt, model) {
-  const token = process.env.GH_TOKEN ?? process.env.GITHUB_TOKEN;
+  const token = process.env.GH_COPILOT_TOKEN ?? process.env.GH_TOKEN ?? process.env.GITHUB_TOKEN;
   if (!token) return null;
 
   try {
-    const response = await fetch(MODELS_API, {
+    const response = await fetch(COPILOT_API, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
+        Accept: "application/json",
+        ...COPILOT_HEADERS,
       },
       body: JSON.stringify({
         model,
@@ -410,15 +444,13 @@ async function fetchAiEnhancement(prompt, model) {
           { role: "system", content: AI_SYSTEM_PROMPT },
           { role: "user", content: prompt },
         ],
-        max_tokens: 400,
-        temperature: 0.3,
       }),
-      signal: AbortSignal.timeout(15_000),
+      signal: AbortSignal.timeout(20_000),
     });
 
     if (!response.ok) {
       process.stderr.write(
-        `GitHub Models API error: ${response.status} ${response.statusText} (model: ${model})\n`,
+        `Copilot API error: ${response.status} ${response.statusText} (model: ${model})\n`,
       );
       return null;
     }
@@ -426,7 +458,7 @@ async function fetchAiEnhancement(prompt, model) {
     const data = await response.json();
     return data?.choices?.[0]?.message?.content?.trim() ?? null;
   } catch (err) {
-    process.stderr.write(`GitHub Models API fetch failed: ${err.message}\n`);
+    process.stderr.write(`Copilot API fetch failed: ${err.message}\n`);
     return null;
   }
 }
@@ -452,6 +484,9 @@ function buildEnhancementPrompt(currentSummary, noteContext) {
  * Strategy by tier:
  *   C — one attempt with the cheap model; fall back to deterministic if weak.
  *   D — cheap attempt first; if weak, one premium attempt; fall back if still weak.
+ *
+ * Both tiers default to `model: "auto"`; pin specific models via
+ * PR_DESC_AI_MODEL_CHEAP / PR_DESC_AI_MODEL_PREMIUM when desired.
  *
  * The rest of the description (Changes, Workflow Artifacts, etc.) is kept intact.
  * Returns null when no improvement was produced, so the caller can keep the original.
