@@ -17,7 +17,7 @@ describe("markdownChunker", () => {
     });
 
     it("has chunkerVersion", () => {
-      expect(markdownChunker.chunkerVersion).toBe("2");
+      expect(markdownChunker.chunkerVersion).toBe("3");
     });
 
     it("has chunkContentMediaType equal to 'text/markdown'", () => {
@@ -266,13 +266,13 @@ describe("markdownChunker", () => {
   });
 
   describe("configurable max chunk chars", () => {
-    it("keeps the historical version at the default ceiling", () => {
-      expect(createMarkdownChunker().chunkerVersion).toBe("2");
-      expect(createMarkdownChunker(DEFAULT_MAX_CHUNK_CHARS).chunkerVersion).toBe("2");
+    it("reports version 3 at the default ceiling", () => {
+      expect(createMarkdownChunker().chunkerVersion).toBe("3");
+      expect(createMarkdownChunker(DEFAULT_MAX_CHUNK_CHARS).chunkerVersion).toBe("3");
     });
 
     it("encodes a non-default ceiling into the chunker version", () => {
-      expect(createMarkdownChunker(8000).chunkerVersion).toBe("2:8000");
+      expect(createMarkdownChunker(8000).chunkerVersion).toBe("3:8000");
     });
 
     it("splits oversized sections into chunks no larger than the configured ceiling", () => {
@@ -304,6 +304,43 @@ describe("markdownChunker", () => {
       const chunks = chunker.chunk(DOC_ID, md);
       expect(chunks).toHaveLength(1);
       expect(chunks[0]!.content).toBe(body);
+    });
+  });
+
+  describe("intro chunks before the first heading (version 3)", () => {
+    it("splits an oversized intro against a custom ceiling", () => {
+      const para = "d".repeat(180) + ".";
+      const md = para + "\n\n" + para + "\n\n" + para + "\n\n# Title\n\nBody.";
+      const chunker = createMarkdownChunker(300);
+      const chunks = chunker.chunk(DOC_ID, md);
+      const introChunks = chunks.filter((c) => c.headingAncestry.length === 0);
+      expect(introChunks.length).toBeGreaterThan(1);
+      for (const chunk of introChunks) {
+        expect(chunk.content.length).toBeLessThanOrEqual(300);
+      }
+      const ordinals = introChunks.map((c) => c.splitOrdinal);
+      expect(ordinals).toEqual(ordinals.map((_, i) => i));
+      expect(chunks.some((c) => c.headingAncestry.at(-1)?.text === "Title")).toBe(true);
+    });
+
+    it("splits an oversized intro at the default ceiling", () => {
+      const intro = "e".repeat(2500) + "\n\n" + "f".repeat(2500);
+      const md = intro + "\n\n# Title\n\nBody.";
+      const chunks = markdownChunker.chunk(DOC_ID, md);
+      const introChunks = chunks.filter((c) => c.headingAncestry.length === 0);
+      expect(introChunks).toHaveLength(2);
+      for (const chunk of introChunks) {
+        expect(chunk.content.length).toBeLessThanOrEqual(4000);
+      }
+    });
+
+    it("keeps an intro below the ceiling as a single chunk with unchanged identity", () => {
+      const md = "Intro text long enough to pass the minimum chunk size.\n\n# Title\n\nBody.";
+      const chunks = markdownChunker.chunk(DOC_ID, md);
+      const introChunks = chunks.filter((c) => c.headingAncestry.length === 0);
+      expect(introChunks).toHaveLength(1);
+      expect(introChunks[0]!.splitOrdinal).toBe(0);
+      expect(introChunks[0]!.chunkId).toBe(`${DOC_ID}::::0::0`);
     });
   });
 });

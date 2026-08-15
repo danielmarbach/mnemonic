@@ -10,6 +10,10 @@ The format is loosely based on Keep a Changelog and uses semver-style version he
 
 - `EMBED_MAX_CHUNK_CHARS` environment variable for configuring the maximum size of document-source chunks (default 4000, range 200–100000); non-default values re-chunk attachments on the next sync.
 
+### Changed
+
+- Oversized introductions before the first heading in document sources are now split against the chunk ceiling instead of being emitted as a single chunk; the chunker version bumps to `3` (or `3:<chars>` with a custom `EMBED_MAX_CHUNK_CHARS`), so document-source attachments re-chunk once on the next sync.
+
 ## [0.42.2] - 2026-08-05
 
 ### Fixed

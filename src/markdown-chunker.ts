@@ -33,12 +33,14 @@ export function resolveMaxChunkChars(env: NodeJS.ProcessEnv = process.env): numb
 
 /**
  * The chunker version is the invalidation signal for existing generations
- * (`isGenerationCurrent` and the lazy-load manifest check compare it), so a
- * non-default ceiling must produce a different version. The default keeps the
- * historical "2" so existing generations stay valid (byte-identical default).
+ * (`isGenerationCurrent` and the lazy-load manifest check compare it). Version
+ * "3" splits introductions that precede the first heading against the chunk
+ * ceiling (previously emitted as a single unsplittable chunk), so existing
+ * generations re-chunk once on the next sync. A non-default ceiling is encoded
+ * as `3:<chars>` for the same reason.
  */
 function chunkerVersionFor(maxChunkChars: number): string {
-  return maxChunkChars === DEFAULT_MAX_CHUNK_CHARS ? "2" : `2:${maxChunkChars}`;
+  return maxChunkChars === DEFAULT_MAX_CHUNK_CHARS ? "3" : `3:${maxChunkChars}`;
 }
 
 interface HeadingContext {
@@ -196,15 +198,9 @@ export function createMarkdownChunker(
             const introTree: Root = { type: "root", children: introContent };
             const introText = serializeBody(introTree).trim();
             if (introText.length >= MIN_CHUNK_CHARS) {
-              chunks.push({
-                chunkId: deriveChunkId(documentId, [], 0, 0),
-                documentId,
-                headingAncestry: [],
-                content: introText,
-                splitOrdinal: 0,
-                contentMediaType: "text/markdown",
-                excerpt: introText.slice(0, 200).trim(),
-              });
+              // Version 3: oversized intros are split against the ceiling like
+              // every other section instead of being emitted as one chunk.
+              chunks.push(...splitOversizedContent(introText, documentId, [], 0, maxChunkChars));
             }
           }
 
