@@ -22,3 +22,5 @@
 *.icns binary
 *.pdf  binary
 *.zip  binary
+
+.github/workflows/*.lock.yml linguist-generated=true
