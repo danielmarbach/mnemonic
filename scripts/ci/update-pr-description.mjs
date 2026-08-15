@@ -16,7 +16,9 @@
  * All AI calls are optional — the script degrades to deterministic output if the
  * AI API is unavailable or returns a weak result. AI enhancement uses the GitHub
  * Copilot chat completions API, auto-selecting a concrete model from the account's
- * live Copilot model list (the cheap tier prefers fast/low-cost models).
+ * live Copilot model list (the cheap tier prefers fast/low-cost models). The
+ * GitHub token is exchanged for a short-lived Copilot session token first, because
+ * Copilot rejects raw PATs on /chat/completions for some account types.
  * GitHub Models was retired on 2026-07-30, so the old models.inference.ai.azure.com
  * endpoint is gone. The Copilot API needs a fine-grained PAT with the "Copilot
  * Requests" permission from a Copilot-subscribed account, passed via the
@@ -72,6 +74,16 @@ const THRESHOLDS = {
 const COPILOT_API = process.env.COPILOT_API_URL ?? "https://api.githubcopilot.com/chat/completions";
 const COPILOT_MODELS_URL = new URL("/models", COPILOT_API).href;
 
+// Session-token exchange endpoint. Copilot's /chat/completions and /models
+// reject raw personal access tokens for some account types ("Personal Access
+// Tokens are not supported for this endpoint"), so the GitHub token must first
+// be exchanged for a short-lived Copilot session token (Copilot CLI does the
+// same). Override via COPILOT_TOKEN_URL for GHEC/enterprise hosts.
+const COPILOT_TOKEN_URL =
+  process.env.COPILOT_TOKEN_URL ?? "https://api.github.com/copilot_internal/v2/token";
+// Copilot session tokens live ~30 minutes; refresh with a 60s safety margin.
+const COPILOT_SESSION_TTL_MS = 25 * 60 * 1000;
+
 // Explicit pins win; otherwise a model is auto-selected from the live list.
 const MODEL_CHEAP = process.env.PR_DESC_AI_MODEL_CHEAP ?? null;
 const MODEL_PREMIUM = process.env.PR_DESC_AI_MODEL_PREMIUM ?? null;
@@ -90,6 +102,9 @@ const FALLBACK_MODEL = "gpt-5-mini";
 // mid-file, and any `let` declared after that call stays in the temporal dead
 // zone while main()'s async body runs.
 const COPILOT_MODELS_CACHE = { promise: null };
+
+// Cached Copilot session token (with expiry) so the exchange runs at most once per run.
+const COPILOT_SESSION_CACHE = { token: null, expiresAt: 0 };
 
 // Copilot API requires these client headers; missing Copilot-Integration-Id
 // yields 403 "token not authorized for this integration". `x-initiator: user`
@@ -451,23 +466,74 @@ function copilotToken() {
  *
  * @returns {Promise<Array<string>|null>}
  */
+/**
+ * Exchanges the GitHub token for a short-lived Copilot session token via
+ * `GET /copilot_internal/v2/token`. Raw PATs are rejected by Copilot's
+ * /chat/completions for some account types, so this exchange is the reliable
+ * path. Returns the session token, or null when the exchange fails.
+ *
+ * @returns {Promise<string|null>}
+ */
+async function getCopilotAccessToken() {
+  const now = Date.now();
+  if (COPILOT_SESSION_CACHE.token && now < COPILOT_SESSION_CACHE.expiresAt) {
+    return COPILOT_SESSION_CACHE.token;
+  }
+  const token = copilotToken();
+  if (!token) return null;
+
+  try {
+    const response = await fetch(COPILOT_TOKEN_URL, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/json",
+        ...COPILOT_HEADERS,
+      },
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!response.ok) {
+      process.stderr.write(
+        `Copilot token exchange error: ${response.status} ${response.statusText}\n`,
+      );
+      return null;
+    }
+    const data = await response.json();
+    if (!data?.token) return null;
+    COPILOT_SESSION_CACHE.token = data.token;
+    // expires_at is a Unix timestamp in seconds; fall back to the TTL if absent.
+    COPILOT_SESSION_CACHE.expiresAt = data.expires_at
+      ? data.expires_at * 1000 - 60_000
+      : now + COPILOT_SESSION_TTL_MS;
+    return data.token;
+  } catch (err) {
+    process.stderr.write(`Copilot token exchange failed: ${err.message}\n`);
+    return null;
+  }
+}
+
 function fetchAvailableModels() {
   if (!COPILOT_MODELS_CACHE.promise) {
     COPILOT_MODELS_CACHE.promise = (async () => {
-      const token = copilotToken();
-      if (!token) return null;
+      // Prefer the exchanged session token; fall back to the raw token for
+      // account types that accept it.
+      const bearer = (await getCopilotAccessToken()) ?? copilotToken();
+      if (!bearer) return null;
       try {
         const response = await fetch(COPILOT_MODELS_URL, {
           method: "GET",
           headers: {
-            Authorization: `Bearer ${token}`,
+            Authorization: `Bearer ${bearer}`,
             ...COPILOT_HEADERS,
           },
           signal: AbortSignal.timeout(10_000),
         });
         if (!response.ok) {
+          const detail = await response.text().catch(() => "");
           process.stderr.write(
-            `Copilot models API error: ${response.status} ${response.statusText}\n`,
+            `Copilot models API error: ${response.status} ${response.statusText}` +
+              (detail ? ` — ${detail.slice(0, 300)}` : "") +
+              "\n",
           );
           return null;
         }
@@ -525,6 +591,9 @@ async function resolveTierModel(tier) {
  * Calls the GitHub Copilot chat completions API with the given prompt and model.
  * Returns the generated text or null on any error (network, auth, rate-limit).
  *
+ * Auth uses the exchanged Copilot session token (see getCopilotAccessToken),
+ * falling back to the raw GitHub token if the exchange fails.
+ *
  * `max_tokens` and `temperature` are intentionally omitted: an auto-selected
  * model may be a reasoning model (GPT-5 family) that rejects those fields. The
  * prompt already constrains the output to 2-4 sentences.
@@ -534,14 +603,16 @@ async function resolveTierModel(tier) {
  * @returns {Promise<string|null>}
  */
 async function fetchAiEnhancement(prompt, model) {
-  const token = copilotToken();
-  if (!token) return null;
+  // Prefer the exchanged session token; fall back to the raw token for account
+  // types that accept it.
+  const bearer = (await getCopilotAccessToken()) ?? copilotToken();
+  if (!bearer) return null;
 
   try {
     const response = await fetch(COPILOT_API, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${token}`,
+        Authorization: `Bearer ${bearer}`,
         "Content-Type": "application/json",
         ...COPILOT_HEADERS,
       },
