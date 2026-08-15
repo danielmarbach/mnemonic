@@ -6,7 +6,7 @@ tags:
   - apply
 lifecycle: temporary
 createdAt: '2026-08-15T11:07:16.607Z'
-updatedAt: '2026-08-15T11:36:30.706Z'
+updatedAt: '2026-08-15T11:47:55.741Z'
 role: plan
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -26,7 +26,7 @@ Plan for RPIR request `rpir-request-qwen3-embedding-endpoints-and-chunk-size-res
 - [x] 2. `tests/markdown-chunker.unit.test.ts`: resolveMaxChunkChars (default/valid/non-integer/below-floor/above-ceiling); createMarkdownChunker identity (default version `"2"`, custom `2:8000`); custom small max splits paragraphs into smaller chunks; single oversized paragraph stays one chunk.
 - [x] 3. Docs: README (rewrite qwen3-embedding paragraph: chunk default 4000 chars, `EMBED_MAX_CHUNK_CHARS` lever for long-context models; notes embed bounded 1200-char projections; add remote-endpoint guidance via `EMBED_PROVIDER=openai-compatible`), env table row in README + AGENT.md, ARCHITECTURE.md chunker mention, docs/index.html config table, CHANGELOG `[Unreleased]` Added entry.
 - [x] 4. Validation: typecheck + lint + full test suite green; MCP contract snapshots untouched.
-- [ ] 5. Scope change (user-endorsed after review: "I'm ok to bump the chunker version"): bump default `chunkerVersion` `"2"` -> `"3"` (custom: `3:<chars>`); route intro-before-first-heading through `splitOversizedContent` behind the existing `MIN_CHUNK_CHARS` gate; update version assertions to `"3"`/`"3:8000"`; add tests for oversized-intro splitting (custom ceiling and default) and small-intro single chunk; CHANGELOG `[Unreleased]` Changed entry.
+- [x] 5. Scope change (user-endorsed after review: "I'm ok to bump the chunker version"): bump default `chunkerVersion` `"2"` -> `"3"` (custom: `3:<chars>`); route intro-before-first-heading through `splitOversizedContent` behind the existing `MIN_CHUNK_CHARS` gate; update version assertions to `"3"`/`"3:8000"`; add tests for oversized-intro splitting (custom ceiling and default) and small-intro single chunk; CHANGELOG `[Unreleased]` Changed entry.
 
 ## Constraints
 
