@@ -14,23 +14,23 @@ on:
   workflow_dispatch:
     inputs:
       pr-number:
-        description: PR number to update (required for manual runs)
-        required: true
+        description: PR number to update (manual runs)
+        required: false
         type: string
       dry-run:
         description: Preview the generated title/description without applying it
         required: false
         type: boolean
         default: false
+  roles: [admin, maintainer, write]
+  reaction: eyes
+  status-comment: true
 
 permissions:
   contents: read
   pull-requests: read
+  issues: read
   copilot-requests: write
-
-roles: [admin, maintainer, write]
-reaction: eyes
-status-comment: true
 
 engine: copilot
 
