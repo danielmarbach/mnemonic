@@ -1,5 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { markdownChunker } from "../src/markdown-chunker.js";
+import {
+  createMarkdownChunker,
+  DEFAULT_MAX_CHUNK_CHARS,
+  markdownChunker,
+  resolveMaxChunkChars,
+} from "../src/markdown-chunker.js";
+import { EmbeddingConfigurationError } from "../src/domain-errors.js";
 import type { DocumentId } from "../src/retrieval-document.js";
 
 const DOC_ID = "test-attachment::readme" as DocumentId;
@@ -219,6 +225,85 @@ describe("markdownChunker", () => {
     it("handles content with only whitespace", () => {
       const chunks = markdownChunker.chunk(DOC_ID, "   \n\n  \n\n  ");
       expect(chunks).toEqual([]);
+    });
+  });
+
+  describe("resolveMaxChunkChars", () => {
+    it("returns the default when the variable is unset", () => {
+      expect(resolveMaxChunkChars({})).toBe(DEFAULT_MAX_CHUNK_CHARS);
+    });
+
+    it("returns the default when the variable is empty", () => {
+      expect(resolveMaxChunkChars({ EMBED_MAX_CHUNK_CHARS: "" })).toBe(DEFAULT_MAX_CHUNK_CHARS);
+    });
+
+    it("accepts integers within the supported range", () => {
+      expect(resolveMaxChunkChars({ EMBED_MAX_CHUNK_CHARS: "200" })).toBe(200);
+      expect(resolveMaxChunkChars({ EMBED_MAX_CHUNK_CHARS: "32000" })).toBe(32000);
+      expect(resolveMaxChunkChars({ EMBED_MAX_CHUNK_CHARS: "100000" })).toBe(100000);
+    });
+
+    it("rejects non-integer values", () => {
+      expect(() => resolveMaxChunkChars({ EMBED_MAX_CHUNK_CHARS: "400.5" })).toThrow(
+        EmbeddingConfigurationError,
+      );
+      expect(() => resolveMaxChunkChars({ EMBED_MAX_CHUNK_CHARS: "big" })).toThrow(
+        EmbeddingConfigurationError,
+      );
+    });
+
+    it("rejects values below the floor", () => {
+      expect(() => resolveMaxChunkChars({ EMBED_MAX_CHUNK_CHARS: "199" })).toThrow(
+        EmbeddingConfigurationError,
+      );
+    });
+
+    it("rejects values above the ceiling", () => {
+      expect(() => resolveMaxChunkChars({ EMBED_MAX_CHUNK_CHARS: "100001" })).toThrow(
+        EmbeddingConfigurationError,
+      );
+    });
+  });
+
+  describe("configurable max chunk chars", () => {
+    it("keeps the historical version at the default ceiling", () => {
+      expect(createMarkdownChunker().chunkerVersion).toBe("2");
+      expect(createMarkdownChunker(DEFAULT_MAX_CHUNK_CHARS).chunkerVersion).toBe("2");
+    });
+
+    it("encodes a non-default ceiling into the chunker version", () => {
+      expect(createMarkdownChunker(8000).chunkerVersion).toBe("2:8000");
+    });
+
+    it("splits oversized sections into chunks no larger than the configured ceiling", () => {
+      const para = "a".repeat(160) + ".";
+      const md = "# Title\n\n" + para + "\n\n" + para + "\n\n" + para;
+      const chunker = createMarkdownChunker(300);
+      const chunks = chunker.chunk(DOC_ID, md);
+      expect(chunks.length).toBeGreaterThan(1);
+      for (const chunk of chunks) {
+        expect(chunk.content.length).toBeLessThanOrEqual(300);
+        expect(chunk.headingAncestry.at(-1)?.text).toBe("Title");
+      }
+      const ordinals = chunks.map((c) => c.splitOrdinal);
+      expect(ordinals).toEqual(ordinals.map((_, i) => i));
+    });
+
+    it("keeps a single paragraph larger than the ceiling as one chunk", () => {
+      const md = "# Title\n\n" + "b".repeat(500);
+      const chunker = createMarkdownChunker(300);
+      const chunks = chunker.chunk(DOC_ID, md);
+      expect(chunks).toHaveLength(1);
+      expect(chunks[0]!.content.length).toBe(500);
+    });
+
+    it("produces one chunk when content exactly matches the ceiling", () => {
+      const body = "c".repeat(300);
+      const md = "# Title\n\n" + body;
+      const chunker = createMarkdownChunker(body.length);
+      const chunks = chunker.chunk(DOC_ID, md);
+      expect(chunks).toHaveLength(1);
+      expect(chunks[0]!.content).toBe(body);
     });
   });
 });

@@ -357,6 +357,7 @@ Skills are loaded via the `skill` tool and extend agent capabilities with specia
 | `VAULT_PATH` | `~/mnemonic-vault` | Vault location |
 | `OLLAMA_URL` | `http://localhost:11434` | Ollama server |
 | `EMBED_MODEL` | `nomic-embed-text-v2-moe` | Embedding model |
+| `EMBED_MAX_CHUNK_CHARS` | `4000` | Max chars per document-source chunk (200–100000); non-default invalidates chunk generations |
 | `DISABLE_GIT` | `false` | Skip git ops if `"true"` |
 
 ## Stack

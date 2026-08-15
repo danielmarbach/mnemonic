@@ -174,7 +174,7 @@ flowchart TD
 | `src/document-entity-ref.ts`   | Entity resolver for `doc:` and `chunk:` namespace references                                  |
 | `src/document-extractor.ts`    | Extractor registry for document-source media types                                            |
 | `src/markdown-extractor.ts`    | Markdown extractor for document-source attachments (uses MDAST)                               |
-| `src/markdown-chunker.ts`      | Heading-aware chunker that splits markdown into retrievable chunks                            |
+| `src/markdown-chunker.ts`      | Heading-aware chunker that splits markdown into retrievable chunks; per-chunk ceiling configurable via `EMBED_MAX_CHUNK_CHARS` (encoded into `chunkerVersion` for invalidation) |
 | `src/document-source-index.ts` | Builds a document-source generation from extracted/chunked files and publishes it            |
 | `src/document-recall.ts`       | Collects and ranks document-chunk candidates via semantic+lexical RRF fusion                 |
 | `src/document-sync.ts`         | Syncs document-source attachments: fetch, enumerate, build generation, embed chunks (fail-soft)|

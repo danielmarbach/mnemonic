@@ -1,10 +1,45 @@
 import type { DocumentChunker, RetrievalChunk, DocumentId } from "./retrieval-document.js";
 import { deriveChunkId } from "./retrieval-document.js";
 import { parseBody, serializeBody } from "./markdown-ast.js";
+import { EmbeddingConfigurationError } from "./domain-errors.js";
 import type { Root, Heading, Content, PhrasingContent } from "mdast";
 
-const MAX_CHUNK_CHARS = 4000;
+export const DEFAULT_MAX_CHUNK_CHARS = 4000;
 const MIN_CHUNK_CHARS = 50;
+const MIN_CONFIGURABLE_MAX_CHUNK_CHARS = 200;
+const MAX_CONFIGURABLE_MAX_CHUNK_CHARS = 100_000;
+
+/**
+ * Resolve the per-chunk character ceiling for document-source chunks from the
+ * `EMBED_MAX_CHUNK_CHARS` environment variable. Embedding models differ in
+ * context window (e.g. qwen3-embedding sizes vs nomic-embed-text-v2-moe), so
+ * the ceiling is configurable. Fails fast on invalid input at startup.
+ */
+export function resolveMaxChunkChars(env: NodeJS.ProcessEnv = process.env): number {
+  const raw = env["EMBED_MAX_CHUNK_CHARS"];
+  if (raw === undefined || raw === "") return DEFAULT_MAX_CHUNK_CHARS;
+  const parsed = Number(raw);
+  if (
+    !Number.isInteger(parsed) ||
+    parsed < MIN_CONFIGURABLE_MAX_CHUNK_CHARS ||
+    parsed > MAX_CONFIGURABLE_MAX_CHUNK_CHARS
+  ) {
+    throw new EmbeddingConfigurationError(
+      `EMBED_MAX_CHUNK_CHARS must be an integer between ${MIN_CONFIGURABLE_MAX_CHUNK_CHARS} and ${MAX_CONFIGURABLE_MAX_CHUNK_CHARS} (got '${raw}')`,
+    );
+  }
+  return parsed;
+}
+
+/**
+ * The chunker version is the invalidation signal for existing generations
+ * (`isGenerationCurrent` and the lazy-load manifest check compare it), so a
+ * non-default ceiling must produce a different version. The default keeps the
+ * historical "2" so existing generations stay valid (byte-identical default).
+ */
+function chunkerVersionFor(maxChunkChars: number): string {
+  return maxChunkChars === DEFAULT_MAX_CHUNK_CHARS ? "2" : `2:${maxChunkChars}`;
+}
 
 interface HeadingContext {
   depth: number;
@@ -63,9 +98,10 @@ function splitOversizedContent(
   documentId: DocumentId,
   headingAncestry: Array<{ depth: number; text: string }>,
   duplicateHeadingOccurrence: number,
+  maxChunkChars: number,
 ): RetrievalChunk[] {
   const chunks: RetrievalChunk[] = [];
-  if (content.length <= MAX_CHUNK_CHARS) {
+  if (content.length <= maxChunkChars) {
     const excerpt = content.slice(0, 200).trim();
     chunks.push({
       chunkId: deriveChunkId(documentId, headingAncestry, duplicateHeadingOccurrence, 0),
@@ -85,7 +121,7 @@ function splitOversizedContent(
 
   for (const para of paragraphs) {
     const candidate = currentChunk ? currentChunk + "\n\n" + para : para;
-    if (candidate.length > MAX_CHUNK_CHARS && currentChunk.length > 0) {
+    if (candidate.length > maxChunkChars && currentChunk.length > 0) {
       const chunkText = currentChunk.trim();
       chunks.push({
         chunkId: deriveChunkId(documentId, headingAncestry, duplicateHeadingOccurrence, ordinal),
@@ -118,92 +154,110 @@ function splitOversizedContent(
   return chunks;
 }
 
-export const markdownChunker: DocumentChunker = {
-  chunkerId: "markdown-heading",
-  chunkerVersion: "2",
-  chunkContentMediaType: "text/markdown",
+export function createMarkdownChunker(
+  maxChunkChars: number = DEFAULT_MAX_CHUNK_CHARS,
+): DocumentChunker {
+  return {
+    chunkerId: "markdown-heading",
+    chunkerVersion: chunkerVersionFor(maxChunkChars),
+    chunkContentMediaType: "text/markdown",
 
-  chunk(documentId: DocumentId, content: string): RetrievalChunk[] {
-    const tree: Root = parseBody(content);
-    const chunks: RetrievalChunk[] = [];
-    const headingStack: HeadingContext[] = [];
-    const headingOccurrenceMap = new Map<string, number>();
+    chunk(documentId: DocumentId, content: string): RetrievalChunk[] {
+      const tree: Root = parseBody(content);
+      const chunks: RetrievalChunk[] = [];
+      const headingStack: HeadingContext[] = [];
+      const headingOccurrenceMap = new Map<string, number>();
 
-    const introContent: Content[] = [];
-    let firstHeadingFound = false;
-    let currentSectionChildren: Content[] = [];
-    let currentHeadingOccurrence = 0;
+      const introContent: Content[] = [];
+      let firstHeadingFound = false;
+      let currentSectionChildren: Content[] = [];
+      let currentHeadingOccurrence = 0;
 
-    for (const child of tree.children) {
-      if (isHeadingNode(child)) {
-        // Flush previous section
-        if (firstHeadingFound && currentSectionChildren.length > 0) {
-          const sectionTree: Root = { type: "root", children: currentSectionChildren };
-          const sectionText = serializeBody(sectionTree);
-          const trimmed = sectionText.trim();
-          if (trimmed.length > 0) {
-            const ancestry = buildAncestry(headingStack);
-            chunks.push(
-              ...splitOversizedContent(trimmed, documentId, ancestry, currentHeadingOccurrence),
-            );
+      for (const child of tree.children) {
+        if (isHeadingNode(child)) {
+          // Flush previous section
+          if (firstHeadingFound && currentSectionChildren.length > 0) {
+            const sectionTree: Root = { type: "root", children: currentSectionChildren };
+            const sectionText = serializeBody(sectionTree);
+            const trimmed = sectionText.trim();
+            if (trimmed.length > 0) {
+              const ancestry = buildAncestry(headingStack);
+              chunks.push(
+                ...splitOversizedContent(
+                  trimmed,
+                  documentId,
+                  ancestry,
+                  currentHeadingOccurrence,
+                  maxChunkChars,
+                ),
+              );
+            }
+          } else if (!firstHeadingFound && introContent.length > 0) {
+            const introTree: Root = { type: "root", children: introContent };
+            const introText = serializeBody(introTree).trim();
+            if (introText.length >= MIN_CHUNK_CHARS) {
+              chunks.push({
+                chunkId: deriveChunkId(documentId, [], 0, 0),
+                documentId,
+                headingAncestry: [],
+                content: introText,
+                splitOrdinal: 0,
+                contentMediaType: "text/markdown",
+                excerpt: introText.slice(0, 200).trim(),
+              });
+            }
           }
-        } else if (!firstHeadingFound && introContent.length > 0) {
-          const introTree: Root = { type: "root", children: introContent };
-          const introText = serializeBody(introTree).trim();
-          if (introText.length >= MIN_CHUNK_CHARS) {
-            chunks.push({
-              chunkId: deriveChunkId(documentId, [], 0, 0),
-              documentId,
-              headingAncestry: [],
-              content: introText,
-              splitOrdinal: 0,
-              contentMediaType: "text/markdown",
-              excerpt: introText.slice(0, 200).trim(),
-            });
+
+          firstHeadingFound = true;
+          currentSectionChildren = [];
+
+          const headingText = getHeadingText(child);
+          while (headingStack.length > 0) {
+            const last = headingStack[headingStack.length - 1];
+            if (last === undefined || last.depth < child.depth) break;
+            headingStack.pop();
           }
-        }
 
-        firstHeadingFound = true;
-        currentSectionChildren = [];
+          const occurrenceKey = `${child.depth}:${headingText}`;
+          const occurrence = headingOccurrenceMap.get(occurrenceKey) ?? 0;
+          headingOccurrenceMap.set(occurrenceKey, occurrence + 1);
 
-        const headingText = getHeadingText(child);
-        while (headingStack.length > 0) {
-          const last = headingStack[headingStack.length - 1];
-          if (last === undefined || last.depth < child.depth) break;
-          headingStack.pop();
-        }
-
-        const occurrenceKey = `${child.depth}:${headingText}`;
-        const occurrence = headingOccurrenceMap.get(occurrenceKey) ?? 0;
-        headingOccurrenceMap.set(occurrenceKey, occurrence + 1);
-
-        headingStack.push({ depth: child.depth, text: headingText, occurrence });
-        currentHeadingOccurrence = occurrence;
-      } else {
-        if (!firstHeadingFound) {
-          introContent.push(child as Content);
+          headingStack.push({ depth: child.depth, text: headingText, occurrence });
+          currentHeadingOccurrence = occurrence;
         } else {
-          currentSectionChildren.push(child as Content);
+          if (!firstHeadingFound) {
+            introContent.push(child as Content);
+          } else {
+            currentSectionChildren.push(child as Content);
+          }
         }
       }
-    }
 
-    // Flush last section
-    if (firstHeadingFound && currentSectionChildren.length > 0) {
-      const sectionTree: Root = { type: "root", children: currentSectionChildren };
-      const sectionText = serializeBody(sectionTree).trim();
-      if (sectionText.length > 0) {
-        const ancestry = buildAncestry(headingStack);
-        chunks.push(
-          ...splitOversizedContent(sectionText, documentId, ancestry, currentHeadingOccurrence),
-        );
+      // Flush last section
+      if (firstHeadingFound && currentSectionChildren.length > 0) {
+        const sectionTree: Root = { type: "root", children: currentSectionChildren };
+        const sectionText = serializeBody(sectionTree).trim();
+        if (sectionText.length > 0) {
+          const ancestry = buildAncestry(headingStack);
+          chunks.push(
+            ...splitOversizedContent(
+              sectionText,
+              documentId,
+              ancestry,
+              currentHeadingOccurrence,
+              maxChunkChars,
+            ),
+          );
+        }
+      } else if (!firstHeadingFound && introContent.length > 0) {
+        const introTree: Root = { type: "root", children: introContent };
+        const introText = serializeBody(introTree).trim();
+        chunks.push(...splitOversizedContent(introText, documentId, [], 0, maxChunkChars));
       }
-    } else if (!firstHeadingFound && introContent.length > 0) {
-      const introTree: Root = { type: "root", children: introContent };
-      const introText = serializeBody(introTree).trim();
-      chunks.push(...splitOversizedContent(introText, documentId, [], 0));
-    }
 
-    return chunks;
-  },
-};
+      return chunks;
+    },
+  };
+}
+
+export const markdownChunker: DocumentChunker = createMarkdownChunker(resolveMaxChunkChars());

@@ -37,13 +37,7 @@ By default, mnemonic uses [Ollama](https://ollama.com) locally. Start Ollama and
 ollama pull nomic-embed-text-v2-moe
 ```
 
-`qwen3-embedding:0.6b` is an alternative with a larger context window for longer notes:
-
-```bash
-ollama pull qwen3-embedding:0.6b
-```
-
-To use it, set `EMBED_MODEL=qwen3-embedding:0.6b` in your environment or MCP config.
+`qwen3-embedding` models (0.6B, 4B, 8B) work with the same endpoints — locally only `EMBED_MODEL` changes (e.g. `EMBED_MODEL=qwen3-embedding:0.6b`); for remote or vLLM/LM Studio-style serving use `EMBED_PROVIDER=openai-compatible` with `EMBED_BASE_URL` (remote Ollama cannot use `OLLAMA_URL`, which is validated to localhost/private networks). Note that note embeddings always use a bounded projection (title, summary, headings), so a larger model context window mainly benefits document-source attachments: their chunk ceiling defaults to 4000 characters and is configurable via `EMBED_MAX_CHUNK_CHARS`.
 
 Advanced users can use OpenAI-compatible endpoints, native OpenAI, or Gemini instead. Provider settings are environment-only; mnemonic never writes API keys to notes, embedding files, vault config, or git.
 
@@ -276,6 +270,7 @@ For local development against this repository's source tree, use `npm run mcp:lo
 | `EMBED_PROVIDER`   | `ollama`                                    | `ollama`, `openai-compatible`, `openai`, or `gemini`                                                                                                                           |
 | `EMBED_MODEL`      | provider default                            | Embedding model. Defaults to `nomic-embed-text-v2-moe` for Ollama, `text-embedding-3-small` for OpenAI, and `gemini-embedding-2` for Gemini. Required for `openai-compatible`. |
 | `EMBED_DIMENSIONS` | unset                                       | Optional provider-supported output dimensions                                                                                                                                  |
+| `EMBED_MAX_CHUNK_CHARS` | unset                                  | Max characters per document-source chunk (200–100000, default 4000). A non-default value re-chunks attachments on the next sync.                                               |
 | `OLLAMA_URL`       | `http://localhost:11434`                    | Ollama server URL, validated to localhost/private-network addresses                                                                                                            |
 | `EMBED_BASE_URL`   | unset                                       | Base URL for `openai-compatible` endpoints such as LiteLLM, LM Studio, vLLM, or Ollama's OpenAI-compatible API                                                                 |
 | `EMBED_API_KEY`    | unset                                       | Optional bearer token for `openai-compatible`; never persisted by mnemonic                                                                                                     |
