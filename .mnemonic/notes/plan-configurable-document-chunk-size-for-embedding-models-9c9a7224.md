@@ -6,11 +6,14 @@ tags:
   - apply
 lifecycle: temporary
 createdAt: '2026-08-15T11:07:16.607Z'
-updatedAt: '2026-08-15T11:08:14.964Z'
+updatedAt: '2026-08-15T11:08:16.377Z'
 role: plan
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: rpir-request-qwen3-embedding-endpoints-and-chunk-size-restri-6f294f65
+    type: derives-from
 memoryVersion: 1
 ---
 Plan for RPIR request `rpir-request-qwen3-embedding-endpoints-and-chunk-size-restri-6f294f65` (handoff pre-authorized by user: "investigate, plan and fix"). Research: `research-qwen3-embedding-endpoint-support-and-fixed-chunk-si-7930fc3d`.
