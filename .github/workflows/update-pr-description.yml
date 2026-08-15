@@ -3,12 +3,13 @@ name: Update PR Description
 # Triggered manually by maintainers commenting `/update-pr` on a PR.
 # Updates the PR title and description from mnemonic design decision notes.
 #
-# Optional AI summary enhancement uses the GitHub Copilot chat completions API
-# with `model: "auto"`. GitHub Models (which previously powered this and needed
-# `permissions: models: read`) was fully retired on 2026-07-30, so AI enhancement
-# now requires a `GH_COPILOT_TOKEN` secret: a fine-grained PAT owned by a personal
-# account with the "Copilot Requests" account permission, from a Copilot-subscribed
-# account. Without it, the description is still generated deterministically.
+# Optional AI summary enhancement uses the GitHub Copilot chat completions API,
+# auto-selecting a concrete model from the account's live Copilot model list.
+# GitHub Models (which previously powered this and needed `permissions: models:
+# read`) was fully retired on 2026-07-30, so AI enhancement now requires a
+# `GH_COPILOT_TOKEN` secret: a fine-grained PAT owned by a personal account with
+# the "Copilot Requests" account permission, from a Copilot-subscribed account.
+# Without it, the description is still generated deterministically.
 
 on:
   issue_comment:

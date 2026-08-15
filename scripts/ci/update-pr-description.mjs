@@ -15,7 +15,8 @@
  *
  * All AI calls are optional — the script degrades to deterministic output if the
  * AI API is unavailable or returns a weak result. AI enhancement uses the GitHub
- * Copilot chat completions API with `model: "auto"` (Copilot picks the best model).
+ * Copilot chat completions API, auto-selecting a concrete model from the account's
+ * live Copilot model list (the cheap tier prefers fast/low-cost models).
  * GitHub Models was retired on 2026-07-30, so the old models.inference.ai.azure.com
  * endpoint is gone. The Copilot API needs a fine-grained PAT with the "Copilot
  * Requests" permission from a Copilot-subscribed account, passed via the
@@ -60,13 +61,35 @@ const THRESHOLDS = {
 // GitHub Copilot chat completions API.
 // GitHub Models (models.inference.ai.azure.com / models.github.ai) was fully
 // retired on 2026-07-30, so AI enhancement now uses the Copilot API.
-// `model: "auto"` lets Copilot route each request to the best available model
-// (fast/low-cost for simple tasks), so no model names need pinning to this file.
+//
+// The Copilot `/chat/completions` endpoint does NOT accept `model: "auto"` —
+// auto model selection is resolved client-side (e.g. VS Code calls a separate
+// routing API). So we auto-select a concrete model from the account's live
+// `GET /models` list, preferring fast/low-cost models for the cheap tier.
+//
 // Enterprise Copilot hosts use a different base URL (api.<org>.githubcopilot.com) —
 // override via COPILOT_API_URL when needed.
 const COPILOT_API = process.env.COPILOT_API_URL ?? "https://api.githubcopilot.com/chat/completions";
-const MODEL_CHEAP = process.env.PR_DESC_AI_MODEL_CHEAP ?? "auto";
-const MODEL_PREMIUM = process.env.PR_DESC_AI_MODEL_PREMIUM ?? "auto";
+const COPILOT_MODELS_URL = new URL("/models", COPILOT_API).href;
+
+// Explicit pins win; otherwise a model is auto-selected from the live list.
+const MODEL_CHEAP = process.env.PR_DESC_AI_MODEL_CHEAP ?? null;
+const MODEL_PREMIUM = process.env.PR_DESC_AI_MODEL_PREMIUM ?? null;
+const PREFERRED_CHEAP_MODELS = [
+  "gpt-5-mini",
+  "claude-haiku-4.5",
+  "gemini-3.5-flash",
+  "gpt-4.1-mini",
+];
+const PREFERRED_PREMIUM_MODELS = ["gpt-5.4", "gpt-5.5", "claude-sonnet-4.6", "gpt-5-mini"];
+// Safe fallback when the model list cannot be fetched (GA across Copilot plans).
+const FALLBACK_MODEL = "gpt-5-mini";
+
+// Module-level cache for the Copilot model list (populated lazily).
+// NOTE: must live at the top of the module — the script invokes `await main()`
+// mid-file, and any `let` declared after that call stays in the temporal dead
+// zone while main()'s async body runs.
+const COPILOT_MODELS_CACHE = { promise: null };
 
 // Copilot API requires these client headers; missing Copilot-Integration-Id
 // yields 403 "token not authorized for this integration". `x-initiator: user`
@@ -407,26 +430,111 @@ export function isWeakSummary(text) {
 // =============================================================================
 
 /**
+ * Resolves the token used for Copilot API calls.
+ *
+ * Prefers GH_COPILOT_TOKEN — a fine-grained PAT with the "Copilot Requests"
+ * permission from a Copilot-subscribed account, stored as a repo/org secret.
+ * Falls back to GH_TOKEN / GITHUB_TOKEN for local runs; note the
+ * Actions-built-in GITHUB_TOKEN has NO Copilot entitlements, so the workflow
+ * must pass GH_COPILOT_TOKEN for AI to work.
+ *
+ * @returns {string|null}
+ */
+function copilotToken() {
+  return process.env.GH_COPILOT_TOKEN ?? process.env.GH_TOKEN ?? process.env.GITHUB_TOKEN ?? null;
+}
+
+/**
+ * Fetches the list of Copilot models available to the authenticated account.
+ * Resolves to an array of model ids, or null when the list cannot be fetched
+ * (network/auth/rate-limit). The result is cached for the lifetime of the run.
+ *
+ * @returns {Promise<Array<string>|null>}
+ */
+function fetchAvailableModels() {
+  if (!COPILOT_MODELS_CACHE.promise) {
+    COPILOT_MODELS_CACHE.promise = (async () => {
+      const token = copilotToken();
+      if (!token) return null;
+      try {
+        const response = await fetch(COPILOT_MODELS_URL, {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            ...COPILOT_HEADERS,
+          },
+          signal: AbortSignal.timeout(10_000),
+        });
+        if (!response.ok) {
+          process.stderr.write(
+            `Copilot models API error: ${response.status} ${response.statusText}\n`,
+          );
+          return null;
+        }
+        const data = await response.json();
+        const list = Array.isArray(data) ? data : (data?.models ?? data?.data ?? []);
+        return list.filter((m) => m && typeof m.id === "string").map((m) => m.id);
+      } catch (err) {
+        process.stderr.write(`Copilot models API fetch failed: ${err.message}\n`);
+        return null;
+      }
+    })();
+  }
+  return COPILOT_MODELS_CACHE.promise;
+}
+
+/**
+ * Picks the first available model matching the preferred ids (exact match first,
+ * then substring). Falls back to the first available model, then to FALLBACK_MODEL
+ * when the list is unavailable.
+ *
+ * @param {string[]} preferredIds
+ * @returns {Promise<string>}
+ */
+async function pickModel(preferredIds) {
+  const available = await fetchAvailableModels();
+  if (!available || available.length === 0) return FALLBACK_MODEL;
+
+  const lower = (s) => s.toLowerCase();
+  for (const id of preferredIds) {
+    if (available.some((m) => lower(m) === lower(id))) return id;
+  }
+  for (const id of preferredIds) {
+    const hit = available.find((m) => lower(m).includes(lower(id)));
+    if (hit) return hit;
+  }
+  return available[0];
+}
+
+/**
+ * Resolves the concrete model id for a tier.
+ * An explicit pin (PR_DESC_AI_MODEL_CHEAP / PR_DESC_AI_MODEL_PREMIUM) wins;
+ * otherwise a model is auto-selected from the account's live Copilot model list.
+ *
+ * @param {'cheap'|'premium'} tier
+ * @returns {Promise<string>}
+ */
+async function resolveTierModel(tier) {
+  const pin = tier === "cheap" ? MODEL_CHEAP : MODEL_PREMIUM;
+  if (pin) return pin;
+  const preferred = tier === "cheap" ? PREFERRED_CHEAP_MODELS : PREFERRED_PREMIUM_MODELS;
+  return pickModel(preferred);
+}
+
+/**
  * Calls the GitHub Copilot chat completions API with the given prompt and model.
  * Returns the generated text or null on any error (network, auth, rate-limit).
  *
- * Uses `fetch` (Node 18+ built-in). Token resolution:
- *   1. GH_COPILOT_TOKEN — fine-grained PAT with the "Copilot Requests" permission
- *      from a Copilot-subscribed account, stored as a repo/org secret.
- *   2. GH_TOKEN / GITHUB_TOKEN fallback (e.g. local runs against a PAT already on
- *      the PATH). Note the Actions-built-in GITHUB_TOKEN has NO Copilot
- *      entitlements, so the workflow must pass GH_COPILOT_TOKEN for AI to work.
- *
- * `max_tokens` and `temperature` are intentionally omitted: `model: "auto"` may
- * route to reasoning models (GPT-5 family) that reject those fields. The prompt
- * already constrains the output to 2-4 sentences.
+ * `max_tokens` and `temperature` are intentionally omitted: an auto-selected
+ * model may be a reasoning model (GPT-5 family) that rejects those fields. The
+ * prompt already constrains the output to 2-4 sentences.
  *
  * @param {string} prompt
- * @param {string} model  Copilot model identifier or "auto"
+ * @param {string} model  Concrete Copilot model identifier (resolved beforehand)
  * @returns {Promise<string|null>}
  */
 async function fetchAiEnhancement(prompt, model) {
-  const token = process.env.GH_COPILOT_TOKEN ?? process.env.GH_TOKEN ?? process.env.GITHUB_TOKEN;
+  const token = copilotToken();
   if (!token) return null;
 
   try {
@@ -435,7 +543,6 @@ async function fetchAiEnhancement(prompt, model) {
       headers: {
         Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
-        Accept: "application/json",
         ...COPILOT_HEADERS,
       },
       body: JSON.stringify({
@@ -449,8 +556,11 @@ async function fetchAiEnhancement(prompt, model) {
     });
 
     if (!response.ok) {
+      const detail = await response.text().catch(() => "");
       process.stderr.write(
-        `Copilot API error: ${response.status} ${response.statusText} (model: ${model})\n`,
+        `Copilot API error: ${response.status} ${response.statusText} (model: ${model})` +
+          (detail ? ` — ${detail.slice(0, 300)}` : "") +
+          "\n",
       );
       return null;
     }
@@ -485,8 +595,9 @@ function buildEnhancementPrompt(currentSummary, noteContext) {
  *   C — one attempt with the cheap model; fall back to deterministic if weak.
  *   D — cheap attempt first; if weak, one premium attempt; fall back if still weak.
  *
- * Both tiers default to `model: "auto"`; pin specific models via
- * PR_DESC_AI_MODEL_CHEAP / PR_DESC_AI_MODEL_PREMIUM when desired.
+ * Each tier auto-selects a concrete model from the account's live Copilot model
+ * list (cheap prefers fast/low-cost models; premium prefers higher quality).
+ * Pin specific models via PR_DESC_AI_MODEL_CHEAP / PR_DESC_AI_MODEL_PREMIUM.
  *
  * The rest of the description (Changes, Workflow Artifacts, etc.) is kept intact.
  * Returns null when no improvement was produced, so the caller can keep the original.
@@ -517,15 +628,17 @@ async function enhancedSummary(description, notes, tier) {
 
   const prompt = buildEnhancementPrompt(currentSummary, noteContext);
 
-  // Try cheap model first
-  const cheapResult = await fetchAiEnhancement(prompt, MODEL_CHEAP);
+  // Try cheap model first (explicit pin, or auto-selected from the live list)
+  const cheapModel = await resolveTierModel("cheap");
+  const cheapResult = await fetchAiEnhancement(prompt, cheapModel);
   if (cheapResult && !isWeakSummary(cheapResult)) {
     return description.replace(summaryRe, `## Summary\n\n${cheapResult}\n\n`);
   }
 
   // Tier D only: escalate to premium if cheap result was weak
   if (tier === "D") {
-    const premiumResult = await fetchAiEnhancement(prompt, MODEL_PREMIUM);
+    const premiumModel = await resolveTierModel("premium");
+    const premiumResult = await fetchAiEnhancement(prompt, premiumModel);
     if (premiumResult && !isWeakSummary(premiumResult)) {
       return description.replace(summaryRe, `## Summary\n\n${premiumResult}\n\n`);
     }
