@@ -8,11 +8,14 @@ tags:
   - policy
 lifecycle: temporary
 createdAt: '2026-08-29T10:53:29.651Z'
-updatedAt: '2026-08-29T10:53:29.651Z'
+updatedAt: '2026-08-29T10:53:39.362Z'
 role: research
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: rpir-request-smarter-default-scoping-for-recall-and-read-too-7ffd0632
+    type: derives-from
 memoryVersion: 1
 ---
 Verified against code at HEAD 1ff136a. Request root: `rpir-request-smarter-default-scoping-for-recall-and-read-too-7ffd0632`.

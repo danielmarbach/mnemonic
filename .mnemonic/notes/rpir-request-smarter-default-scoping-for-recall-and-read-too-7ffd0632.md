@@ -5,11 +5,14 @@ tags:
   - request
 lifecycle: temporary
 createdAt: '2026-08-29T10:49:24.929Z'
-updatedAt: '2026-08-29T10:49:24.929Z'
+updatedAt: '2026-08-29T10:53:39.362Z'
 role: context
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: research-read-tool-scoping-behavior-and-missing-cwd-handling-8a77b8a5
+    type: derives-from
 memoryVersion: 1
 ---
 Request: investigate, plan, and (if warranted) implement improvements so that recall (and potentially other read tools) do smarter scoping by default.
