@@ -8,7 +8,7 @@ tags:
   - policy
 lifecycle: temporary
 createdAt: '2026-08-29T10:53:29.651Z'
-updatedAt: '2026-08-29T20:34:12.952Z'
+updatedAt: '2026-08-29T20:34:25.594Z'
 role: research
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -52,6 +52,14 @@ Verified against code at HEAD 1ff136a. Request root: `rpir-request-smarter-defau
 ## Verification against existing design notes (addendum)
 
 ## User-confirmed design constraint (decides direction)
+
+## Refined direction: project-anchored precision for the derived default
+
+Keep the derived default scope `all`, but gate SEMANTIC-channel admission of main-vault global notes when cwd resolves a project and scope was NOT explicitly passed: globals are admitted only if curated (`alwaysLoad: true` explicit, or `importance: 'high'`) or strongly matching (`rawScore >= minSimilarity + GLOBAL_BAR_DELTA`, proposed +0.15, code constant). Project notes (current-project-associated, wherever stored) and attached-vault notes keep the normal `minSimilarity`. Lexical and graph channels unchanged — exact token matches and relationship-linked global notes still weave in. Document chunks unchanged.
+
+Empty-pool lift: if admitted notes AND document chunks are both empty, sub-bar global candidates rejoin (bar lifts) — no dead ends, single pass, no rerun. Explicit `scope: 'all'` (caller-passed string) = today's ungated behavior; requires removing the zod `.default('all')` so undefined (derived) vs explicit is distinguishable. Transparency: when gating suppressed globals, append one header line with the count and how to disable (pass explicit scope all). Applies to recall only; list/recent\_memories/memory\_graph keep current defaults plus missing-cwd hints.
+
+This preserves the weaving guarantee for exactly the notes the goal is about (curated anchors, strong matches, relationship-linked, exact lexical matches) while removing weakly-matching global noise from the default top-K — addressing both displacement misses and bloat.
 
 The weaving goal is explicit user intent, not just note prose: the main/global vault holds common rules and design knowledge that must get woven into project context. A hard default `scope: 'project'` contradicts this goal and is rejected by the user.
 
