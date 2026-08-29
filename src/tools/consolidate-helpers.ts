@@ -51,6 +51,7 @@ import {
 } from "../helpers/vault.js";
 import { toProjectRef } from "../helpers/project.js";
 import { embedNote } from "../helpers/embed.js";
+import { mapWithConcurrency } from "../concurrency.js";
 import type { EmbeddingRecord, Note } from "../storage.js";
 import { hasNoteContent } from "../storage.js";
 import type { Vault } from "../vault.js";
@@ -1155,21 +1156,37 @@ export async function suggestMerges(
   return { content: [{ type: "text", text: lines.join("\n") }], structuredContent };
 }
 
-async function loadEmbeddingsByNoteId(entries: NoteEntry[]): Promise<Map<string, EmbeddingRecord>> {
-  const embeddings = new Map<string, EmbeddingRecord>();
+/**
+ * Bound on concurrent embedding-file reads while scanning consolidation
+ * candidates (duplicate detection / merge suggestions). The cap IS the
+ * file-descriptor bound: at most N `readEmbedding` reads in flight.
+ */
+const EMBEDDING_READ_CONCURRENCY = 32;
 
-  await Promise.all(
-    entries.map(async (entry) => {
+async function loadEmbeddingsByNoteId(entries: NoteEntry[]): Promise<Map<string, EmbeddingRecord>> {
+  const results = await mapWithConcurrency(
+    entries,
+    EMBEDDING_READ_CONCURRENCY,
+    async (entry): Promise<{ id: string; record: EmbeddingRecord } | null> => {
       const record = await entry.vault.storage.readEmbedding(entry.note.id);
       if (
         record &&
         checkEmbeddingCompatibility(record, currentEmbeddingIdentity).status === "compatible"
       ) {
-        embeddings.set(entry.note.id, record);
+        return { id: entry.note.id, record };
       }
-    }),
+      return null;
+    },
   );
 
+  // Build the map post-loop: mapWithConcurrency forbids mutating shared
+  // structures inside the per-item function (nondeterministic completion
+  // order); returning { id, record } per entry and reducing here keeps the
+  // ordering deterministic and bounds concurrent reads.
+  const embeddings = new Map<string, EmbeddingRecord>();
+  for (const result of results) {
+    if (result !== null) embeddings.set(result.id, result.record);
+  }
   return embeddings;
 }
 

@@ -4,12 +4,20 @@ import { promises as fs } from "fs";
 
 import type { MemoryId } from "../brands.js";
 import { memoryId, isoDateString } from "../brands.js";
+import { mapWithConcurrency } from "../concurrency.js";
 import { resolveUserPath, defaultVaultPath, defaultClaudeHome } from "../paths.js";
 import { VaultManager } from "../vault.js";
 import { parseMemorySections } from "../import.js";
 import { MnemonicConfigStore } from "../config.js";
 import { debugLog, getErrorMessage } from "../error-utils.js";
 import type { Note } from "../storage.js";
+
+/**
+ * Bound on concurrent note writes while importing a Claude memory dump. The
+ * cap IS the file-descriptor bound: at most N `writeNote` calls in flight
+ * instead of one per imported section.
+ */
+const IMPORT_WRITE_CONCURRENCY = 32;
 
 export function makeImportNoteId(title: string): MemoryId {
   const slug = title
@@ -149,12 +157,13 @@ Examples:
     process.exit(0);
   }
 
-  const filesToCommit: string[] = [];
-  await Promise.all(
-    notesToWrite.map(async (note) => {
+  const filesToCommit = await mapWithConcurrency(
+    notesToWrite,
+    IMPORT_WRITE_CONCURRENCY,
+    async (note) => {
       await vault.storage.writeNote(note);
-      filesToCommit.push(`notes/${note.id}.md`);
-    }),
+      return `notes/${note.id}.md`;
+    },
   );
 
   const commitMessage = [

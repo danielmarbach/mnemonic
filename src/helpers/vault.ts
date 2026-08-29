@@ -1,5 +1,6 @@
 import type { Note, NoteMetadata, NoteLifecycle, NoteRole } from "../storage.js";
 import { hasNoteContent } from "../storage.js";
+import { mapWithConcurrency } from "../concurrency.js";
 import type { ServerContext } from "../server-context.js";
 import type { Vault } from "../vault.js";
 import type { PersistenceStatus } from "../structured-content.js";
@@ -328,31 +329,54 @@ export async function moveNoteBetweenVaults(
   };
 }
 
+/**
+ * Bound on concurrent note rewrites while cleaning up relationships across
+ * every mutable vault. The cap IS the file-descriptor bound: at most N
+ * `writeNote` calls in flight instead of one per stale relationship.
+ */
+const RELATIONSHIP_CLEANUP_CONCURRENCY = 32;
+
 export async function removeRelationshipsToNoteIds(
   ctx: ServerContext,
   noteIds: string[],
 ): Promise<Map<Vault, string[]>> {
   const vaultChanges = new Map<Vault, string[]>();
 
-  await Promise.all(
-    ctx.vaultManager.allKnownVaultsMutable().map(async (vault) => {
-      const notes = await vault.storage.listNotes();
-      await Promise.all(
-        notes.map(async (note) => {
-          const filtered = filterRelationships(note.relatedTo, noteIds);
-          if (filtered === note.relatedTo) {
-            return;
-          }
+  // Collect every (vault, note) pair first (each `listNotes` is itself bounded
+  // internally), then rewrite only the notes whose `relatedTo` actually
+  // changes. Each rewrite returns its vault + relPath; `vaultChanges` is
+  // populated post-loop so no shared structure is mutated from inside the
+  // bounded worker pool (nondeterministic completion order otherwise).
+  const candidates: Array<{ vault: Vault; note: Note }> = [];
+  for (const vault of ctx.vaultManager.allKnownVaultsMutable()) {
+    const notes = await vault.storage.listNotes();
+    for (const note of notes) {
+      candidates.push({ vault, note });
+    }
+  }
 
-          await vault.storage.writeNote({
-            ...note,
-            relatedTo: filtered,
-          });
-          addVaultChange(vaultChanges, vault, ctx.vaultManager.noteRelPath(vault, note.id));
-        }),
-      );
-    }),
+  const changes = await mapWithConcurrency(
+    candidates,
+    RELATIONSHIP_CLEANUP_CONCURRENCY,
+    async ({ vault, note }) => {
+      const filtered = filterRelationships(note.relatedTo, noteIds);
+      if (filtered === note.relatedTo) {
+        return null;
+      }
+
+      await vault.storage.writeNote({
+        ...note,
+        relatedTo: filtered,
+      });
+      return { vault, relPath: ctx.vaultManager.noteRelPath(vault, note.id) };
+    },
   );
+
+  for (const change of changes) {
+    if (change !== null) {
+      addVaultChange(vaultChanges, change.vault, change.relPath);
+    }
+  }
 
   return vaultChanges;
 }

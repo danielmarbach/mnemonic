@@ -73,9 +73,11 @@ export async function embedMissingNotes(
   const noteMetadata =
     source?.notes ??
     (noteIds
-      ? (await Promise.all(noteIds.map((id) => storage.readNoteMetadata(memoryId(id))))).filter(
-          (n): n is NoteMetadata => n !== null,
-        )
+      ? (
+          await mapWithConcurrency(noteIds, ctx.config.reindexEmbedConcurrency, async (id) =>
+            storage.readNoteMetadata(memoryId(id)),
+          )
+        ).filter((n): n is NoteMetadata => n !== null)
       : await storage.listNotesMetadata());
 
   const existingEmbeddings = source?.embeddings ?? (await storage.listEmbeddings());
