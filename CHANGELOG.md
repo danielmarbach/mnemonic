@@ -6,6 +6,8 @@ The format is loosely based on Keep a Changelog and uses semver-style version he
 
 ## [Unreleased]
 
+## [0.43.0] - 2026-08-29
+
 ### Added
 
 - `EMBED_MAX_CHUNK_CHARS` environment variable for configuring the maximum size of document-source chunks (default 4000, range 200–100000); non-default values re-chunk attachments on the next sync.
