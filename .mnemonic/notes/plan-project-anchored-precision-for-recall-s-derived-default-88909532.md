@@ -8,7 +8,7 @@ tags:
   - gating
 lifecycle: temporary
 createdAt: '2026-08-29T20:40:46.880Z'
-updatedAt: '2026-08-29T20:52:00.000Z'
+updatedAt: '2026-08-29T21:20:39.624Z'
 role: plan
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -16,6 +16,8 @@ projectName: mnemonic
 relatedTo:
   - id: rpir-request-smarter-default-scoping-for-recall-and-read-too-7ffd0632
     type: derives-from
+  - id: apply-project-anchored-precision-for-recall-s-derived-defaul-2d318266
+    type: follows
 memoryVersion: 1
 ---
 Derived default scope `all` for recall stays; gate weak global SEMANTIC candidates when cwd resolves a project and scope was NOT explicitly passed. Weaving goal preserved: curated (`alwaysLoad: true`), strong matches (rawScore >= minSimilarity + GLOBAL_BAR_DELTA = 0.15), lexical-exact, and graph-linked globals still weave in. Research: research-read-tool-scoping-behavior-and-missing-cwd-handling-8a77b8a5.
