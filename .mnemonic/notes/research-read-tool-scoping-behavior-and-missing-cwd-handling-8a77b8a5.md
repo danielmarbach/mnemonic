@@ -8,7 +8,7 @@ tags:
   - policy
 lifecycle: temporary
 createdAt: '2026-08-29T10:53:29.651Z'
-updatedAt: '2026-08-29T11:01:49.369Z'
+updatedAt: '2026-08-29T20:34:12.952Z'
 role: research
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -50,6 +50,10 @@ Verified against code at HEAD 1ff136a. Request root: `rpir-request-smarter-defau
 ## Solution-space assessment
 
 ## Verification against existing design notes (addendum)
+
+## User-confirmed design constraint (decides direction)
+
+The weaving goal is explicit user intent, not just note prose: the main/global vault holds common rules and design knowledge that must get woven into project context. A hard default `scope: 'project'` contradicts this goal and is rejected by the user.
 
 - `mnemonic-key-design-decisions-3f2a6273` (permanent summary): "**Similarity boost, not hard filter:** `recall` gives project notes +0.15 cosine similarity boost rather than excluding global notes. Global memories (user prefs, cross-project patterns) remain accessible in project context." — The `all` default is a DOCUMENTED decision with rationale. A derived `project` default would exclude global memories from default recall (except via zero-result widening), so it is a SUPERSESSION of this decision, not a bug fix. Note: the +0.15 figure is stale — the RRF rework replaced it with the bounded +0.005 `PROJECT_SCOPE_BOOST` — but the accessibility intent still governs the current default.
 - `vault-creation-audit-which-tools-can-create-mnemonic-and-whi-d0388691` (permanent): key invariant — passing cwd for context/lookup must never trigger vault creation. All read paths route through `getProjectVaultIfExists` — the proposed changes preserve this invariant (no `getOrCreateProjectVault` in any read path).
