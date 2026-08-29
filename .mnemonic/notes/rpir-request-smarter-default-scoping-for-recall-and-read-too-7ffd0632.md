@@ -5,13 +5,15 @@ tags:
   - request
 lifecycle: temporary
 createdAt: '2026-08-29T10:49:24.929Z'
-updatedAt: '2026-08-29T10:53:39.362Z'
+updatedAt: '2026-08-29T20:41:26.705Z'
 role: context
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
   - id: research-read-tool-scoping-behavior-and-missing-cwd-handling-8a77b8a5
+    type: derives-from
+  - id: plan-project-anchored-precision-for-recall-s-derived-default-88909532
     type: derives-from
 memoryVersion: 1
 ---
