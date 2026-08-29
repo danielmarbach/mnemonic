@@ -8,7 +8,7 @@ tags:
   - gating
 lifecycle: temporary
 createdAt: '2026-08-29T20:40:46.880Z'
-updatedAt: '2026-08-29T20:41:26.705Z'
+updatedAt: '2026-08-29T20:45:00.823Z'
 role: plan
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -40,6 +40,11 @@ Derived-default read scoping for recall: keep default `all`, gate weak global se
 - remember unadopted-ask elicitation and vault-creation rules untouched; project\_memory\_summary untouched.
 
 ## Constraints
+
+## Additions: homepage, dogfood, tests (post-handoff)
+
+- [ ] 14\. Homepage (docs/index.html): update the 'Project-scoped recall' feature card to state the derived default honestly (weak global matches gated; curated/strong/lexical/graph-linked remain; explicit scope 'all' disables gating). Check recall JSON examples on the page and include cwd where shown. Historical dogfood card recall-heuristic-instead-of-full-dynamic-context-12324717 (fill-the-limit idea, note no longer in vault) stays as-is; do NOT reintroduce fill-the-limit language — July RRF decision supersedes (bounded prior, no hard project-first).
+- [ ] 15\. Dogfood: run `npm run dogfood:isolated`, no NEW advisories vs baseline. Pack A line 98 passes explicit scope all (unaffected); other recall calls pass cwd without scope — derived gating is exercised. Add two bounded Pack A observations: derived-scope recall with cwd returns results; recall without cwd shows the missing-cwd hint line. Keep dogfooding-runner tests green.
 
 - No behavior change when scope is explicitly passed or when cwd/project unresolved.
 - Lexical/graph thresholds untouched; tags/lifecycle filters orthogonal to gating.
