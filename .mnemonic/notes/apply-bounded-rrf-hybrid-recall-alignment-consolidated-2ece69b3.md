@@ -10,12 +10,14 @@ tags:
   - hybrid-search
 lifecycle: permanent
 createdAt: '2026-08-30T11:24:05.989Z'
-updatedAt: '2026-08-30T11:24:05.989Z'
+updatedAt: '2026-08-30T11:24:09.382Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
   - id: validate-mnemonic-recall-against-reciprocal-rank-fusion-9619d67b
     type: derives-from
+  - id: canonical-design-bounded-rrf-hybrid-recall-172a96ab
+    type: related-to
 memoryVersion: 1
 ---
 Merge the completed one-shot RRF alignment plan and its apply checklist into a single delivery record; the design itself lives in canonical-design-bounded-rrf-hybrid-recall-172a96ab.
