@@ -9,7 +9,7 @@ tags:
   - path-layout
 lifecycle: permanent
 createdAt: '2026-08-03T15:21:23.609Z'
-updatedAt: '2026-08-30T11:19:37.525Z'
+updatedAt: '2026-08-30T11:21:20.538Z'
 role: decision
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -20,6 +20,8 @@ relatedTo:
   - id: document-source-chunk-embeddings-use-xxh128-for-filenames-an-e3e988b8
     type: derives-from
   - id: document-source-embeddings-for-global-policy-projects-main-v-ff2954f1
+    type: related-to
+  - id: bug-bidirectional-relate-duplicates-directional-relationship-4b9a18fa
     type: related-to
 memoryVersion: 1
 ---
