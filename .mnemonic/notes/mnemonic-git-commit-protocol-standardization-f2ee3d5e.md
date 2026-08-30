@@ -10,13 +10,15 @@ tags:
   - llm
 lifecycle: permanent
 createdAt: '2026-03-07T23:34:04.303Z'
-updatedAt: '2026-03-26T21:00:32.043Z'
+updatedAt: '2026-08-30T11:24:30.794Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
   - id: mnemonic-key-design-decisions-3f2a6273
     type: related-to
   - id: manual-exact-git-recovery-contract-for-partial-mnemonic-pers-ffae4896
+    type: related-to
+  - id: vault-commit-discipline-single-branch-delivery-and-cwd-scopi-acb7659a
     type: related-to
 memoryVersion: 1
 ---
