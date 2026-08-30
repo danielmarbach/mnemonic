@@ -12,9 +12,12 @@ tags:
   - request
 lifecycle: permanent
 createdAt: '2026-08-30T11:24:20.488Z'
-updatedAt: '2026-08-30T11:24:20.488Z'
+updatedAt: '2026-08-30T11:24:34.566Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: import-claude-memory-cli-command-design-and-implementation-dcdc5a05
+    type: related-to
 memoryVersion: 1
 ---
 Consolidate the MCP-versus-CLI research into a permanent product-boundary record; the recommendation (MCP canonical, narrow operational CLI, no 1:1 mirror) was previously captured nowhere.
