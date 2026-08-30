@@ -9,7 +9,7 @@ tags:
   - documentation
 lifecycle: permanent
 createdAt: '2026-05-09T12:54:02.094Z'
-updatedAt: '2026-08-06T04:42:02.383Z'
+updatedAt: '2026-08-30T10:18:31.162Z'
 role: summary
 alwaysLoad: true
 project: https-github-com-danielmarbach-mnemonic
@@ -36,6 +36,8 @@ relatedTo:
   - id: dogfooding-test-suite-reusable-prompt-for-phases-1-8-validat-c7c702d8
     type: related-to
   - id: bounded-concurrency-and-single-source-of-truth-principles-52e1d1c6
+    type: related-to
+  - id: derived-default-scope-for-recall-project-anchored-precision-98164deb
     type: related-to
 memoryVersion: 1
 ---
