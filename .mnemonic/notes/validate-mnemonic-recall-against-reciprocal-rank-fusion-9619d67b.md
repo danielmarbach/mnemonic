@@ -12,9 +12,6 @@ role: context
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
-relatedTo:
-  - id: research-current-recall-rrf-alignment-has-blocking-gaps-8fc61d24
-    type: derives-from
 memoryVersion: 1
 ---
 Request root for a critical one-shot review of mnemonic's current semantic, lexical, graph, and RRF recall behavior against the supplied RRF reference and the proposed alignment plan. The review must distinguish true RRF requirements from product-specific semantic-first policy and must report whether code changes are warranted.
