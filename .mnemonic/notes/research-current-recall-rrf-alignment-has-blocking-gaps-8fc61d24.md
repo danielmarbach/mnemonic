@@ -18,8 +18,6 @@ projectName: mnemonic
 relatedTo:
   - id: validate-mnemonic-recall-against-reciprocal-rank-fusion-9619d67b
     type: derives-from
-  - id: plan-one-shot-bounded-rrf-hybrid-recall-alignment-7aa73aaa
-    type: derives-from
 memoryVersion: 1
 ---
 The current implementation is a hybrid semantic-first ranker, not a fully independent three-channel RRF pipeline. Semantic candidates are generated from embeddings in src/tools/recall.ts, lexical scoring is applied only to those candidates in applyLexicalReranking, and TF-IDF lexical rescue scans non-semantic notes only when the strongest semantic score is below 0.35 or no semantic candidates exist. Therefore a strong semantic result can prevent an exact identifier or phrase match outside the semantic set from entering fusion. Graph spreading is also seeded from only the top five semantic candidates with score >= 0.5; it is a bounded semantic-conditioned expansion rather than a corpus-independent graph retriever, which may be intentional but should be explicit.
