@@ -11,11 +11,14 @@ tags:
   - consolidate
 lifecycle: permanent
 createdAt: '2026-08-30T11:21:15.725Z'
-updatedAt: '2026-08-30T11:21:15.725Z'
+updatedAt: '2026-08-30T11:21:19.173Z'
 role: review
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: consolidate-tool-design-execute-merge-behavior-idempotency-a-0911e2cd
+    type: related-to
 memoryVersion: 1
 ---
 ## Problem

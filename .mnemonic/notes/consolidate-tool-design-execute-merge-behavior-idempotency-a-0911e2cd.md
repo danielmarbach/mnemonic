@@ -7,7 +7,7 @@ tags:
   - decision
 lifecycle: permanent
 createdAt: '2026-03-24T10:54:19.723Z'
-updatedAt: '2026-04-26T10:08:01.283Z'
+updatedAt: '2026-08-30T11:21:19.173Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
@@ -15,6 +15,8 @@ relatedTo:
     type: related-to
   - id: mnemonic-mcp-tools-inventory-47499799
     type: explains
+  - id: bug-bidirectional-relate-duplicates-directional-relationship-4b9a18fa
+    type: related-to
 memoryVersion: 1
 ---
 ## Tool design
