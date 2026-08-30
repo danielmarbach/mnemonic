@@ -12,9 +12,6 @@ role: research
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
-relatedTo:
-  - id: rpir-request-qwen3-embedding-endpoints-and-chunk-size-restri-6f294f65
-    type: derives-from
 memoryVersion: 1
 ---
 Verified DeepSeek's claims against code at commit d337c47.
