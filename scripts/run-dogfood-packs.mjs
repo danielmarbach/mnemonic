@@ -199,6 +199,18 @@ async function main() {
     limit: 5,
     scope: "all",
   });
+  // Derived-scope coverage: recall with cwd but no explicit scope exercises the
+  // project-anchored default (global gating); pass-free cwd check verifies the
+  // missing-cwd hint. Both are non-blocking scorecard observations.
+  const recallDerivedScope = await callTool("recall", {
+    query: "Why are embeddings gitignored?",
+    cwd,
+    limit: 5,
+  });
+  const recallNoCwdHint = await callTool("recall", {
+    query: "Why are embeddings gitignored?",
+    limit: 5,
+  });
   const recentTemporary = await callTool("recent_memories", {
     cwd,
     scope: "all",
@@ -309,6 +321,11 @@ async function main() {
   ).some((p) => typeof (p.noteA?.classification ?? p.noteB?.classification) === "string");
   const recallNoDecayInfo = diagResults.every((r) => r.decayInfo === undefined);
 
+  const derivedScopeRecallReturnsResults =
+    (recallDerivedScope.structured?.results ?? []).length > 0 ||
+    recallDerivedScope.structured?.documentChunks != null;
+  const missingCwdHintShown = recallNoCwdHint.text.includes("no cwd was provided");
+
   const packA = {
     advisory: [
       !canonicalDesignInTopEmbeddings && "recall answers canonical design questions",
@@ -325,6 +342,8 @@ async function main() {
       // consolidate classification is verified by consolidatePairsHaveClassification.
       !recallNoDecayInfo &&
         "decayInfo should not appear in recall structured output (internal-only)",
+      !derivedScopeRecallReturnsResults && "derived-scope recall (cwd, no scope) returns results",
+      !missingCwdHintShown && "recall without cwd shows the missing-cwd hint",
     ].filter(Boolean),
     themeCount: themeEntries.length,
     topEmbeddingResult: b1Top?.title,
@@ -352,6 +371,8 @@ async function main() {
       consolidateDryRunHasMaintenanceKey,
       consolidatePairsHaveClassification,
       recallDecayInfoInternalOnly: recallNoDecayInfo,
+      derivedScopeRecallReturnsResults,
+      missingCwdHintShown,
     },
   };
 

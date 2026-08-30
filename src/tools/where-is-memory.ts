@@ -6,6 +6,7 @@ import {
   resolveProject,
   noteProjectRef,
   projectParam,
+  missingCwdHint,
 } from "../helpers/project.js";
 import { storageLabel } from "../helpers/vault.js";
 import { WhereIsResultSchema, type WhereIsResult, NoteIdSchema } from "../structured-content.js";
@@ -46,7 +47,9 @@ export function registerWhereIsMemoryTool(server: McpServer, ctx: ServerContext)
       const found = await ctx.vaultManager.findNote(id, cwd, { projectId: project?.id });
       if (!found) {
         return {
-          content: [{ type: "text", text: `No memory found with id '${id}'` }],
+          content: [
+            { type: "text", text: `No memory found with id '${id}'${missingCwdHint(cwd)}` },
+          ],
           isError: true,
         };
       }

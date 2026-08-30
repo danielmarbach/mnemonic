@@ -244,7 +244,9 @@ When `recall` called with `cwd`, project notes get a small **tiebreaker boost** 
 - Treat `cwd` as mandatory for project-specific `remember`, `recall`, `update`, `move_memory`, `get`, `list`, and `sync` calls
 - `remember` + `scope: "project"` → project vault (creates `.mnemonic/`)
 - `remember` + `scope: "global"` → main vault (keeps project in frontmatter)
-- `scope` omitted → use saved policy or fallback to `project` with `cwd`
+- `scope` omitted (writes) → use saved policy or fallback to `project` with `cwd`
+- `recall` with `scope` omitted and a detected project → derived `all` with project-anchored precision: weakly-matching unassociated global notes are held back from the semantic channel unless `alwaysLoad`-curated, strongly matching, or admitted via lexical/graph evidence; suppressed matches are reported and an empty pool widens back to everything. Explicit `scope` values never gate.
+- Recall/list without `cwd` → main vault only, with a hint telling the caller to pass `cwd`
 - Policy `ask` → ask: "Project vault" or "Private main vault"
 - `remember` without `cwd` → main vault
 - `move_memory` main-vault → project-vault rewrites `project` / `projectName` from `cwd`
@@ -336,7 +338,7 @@ Skills are loaded via the `skill` tool and extend agent capabilities with specia
 | `memory_graph` | Show compact adjacency list of relationships |
 | `move_memory` | Move note between vaults without changing id |
 | `project_memory_summary` | Session-start entrypoint: themes, anchors, orientation, maintenance warnings, and working-state recovery hints |
-| `recall` | Semantic search with optional project boost plus `temporal` and `workflow` modes; `storedIn: "attached"` filters to attached-repo notes. Returns `documentChunks` from document-source attachments alongside memory results for project and all scope. |
+| `recall` | Semantic search with optional project boost plus `temporal` and `workflow` modes; `storedIn: "attached"` filters to attached-repo notes. Returns `documentChunks` from document-source attachments alongside memory results for project and all scope. Omitted `scope` with a detected project derives project-anchored precision (weak global matches gated; alwaysLoad/strong/lexical/graph-linked notes still surface; explicit `all` ungated). |
 | `recent_memories` | Show most recently updated notes for scope |
 | `remember` | Write note + embedding; `cwd` sets context, `scope` picks storage, `lifecycle` picks temporary vs permanent |
 | `relate` | Create typed relationship between notes (bidirectional) |

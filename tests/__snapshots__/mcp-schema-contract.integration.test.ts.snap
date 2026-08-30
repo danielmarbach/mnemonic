@@ -384,7 +384,7 @@ Typical next step:
           "type": "boolean",
         },
         "cwd": {
-          "description": "Absolute path of the project working directory. Required for project-scoped routing, vault selection, and search boosting.",
+          "description": "Absolute path of the project working directory. Required for project-scoped routing, vault selection, and search boosting. Without it, only the global main vault is used: project memories are invisible to reads, and writes land in the main vault.",
           "type": "string",
         },
         "evidence": {
@@ -1750,7 +1750,7 @@ Typical next step:
           "type": "string",
         },
         "cwd": {
-          "description": "Absolute path of the project working directory. Required for project-scoped routing, vault selection, and search boosting.",
+          "description": "Absolute path of the project working directory. Required for project-scoped routing, vault selection, and search boosting. Without it, only the global main vault is used: project memories are invisible to reads, and writes land in the main vault.",
           "type": "string",
         },
         "lifecycle": {
@@ -2110,7 +2110,7 @@ Typical next step:
           "type": "boolean",
         },
         "cwd": {
-          "description": "Absolute path of the project working directory. Required for project-scoped routing, vault selection, and search boosting.",
+          "description": "Absolute path of the project working directory. Required for project-scoped routing, vault selection, and search boosting. Without it, only the global main vault is used: project memories are invisible to reads, and writes land in the main vault.",
           "type": "string",
         },
         "id": {
@@ -2342,7 +2342,7 @@ Typical next step:
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "properties": {
         "cwd": {
-          "description": "Absolute path of the project working directory. Required for project-scoped routing, vault selection, and search boosting.",
+          "description": "Absolute path of the project working directory. Required for project-scoped routing, vault selection, and search boosting. Without it, only the global main vault is used: project memories are invisible to reads, and writes land in the main vault.",
           "type": "string",
         },
         "ids": {
@@ -3402,7 +3402,7 @@ Typical next step:
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "properties": {
         "cwd": {
-          "description": "Absolute path of the project working directory. Required for project-scoped routing, vault selection, and search boosting.",
+          "description": "Absolute path of the project working directory. Required for project-scoped routing, vault selection, and search boosting. Without it, only the global main vault is used: project memories are invisible to reads, and writes land in the main vault.",
           "type": "string",
         },
         "includePreview": {
@@ -3883,7 +3883,7 @@ Typical next step:
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "properties": {
         "cwd": {
-          "description": "Absolute path of the project working directory. Required for project-scoped routing, vault selection, and search boosting.",
+          "description": "Absolute path of the project working directory. Required for project-scoped routing, vault selection, and search boosting. Without it, only the global main vault is used: project memories are invisible to reads, and writes land in the main vault.",
           "type": "string",
         },
         "limit": {
@@ -4039,7 +4039,7 @@ Typical next step:
           "type": "boolean",
         },
         "cwd": {
-          "description": "Absolute path of the project working directory. Required for project-scoped routing, vault selection, and search boosting.",
+          "description": "Absolute path of the project working directory. Required for project-scoped routing, vault selection, and search boosting. Without it, only the global main vault is used: project memories are invisible to reads, and writes land in the main vault.",
           "type": "string",
         },
         "id": {
@@ -5021,7 +5021,7 @@ Typical next step:
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "properties": {
         "cwd": {
-          "description": "Absolute path of the project working directory. Required for project-scoped routing, vault selection, and search boosting.",
+          "description": "Absolute path of the project working directory. Required for project-scoped routing, vault selection, and search boosting. Without it, only the global main vault is used: project memories are invisible to reads, and writes land in the main vault.",
           "type": "string",
         },
         "evidence": {
@@ -5067,8 +5067,7 @@ Typical next step:
           "type": "string",
         },
         "scope": {
-          "default": "all",
-          "description": "'project' = this project's memories and attached vault notes, 'global' = only unscoped memories (main/global storage), 'all' = both, with project notes boosted (default)",
+          "description": "'project' = this project's memories and attached vault notes, 'global' = memories in the main/global vault (may include project-tagged personal notes), 'all' = both, with project notes boosted. When omitted with a cwd-resolved project, scope is derived: semantic matches from unassociated global notes must be curated (alwaysLoad) or strongly matching to appear; exact-wording lexical and graph-linked matches still apply. Explicit values disable derived gating — pass 'all' to always include everything.",
           "enum": [
             "project",
             "global",
@@ -5755,7 +5754,7 @@ Typical next step:
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "properties": {
         "cwd": {
-          "description": "Absolute path of the project working directory. Required for project-scoped routing, vault selection, and search boosting.",
+          "description": "Absolute path of the project working directory. Required for project-scoped routing, vault selection, and search boosting. Without it, only the global main vault is used: project memories are invisible to reads, and writes land in the main vault.",
           "type": "string",
         },
         "includePreview": {
@@ -5945,7 +5944,7 @@ Typical next step:
           "type": "boolean",
         },
         "cwd": {
-          "description": "Absolute path of the project working directory. Required for project-scoped routing, vault selection, and search boosting.",
+          "description": "Absolute path of the project working directory. Required for project-scoped routing, vault selection, and search boosting. Without it, only the global main vault is used: project memories are invisible to reads, and writes land in the main vault.",
           "type": "string",
         },
         "fromId": {
@@ -7933,7 +7932,7 @@ Typical next step:
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "properties": {
         "cwd": {
-          "description": "Absolute path of the project working directory. Required for project-scoped routing, vault selection, and search boosting.",
+          "description": "Absolute path of the project working directory. Required for project-scoped routing, vault selection, and search boosting. Without it, only the global main vault is used: project memories are invisible to reads, and writes land in the main vault.",
           "type": "string",
         },
         "force": {
@@ -8096,7 +8095,7 @@ Typical next step:
           "type": "boolean",
         },
         "cwd": {
-          "description": "Absolute path of the project working directory. Required for project-scoped routing, vault selection, and search boosting.",
+          "description": "Absolute path of the project working directory. Required for project-scoped routing, vault selection, and search boosting. Without it, only the global main vault is used: project memories are invisible to reads, and writes land in the main vault.",
           "type": "string",
         },
         "fromId": {
@@ -8346,7 +8345,7 @@ Use \`semanticPatch\` for targeted edits (more token-efficient). Use \`content\`
           "type": "string",
         },
         "cwd": {
-          "description": "Absolute path of the project working directory. Required for project-scoped routing, vault selection, and search boosting.",
+          "description": "Absolute path of the project working directory. Required for project-scoped routing, vault selection, and search boosting. Without it, only the global main vault is used: project memories are invisible to reads, and writes land in the main vault.",
           "type": "string",
         },
         "id": {
@@ -8933,7 +8932,7 @@ Typical next step:
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "properties": {
         "cwd": {
-          "description": "Absolute path of the project working directory. Required for project-scoped routing, vault selection, and search boosting.",
+          "description": "Absolute path of the project working directory. Required for project-scoped routing, vault selection, and search boosting. Without it, only the global main vault is used: project memories are invisible to reads, and writes land in the main vault.",
           "type": "string",
         },
         "id": {

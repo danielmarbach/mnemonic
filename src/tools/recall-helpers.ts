@@ -72,6 +72,9 @@ export function buildRecallCandidateContext(
 // Bounded policy priors remain smaller than meaningful multi-channel RRF agreement.
 export const PROJECT_SCOPE_BOOST = 0.005;
 export const ATTACHMENT_BOOST = PROJECT_SCOPE_BOOST / 2;
+// Re-exported for discoverability; defined next to the gate predicate in
+// ../recall.ts to avoid a circular import.
+export { GLOBAL_BAR_DELTA } from "../recall.js";
 // Document chunks fuse into the unified recall ranking with a prior smaller than
 // ATTACHMENT_BOOST so notes outrank chunks by default while documents stay visible
 // (rank just below notes; a dramatically stronger chunk can still rise).
@@ -103,7 +106,7 @@ export async function collectLexicalCandidates(
   query: string,
   temporalQueryHint: TemporalQueryHint | undefined,
   project: { id: string; name: string } | undefined,
-  scope: "project" | "global" | "all",
+  scope: "project" | "global" | "all" | undefined,
   tags: string[] | undefined,
   lifecycle: NoteLifecycle | undefined,
   existingIds: ScoredRecallCandidate[],
@@ -142,12 +145,14 @@ export async function collectLexicalCandidates(
 
       if (lifecycle && note.lifecycle !== lifecycle) continue;
 
-      const isProjectNote = note.project !== undefined;
       const isCurrentProject = project && note.project === project.id;
       const isAttachedVault = vault.provenance === "project-attached";
 
       if (scope === "project" && !isCurrentProject && !isAttachedVault) continue;
-      if (scope === "global" && isProjectNote && !isAttachedVault) continue;
+      // Location-based, matching the semantic channel: "global" scope admits all
+      // main-vault notes, including project-tagged personal notes ("repo you
+      // don't own" case asserted by vault-routing integration tests).
+      if (scope === "global" && vault.provenance !== "main") continue;
       if (
         applyTemporalFilter &&
         temporalFilterWindowDays !== undefined &&

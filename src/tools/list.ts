@@ -3,7 +3,12 @@ import type { McpServer } from "@modelcontextprotocol/server";
 import type { ServerContext } from "../server-context.js";
 import { ListResultSchema, type ListResult, type ProjectRef } from "../structured-content.js";
 import type { Note, NoteLifecycle } from "../storage.js";
-import { projectParam, ensureBranchSynced, noteProjectRef } from "../helpers/project.js";
+import {
+  projectParam,
+  ensureBranchSynced,
+  noteProjectRef,
+  missingCwdHint,
+} from "../helpers/project.js";
 import { collectVisibleNotes, formatListEntry, storageLabel } from "../helpers/vault.js";
 
 export function registerListTool(server: McpServer, ctx: ServerContext): void {
@@ -99,7 +104,10 @@ export function registerListTool(server: McpServer, ctx: ServerContext): void {
           project: project ? { id: project.id, name: project.name } : undefined,
           notes: [],
         };
-        return { content: [{ type: "text", text: "No memories found." }], structuredContent };
+        return {
+          content: [{ type: "text", text: `No memories found.${missingCwdHint(cwd)}` }],
+          structuredContent,
+        };
       }
 
       const lines = entries.map((entry) =>
@@ -116,7 +124,7 @@ export function registerListTool(server: McpServer, ctx: ServerContext): void {
           ? `${entries.length} memories (project: ${project.name}, scope: ${scope}, storedIn: ${storedIn}):`
           : `${entries.length} memories (scope: ${scope}, storedIn: ${storedIn}):`;
 
-      const textContent = `${header}\n\n${lines.join("\n")}`;
+      const textContent = `${header}\n\n${lines.join("\n")}${missingCwdHint(cwd)}`;
 
       const structuredNotes: Array<{
         id: string;

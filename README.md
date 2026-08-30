@@ -402,9 +402,11 @@ Use `verbose: true` together with temporal mode when you want richer change stat
 
 The `scope` parameter on `recall` narrows results:
 
-- `"all"` (default): project memories boosted, then global
-- `"project"`: only memories for the detected project
-- `"global"`: only memories with no project association
+- `"all"` (default): project memories boosted, then global. When `scope` is omitted and `cwd` detects a project, recall applies project-anchored precision: semantic matches from unassociated global notes must be curated (`alwaysLoad`), strongly matching, or arrive via exact-wording lexical or graph-linked evidence to appear; the response reports any suppressed matches and a pass `scope: "all"` includes everything ungated. When no result is admitted at all, recall widens to the full pool and says so.
+- `"project"`: only memories for the detected project (project-associated notes wherever stored, plus attached vault notes)
+- `"global"`: memories in the main/global vault, which may include project-tagged personal notes (the "repo you don't own" case)
+
+When `cwd` is omitted, only the global main vault is searched; recall and list tools say so in their output so the caller can pass the project working directory.
 
 ### Note lifecycle
 

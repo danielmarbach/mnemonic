@@ -36,6 +36,8 @@ import {
   applyCanonicalExplanationPromotion,
   applyGraphSpreadingActivation,
   recallCandidateIdentity,
+  shouldGateGlobalCandidate,
+  partitionGatedCandidates,
   type ScoredRecallCandidate,
 } from "../recall.js";
 import { attempt } from "../error-utils.js";
@@ -56,6 +58,7 @@ import {
   resolveProject,
   noteProjectRef,
   projectParam,
+  missingCwdHint,
 } from "../helpers/project.js";
 import { storageLabel } from "../helpers/vault.js";
 import {
@@ -159,11 +162,14 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
         scope: z
           .enum(["project", "global", "all"])
           .optional()
-          .default("all")
           .describe(
             "'project' = this project's memories and attached vault notes, " +
-              "'global' = only unscoped memories (main/global storage), " +
-              "'all' = both, with project notes boosted (default)",
+              "'global' = memories in the main/global vault (may include project-tagged personal notes), " +
+              "'all' = both, with project notes boosted. " +
+              "When omitted with a cwd-resolved project, scope is derived: semantic matches from " +
+              "unassociated global notes must be curated (alwaysLoad) or strongly matching to appear; " +
+              "exact-wording lexical and graph-linked matches still apply. " +
+              "Explicit values disable derived gating — pass 'all' to always include everything.",
           ),
         lifecycle: z
           .enum(["temporary", "permanent"])
@@ -190,6 +196,12 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
       await ensureBranchSynced(ctx, cwd);
 
       const project = await resolveProject(ctx, cwd);
+      // Derived default scope: when the caller omitted scope and a project was
+      // resolved, unassociated main-vault ("global") semantic candidates are
+      // held back (subBarGlobal) unless curated (alwaysLoad) or strongly
+      // matching. Explicit scopes run fully ungated.
+      const gateActive = scope === undefined && project !== undefined;
+      const cwdHint = missingCwdHint(cwd);
       // Fail-soft: if the query embedding cannot be generated (Ollama down, model
       // not pulled, quota exceeded), skip semantic memory scoring but keep the
       // lexical projection channel and document-source chunks (which are lexical
@@ -407,6 +419,16 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
             if (vault.provenance !== "main") continue;
           }
 
+          const gatedByDerivedScope = shouldGateGlobalCandidate({
+            gateActive,
+            vaultProvenance: vault.provenance,
+            isCurrentProject: Boolean(isCurrentProject),
+            isAttachedVault,
+            alwaysLoad: meta.alwaysLoad,
+            rawScore,
+            minSimilarity,
+          });
+
           if (
             applyTemporalFilter &&
             temporalFilterWindowDays !== undefined &&
@@ -447,6 +469,7 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
             boosted: rawScore + boost,
             vault,
             isCurrentProject: Boolean(isCurrentProject),
+            subBarGlobal: gatedByDerivedScope || undefined,
             lifecycle: context.lifecycle,
             relatedCount: context.relatedCount,
             connectionDiversity: context.connectionDiversity,
@@ -555,7 +578,7 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
         if (lifecycle && meta.lifecycle !== lifecycle) continue;
         const isAttachedVault = candidate.vault.provenance === "project-attached";
         if (scope === "project" && !candidate.isCurrentProject && !isAttachedVault) continue;
-        if (scope === "global" && meta.project !== undefined && !isAttachedVault) continue;
+        if (scope === "global" && candidate.vault.provenance !== "main") continue;
         if (
           applyTemporalFilter &&
           temporalFilterWindowDays !== undefined &&
@@ -600,16 +623,25 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
           existing.projectPrior = existing.projectPrior ?? lexicalCandidate.projectPrior;
           existing.temporalPrior = existing.temporalPrior ?? lexicalCandidate.temporalPrior;
           existing.metadataPrior = existing.metadataPrior ?? lexicalCandidate.metadataPrior;
+          // Exact-token lexical evidence overrides the derived-scope bar.
+          existing.subBarGlobal = false;
         } else {
           candidatesById.set(recallCandidateIdentity(lexicalCandidate), lexicalCandidate);
         }
       }
       const promoted = applyCanonicalExplanationPromotion([...candidatesById.values()]);
 
-      const top =
+      const selectTop = (
+        pool: ScoredRecallCandidate[],
+        options?: { includeSubBar?: boolean },
+      ): ScoredRecallCandidate[] =>
         mode === "workflow"
-          ? selectWorkflowResults(promoted, effectiveLimit, scope)
-          : selectRecallResults(promoted, effectiveLimit, scope);
+          ? selectWorkflowResults(pool, effectiveLimit, scope, options)
+          : selectRecallResults(pool, effectiveLimit, scope, options);
+
+      const { visible, gated } = partitionGatedCandidates(promoted);
+      let top = selectTop(visible);
+      let widenedScope = false;
 
       // Collect document chunks from document-source attachments BEFORE the
       // empty-memory early return. External documents are the primary fallback
@@ -622,7 +654,7 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
       const isDefaultMode = mode === undefined || mode === "default";
       if (
         project &&
-        (scope === "all" || scope === "project") &&
+        (scope === undefined || scope === "all" || scope === "project") &&
         isDefaultMode &&
         !hasTagFilter &&
         !hasLifecycleFilter
@@ -700,6 +732,14 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
         }
       }
 
+      // Empty-pool lift: when derived gating held back every significant
+      // candidate and yielded nothing (and no document chunks either), re-select
+      // from the unfiltered pool — missing everything is worse than weak matches.
+      if (top.length === 0 && gated.length > 0 && documentChunks.length === 0) {
+        top = selectTop(promoted, { includeSubBar: true });
+        widenedScope = top.length > 0;
+      }
+
       if (top.length === 0 && documentChunks.length === 0) {
         const structuredContent: RecallResult = {
           action: "recalled",
@@ -709,14 +749,24 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
           results: [],
         };
         return {
-          content: [{ type: "text", text: "No memories found matching that query." }],
+          content: [{ type: "text", text: `No memories found matching that query.${cwdHint}` }],
           structuredContent,
         };
       }
 
       const header = project
-        ? `Recall results for project **${project.name}** (scope: ${scope}):`
+        ? `Recall results for project **${project.name}** (scope: ${scope ?? "all"}):`
         : `Recall results (global):`;
+
+      const gatingNotices: string[] = [];
+      if (widenedScope) {
+        gatingNotices.push("no project-scoped matches; showing all matches");
+      } else if (gated.length > 0) {
+        gatingNotices.push(
+          `${gated.length} weak global matches suppressed — pass scope: 'all' to include them`,
+        );
+      }
+      const gatingNoticeLine = gatingNotices.length > 0 ? `\n${gatingNotices.join(" | ")}` : "";
 
       const noteEntries: Array<{ kind: "note"; score: number; sortKey: string; text: string }> = [];
       const structuredResults: Array<{
@@ -1017,7 +1067,7 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
       }
       const diagnosticsLine =
         diagnosticsParts.length > 0 ? `\n${diagnosticsParts.join(" | ")}` : "";
-      const textContent = `${header}${diagnosticsLine}\n\n${unifiedText}`;
+      const textContent = `${header}${diagnosticsLine}${gatingNoticeLine}\n\n${unifiedText}${cwdHint}`;
 
       const structuredContent: RecallResult = {
         action: "recalled",

@@ -18,6 +18,7 @@ import {
   resolveProject,
   noteProjectRef,
   projectParam,
+  missingCwdHint,
 } from "../helpers/project.js";
 import { storageLabel } from "../helpers/vault.js";
 import { formatRelationshipPreview } from "../helpers/index.js";
@@ -342,6 +343,12 @@ export function registerGetTool(server: McpServer, ctx: ServerContext): void {
       }
       if (notFound.length > 0) {
         lines.push(`Not found: ${notFound.join(", ")}`);
+        // Without cwd only the main vault was searched — project-vault ids
+        // cannot resolve. Tell the caller how to self-correct.
+        const missingCwd = missingCwdHint(cwd);
+        if (missingCwd) {
+          lines.push(missingCwd.trim());
+        }
       }
 
       const structuredContent: GetResult = {

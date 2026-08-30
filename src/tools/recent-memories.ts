@@ -7,6 +7,7 @@ import {
   toProjectRef,
   noteProjectRef,
   ensureBranchSynced,
+  missingCwdHint,
 } from "../helpers/project.js";
 import { collectVisibleNotes, formatListEntry, storageLabel } from "../helpers/vault.js";
 import { hasNoteContent } from "../storage.js";
@@ -72,7 +73,10 @@ export function registerRecentMemoriesTool(server: McpServer, ctx: ServerContext
           limit: limit || 5,
           notes: [],
         };
-        return { content: [{ type: "text", text: "No memories found." }], structuredContent };
+        return {
+          content: [{ type: "text", text: `No memories found.${missingCwdHint(cwd)}` }],
+          structuredContent,
+        };
       }
 
       const header =
@@ -85,7 +89,7 @@ export function registerRecentMemoriesTool(server: McpServer, ctx: ServerContext
         }),
       );
 
-      const textContent = `${header}\n\n${lines.join("\n")}`;
+      const textContent = `${header}\n\n${lines.join("\n")}${missingCwdHint(cwd)}`;
 
       const structuredNotes = recent.map(({ note, vault }) => {
         const content = hasNoteContent(note) ? note.content : "";

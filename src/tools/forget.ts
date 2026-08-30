@@ -12,6 +12,7 @@ import {
   resolveProject,
   noteProjectRef,
   ensureBranchSynced,
+  missingCwdHint,
 } from "../helpers/project.js";
 import { memoryId } from "../brands.js";
 import {
@@ -93,7 +94,9 @@ export function registerForgetTool(server: McpServer, ctx: ServerContext): void 
           };
         }
         return {
-          content: [{ type: "text", text: `No memory found with id '${id}'` }],
+          content: [
+            { type: "text", text: `No memory found with id '${id}'${missingCwdHint(cwd)}` },
+          ],
           isError: true,
         };
       }

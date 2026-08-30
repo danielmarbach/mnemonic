@@ -6,6 +6,7 @@ import {
   resolveProject,
   noteProjectRef,
   projectParam,
+  missingCwdHint,
 } from "../helpers/project.js";
 import {
   formatCommitBody,
@@ -227,7 +228,9 @@ export function registerUpdateTool(server: McpServer, ctx: ServerContext): void 
           };
         }
         return {
-          content: [{ type: "text", text: `No memory found with id '${id}'` }],
+          content: [
+            { type: "text", text: `No memory found with id '${id}'${missingCwdHint(cwd)}` },
+          ],
           isError: true,
         };
       }

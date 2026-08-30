@@ -14,6 +14,9 @@ import {
   computeTemporalRecencyBoost,
   shouldApplyTemporalFiltering,
   isWithinTemporalFilterWindow,
+  GLOBAL_BAR_DELTA,
+  shouldGateGlobalCandidate,
+  partitionGatedCandidates,
   type ScoredRecallCandidate,
 } from "../src/recall.js";
 import type { EffectiveNoteMetadata } from "../src/role-suggestions.js";
@@ -1034,6 +1037,33 @@ describe("applyGraphSpreadingActivation", () => {
     expect(boosted.graphRank).toBe(1);
   });
 
+  it("clears subBarGlobal when graph evidence attaches to a flagged candidate", () => {
+    const candidates: ScoredRecallCandidate[] = [
+      { id: "entry", score: 0.6, boosted: 0.6, vault, isCurrentProject: true },
+      {
+        id: "weak-global",
+        score: 0.35,
+        boosted: 0.35,
+        vault,
+        isCurrentProject: false,
+        subBarGlobal: true,
+      },
+    ];
+
+    const getNoteRelationships = (id: string) => {
+      if (id === "entry") {
+        return [{ id: "weak-global", type: "related-to" as const }];
+      }
+      return undefined;
+    };
+
+    const result = applyGraphSpreadingActivation(candidates, getNoteRelationships);
+
+    const linked = result.find((c) => c.id === "weak-global")!;
+    expect(linked.graphScore).toBeGreaterThan(0);
+    expect(linked.subBarGlobal).toBe(false);
+  });
+
   it("keeps graph identity vault-qualified when note ids collide", () => {
     const projectVault = { storage: { vaultPath: "/project" } } as ScoredRecallCandidate["vault"];
     const mainVault = { storage: { vaultPath: "/main" } } as ScoredRecallCandidate["vault"];
@@ -1310,5 +1340,116 @@ describe("resolveDiscoveredVaults", () => {
 
     expect(candidates[1]!.vault).toBe(projectVault);
     expect(candidates[1]!.isCurrentProject).toBe(true);
+  });
+});
+
+describe("GLOBAL_BAR_DELTA", () => {
+  it("keeps the documented derivation-compatible value", () => {
+    expect(GLOBAL_BAR_DELTA).toBe(0.15);
+  });
+});
+
+describe("shouldGateGlobalCandidate", () => {
+  const baseInput = {
+    gateActive: true,
+    vaultProvenance: "main" as const,
+    isCurrentProject: false,
+    isAttachedVault: false,
+    alwaysLoad: undefined,
+    rawScore: 0.5,
+    minSimilarity: 0.4,
+  };
+
+  it("gates unassociated main-vault candidates below the bar", () => {
+    expect(shouldGateGlobalCandidate(baseInput)).toBe(true);
+  });
+
+  it("admits candidates exactly at the bar (strict less-than)", () => {
+    expect(shouldGateGlobalCandidate({ ...baseInput, rawScore: 0.4 + GLOBAL_BAR_DELTA })).toBe(
+      false,
+    );
+  });
+
+  it("gates candidates one epsilon below the bar", () => {
+    expect(
+      shouldGateGlobalCandidate({ ...baseInput, rawScore: 0.4 + GLOBAL_BAR_DELTA - 1e-9 }),
+    ).toBe(true);
+  });
+
+  it("never gates when the gate is inactive (explicit scope or no project)", () => {
+    expect(shouldGateGlobalCandidate({ ...baseInput, gateActive: false })).toBe(false);
+  });
+
+  it("never gates project-associated candidates", () => {
+    expect(shouldGateGlobalCandidate({ ...baseInput, isCurrentProject: true })).toBe(false);
+  });
+
+  it("never gates attached-vault candidates", () => {
+    expect(shouldGateGlobalCandidate({ ...baseInput, isAttachedVault: true })).toBe(false);
+  });
+
+  it("exempts explicit alwaysLoad curation even below the bar", () => {
+    expect(shouldGateGlobalCandidate({ ...baseInput, alwaysLoad: true, rawScore: 0.31 })).toBe(
+      false,
+    );
+  });
+
+  it("only gates main-vault candidates", () => {
+    expect(shouldGateGlobalCandidate({ ...baseInput, vaultProvenance: "project-local" })).toBe(
+      false,
+    );
+    expect(shouldGateGlobalCandidate({ ...baseInput, vaultProvenance: "project-attached" })).toBe(
+      false,
+    );
+  });
+});
+
+describe("partitionGatedCandidates and derived-scope selection", () => {
+  const mainVault = { storage: { vaultPath: "/main" } } as ScoredRecallCandidate["vault"];
+
+  const candidate = (id: string, score: number, subBarGlobal?: boolean): ScoredRecallCandidate => ({
+    id,
+    score,
+    semanticScore: score,
+    semanticRank: 1,
+    boosted: score,
+    vault: mainVault,
+    isCurrentProject: false,
+    subBarGlobal,
+  });
+
+  it("splits flagged candidates from visible ones", () => {
+    const { visible, gated } = partitionGatedCandidates([
+      candidate("project-note", 0.7),
+      candidate("weak-global", 0.35, true),
+    ]);
+
+    expect(visible.map((c) => c.id)).toEqual(["project-note"]);
+    expect(gated.map((c) => c.id)).toEqual(["weak-global"]);
+  });
+
+  it("selectRecallResults excludes gated candidates and supports the lift", () => {
+    const scored = [candidate("project-note", 0.7), candidate("weak-global", 0.35, true)];
+
+    const defaultSelection = selectRecallResults(scored, 5, "all");
+    expect(defaultSelection.map((c) => c.id)).toEqual(["project-note"]);
+
+    const lifted = selectRecallResults(scored, 5, "all", { includeSubBar: true });
+    expect(lifted.map((c) => c.id)).toEqual(["project-note", "weak-global"]);
+  });
+
+  it("empty-pool lift surfaces only-gated candidates when admitted", () => {
+    const scored = [candidate("weak-global-1", 0.33, true), candidate("weak-global-2", 0.32, true)];
+
+    expect(selectRecallResults(scored, 5, "all")).toEqual([]);
+
+    const lifted = selectRecallResults(scored, 5, "all", { includeSubBar: true });
+    expect(lifted.map((c) => c.id)).toEqual(["weak-global-1", "weak-global-2"]);
+  });
+
+  it("leaves unrelated pools untouched (backward compatible)", () => {
+    const scored = [candidate("a", 0.9), candidate("b", 0.6)];
+
+    expect(selectRecallResults(scored, 5, "all").map((c) => c.id)).toEqual(["a", "b"]);
   });
 });

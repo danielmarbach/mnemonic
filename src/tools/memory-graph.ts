@@ -2,7 +2,12 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/server";
 import type { ServerContext } from "../server-context.js";
 import { MemoryGraphResultSchema, type MemoryGraphResult } from "../structured-content.js";
-import { projectParam, toProjectRef, ensureBranchSynced } from "../helpers/project.js";
+import {
+  projectParam,
+  toProjectRef,
+  ensureBranchSynced,
+  missingCwdHint,
+} from "../helpers/project.js";
 import { type NoteEntry, collectVisibleNotes } from "../helpers/vault.js";
 
 export function registerMemoryGraphTool(server: McpServer, ctx: ServerContext): void {
@@ -50,7 +55,10 @@ export function registerMemoryGraphTool(server: McpServer, ctx: ServerContext): 
           limit,
           truncated: false,
         };
-        return { content: [{ type: "text", text: "No memories found." }], structuredContent };
+        return {
+          content: [{ type: "text", text: `No memories found.${missingCwdHint(cwd)}` }],
+          structuredContent,
+        };
       }
 
       const visibleIds = new Set(entries.map((entry) => entry.note.id));
@@ -76,7 +84,9 @@ export function registerMemoryGraphTool(server: McpServer, ctx: ServerContext): 
           truncated: false,
         };
         return {
-          content: [{ type: "text", text: "No relationships found for that scope." }],
+          content: [
+            { type: "text", text: `No relationships found for that scope.${missingCwdHint(cwd)}` },
+          ],
           structuredContent,
         };
       }
@@ -84,7 +94,7 @@ export function registerMemoryGraphTool(server: McpServer, ctx: ServerContext): 
       const header =
         project && scope !== "global" ? `Memory graph for ${project.name}:` : "Memory graph:";
 
-      const textContent = `${header}\n\n${lines.join("\n")}`;
+      const textContent = `${header}\n\n${lines.join("\n")}${missingCwdHint(cwd)}`;
 
       // Build structured graph
       const structuredNodes = entries

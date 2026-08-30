@@ -78,6 +78,13 @@ export interface ScoredRecallCandidate {
   lexicalChannelScore?: number;
   /** Whether this candidate is present in the bounded lexical result list. */
   lexicalChannelCandidate?: boolean;
+  /**
+   * Derived-default scope gating: this unassociated main-vault candidate was
+   * held back from the semantic channel (below the GLOBAL_BAR_DELTA bar and not
+   * alwaysLoad-curated). Cleared by lexical admission or re-admitted by the
+   * empty-pool lift; explicit scopes never set it.
+   */
+  subBarGlobal?: boolean;
   /** Original semantic channel score, when semantic retrieval found this note. */
   semanticScore?: number;
   /** Bounded semantic confidence contribution to final ranking. */
@@ -104,6 +111,50 @@ export interface ScoredRecallCandidate {
 
 export function recallCandidateIdentity(candidate: ScoredRecallCandidate): string {
   return candidate.identityKey ?? `${candidate.vault.storage?.vaultPath ?? ""}::${candidate.id}`;
+}
+
+/**
+ * Semantic-channel admission bar (added to minSimilarity) for unassociated
+ * main-vault ("global") candidates under the derived default scope. With the
+ * default minSimilarity of 0.3 the bar sits at 0.45 — below
+ * SPREADING_ACTIVATION_GATE (0.5), so sub-bar candidates can never become graph
+ * spreading entry points. Curated notes (explicit alwaysLoad) and lexical/
+ * graph admissions are exempt.
+ */
+export const GLOBAL_BAR_DELTA = 0.15;
+
+export interface GateGlobalCandidateInput {
+  gateActive: boolean;
+  vaultProvenance: Vault["provenance"];
+  isCurrentProject: boolean;
+  isAttachedVault: boolean;
+  alwaysLoad: boolean | undefined;
+  rawScore: number;
+  minSimilarity: number;
+}
+
+export function shouldGateGlobalCandidate(input: GateGlobalCandidateInput): boolean {
+  if (!input.gateActive) return false;
+  if (input.vaultProvenance !== "main") return false;
+  if (input.isCurrentProject || input.isAttachedVault) return false;
+  if (input.alwaysLoad === true) return false;
+  return input.rawScore < input.minSimilarity + GLOBAL_BAR_DELTA;
+}
+
+export function partitionGatedCandidates(scored: ScoredRecallCandidate[]): {
+  visible: ScoredRecallCandidate[];
+  gated: ScoredRecallCandidate[];
+} {
+  const visible: ScoredRecallCandidate[] = [];
+  const gated: ScoredRecallCandidate[] = [];
+  for (const candidate of scored) {
+    if (candidate.subBarGlobal === true) {
+      gated.push(candidate);
+    } else {
+      visible.push(candidate);
+    }
+  }
+  return { visible, gated };
 }
 
 export function computeRecallMetadataBoost(metadata?: EffectiveNoteMetadata): number {
@@ -513,10 +564,15 @@ export function enrichRescueCandidateScores(
 export function selectRecallResults(
   scored: ScoredRecallCandidate[],
   limit: number,
-  scope: "project" | "global" | "all",
+  scope: "project" | "global" | "all" | undefined,
+  options?: { includeSubBar?: boolean },
 ): ScoredRecallCandidate[] {
   void scope;
-  const sorted = [...scored].sort(compareByHybridScore);
+  let pool = scored;
+  if (options?.includeSubBar !== true && scored.some((c) => c.subBarGlobal === true)) {
+    pool = scored.filter((candidate) => candidate.subBarGlobal !== true);
+  }
+  const sorted = [...pool].sort(compareByHybridScore);
   return sorted.slice(0, limit);
 }
 
@@ -532,10 +588,15 @@ function computeWorkflowScore(candidate: ScoredRecallCandidate): number {
 export function selectWorkflowResults(
   scored: ScoredRecallCandidate[],
   limit: number,
-  scope: "project" | "global" | "all",
+  scope: "project" | "global" | "all" | undefined,
+  options?: { includeSubBar?: boolean },
 ): ScoredRecallCandidate[] {
   void scope;
-  const sorted = [...scored].sort((a, b) => {
+  let pool = scored;
+  if (options?.includeSubBar !== true && scored.some((c) => c.subBarGlobal === true)) {
+    pool = scored.filter((candidate) => candidate.subBarGlobal !== true);
+  }
+  const sorted = [...pool].sort((a, b) => {
     const workflowDelta = computeWorkflowScore(b) - computeWorkflowScore(a);
     if (workflowDelta !== 0) {
       return workflowDelta;
@@ -602,6 +663,12 @@ export function applyGraphSpreadingActivation(
       const existingCandidate = candidateMap.get(relatedIdentity);
       if (existingCandidate) {
         existingCandidate.graphScore = (existingCandidate.graphScore ?? 0) + propagatedScore;
+        // Graph evidence is weaving evidence: a relationship-linked global held
+        // back by the derived-scope bar joins the visible pool, matching the
+        // documented "graph-linked globals weave in" contract.
+        if (existingCandidate.subBarGlobal === true) {
+          existingCandidate.subBarGlobal = false;
+        }
       } else if (!discovered.has(relatedIdentity)) {
         discovered.set(relatedIdentity, {
           id: rel.id,

@@ -15,11 +15,23 @@ import { backfillEmbeddingsAfterSync, removeStaleEmbeddings } from "./embed.js";
 import { expandHomePath } from "../paths.js";
 import { attempt as attemptFn, getErrorMessage } from "../error-utils.js";
 
+const missingCwdHintText =
+  "Note: no cwd was provided — only global memories were searched. Pass the project's absolute working directory to also search project memories.";
+
+/**
+ * Trailing line for read tools when cwd was omitted: without cwd only the
+ * global main vault is visible, so the caller must learn that project memories
+ * were not searched and can self-correct on the next call.
+ */
+export function missingCwdHint(cwd: string | undefined): string {
+  return cwd ? "" : `\n${missingCwdHintText}`;
+}
+
 export const projectParam = z
   .string()
   .optional()
   .describe(
-    "Absolute path of the project working directory. Required for project-scoped routing, vault selection, and search boosting.",
+    "Absolute path of the project working directory. Required for project-scoped routing, vault selection, and search boosting. Without it, only the global main vault is used: project memories are invisible to reads, and writes land in the main vault.",
   );
 
 export async function resolveProject(ctx: ServerContext, cwd?: string) {
