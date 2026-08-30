@@ -7,7 +7,7 @@ tags:
   - rationale
 lifecycle: permanent
 createdAt: '2026-03-07T17:59:12.124Z'
-updatedAt: '2026-08-30T10:18:31.160Z'
+updatedAt: '2026-08-30T10:18:38.571Z'
 role: summary
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
@@ -56,7 +56,7 @@ memoryVersion: 1
 
 **Project ID from git remote URL, not local path:** `project.ts` normalizes remote URLs to stable slugs (e.g. `github-com-acme-myapp`). This makes cross-machine consistency work — local paths differ, remote URLs don't.
 
-**Similarity boost, not hard filter:** `recall` gives project notes +0.15 cosine similarity boost rather than excluding global notes. Global memories (user prefs, cross-project patterns) remain accessible in project context.
+**Similarity boost, not hard filter:** `recall` gives project notes a bounded ranking prior (the old +0.15 additive figure was replaced by the RRF rework). Global memories (user prefs, cross-project patterns) remain accessible in project context: since 0.44.0 the derived default applies project-anchored precision — weakly-matching unassociated global semantic matches are held back unless curated (`alwaysLoad`), strongly matching, or admitted via lexical/graph evidence; an empty pool lifts back to everything and explicit `scope: "all"` is ungated. Decision note: `derived-default-scope-for-recall-project-anchored-precision-98164deb`.
 
 **Temporal recall is semantic-first and opt-in:** `recall` supports `mode: "temporal"` for on-demand history exploration, but only after normal semantic selection. Default recall behavior and latency expectations stay unchanged. Temporal enrichment is bounded to top matches and compact commit summaries; `verbose: true` adds richer stats-based context, not raw diffs.
 
