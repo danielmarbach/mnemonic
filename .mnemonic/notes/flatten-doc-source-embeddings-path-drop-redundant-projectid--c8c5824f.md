@@ -9,14 +9,12 @@ tags:
   - path-layout
 lifecycle: permanent
 createdAt: '2026-08-03T15:21:23.609Z'
-updatedAt: '2026-08-03T15:21:39.085Z'
+updatedAt: '2026-08-30T11:19:32.670Z'
 role: decision
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
-  - id: document-source-embeddings-for-global-policy-projects-main-v-ff2954f1
-    type: supersedes
   - id: chunk-embedding-path-layout-drop-redundant-guid-prefix-lower-6b739d42
     type: derives-from
   - id: document-source-chunk-embeddings-use-xxh128-for-filenames-an-e3e988b8
