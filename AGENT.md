@@ -246,7 +246,8 @@ When `recall` called with `cwd`, project notes get a small **tiebreaker boost** 
 - `remember` + `scope: "global"` → main vault (keeps project in frontmatter)
 - `scope` omitted (writes) → use saved policy or fallback to `project` with `cwd`
 - `recall` with `scope` omitted and a detected project → derived `all` with project-anchored precision: weakly-matching unassociated global notes are held back from the semantic channel unless `alwaysLoad`-curated, strongly matching, or admitted via lexical/graph evidence; suppressed matches are reported and an empty pool widens back to everything. Explicit `scope` values never gate.
-- Recall/list without `cwd` → main vault only, with a hint telling the caller to pass `cwd`
+- Explicit `scope: "global"` on recall → main-vault notes by location: project-tagged personal notes are included ("repo you don't own" case), attached vault notes are excluded
+- Read tools without `cwd` (`recall`/`list`/`recent_memories`/`memory_graph`) → main vault only, with a hint telling the caller to pass `cwd`; `get`/`update`/`forget`/`where_is_memory` add the hint to not-found responses
 - Policy `ask` → ask: "Project vault" or "Private main vault"
 - `remember` without `cwd` → main vault
 - `move_memory` main-vault → project-vault rewrites `project` / `projectName` from `cwd`

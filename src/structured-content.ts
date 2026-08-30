@@ -125,6 +125,10 @@ export interface RecallResult extends Record<string, unknown> {
   query: string;
   scope: "project" | "global" | "all";
   recallScopeNoteCount?: number;
+  /** Weak global matches held back by the derived default scope and not re-admitted. */
+  suppressedGlobalCount?: number;
+  /** True when derived gating admitted nothing and recall widened to the full pool. */
+  widenedScope?: boolean;
   diversity?: RecallDiversity;
   retrievalCoverage?: RecallRetrievalCoverage;
   results: Array<{
@@ -1031,6 +1035,20 @@ export const RecallResultSchema = z.object({
     .optional()
     .describe(
       "Total notes visible across all vaults for this recall scope. Use to decide whether to increase limit for small vaults.",
+    ),
+  suppressedGlobalCount: z
+    .number()
+    .int()
+    .min(0)
+    .optional()
+    .describe(
+      "Weakly-matching unassociated global notes held back by the derived default scope and not re-admitted. Present only when derived gating suppressed matches; pass scope: 'all' explicitly to include them.",
+    ),
+  widenedScope: z
+    .boolean()
+    .optional()
+    .describe(
+      "True when derived gating admitted nothing and recall widened to the full pool. The text output reports the widening.",
     ),
   diversity: z
     .object({

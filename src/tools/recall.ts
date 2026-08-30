@@ -108,7 +108,7 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
         "Do not use this when:\n" +
         "- You already know the exact id; use `get`\n" +
         "- You just want to browse by tags or scope; use `list`\n\n" +
-        "Returns: ranked matches (id, title, score, vault, tags, lifecycle, updatedAt), 1-hop relationship previews on top results, temporal history (mode: temporal), retrieval evidence (evidence: compact), including optional score decomposition, diagnostics: recallScopeNoteCount, diversity, retrievalCoverage, signalStrength.\n" +
+        "Returns: ranked matches (id, title, score, vault, tags, lifecycle, updatedAt), 1-hop relationship previews on top results, temporal history (mode: temporal), retrieval evidence (evidence: compact), including optional score decomposition, diagnostics: recallScopeNoteCount, diversity, retrievalCoverage, signalStrength, plus derived-scope gating fields: suppressedGlobalCount (weak global matches held back) and widenedScope (recall widened after an empty admitted pool).\n" +
         "Document-source attachments return documentChunks (kind, chunkId, documentId, score, boosted, semanticScore, lexicalScore, sourcePath, headingAncestry, excerpt, attachmentId, sourceMediaType, extractionMetadata, indexedCommit, generationId, retrievalHandle); chunks rank below memories by default and render inline in the ranked list.\n\n" +
         "Typical next step:\n" +
         "- Use `get`, `update`, `relate`, or `consolidate` based on the results.",
@@ -767,6 +767,11 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
         );
       }
       const gatingNoticeLine = gatingNotices.length > 0 ? `\n${gatingNotices.join(" | ")}` : "";
+      // Structured counterpart of the text notices: the suppression count is
+      // only meaningful when the gated candidates stayed suppressed (a lift
+      // re-admitted them), matching the text rendering exactly.
+      const suppressedGlobalCount =
+        gateActive && !widenedScope && gated.length > 0 ? gated.length : undefined;
 
       const noteEntries: Array<{ kind: "note"; score: number; sortKey: string; text: string }> = [];
       const structuredResults: Array<{
@@ -1074,6 +1079,8 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
         query,
         scope: scope || "all",
         recallScopeNoteCount,
+        suppressedGlobalCount,
+        widenedScope: widenedScope || undefined,
         diversity,
         retrievalCoverage,
         results: structuredResults,

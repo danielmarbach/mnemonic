@@ -10,7 +10,7 @@ The format is loosely based on Keep a Changelog and uses semver-style version he
 
 ### Added
 
-- Derived default scope for `recall`: when `scope` is omitted and `cwd` detects a project, weakly-matching unassociated global notes are gated out of the semantic channel unless they are curated (`alwaysLoad`), strongly matching, or arrive via the lexical (exact wording) or graph channels. The response reports the count of suppressed global matches, and recall widens to the full pool and reports it when nothing was admitted. Gating never applies to explicit scopes or when `cwd` is absent.
+- Derived default scope for `recall`: when `scope` is omitted and `cwd` detects a project, weakly-matching unassociated global notes are gated out of the semantic channel unless they are curated (`alwaysLoad`), strongly matching, or arrive via the lexical (exact wording) or graph channels. Suppression counts and widening are reported in text and as structured output (`suppressedGlobalCount`, `widenedScope`), and recall widens to the full pool when nothing was admitted. Gating never applies to explicit scopes or when `cwd` is absent.
 
 ### Changed
 

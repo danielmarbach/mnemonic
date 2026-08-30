@@ -5012,7 +5012,7 @@ Do not use this when:
 - You already know the exact id; use \`get\`
 - You just want to browse by tags or scope; use \`list\`
 
-Returns: ranked matches (id, title, score, vault, tags, lifecycle, updatedAt), 1-hop relationship previews on top results, temporal history (mode: temporal), retrieval evidence (evidence: compact), including optional score decomposition, diagnostics: recallScopeNoteCount, diversity, retrievalCoverage, signalStrength.
+Returns: ranked matches (id, title, score, vault, tags, lifecycle, updatedAt), 1-hop relationship previews on top results, temporal history (mode: temporal), retrieval evidence (evidence: compact), including optional score decomposition, diagnostics: recallScopeNoteCount, diversity, retrievalCoverage, signalStrength, plus derived-scope gating fields: suppressedGlobalCount (weak global matches held back) and widenedScope (recall widened after an empty admitted pool).
 Document-source attachments return documentChunks (kind, chunkId, documentId, score, boosted, semanticScore, lexicalScore, sourcePath, headingAncestry, excerpt, attachmentId, sourceMediaType, extractionMetadata, indexedCommit, generationId, retrievalHandle); chunks rank below memories by default and render inline in the ranked list.
 
 Typical next step:
@@ -5719,6 +5719,16 @@ Typical next step:
             "all",
           ],
           "type": "string",
+        },
+        "suppressedGlobalCount": {
+          "description": "Weakly-matching unassociated global notes held back by the derived default scope and not re-admitted. Present only when derived gating suppressed matches; pass scope: 'all' explicitly to include them.",
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "type": "integer",
+        },
+        "widenedScope": {
+          "description": "True when derived gating admitted nothing and recall widened to the full pool. The text output reports the widening.",
+          "type": "boolean",
         },
       },
       "required": [

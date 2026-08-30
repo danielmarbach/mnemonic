@@ -11,6 +11,7 @@ import {
   startFakeEmbeddingServer,
   tempDirs,
 } from "./helpers/mcp.js";
+import { RecallResultSchema } from "../src/structured-content.js";
 
 // The fake embedding server returns a constant vector for every input, so all
 // semantic similarities are ~1.0. A bar above 1 (minSimilarity 0.9 + 0.15)
@@ -86,6 +87,12 @@ describe("recall-scope-gating", () => {
       expect(recalled.text).toContain("Zebra pipeline architecture");
       expect(recalled.text).not.toContain("Orchid watering schedule");
       expect(recalled.text).toContain("weak global matches suppressed");
+      const parsed = RecallResultSchema.safeParse(recalled.structuredContent);
+      expect(parsed.success).toBe(true);
+      if (parsed.success) {
+        expect(parsed.data.suppressedGlobalCount).toBeGreaterThan(0);
+        expect(parsed.data.widenedScope).toBeUndefined();
+      }
     } finally {
       await embeddingServer.close();
     }
@@ -254,6 +261,12 @@ describe("recall-scope-gating (lift + onboarding)", () => {
 
       expect(recalled.text).toContain("Photography exposure primer");
       expect(recalled.text).toContain("no project-scoped matches; showing all matches");
+      const liftParsed = RecallResultSchema.safeParse(recalled.structuredContent);
+      expect(liftParsed.success).toBe(true);
+      if (liftParsed.success) {
+        expect(liftParsed.data.widenedScope).toBe(true);
+        expect(liftParsed.data.suppressedGlobalCount).toBeUndefined();
+      }
     } finally {
       await embeddingServer.close();
     }
@@ -361,7 +374,7 @@ describe("recall-scope-gating (channels + hints)", () => {
 });
 
 describe("recall-scope-gating (hints)", () => {
-  it("shows the missing-cwd hint on recall, list, and get without cwd", async () => {
+  it("shows the missing-cwd hint on read tools and not-found responses without cwd", async () => {
     const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-gating-vault-"));
     tempDirs.push(vaultDir);
 
@@ -399,6 +412,36 @@ describe("recall-scope-gating (hints)", () => {
       );
       expect(getNoCwd).toContain("Not found");
       expect(getNoCwd).toContain("no cwd was provided");
+
+      const recentNoCwd = await callLocalMcp(vaultDir, "recent_memories", {}, embeddingServer.url);
+      expect(recentNoCwd).toContain("no cwd was provided");
+
+      const graphNoCwd = await callLocalMcp(vaultDir, "memory_graph", {}, embeddingServer.url);
+      expect(graphNoCwd).toContain("no cwd was provided");
+
+      const updateNoCwd = await callLocalMcp(
+        vaultDir,
+        "update",
+        { id: "does-not-exist-1234", content: "Should not be written" },
+        embeddingServer.url,
+      );
+      expect(updateNoCwd).toContain("no cwd was provided");
+
+      const forgetNoCwd = await callLocalMcp(
+        vaultDir,
+        "forget",
+        { id: "does-not-exist-1234" },
+        embeddingServer.url,
+      );
+      expect(forgetNoCwd).toContain("no cwd was provided");
+
+      const whereNoCwd = await callLocalMcp(
+        vaultDir,
+        "where_is_memory",
+        { id: "does-not-exist-1234" },
+        embeddingServer.url,
+      );
+      expect(whereNoCwd).toContain("no cwd was provided");
     } finally {
       await embeddingServer.close();
     }
@@ -459,11 +502,12 @@ describe("recall-scope-gating (global alignment)", () => {
       );
 
       expect(recalled.text).toContain("wombatile deploy runbook");
-      const results = recalled.structuredContent?.["results"] as Array<{
-        id: string;
-        title?: string;
-        retrievalEvidence?: { channels?: string[] };
-      }>;
+      const parsed = RecallResultSchema.safeParse(recalled.structuredContent);
+      expect(parsed.success).toBe(true);
+      if (!parsed.success) {
+        throw new Error(`RecallResultSchema parse failed: ${parsed.error.message}`);
+      }
+      const results = parsed.data.results;
       expect(results.length).toBeGreaterThan(0);
       // The lexical channel must rank the project-tagged main-vault note (the
       // old association-based filter would have excluded it from that channel).

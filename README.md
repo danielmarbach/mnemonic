@@ -406,7 +406,7 @@ The `scope` parameter on `recall` narrows results:
 - `"project"`: only memories for the detected project (project-associated notes wherever stored, plus attached vault notes)
 - `"global"`: memories in the main/global vault, which may include project-tagged personal notes (the "repo you don't own" case)
 
-When `cwd` is omitted, only the global main vault is searched; recall and list tools say so in their output so the caller can pass the project working directory.
+When `cwd` is omitted, only the global main vault is searched; `recall`, `list`, `recent_memories`, and `memory_graph` say so in their output, and `get`, `update`, `forget`, and `where_is_memory` mention it when an id cannot be found, so the caller can pass the project working directory.
 
 ### Note lifecycle
 
