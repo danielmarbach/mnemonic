@@ -13,9 +13,6 @@ role: review
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
-relatedTo:
-  - id: apply-project-anchored-precision-for-recall-s-derived-defaul-2d318266
-    type: derives-from
 memoryVersion: 1
 ---
 Fresh-context adversarial review (session model) of the derived-scope gating implementation. Outcome: continue. Full review text in subagent session; essentials preserved here.
