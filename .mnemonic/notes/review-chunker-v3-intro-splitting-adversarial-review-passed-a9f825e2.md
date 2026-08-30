@@ -12,9 +12,6 @@ role: review
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
-relatedTo:
-  - id: apply-configurable-document-chunk-size-shipped-a105b8ab
-    type: derives-from
 memoryVersion: 1
 ---
 Fresh-context adversarial review of work commit `6ad14e7` (Split oversized intros against the chunk ceiling, chunker v3) in isolated worktree `/tmp/mnemonic-review-v3`. Reviewer had no prior exposure to implementation decisions. Follows the user-endorsed scope change ("I'm ok to bump the chunker version") captured as plan step 5 / constraint C8.

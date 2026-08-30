@@ -12,9 +12,6 @@ role: review
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
-relatedTo:
-  - id: apply-configurable-document-chunk-size-shipped-a105b8ab
-    type: derives-from
 memoryVersion: 1
 ---
 Fresh-context adversarial review of work commit `7179557` (branch `feat/embed-max-chunk-chars`), run in isolated worktree at the branch tip. Reviewer had no prior exposure to implementation decisions.
