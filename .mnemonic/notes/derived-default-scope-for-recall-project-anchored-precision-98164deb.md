@@ -8,13 +8,15 @@ tags:
   - decision
 lifecycle: permanent
 createdAt: '2026-08-30T10:01:18.662Z'
-updatedAt: '2026-08-30T10:18:31.162Z'
+updatedAt: '2026-08-30T10:18:52.444Z'
 role: decision
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
   - id: implementation-principles-for-mnemonic-mcp-2e178bba
+    type: related-to
+  - id: rpir-outcome-recall-derived-scope-gating-shipped-in-0-44-0-a31e83a4
     type: related-to
 memoryVersion: 1
 ---

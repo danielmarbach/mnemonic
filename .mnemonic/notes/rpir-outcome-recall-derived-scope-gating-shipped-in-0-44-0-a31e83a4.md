@@ -9,11 +9,14 @@ tags:
   - release
 lifecycle: permanent
 createdAt: '2026-08-30T10:18:48.087Z'
-updatedAt: '2026-08-30T10:18:48.087Z'
+updatedAt: '2026-08-30T10:18:52.444Z'
 role: summary
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: derived-default-scope-for-recall-project-anchored-precision-98164deb
+    type: related-to
 memoryVersion: 1
 ---
 RPIR workflow for "smarter default scoping for recall and read tools" completed; shipped in 0.44.0 (squashed to main as PR #343). Design lives in `derived-default-scope-for-recall-project-anchored-precision-98164deb`.
