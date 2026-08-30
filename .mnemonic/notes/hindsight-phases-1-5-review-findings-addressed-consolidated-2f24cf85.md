@@ -11,8 +11,6 @@ updatedAt: '2026-05-09T21:09:07.363Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
-  - id: hybrid-recall-design-and-implementation-0-20-0-0-23-0-350317a0
-    type: related-to
   - id: performance-principles-for-file-first-mcp-and-git-backed-wor-4e7d3bc8
     type: explains
   - id: mnemonic-key-design-decisions-3f2a6273

@@ -23,8 +23,6 @@ relatedTo:
     type: related-to
   - id: hindsight-phases-1-5-review-findings-addressed-consolidated-2f24cf85
     type: derives-from
-  - id: decision-phase-2-recall-scoring-uses-rrf-with-dense-rank-tie-7969c37d
-    type: derives-from
   - id: sync-redesign-decouple-embedding-from-git-force-flag-remove--6f2c1517
     type: related-to
   - id: bounded-concurrency-and-single-source-of-truth-principles-52e1d1c6

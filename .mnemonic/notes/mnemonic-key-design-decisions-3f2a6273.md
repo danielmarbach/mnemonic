@@ -36,8 +36,6 @@ relatedTo:
     type: related-to
   - id: zod-v4-migration-requires-explicit-key-schema-for-z-record-0229f4e5
     type: related-to
-  - id: decision-phase-2-recall-scoring-uses-rrf-with-dense-rank-tie-7969c37d
-    type: related-to
   - id: multi-vault-architecture-sub-vault-support-and-label-convent-d5e5840d
     type: related-to
   - id: protected-branch-policy-consistency-rollout-consolidated-d9892181
