@@ -14,8 +14,6 @@ updatedAt: '2026-08-30T11:24:09.382Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
-  - id: validate-mnemonic-recall-against-reciprocal-rank-fusion-9619d67b
-    type: derives-from
   - id: canonical-design-bounded-rrf-hybrid-recall-172a96ab
     type: related-to
 memoryVersion: 1
