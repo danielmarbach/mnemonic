@@ -15,8 +15,6 @@ relatedTo:
     type: related-to
   - id: mnemonic-mcp-tools-inventory-47499799
     type: explains
-  - id: bug-bidirectional-relate-duplicates-directional-relationship-4b9a18fa
-    type: related-to
 memoryVersion: 1
 ---
 ## Tool design

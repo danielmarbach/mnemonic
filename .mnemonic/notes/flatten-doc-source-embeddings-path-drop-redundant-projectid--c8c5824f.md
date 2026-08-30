@@ -21,8 +21,6 @@ relatedTo:
     type: derives-from
   - id: document-source-embeddings-for-global-policy-projects-main-v-ff2954f1
     type: related-to
-  - id: bug-bidirectional-relate-duplicates-directional-relationship-4b9a18fa
-    type: related-to
 memoryVersion: 1
 ---
 # Flatten doc-source embeddings path: drop redundant projectId segment
