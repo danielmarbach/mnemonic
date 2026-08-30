@@ -6,7 +6,7 @@ The format is loosely based on Keep a Changelog and uses semver-style version he
 
 ## [Unreleased]
 
-## [0.43.0] - 2026-08-29
+## [0.44.0] - 2026-08-30
 
 ### Added
 
