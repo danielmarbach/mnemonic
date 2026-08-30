@@ -7,7 +7,7 @@ tags:
   - typescript
 lifecycle: permanent
 createdAt: '2026-03-07T17:58:49.005Z'
-updatedAt: '2026-08-01T10:55:12.757Z'
+updatedAt: '2026-08-30T11:24:32.521Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
@@ -20,6 +20,8 @@ relatedTo:
   - id: dynamic-project-context-loading-plan-9f2ed29c
     type: related-to
   - id: theme-refinement-design-emergent-themes-and-graduation-8bd47342
+    type: related-to
+  - id: mcp-2026-07-28-typescript-sdk-v2-migration-consolidated-8a1b2d12
     type: related-to
 memoryVersion: 1
 ---
