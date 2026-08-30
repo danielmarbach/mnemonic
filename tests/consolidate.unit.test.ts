@@ -103,9 +103,11 @@ describe("consolidate helpers", () => {
     expect(deriveMergeRisk(["lifecycle (temporary) differs from group majority (permanent)"])).toBe(
       "medium",
     );
-    expect(deriveMergeRisk(["supersedes 1 other - merging may orphan the supersedes chain"])).toBe(
-      "high",
-    );
+    expect(
+      deriveMergeRisk([
+        "marked as superseded (supersedes 1 target) - merging may orphan the supersedes chain",
+      ]),
+    ).toBe("high");
     expect(deriveMergeRisk(["target is older than 1 source - stale summary risk"])).toBe("high");
     expect(
       deriveMergeRisk([
@@ -155,7 +157,9 @@ describe("consolidate helpers", () => {
     expect(warningsA).toContain(
       "temporary research - consider whether it contains unique evidence",
     );
-    expect(warningsA).toContain("supersedes 1 other - merging may orphan the supersedes chain");
+    expect(warningsA).toContain(
+      "marked as superseded (supersedes 1 target) - merging may orphan the supersedes chain",
+    );
     expect(warningsA).toContain("target is older than 2 sources - stale summary risk");
     expect(warningsA).toContain("lifecycle (temporary) differs from group majority (permanent)");
     expect(warningsB).toEqual([]);
@@ -186,6 +190,8 @@ describe("consolidate helpers", () => {
   });
 
   it("builds consolidate note evidence with per-note warnings and accurate risk", () => {
+    // Passive supersedes convention: the note carrying the edge is the
+    // superseded source, and its own edge names the canonical successor.
     const sourceNote = {
       id: "source" as MemoryId,
       title: "Source",
@@ -200,7 +206,7 @@ describe("consolidate helpers", () => {
       lifecycle: "permanent" as const,
       role: undefined,
       updatedAt: "2026-04-12T00:00:00.000Z" as ISO8601DateString,
-      relatedTo: [{ id: "source" as MemoryId, type: "supersedes" as const }],
+      relatedTo: [] as Relationship[],
     };
     const allNotes = [sourceNote, otherNote];
     const evidence = buildConsolidateNoteEvidence(
@@ -213,7 +219,7 @@ describe("consolidate helpers", () => {
     expect(evidence.id).toBe("source");
     expect(evidence.superseded).toBe(true);
     expect(evidence.supersededCount).toBe(1);
-    expect(evidence.supersededBy).toBe("other");
+    expect(evidence.supersededBy).toBe("target");
     expect(evidence.relatedCount).toBe(1);
     expect(evidence.ageDays).toBeGreaterThan(0);
     expect(evidence.mergeRisk).toBe("high");
@@ -262,14 +268,15 @@ describe("consolidate helpers", () => {
       expect(classifyConsolidationPair(research, plan)).toBe("lineage");
     });
 
-    it("classifies supersession-pressure when one note supersedes another", () => {
+    it("classifies supersession-pressure when a note in the pair is superseded", () => {
+      // Passive supersedes convention: the superseded note carries the edge.
       const newer = {
         id: "newer" as MemoryId,
         title: "Newer decision",
         lifecycle: "permanent" as const,
         role: "decision" as const,
         updatedAt: "2026-04-12T00:00:00.000Z" as ISO8601DateString,
-        relatedTo: [{ id: "older" as MemoryId, type: "supersedes" as const }],
+        relatedTo: [] as Relationship[],
       };
       const older = {
         id: "older" as MemoryId,
@@ -277,7 +284,7 @@ describe("consolidate helpers", () => {
         lifecycle: "permanent" as const,
         role: "decision" as const,
         updatedAt: "2026-04-10T00:00:00.000Z" as ISO8601DateString,
-        relatedTo: [] as Relationship[],
+        relatedTo: [{ id: "newer" as MemoryId, type: "supersedes" as const }],
       };
       expect(classifyConsolidationPair(newer, older)).toBe("supersession-pressure");
     });
@@ -344,7 +351,7 @@ describe("consolidate helpers", () => {
   });
 
   describe("classifyConsolidationNote", () => {
-    it("returns supersession-pressure for a note that supersedes another", () => {
+    it("returns supersession-pressure for a note marked as superseded (carrier owns the edge)", () => {
       const note = {
         id: "newer" as MemoryId,
         title: "Newer decision",
@@ -358,26 +365,27 @@ describe("consolidate helpers", () => {
       expect(classifyConsolidationNote(note, allNotes, contextIds)).toBe("supersession-pressure");
     });
 
-    it("returns supersession-pressure for a note that is superseded", () => {
+    it("returns supersession-pressure for the note referenced by another's supersedes edge", () => {
+      // The canonical successor is referenced by the superseded note's edge.
       const note = {
-        id: "older" as MemoryId,
-        title: "Older decision",
-        lifecycle: "permanent" as const,
-        role: "decision" as const,
-        updatedAt: "2026-04-10T00:00:00.000Z" as ISO8601DateString,
-        relatedTo: [] as Relationship[],
-      };
-      const newer = {
         id: "newer" as MemoryId,
         title: "Newer decision",
         lifecycle: "permanent" as const,
         role: "decision" as const,
         updatedAt: "2026-04-12T00:00:00.000Z" as ISO8601DateString,
-        relatedTo: [{ id: "older" as MemoryId, type: "supersedes" as const }],
+        relatedTo: [] as Relationship[],
       };
-      const allNotes = [note, newer];
-      const contextIds = new Set([note.id, newer.id]);
-      expect(classifyConsolidationNote(note, allNotes, contextIds)).toBe("supersession-pressure");
+      const older = {
+        id: "older" as MemoryId,
+        title: "Older decision",
+        lifecycle: "permanent" as const,
+        role: "decision" as const,
+        updatedAt: "2026-04-10T00:00:00.000Z" as ISO8601DateString,
+        relatedTo: [{ id: "newer" as MemoryId, type: "supersedes" as const }],
+      };
+      const allNotes = [note, older];
+      const contextIds = new Set([note.id, older.id]);
+      expect(classifyConsolidationNote(older, allNotes, contextIds)).toBe("supersession-pressure");
     });
 
     it("returns lineage for a note with derives-from to a context note", () => {

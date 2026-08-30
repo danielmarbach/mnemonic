@@ -35,15 +35,15 @@ function hasLineageRelationship(note: NoteForWarnings, otherIds: Set<string>): b
 
 export function classifyConsolidationNote(
   note: NoteForWarnings,
-  allNotes: NoteForWarnings[],
+  _allNotes: NoteForWarnings[],
   contextIds: Set<string>,
 ): ConsolidateClassification | undefined {
-  const supersededByMap = buildSupersededByMap(allNotes);
   const supersedes = (note.relatedTo ?? []).filter((rel) => rel.type === "supersedes");
-  const isSupersededSource = supersedes.length > 0;
-  const isSupersededTarget = supersededByMap.has(note.id);
+  // Passive convention: a note carrying a `supersedes` edge is itself the
+  // superseded source ("X is superseded by <referenced id>").
+  const isSuperseded = supersedes.length > 0;
 
-  if (isSupersededSource || isSupersededTarget) {
+  if (isSuperseded) {
     return "supersession-pressure";
   }
 
@@ -68,12 +68,9 @@ export function classifyConsolidationPair(
     return "lineage";
   }
 
-  const supersededByMap = buildSupersededByMap([noteA, noteB]);
   if (
     (noteA.relatedTo ?? []).some((rel) => rel.type === "supersedes") ||
-    (noteB.relatedTo ?? []).some((rel) => rel.type === "supersedes") ||
-    supersededByMap.has(noteA.id) ||
-    supersededByMap.has(noteB.id)
+    (noteB.relatedTo ?? []).some((rel) => rel.type === "supersedes")
   ) {
     return "supersession-pressure";
   }
@@ -85,19 +82,12 @@ export function classifyConsolidationPair(
   return "duplicate-pressure";
 }
 
-function buildSupersededByMap(notes: Array<Pick<Note, "id" | "relatedTo">>): Map<string, string> {
-  const inbound = new Map<string, string>();
-  for (const note of notes) {
-    for (const rel of note.relatedTo ?? []) {
-      if (rel.type !== "supersedes") continue;
-      if (!inbound.has(rel.id)) {
-        inbound.set(rel.id, note.id);
-      }
-    }
-  }
-  return inbound;
-}
-
+/**
+ * The storage convention for `supersedes` is passive: a note carrying
+ * `{ id: Y, type: "supersedes" }` is superseded BY Y. A well-formed
+ * supersession therefore never needs a reverse lookup — the carrier's own edge
+ * names its successor — so no inbound map is built.
+ */
 function isTemporaryResearchNote(note: Pick<Note, "lifecycle" | "role">): boolean {
   return note.lifecycle === "temporary" && note.role === "research";
 }
@@ -143,7 +133,7 @@ export function buildNoteWarnings(
   const supersedesCount = (note.relatedTo ?? []).filter((rel) => rel.type === "supersedes").length;
   if (supersedesCount > 0) {
     warnings.push(
-      `supersedes ${supersedesCount} other${supersedesCount > 1 ? "s" : ""} - merging may orphan the supersedes chain`,
+      `marked as superseded (supersedes ${supersedesCount} target${supersedesCount > 1 ? "s" : ""}) - merging may orphan the supersedes chain`,
     );
   }
 
@@ -226,7 +216,6 @@ export function buildConsolidateNoteEvidence(
   now: Date = new Date(),
   contextIds?: Set<string>,
 ): ConsolidateNoteEvidence {
-  const supersededByMap = buildSupersededByMap(allNotes);
   const supersedes = (note.relatedTo ?? []).filter((rel) => rel.type === "supersedes");
   const noteWarnings = buildNoteWarnings(note, allNotes, targetNote);
   const classification = contextIds
@@ -239,7 +228,7 @@ export function buildConsolidateNoteEvidence(
     role: note.role,
     ageDays: noteAgeDays(note.updatedAt, now),
     superseded: supersedes.length > 0,
-    supersededBy: supersededByMap.get(note.id),
+    supersededBy: supersedes.length > 0 ? supersedes[0]?.id : undefined,
     supersededCount: supersedes.length > 0 ? supersedes.length : undefined,
     relatedCount: note.relatedTo?.length ?? 0,
     classification,

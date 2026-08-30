@@ -55,7 +55,9 @@ export function registerUnrelateTool(server: McpServer, ctx: ServerContext): voi
           .boolean()
           .optional()
           .default(true)
-          .describe("Remove relationship in both directions (default: true)"),
+          .describe(
+            "Remove relationship in both directions (default: true). Accepted for compatibility; the edge is removed from whichever note carries it.",
+          ),
         cwd: projectParam,
         allowProtectedBranch: z
           .boolean()
@@ -108,10 +110,13 @@ export function registerUnrelateTool(server: McpServer, ctx: ServerContext): voi
       const now = isoDateString(new Date().toISOString());
       const vaultChanges = new Map<Vault, string[]>();
 
-      // Pre-check branch protection before mutating any vaults
+      // The relationship edge may be stored on either endpoint: forward
+      // directional types store it on `from`, while passive `supersedes` stores
+      // it on the superseded (`to`) note. `unrelate` has no type parameter, so
+      // it inspects and cleans both endpoints whenever the pair is found.
       const mutableVaults = new Set<Vault>();
       if (foundFrom) mutableVaults.add(foundFrom.vault);
-      if (bidirectional && foundTo) mutableVaults.add(foundTo.vault);
+      if (foundTo) mutableVaults.add(foundTo.vault);
       const preChecks = await Promise.all(
         Array.from(mutableVaults).map((vault) =>
           checkVaultProtectedBranch({
@@ -150,7 +155,7 @@ export function registerUnrelateTool(server: McpServer, ctx: ServerContext): voi
         }
       }
 
-      if (bidirectional && foundTo) {
+      if (foundTo) {
         const { note: toNote, vault: toVault } = foundTo;
         const filtered = (toNote.relatedTo ?? []).filter((r) => r.id !== fromId);
         const toRelExisted = (toNote.relatedTo?.length ?? 0) > filtered.length;
@@ -167,12 +172,12 @@ export function registerUnrelateTool(server: McpServer, ctx: ServerContext): voi
         // If no relationships were found in note content, check git status for pending changes
         const allVaults = new Set<Vault>();
         if (foundFrom) allVaults.add(foundFrom.vault);
-        if (bidirectional && foundTo) allVaults.add(foundTo.vault);
+        if (foundTo) allVaults.add(foundTo.vault);
 
         for (const vault of allVaults) {
           const noteIds: string[] = [];
           if (foundFrom && foundFrom.vault === vault) noteIds.push(fromId);
-          if (bidirectional && foundTo && foundTo.vault === vault) noteIds.push(toId);
+          if (foundTo && foundTo.vault === vault) noteIds.push(toId);
 
           const pendingFiles = await ctx.vaultManager.getPendingNoteFiles(vault, noteIds);
 

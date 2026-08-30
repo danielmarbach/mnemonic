@@ -6,6 +6,14 @@ The format is loosely based on Keep a Changelog and uses semver-style version he
 
 ## [Unreleased]
 
+### Fixed
+
+- `relate` no longer writes a same-type backlink for directional relationship types. Previously `relate(..., type: "supersedes")` with the default `bidirectional: true` wrote `supersedes` on both notes, creating a mutual pair where each note claimed to supersede the other — and `prune-superseded` then deleted both notes, including the canonical survivor. Directional types (`explains`, `example-of`, `derives-from`, `follows`) are now stored forward-only on the source note, and `supersedes` is stored on the superseded note: `relate(fromId, toId, "supersedes")` marks `toId` as superseded by `fromId`, matching what `execute-merge` writes and what `prune-superseded` / recall evidence / maintenance warnings read. The `bidirectional` flag now only applies to the symmetric `related-to` type.
+- `relate` refuses to create self-relations, mutual supersedes pairs (the reverse edge already exists), or a second superseder on the same note. Existing edges are matched by id + type + vault path instead of id alone.
+- `unrelate` removes the relationship from whichever note carries it. Passive `supersedes` edges live on the superseded note, so `unrelate(..., bidirectional: false)` previously missed them and left a stale edge behind.
+- `prune-superseded` validates the supersession lineage before deleting anything: mutual pairs, self-loops, longer cycles, ambiguous multiple-target carriers, and carriers whose superseder is out of scope are skipped with a warning instead of deleted, preventing silent knowledge loss on legacy data. Relationship cleanup now only strips references to notes that were actually pruned, and protected-branch pre-checks cover every vault that will be mutated (including relationship-cleanup targets).
+- Consolidation evidence and high-priority anchor selection now read `supersedes` edges under the same passive convention as the rest of the codebase: `supersededBy` is derived from the carrier's own edge, and superseded notes are excluded from anchors.
+
 ## [0.44.0] - 2026-08-30
 
 ### Added

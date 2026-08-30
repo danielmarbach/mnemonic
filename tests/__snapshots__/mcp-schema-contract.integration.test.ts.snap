@@ -5933,11 +5933,16 @@ Do not use this when:
 - The connection is weak or speculative
 - You need to remove a relationship rather than add one
 
+Direction conventions:
+- 'related-to' is symmetric: both notes get an edge (or only \`fromId\` with bidirectional: false).
+- 'explains', 'example-of', 'derives-from', 'follows' are stored once on \`fromId\`.
+- 'supersedes' is stored on the SUPERSEDED note: \`relate(fromId, toId, 'supersedes')\` marks \`toId\` as superseded by \`fromId\`; \`toId\` becomes a \`prune-superseded\` candidate. This matches \`execute-merge\` and \`prune-superseded\` semantics.
+
 Returns: both ids, relationship type.
 
 Writable attachments: can relate notes in writable attached vaults.
 
-[mutating: modifies both notes, git commits, may push]
+[mutating: modifies notes, git commits, may push]
 
 Typical next step:
 - Use \`get\` on both notes to verify the relationship context reads well.",
@@ -5950,7 +5955,7 @@ Typical next step:
         },
         "bidirectional": {
           "default": true,
-          "description": "Add relationship in both directions (default: true)",
+          "description": "Add relationship in both directions (default: true). Only meaningful for the symmetric 'related-to' type; directional types are always stored one-way.",
           "type": "boolean",
         },
         "cwd": {
@@ -5958,16 +5963,16 @@ Typical next step:
           "type": "string",
         },
         "fromId": {
-          "description": "Source memory id",
+          "description": "Source memory id (the superseder for 'supersedes')",
           "type": "string",
         },
         "toId": {
-          "description": "Target memory id",
+          "description": "Target memory id (the superseded note for 'supersedes')",
           "type": "string",
         },
         "type": {
           "default": "related-to",
-          "description": "Relationship type: 'related-to' (same topic), 'explains' (clarifies why), 'example-of' (instance of pattern), 'supersedes' (replaces), 'derives-from' (derived artifact), 'follows' (sequence order)",
+          "description": "Relationship type: 'related-to' (same topic; symmetric), 'explains' (clarifies why), 'example-of' (instance of pattern), 'supersedes' (fromId replaces toId; stored on toId), 'derives-from' (derived artifact), 'follows' (sequence order)",
           "enum": [
             "related-to",
             "explains",
@@ -8101,7 +8106,7 @@ Typical next step:
         },
         "bidirectional": {
           "default": true,
-          "description": "Remove relationship in both directions (default: true)",
+          "description": "Remove relationship in both directions (default: true). Accepted for compatibility; the edge is removed from whichever note carries it.",
           "type": "boolean",
         },
         "cwd": {

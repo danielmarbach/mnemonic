@@ -16,6 +16,8 @@ import {
 
 import { writeFile } from "fs/promises";
 
+import matter from "gray-matter";
+
 import { ConsolidateResultSchema } from "../src/structured-content.js";
 
 describe("memory-lifecycle", () => {
@@ -591,6 +593,430 @@ describe("memory-lifecycle", () => {
       );
       expect(mainContents).not.toContain(projectId);
       expect(projectContents).not.toContain(mainId);
+    } finally {
+      await embeddingServer.close();
+    }
+  }, 20000);
+
+  it("relate stores directional types forward-only and supersedes passively", async () => {
+    const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-vault-"));
+    tempDirs.push(vaultDir);
+    const embeddingServer = await startFakeEmbeddingServer();
+
+    try {
+      await initTestVaultRepo(vaultDir);
+
+      const canonicalId = extractRememberedId(
+        await callLocalMcp(
+          vaultDir,
+          "remember",
+          {
+            title: "Canonical decision",
+            content: "The newer canonical decision that replaces older fragments.",
+            tags: ["integration", "direction"],
+            scope: "global",
+            lifecycle: "permanent",
+            summary: "Create canonical note for direction test",
+          },
+          embeddingServer.url,
+        ),
+      );
+      const obsoleteId = extractRememberedId(
+        await callLocalMcp(
+          vaultDir,
+          "remember",
+          {
+            title: "Obsolete fragment",
+            content: "Older fragment that is superseded by the canonical decision.",
+            tags: ["integration", "direction"],
+            scope: "global",
+            summary: "Create obsolete note for direction test",
+          },
+          embeddingServer.url,
+        ),
+      );
+
+      // Directional (non-supersedes) types are stored forward-only on `from`,
+      // even when bidirectional is requested.
+      const explainsResponse = await callLocalMcpResponse(
+        vaultDir,
+        "relate",
+        {
+          fromId: canonicalId,
+          toId: obsoleteId,
+          type: "explains",
+          bidirectional: true,
+        },
+        embeddingServer.url,
+      );
+      expect(explainsResponse.text).toContain(
+        `Linked \`${canonicalId}\` → \`${obsoleteId}\` (explains)`,
+      );
+      expect(explainsResponse.structuredContent?.["bidirectional"] as boolean).toBe(false);
+
+      const canonicalContents = await readFile(
+        path.join(vaultDir, "notes", `${canonicalId}.md`),
+        "utf8",
+      );
+      const obsoleteContents = await readFile(
+        path.join(vaultDir, "notes", `${obsoleteId}.md`),
+        "utf8",
+      );
+      expect(canonicalContents).toContain("type: explains");
+      expect(canonicalContents).toContain(`- id: ${obsoleteId}`);
+      expect(obsoleteContents).not.toContain("type: explains");
+
+      // Supersedes is passive: the edge is stored on the SUPERSEDED note
+      // (`toId`) referencing the superseder (`fromId`), making `toId` the
+      // prune-superseded candidate.
+      const supersedesResponse = await callLocalMcpResponse(
+        vaultDir,
+        "relate",
+        {
+          fromId: canonicalId,
+          toId: obsoleteId,
+          type: "supersedes",
+          bidirectional: true,
+        },
+        embeddingServer.url,
+      );
+      expect(supersedesResponse.text).toContain(
+        `Linked \`${canonicalId}\` → \`${obsoleteId}\` (supersedes)`,
+      );
+      expect(supersedesResponse.text).toContain("prune-superseded candidate");
+      expect(supersedesResponse.structuredContent?.["bidirectional"] as boolean).toBe(false);
+
+      const canonicalAfter = await readFile(
+        path.join(vaultDir, "notes", `${canonicalId}.md`),
+        "utf8",
+      );
+      const obsoleteAfter = await readFile(
+        path.join(vaultDir, "notes", `${obsoleteId}.md`),
+        "utf8",
+      );
+      expect(obsoleteAfter).toContain("type: supersedes");
+      expect(obsoleteAfter).toContain(`- id: ${canonicalId}`);
+      // The canonical note must NOT carry a supersedes edge (no mutual pair).
+      expect(canonicalAfter).not.toContain("type: supersedes");
+    } finally {
+      await embeddingServer.close();
+    }
+  }, 20000);
+
+  it("relate refuses to create a mutual supersedes pair", async () => {
+    const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-vault-"));
+    tempDirs.push(vaultDir);
+    const embeddingServer = await startFakeEmbeddingServer();
+
+    try {
+      await initTestVaultRepo(vaultDir);
+
+      const canonicalId = extractRememberedId(
+        await callLocalMcp(
+          vaultDir,
+          "remember",
+          {
+            title: "Canonical decision",
+            content: "Canonical note for mutual-pair guard test.",
+            tags: ["integration", "direction"],
+            scope: "global",
+            lifecycle: "permanent",
+            summary: "Create canonical note for mutual-pair guard test",
+          },
+          embeddingServer.url,
+        ),
+      );
+      const obsoleteId = extractRememberedId(
+        await callLocalMcp(
+          vaultDir,
+          "remember",
+          {
+            title: "Obsolete fragment",
+            content: "Obsolete note for mutual-pair guard test.",
+            tags: ["integration", "direction"],
+            scope: "global",
+            summary: "Create obsolete note for mutual-pair guard test",
+          },
+          embeddingServer.url,
+        ),
+      );
+
+      // Simulate legacy buggy data: the canonical note already carries a
+      // supersedes edge back to the obsolete note (a mutual pair in waiting).
+      const notePath = path.join(vaultDir, "notes", `${canonicalId}.md`);
+      const raw = await readFile(notePath, "utf8");
+      const parsed = matter(raw);
+      await writeFile(
+        notePath,
+        matter.stringify(parsed.content, {
+          ...parsed.data,
+          relatedTo: [{ id: obsoleteId, type: "supersedes" }],
+        }),
+      );
+
+      const response = await callLocalMcpResponse(
+        vaultDir,
+        "relate",
+        {
+          fromId: canonicalId,
+          toId: obsoleteId,
+          type: "supersedes",
+        },
+        embeddingServer.url,
+      );
+      expect(response.text).toContain("mutual pair");
+      expect(response.text).toContain("unrelate");
+
+      // The obsolete note must not have gained the completing edge.
+      const obsoleteContents = await readFile(
+        path.join(vaultDir, "notes", `${obsoleteId}.md`),
+        "utf8",
+      );
+      expect(obsoleteContents).not.toContain("type: supersedes");
+    } finally {
+      await embeddingServer.close();
+    }
+  }, 20000);
+
+  it("relate refuses a second superseder on the same note", async () => {
+    const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-vault-"));
+    tempDirs.push(vaultDir);
+    const embeddingServer = await startFakeEmbeddingServer();
+
+    try {
+      await initTestVaultRepo(vaultDir);
+
+      const firstId = extractRememberedId(
+        await callLocalMcp(
+          vaultDir,
+          "remember",
+          {
+            title: "First superseder",
+            content: "First canonical for the second-superseder guard test.",
+            tags: ["integration", "direction"],
+            scope: "global",
+            lifecycle: "permanent",
+            summary: "Create first superseder",
+          },
+          embeddingServer.url,
+        ),
+      );
+      const secondId = extractRememberedId(
+        await callLocalMcp(
+          vaultDir,
+          "remember",
+          {
+            title: "Second superseder",
+            content: "Second candidate canonical for the second-superseder guard test.",
+            tags: ["integration", "direction"],
+            scope: "global",
+            lifecycle: "permanent",
+            summary: "Create second superseder",
+          },
+          embeddingServer.url,
+        ),
+      );
+      const obsoleteId = extractRememberedId(
+        await callLocalMcp(
+          vaultDir,
+          "remember",
+          {
+            title: "Obsolete fragment",
+            content: "Obsolete note that can only have one superseder.",
+            tags: ["integration", "direction"],
+            scope: "global",
+            summary: "Create obsolete note for second-superseder guard test",
+          },
+          embeddingServer.url,
+        ),
+      );
+
+      await callLocalMcp(
+        vaultDir,
+        "relate",
+        {
+          fromId: firstId,
+          toId: obsoleteId,
+          type: "supersedes",
+        },
+        embeddingServer.url,
+      );
+
+      const response = await callLocalMcpResponse(
+        vaultDir,
+        "relate",
+        {
+          fromId: secondId,
+          toId: obsoleteId,
+          type: "supersedes",
+        },
+        embeddingServer.url,
+      );
+      expect(response.text).toContain("already superseded by");
+      expect(response.text).toContain(firstId);
+    } finally {
+      await embeddingServer.close();
+    }
+  }, 20000);
+
+  it("prune-superseded refuses mutual pairs and keeps both notes", async () => {
+    const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-vault-"));
+    const repoDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-project-"));
+    tempDirs.push(vaultDir, repoDir);
+
+    await initTestRepo(repoDir);
+
+    const embeddingServer = await startFakeEmbeddingServer();
+
+    try {
+      const noteAId = extractRememberedId(
+        await callLocalMcp(
+          vaultDir,
+          "remember",
+          {
+            title: "Mutual A",
+            content: "Note A in a legacy mutual supersedes pair.",
+            tags: ["integration", "prune"],
+            cwd: repoDir,
+            scope: "project",
+            summary: "Create mutual pair note A",
+          },
+          embeddingServer.url,
+        ),
+      );
+      const noteBId = extractRememberedId(
+        await callLocalMcp(
+          vaultDir,
+          "remember",
+          {
+            title: "Mutual B",
+            content: "Note B in a legacy mutual supersedes pair.",
+            tags: ["integration", "prune"],
+            cwd: repoDir,
+            scope: "project",
+            summary: "Create mutual pair note B",
+          },
+          embeddingServer.url,
+        ),
+      );
+
+      // Write the legacy buggy mutual pair directly into frontmatter.
+      const noteAPath = path.join(repoDir, ".mnemonic", "notes", `${noteAId}.md`);
+      const noteBPath = path.join(repoDir, ".mnemonic", "notes", `${noteBId}.md`);
+      const rawA = await readFile(noteAPath, "utf8");
+      const rawB = await readFile(noteBPath, "utf8");
+      const parsedA = matter(rawA);
+      const parsedB = matter(rawB);
+      await writeFile(
+        noteAPath,
+        matter.stringify(parsedA.content, {
+          ...parsedA.data,
+          relatedTo: [{ id: noteBId, type: "supersedes" }],
+        }),
+      );
+      await writeFile(
+        noteBPath,
+        matter.stringify(parsedB.content, {
+          ...parsedB.data,
+          relatedTo: [{ id: noteAId, type: "supersedes" }],
+        }),
+      );
+
+      const pruneResponse = await callLocalMcpResponse(
+        vaultDir,
+        "consolidate",
+        {
+          cwd: repoDir,
+          strategy: "prune-superseded",
+          mode: "delete",
+        },
+        embeddingServer.url,
+      );
+
+      expect(pruneResponse.text).toContain("Skipping");
+      expect(pruneResponse.text).toContain("cycle");
+      const parsed = ConsolidateResultSchema.parse(pruneResponse.structuredContent);
+      expect(parsed.notesModified).toBe(0);
+      expect(parsed.warnings?.some((w) => w.includes("cycle"))).toBe(true);
+
+      // Neither note may be deleted — the canonical survivor would be lost.
+      await expect(stat(noteAPath)).resolves.toBeDefined();
+      await expect(stat(noteBPath)).resolves.toBeDefined();
+    } finally {
+      await embeddingServer.close();
+    }
+  }, 20000);
+
+  it("prune-superseded deletes only the passive superseded note", async () => {
+    const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-vault-"));
+    const repoDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mcp-project-"));
+    tempDirs.push(vaultDir, repoDir);
+
+    await initTestRepo(repoDir);
+
+    const embeddingServer = await startFakeEmbeddingServer();
+
+    try {
+      const canonicalId = extractRememberedId(
+        await callLocalMcp(
+          vaultDir,
+          "remember",
+          {
+            title: "Canonical decision",
+            content: "The canonical note that survives pruning.",
+            tags: ["integration", "prune"],
+            cwd: repoDir,
+            scope: "project",
+            lifecycle: "permanent",
+            summary: "Create canonical note for prune test",
+          },
+          embeddingServer.url,
+        ),
+      );
+      const obsoleteId = extractRememberedId(
+        await callLocalMcp(
+          vaultDir,
+          "remember",
+          {
+            title: "Obsolete fragment",
+            content: "The obsolete note that should be pruned.",
+            tags: ["integration", "prune"],
+            cwd: repoDir,
+            scope: "project",
+            summary: "Create obsolete note for prune test",
+          },
+          embeddingServer.url,
+        ),
+      );
+
+      // Passive supersedes: obsolete carries `{ id: canonical, supersedes }`.
+      const obsoletePath = path.join(repoDir, ".mnemonic", "notes", `${obsoleteId}.md`);
+      const raw = await readFile(obsoletePath, "utf8");
+      const parsed = matter(raw);
+      await writeFile(
+        obsoletePath,
+        matter.stringify(parsed.content, {
+          ...parsed.data,
+          relatedTo: [{ id: canonicalId, type: "supersedes" }],
+        }),
+      );
+
+      const pruneResponse = await callLocalMcpResponse(
+        vaultDir,
+        "consolidate",
+        {
+          cwd: repoDir,
+          strategy: "prune-superseded",
+          mode: "delete",
+        },
+        embeddingServer.url,
+      );
+
+      expect(pruneResponse.text).toContain("Pruned 1 note(s).");
+      await expect(stat(obsoletePath)).rejects.toThrow();
+      await expect(
+        stat(path.join(repoDir, ".mnemonic", "notes", `${canonicalId}.md`)),
+      ).resolves.toBeDefined();
     } finally {
       await embeddingServer.close();
     }

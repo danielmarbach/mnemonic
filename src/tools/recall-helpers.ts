@@ -369,20 +369,20 @@ export async function identifyHighPriorityAnchors(
     const vaultResult = await attempt("recall:anchor-scan", async () => {
       const notes = await getOrBuildVaultNoteList(projectId, vault);
       if (!notes) return undefined;
-      const supersededTargets = new Set<string>();
+      // Passive supersedes convention: a note carrying a `supersedes` edge is
+      // itself the superseded source, so it must not be treated as a
+      // high-priority anchor (the canonical successor may be).
+      const supersededNotes = new Set<string>();
       for (const note of notes) {
         if (note.project !== projectId) continue;
-        for (const rel of note.relatedTo ?? []) {
-          if (rel.type === "supersedes") {
-            supersededTargets.add(rel.id);
-          }
-        }
+        const isSuperseded = (note.relatedTo ?? []).some((rel) => rel.type === "supersedes");
+        if (isSuperseded) supersededNotes.add(note.id);
       }
       for (const note of notes) {
         if (note.project !== projectId) continue;
         if (
           (note.alwaysLoad === true || note.role === "summary") &&
-          !supersededTargets.has(note.id)
+          !supersededNotes.has(note.id)
         ) {
           anchorIds.add(note.id);
           anchorLookup.set(note.id, note.title);

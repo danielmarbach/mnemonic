@@ -310,7 +310,7 @@ async function handleSupersedesMode(
 ): Promise<void> {
   for (const entry of sourceEntries) {
     const updatedRels = [...(entry.note.relatedTo ?? [])];
-    if (!updatedRels.some((r) => r.id === targetId)) {
+    if (!updatedRels.some((r) => r.id === targetId && r.type === "supersedes")) {
       updatedRels.push({ id: memoryId(targetId), type: "supersedes" });
     }
     // Rewriting requires the full body — resolve it (entries from
@@ -1273,20 +1273,28 @@ export async function pruneSuperseded(
   lines.push(`Pruning superseded notes for ${project?.name ?? "global"}:`);
   lines.push("");
 
-  // Find all notes that have a supersedes relationship pointing to them
-  const supersededIds = new Set<string>();
+  // Collect every `supersedes` edge. The storage convention is passive: a note
+  // carrying `{ id: Y, type: "supersedes" }` is superseded BY Y (the carrier is
+  // the obsolete source, the referenced id is the canonical successor). This is
+  // what `execute-merge` writes and what `relate` now writes.
+  const entryById = new Map<string, NoteEntry>(entries.map((entry) => [entry.note.id, entry]));
   const supersededBy = new Map<string, string>();
-
+  const multiTarget = new Set<string>();
+  const selfLoops = new Set<string>();
   for (const entry of entries) {
-    for (const rel of entry.note.relatedTo ?? []) {
-      if (rel.type === "supersedes") {
-        supersededIds.add(entry.note.id);
-        supersededBy.set(entry.note.id, rel.id);
+    const supersedes = (entry.note.relatedTo ?? []).filter((rel) => rel.type === "supersedes");
+    for (const rel of supersedes) {
+      if (rel.id === entry.note.id) {
+        selfLoops.add(entry.note.id);
+      } else if (supersededBy.has(entry.note.id) && supersededBy.get(entry.note.id) !== rel.id) {
+        multiTarget.add(entry.note.id);
       }
+      supersededBy.set(entry.note.id, rel.id);
     }
   }
 
-  if (supersededIds.size === 0) {
+  const carriers = new Set(supersededBy.keys());
+  if (carriers.size === 0) {
     lines.push("No superseded notes found.");
     const structuredContent: ConsolidateResult = {
       action: "consolidated",
@@ -1298,10 +1306,85 @@ export async function pruneSuperseded(
     return { content: [{ type: "text", text: lines.join("\n") }], structuredContent };
   }
 
-  // Pre-check protected branches
-  for (const vault of new Set(
-    entries.filter((e) => supersededIds.has(e.note.id)).map((e) => e.vault),
-  )) {
+  // Validate the supersession lineage before deleting anything. A well-formed
+  // lineage is a forest of chains ending at a non-carrier canonical target
+  // (e.g. A -> B -> C where C carries no supersedes edge). Deleting on a
+  // malformed lineage risks silent knowledge loss: a mutual pair (A -> B and
+  // B -> A) or longer cycle would delete the canonical note together with its
+  // superseded sources. Skip anything that cannot be validated.
+  const pruneable = new Set<string>();
+  const skipped: Array<{ id: string; title: string; reason: string }> = [];
+  for (const carrier of carriers) {
+    if (selfLoops.has(carrier)) {
+      skipped.push({
+        id: carrier,
+        title: entryById.get(carrier)?.note.title ?? carrier,
+        reason: "self-loop",
+      });
+      continue;
+    }
+    if (multiTarget.has(carrier)) {
+      skipped.push({
+        id: carrier,
+        title: entryById.get(carrier)?.note.title ?? carrier,
+        reason: "multiple supersedes targets",
+      });
+      continue;
+    }
+    const target = supersededBy.get(carrier);
+    if (!target || !entryById.has(target)) {
+      skipped.push({
+        id: carrier,
+        title: entryById.get(carrier)?.note.title ?? carrier,
+        reason: "superseder not found in scope",
+      });
+      continue;
+    }
+    // Walk the supersession chain forward; if it returns to a visited note,
+    // the carrier is part of (or leads into) a supersedes cycle.
+    const seen = new Set<string>([carrier]);
+    let cursor: string | undefined = target;
+    let inCycle = false;
+    while (cursor !== undefined && carriers.has(cursor)) {
+      if (seen.has(cursor)) {
+        inCycle = true;
+        break;
+      }
+      seen.add(cursor);
+      cursor = supersededBy.get(cursor);
+    }
+    if (inCycle) {
+      skipped.push({
+        id: carrier,
+        title: entryById.get(carrier)?.note.title ?? carrier,
+        reason: "part of a supersedes cycle",
+      });
+      continue;
+    }
+    pruneable.add(carrier);
+  }
+
+  const skippedWarnings = skipped.map(
+    (note) =>
+      `Skipped '${note.title}' (${note.id}): ${note.reason} — resolve the supersession manually before pruning.`,
+  );
+
+  // Precompute every vault this prune will mutate: vaults holding pruneable
+  // carriers plus vaults holding notes that reference pruned ids (relationship
+  // cleanup can touch any mutable vault), then pre-check protected branches.
+  const mutableVaultsToCheck = new Set<Vault>();
+  for (const id of pruneable) {
+    const entry = entryById.get(id);
+    if (entry) mutableVaultsToCheck.add(entry.vault);
+  }
+  for (const vault of ctx.vaultManager.allKnownVaultsMutable()) {
+    const notes = await vault.storage.listNotes();
+    const referencesPruned = notes.some((note) =>
+      (note.relatedTo ?? []).some((rel) => pruneable.has(rel.id)),
+    );
+    if (referencesPruned) mutableVaultsToCheck.add(vault);
+  }
+  for (const vault of mutableVaultsToCheck) {
     const check = await checkVaultProtectedBranch({
       ctx,
       vault,
@@ -1316,7 +1399,7 @@ export async function pruneSuperseded(
         project: toProjectRef(project),
         notesProcessed: entries.length,
         notesModified: 0,
-        warnings: [check.message],
+        warnings: [...skippedWarnings, check.message],
       };
       if (declinedBranchConsent || requestCtx === undefined || !isMrtrSupported(requestCtx)) {
         return {
@@ -1328,11 +1411,15 @@ export async function pruneSuperseded(
     }
   }
 
-  lines.push(`Found ${supersededIds.size} superseded note(s) to prune:`);
+  lines.push(`Found ${pruneable.size} superseded note(s) to prune:`);
+  for (const note of skipped) {
+    lines.push(`  - Skipping ${note.title} (${note.id}): ${note.reason}`);
+  }
   const vaultChanges = new Map<Vault, string[]>();
+  const deletedIds: string[] = [];
 
-  for (const id of supersededIds) {
-    const entry = entries.find((e) => e.note.id === id);
+  for (const id of pruneable) {
+    const entry = entryById.get(id);
     if (!entry) continue;
     if (!entry.vault.writable) {
       lines.push(`  - Skipping ${entry.note.title} (${id}): in attached vault (read-only)`);
@@ -1344,9 +1431,12 @@ export async function pruneSuperseded(
 
     await entry.vault.storage.deleteNote(memoryId(id));
     addVaultChange(vaultChanges, entry.vault, vaultManager.noteRelPath(entry.vault, id));
+    deletedIds.push(id);
   }
 
-  const cleanupChanges = await removeRelationshipsToNoteIds(ctx, Array.from(supersededIds));
+  // Clean up references to the notes that were ACTUALLY deleted. Skipped notes
+  // (cycles, read-only, ambiguous) keep their relationships intact.
+  const cleanupChanges = await removeRelationshipsToNoteIds(ctx, deletedIds);
   for (const [vault, files] of cleanupChanges) {
     for (const file of files) {
       addVaultChange(vaultChanges, vault, file);
@@ -1390,7 +1480,7 @@ export async function pruneSuperseded(
   }
 
   lines.push("");
-  lines.push(`Pruned ${supersededIds.size} note(s).`);
+  lines.push(`Pruned ${deletedIds.length} note(s).`);
 
   const structuredContent: ConsolidateResult = {
     action: "consolidated",
@@ -1398,6 +1488,7 @@ export async function pruneSuperseded(
     project: toProjectRef(project),
     notesProcessed: entries.length,
     notesModified: vaultChanges.size,
+    warnings: skippedWarnings.length > 0 ? skippedWarnings : undefined,
     retry,
   };
 

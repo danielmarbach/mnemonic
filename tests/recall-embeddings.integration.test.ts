@@ -1210,6 +1210,9 @@ This note has no embedding.`,
         vaultDir,
         "relate",
         {
+          // Passive supersedes: fromId supersedes toId, stored on toId. The
+          // source supersedes the older child fragment, so the edge lives on
+          // the child note (the prune candidate).
           fromId: sourceId,
           toId: childId,
           type: "supersedes",
@@ -1237,14 +1240,15 @@ This note has no embedding.`,
         vaultDir,
         "recall",
         {
-          query: "Recall evidence source",
+          query: "Recall evidence child",
           scope: "global",
           evidence: "compact",
         },
         embeddingServer.url,
       );
       const evidenceParsed = RecallResultSchema.parse(evidenceResponse.structuredContent);
-      const evidenceMatch = evidenceParsed.results.find((result) => result.id === sourceId);
+      const evidenceMatch = evidenceParsed.results.find((result) => result.id === childId);
+      expect(evidenceMatch).toBeDefined();
       expect(evidenceMatch?.retrievalEvidence).toBeDefined();
       expect(evidenceMatch?.retrievalEvidence?.channels.length).toBeGreaterThan(0);
       expect(["top3", "top10", "lower"]).toContain(evidenceMatch?.retrievalEvidence?.rankBand);
@@ -1253,7 +1257,7 @@ This note has no embedding.`,
       );
       expect(evidenceMatch?.retrievalEvidence?.projectRelevant).toBe(false);
       expect(evidenceMatch?.retrievalEvidence?.superseded).toBe(true);
-      expect(evidenceMatch?.retrievalEvidence?.supersededBy).toBe(childId);
+      expect(evidenceMatch?.retrievalEvidence?.supersededBy).toBe(sourceId);
       expect(evidenceMatch?.retrievalEvidence?.supersededCount).toBeGreaterThan(0);
       expect(evidenceResponse.text).toContain("channels:");
       expect(evidenceResponse.text).toContain("supersedes");
