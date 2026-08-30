@@ -14,8 +14,6 @@ alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
-  - id: rpir-request-smarter-default-scoping-for-recall-and-read-too-7ffd0632
-    type: derives-from
   - id: mnemonic-key-design-decisions-3f2a6273
     type: related-to
 memoryVersion: 1

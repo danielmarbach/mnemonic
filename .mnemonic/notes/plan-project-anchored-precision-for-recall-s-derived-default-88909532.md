@@ -14,8 +14,6 @@ alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
-  - id: rpir-request-smarter-default-scoping-for-recall-and-read-too-7ffd0632
-    type: derives-from
   - id: apply-project-anchored-precision-for-recall-s-derived-defaul-2d318266
     type: follows
 memoryVersion: 1
