@@ -8,11 +8,14 @@ tags:
   - decision
 lifecycle: permanent
 createdAt: '2026-08-30T10:01:18.662Z'
-updatedAt: '2026-08-30T10:01:18.662Z'
+updatedAt: '2026-08-30T10:18:31.162Z'
 role: decision
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: implementation-principles-for-mnemonic-mcp-2e178bba
+    type: related-to
 memoryVersion: 1
 ---
 recall keeps `all` as the derived default, but when cwd resolves a project and no explicit `scope` was passed, weakly-matching unassociated main-vault global semantic candidates are held back (`subBarGlobal`) unless curated (`alwaysLoad: true` explicit), strongly matching (rawScore >= minSimilarity + GLOBAL_BAR_DELTA 0.15), or admitted via lexical-exact or graph-linked evidence (graph spreading clears the flag). An empty admitted pool (notes AND document chunks) lifts back to the full set. Suppression and widening are reported in text AND structured output (`suppressedGlobalCount`, `widenedScope`), satisfying the structured-output parity contract. Explicit scopes never gate. Missing-cwd hints appear on all read tools and id-tool not-found responses; explicit scope `global` is location-based (main vault) across all channels.
