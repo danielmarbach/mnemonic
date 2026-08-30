@@ -10,9 +10,6 @@ role: context
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
-relatedTo:
-  - id: plan-configurable-document-chunk-size-for-embedding-models-9c9a7224
-    type: follows
 memoryVersion: 1
 ---
 Scope change directed by user after implementation: the work commit and the RPIR memory notes must live on ONE branch, not separate work/memory branches.
