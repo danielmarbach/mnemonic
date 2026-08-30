@@ -14,8 +14,6 @@ alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
-  - id: plan-project-anchored-precision-for-recall-s-derived-default-88909532
-    type: follows
   - id: review-derived-scope-gating-implementation-continue-with-3-p-b52a2e1d
     type: derives-from
 memoryVersion: 1
