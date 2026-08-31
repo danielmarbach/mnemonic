@@ -474,18 +474,21 @@ function buildQueryTokenDocumentFrequencies(
   corpusTexts: string[],
 ): Map<string, number> {
   const queryTokens = Array.from(new Set(tokenize(query))).filter((token) => token.length >= 4);
-  const frequencies = new Map<string, number>(queryTokens.map((token) => [token, 0]));
   if (queryTokens.length === 0) {
-    return frequencies;
+    return new Map();
   }
 
-  for (const text of corpusTexts) {
-    const tokens = new Set(tokenize(text));
-    for (const token of queryTokens) {
-      if (tokens.has(token)) {
-        frequencies.set(token, (frequencies.get(token) ?? 0) + 1);
-      }
-    }
+  const corpusTokenSets = corpusTexts.map((text) => new Set(tokenize(text)));
+
+  // Every query token is set unconditionally — including zero-frequency tokens,
+  // which must remain present so they contribute their baseline weight in
+  // {@link computeWeightedQueryCoverage}.
+  const frequencies = new Map<string, number>();
+  for (const token of queryTokens) {
+    frequencies.set(
+      token,
+      corpusTokenSets.reduce((count, tokens) => count + (tokens.has(token) ? 1 : 0), 0),
+    );
   }
 
   return frequencies;
