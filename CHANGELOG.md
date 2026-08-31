@@ -19,6 +19,10 @@ The format is loosely based on Keep a Changelog and uses semver-style version he
 
 - `recall` is significantly faster on large result sets: query-token document frequencies for coverage scoring are now computed once per rerank instead of re-tokenising the entire candidate corpus for every candidate, reducing the dominant reranking cost from quadratic to linear (19.5s of a 22.5s recall on a 1026-note vault down to 0.15s) - A contribution from @claudedowling
 
+### Removed
+
+- The orphaned lexical-rescue scoring path: `enrichRescueCandidateScores` (unwired since the bounded-RRF hybrid recall change folded lexical coverage into the always-on TF-IDF channel score) and its zero-caller wrapper `collectLexicalRescueCandidates`, deferred as dead code in 0.44.0. No behavior change; their keys-by-raw-id rescue set also removes a benign cross-vault rescoring quirk that no longer has any code path.
+
 ## [0.44.0] - 2026-08-30
 
 ### Added

@@ -29,9 +29,6 @@ import {
   LEXICAL_RETRIEVAL_CANDIDATE_LIMIT,
   LEXICAL_RETRIEVAL_RESULT_LIMIT,
   LEXICAL_RETRIEVAL_THRESHOLD,
-  LEXICAL_RESCUE_CANDIDATE_LIMIT,
-  LEXICAL_RESCUE_THRESHOLD,
-  LEXICAL_RESCUE_RESULT_LIMIT,
 } from "../lexical.js";
 import type {
   RecallDiversity,
@@ -92,13 +89,6 @@ const ALWAYS_ON_LEXICAL_OPTIONS: LexicalCandidateOptions = {
   candidateLimit: LEXICAL_RETRIEVAL_CANDIDATE_LIMIT,
   resultLimit: LEXICAL_RETRIEVAL_RESULT_LIMIT,
   minimumScore: LEXICAL_RETRIEVAL_THRESHOLD,
-};
-
-const RESCUE_LEXICAL_OPTIONS: LexicalCandidateOptions = {
-  excludeExisting: true,
-  candidateLimit: LEXICAL_RESCUE_CANDIDATE_LIMIT,
-  resultLimit: LEXICAL_RESCUE_RESULT_LIMIT,
-  minimumScore: LEXICAL_RESCUE_THRESHOLD,
 };
 
 export async function collectLexicalCandidates(
@@ -296,29 +286,6 @@ export async function collectLexicalCandidates(
         : recallCandidateIdentity(a).localeCompare(recallCandidateIdentity(b));
     })
     .slice(0, options.resultLimit);
-}
-
-export function collectLexicalRescueCandidates(
-  vaults: Vault[],
-  query: string,
-  temporalQueryHint: TemporalQueryHint | undefined,
-  project: { id: string; name: string } | undefined,
-  scope: "project" | "global" | "all",
-  tags: string[] | undefined,
-  lifecycle: NoteLifecycle | undefined,
-  existingIds: ScoredRecallCandidate[],
-): Promise<ScoredRecallCandidate[]> {
-  return collectLexicalCandidates(
-    vaults,
-    query,
-    temporalQueryHint,
-    project,
-    scope,
-    tags,
-    lifecycle,
-    existingIds,
-    RESCUE_LEXICAL_OPTIONS,
-  );
 }
 
 // ── Tag discovery helpers ─────────────────────────────────────────────────────

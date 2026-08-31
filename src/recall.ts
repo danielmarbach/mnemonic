@@ -561,34 +561,6 @@ export function applyLexicalReranking(
   return candidates;
 }
 
-export function enrichRescueCandidateScores(
-  allCandidates: ScoredRecallCandidate[],
-  query: string,
-  getProjectionText: (id: string, candidate?: ScoredRecallCandidate) => string | undefined,
-): void {
-  const rescueIds = new Set(
-    allCandidates
-      .filter((c) => c.coverageScore === undefined && c.lexicalScore !== undefined)
-      .map((c) => c.id),
-  );
-  if (rescueIds.size === 0) return;
-
-  const corpusTexts = allCandidates
-    .map((candidate) => getProjectionText(candidate.id, candidate))
-    .filter((text): text is string => Boolean(text));
-
-  const documentFrequencies = buildQueryTokenDocumentFrequencies(query, corpusTexts);
-
-  for (const candidate of allCandidates) {
-    if (!rescueIds.has(candidate.id)) continue;
-    const projText = getProjectionText(candidate.id, candidate);
-    if (projText) {
-      candidate.coverageScore = computeWeightedQueryCoverage(projText, documentFrequencies);
-      candidate.phraseScore = computeSignificantPhraseScore(query, projText);
-    }
-  }
-}
-
 export function selectRecallResults(
   scored: ScoredRecallCandidate[],
   limit: number,
