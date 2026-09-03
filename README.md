@@ -346,7 +346,7 @@ Two vault types store notes:
 
 `cwd` sets project context; `scope` picks storage:
 
-- `cwd` + `scope: "project"` _(default when `cwd` is present)_ → project vault (`.mnemonic/`)
+- `cwd` + `scope: "project"` _(default when `cwd` is present and no policy is saved)_ → project vault (`.mnemonic/`)
 - `cwd` + `scope: "global"` → main vault, with project association in frontmatter
 - no `cwd` → main vault as a plain global memory
 
@@ -358,6 +358,10 @@ Use `set_project_memory_policy` to save per-project defaults:
 - protected-branch patterns (glob strings; defaults are `main`, `master`, `release*`)
 
 When write scope policy is `ask`, `remember` returns a clear storage choice instead of guessing. On supported MCP clients, it asks you to choose project or global storage through the client UI. When protected-branch behavior is `ask`, mutating tools that would commit to the project vault ask for one-time confirmation through the client UI. Clients without that support return the `allowProtectedBranch: true` override option and instructions for persisting `block` or `allow`.
+
+A saved write-scope policy is authoritative: when an explicitly passed `scope` contradicts it, nothing is written. On clients with elicitation support, `remember` asks the user to pick between the policy and the explicit value; other clients get an error explaining the conflict. Pass `scopePolicyOverride: true` only when the user explicitly requested the deviation. An `ask` policy conflicts with any explicit `scope`, since the user asked to choose every time. Successful writes record the governing policy as `[policy=global]` in the result text (or `[policy=global→project, override]`) and as `policyScope` in structured output.
+
+`move_memory` takes `target` (`main-vault` or `project-vault`) and also accepts the `scope` alias with `remember`'s vocabulary (`global`/`project`); `target` values from either vocabulary are normalized.
 
 ### Project identity
 
@@ -558,7 +562,7 @@ Imported notes are written to the main vault with `lifecycle: permanent` and `sc
 | `project_memory_summary`    | Session-start entrypoint: themes, anchors, orientation, maintenance warnings, and working-state recovery hints                                      |
 | `recall`                    | Hybrid semantic, exact-wording, and relationship search with temporal/workflow modes and optional `evidence: "compact"` rationale. Returns `documentChunks` from document-source attachments alongside memory results.                   |
 | `recent_memories`           | Show most recently updated notes for scope                                                                                                          |
-| `remember`                  | Write note + embedding; `cwd` sets context, `scope` picks storage, `lifecycle` picks temporary vs permanent                                         |
+| `remember`                  | Write note + embedding; `cwd` sets context, `scope` picks storage (prefer omitting so the saved policy governs; contradicting it requires confirmation or `scopePolicyOverride`), `lifecycle` picks temporary vs permanent                                         |
 | `relate`                    | Create typed relationship between notes (bidirectional)                                                                                             |
 | `remove_attachment`         | Remove an attached repository by `projectSlug`                                                                                                      |
 | `set_attachment_branch`     | Change the branch an attached repository reads from; requires `projectSlug` and `branch`                                                            |

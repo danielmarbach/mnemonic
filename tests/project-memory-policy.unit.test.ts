@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { MnemonicConfigStore } from "../src/config.js";
 import {
   branchMatchesProtectedPattern,
+  explicitScopeConflictsWithPolicy,
   isProtectedBranch,
   resolveProtectedBranchBehavior,
   resolveProtectedBranchPatterns,
@@ -49,6 +50,33 @@ describe("resolveWriteScope", () => {
 
   it("saved policy bypasses unadopted project check", () => {
     expect(resolveWriteScope(undefined, "global", true, false)).toBe("global");
+  });
+});
+
+describe("explicitScopeConflictsWithPolicy", () => {
+  it("returns false when no explicit scope is passed", () => {
+    expect(explicitScopeConflictsWithPolicy(undefined, "global")).toBe(false);
+    expect(explicitScopeConflictsWithPolicy(undefined, "ask")).toBe(false);
+  });
+
+  it("returns false when no policy is saved", () => {
+    expect(explicitScopeConflictsWithPolicy("project", undefined)).toBe(false);
+    expect(explicitScopeConflictsWithPolicy("global", undefined)).toBe(false);
+  });
+
+  it("returns false when the explicit scope matches the policy", () => {
+    expect(explicitScopeConflictsWithPolicy("global", "global")).toBe(false);
+    expect(explicitScopeConflictsWithPolicy("project", "project")).toBe(false);
+  });
+
+  it("returns true when the explicit scope differs from the policy", () => {
+    expect(explicitScopeConflictsWithPolicy("project", "global")).toBe(true);
+    expect(explicitScopeConflictsWithPolicy("global", "project")).toBe(true);
+  });
+
+  it("returns true for any explicit scope when the policy is ask", () => {
+    expect(explicitScopeConflictsWithPolicy("project", "ask")).toBe(true);
+    expect(explicitScopeConflictsWithPolicy("global", "ask")).toBe(true);
   });
 });
 

@@ -6,4 +6,6 @@ No system prompt required. Mnemonic's tools are self-describing — each tool in
 For on-demand workflow guidance, use the `mnemonic-workflow-hint` MCP prompt. It now acts
 as a compact decision protocol: start with `recall` or `list`, inspect with `get`,
 prefer `update` for existing memories, use `remember` only when nothing matches, then
-organize with `relate`, `consolidate`, or `move_memory`.
+organize with `relate`, `consolidate`, or `move_memory`. When writing, omit `scope`
+unless the user explicitly asked for a specific vault: saved project policies are
+authoritative and contradicting them triggers a confirmation.

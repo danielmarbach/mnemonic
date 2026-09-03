@@ -6,6 +6,7 @@ import {
   type ProtectedBranchBehavior,
   type WriteScope,
   type ProjectMemoryPolicy,
+  type ProjectPolicyScope,
 } from "../project-memory-policy.js";
 import type { ServerContext } from "../server-context.js";
 import type { Vault } from "../vault.js";
@@ -116,6 +117,23 @@ export function formatAskForWriteScope(
     '- `scope: "global"` — private main vault with project association',
     "",
     "To avoid being asked again: call `set_project_memory_policy` with your preferred scope.",
+  ].join("\n");
+}
+
+export function formatScopePolicyConflict(
+  project: { id: string; name: string } | null | undefined,
+  explicitScope: WriteScope,
+  policyScope: ProjectPolicyScope,
+): string {
+  const projectLabel = project ? `${project.name} (${project.id})` : "this context";
+  const policyScopeLabel = policyScope === "ask" ? "always ask" : `"${policyScope}"`;
+  return [
+    `Explicit scope="${explicitScope}" contradicts the saved project memory policy for ${projectLabel} (defaultScope=${policyScopeLabel}). The note was NOT stored.`,
+    "Resolve the conflict and call `remember` again with one of:",
+    "- Omit `scope` entirely to follow the saved policy (recommended unless the user asked otherwise)",
+    `- Pass \`scopePolicyOverride: true\` together with \`scope: "${explicitScope}"\` only when the user explicitly requested this deviation`,
+    "",
+    "When unsure, ask the user. Update the saved routing with `set_project_memory_policy` if it should change permanently.",
   ].join("\n");
 }
 

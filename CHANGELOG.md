@@ -4,6 +4,14 @@ All notable changes to `mnemonic` will be documented in this file.
 
 The format is loosely based on Keep a Changelog and uses semver-style version headings.
 
+## [Unreleased]
+
+### Added
+
+- Policy-conflict guard on `remember`: an explicitly passed `scope` that contradicts the project's saved `defaultScope` policy no longer silently overrides it. Nothing is written; clients with elicitation support get a user confirmation prompt ("follow the saved policy" vs "keep the explicit value"), legacy clients get an actionable error. Pass the new `scopePolicyOverride: true` only when the user explicitly requested the deviation. An `ask` policy conflicts with any explicit `scope`, since the user asked to choose every time.
+- `remember` results now record the governing routing: `[policy=global]` in the result text (or `[policy=global→project, override]` after a confirmed deviation) and a `policyScope` field in structured output, so agents and users can see which rule applied.
+- `move_memory` accepts `scope` (`global`/`project`) as an alias for `target`, and `target` itself accepts both vocabularies (`main-vault`/`project-vault` and `global`/`project`), aligning it with `remember`'s parameter names and values.
+
 ## [0.44.1] - 2026-08-31
 
 ### Fixed

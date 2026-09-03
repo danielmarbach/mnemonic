@@ -18,12 +18,18 @@ import {
 } from "../cache.js";
 import { suggestAutoRelationships } from "../auto-relate.js";
 import { MarkdownLintError, cleanMarkdown } from "../markdown.js";
-import { resolveWriteScope, WRITE_SCOPES, type WriteScope } from "../project-memory-policy.js";
+import {
+  explicitScopeConflictsWithPolicy,
+  resolveWriteScope,
+  WRITE_SCOPES,
+  type WriteScope,
+} from "../project-memory-policy.js";
 import { resolveProject, ensureBranchSynced, describeProject } from "../helpers/project.js";
 import {
   extractSummary,
   formatCommitBody,
   formatAskForWriteScope,
+  formatScopePolicyConflict,
   checkVaultProtectedBranch,
   commitVaultWithProtection,
 } from "../helpers/git-commit.js";
@@ -222,8 +228,17 @@ export function registerRememberTool(server: McpServer, ctx: ServerContext): voi
           .describe(
             "Where to store: 'project' writes to the shared project vault visible to all contributors; " +
               "'global' writes to the private main vault visible only on this machine. " +
+              "Prefer omitting this: the project's saved policy (see set_project_memory_policy) is authoritative when one exists, and passing a value that contradicts it triggers a user confirmation " +
+              "(or an error on clients without prompts; retry with scopePolicyOverride=true only when the user explicitly requested the deviation). " +
               "When writable attached vaults exist for the project, you may be asked to pick the write target. " +
-              "When omitted, uses the project's saved policy or defaults to 'project'.",
+              "When omitted and no policy exists, defaults to 'project' when cwd is present, otherwise 'global'.",
+          ),
+        scopePolicyOverride: z
+          .boolean()
+          .optional()
+          .describe(
+            "One-time override for the saved write-scope policy. " +
+              "Set true only when the user explicitly asked to store somewhere that contradicts the project's saved policy; the result then records the override.",
           ),
         allowProtectedBranch: z
           .boolean()
@@ -252,6 +267,7 @@ export function registerRememberTool(server: McpServer, ctx: ServerContext): voi
         alwaysLoad,
         cwd,
         scope,
+        scopePolicyOverride = false,
         allowProtectedBranch: allowProtectedBranchArg = false,
       },
       requestCtx,
@@ -293,22 +309,48 @@ export function registerRememberTool(server: McpServer, ctx: ServerContext): voi
         ? Boolean(await ctx.vaultManager.getProjectVaultIfExists(cwd))
         : true;
       let writeScope = resolveWriteScope(scope, policyScope, Boolean(project), projectVaultExists);
-      if (writeScope === "ask") {
+      // An explicit scope that contradicts the saved policy must not silently
+      // override it (agents habitually restate the default explicitly). Route
+      // it through the same choice flow as policy "ask": a folded MRTR
+      // response wins, a decline or legacy client gets actionable error text,
+      // otherwise elicit. scopePolicyOverride short-circuits the guard when
+      // the user explicitly requested the deviation.
+      const scopeConflictsWithPolicy =
+        scope !== undefined &&
+        policyScope !== undefined &&
+        !scopePolicyOverride &&
+        explicitScopeConflictsWithPolicy(scope, policyScope);
+      if (writeScope === "ask" || scopeConflictsWithPolicy) {
         const unadopted = !projectVaultExists && !policyScope;
         const scopeChoice = readWriteScopeChoice(requestCtx);
         if (scopeChoice?.kind === "accepted") {
           writeScope = scopeChoice.value.scope;
         } else if (scopeChoice?.kind === "declined" || !isMrtrSupported(requestCtx)) {
+          const text = scopeConflictsWithPolicy
+            ? formatScopePolicyConflict(project, scope, policyScope)
+            : formatAskForWriteScope(project, unadopted);
           return {
-            content: [{ type: "text", text: formatAskForWriteScope(project, unadopted) }],
+            content: [{ type: "text", text }],
             isError: true,
           };
         } else {
-          const header = formatAskForWriteScope(project, unadopted).split("\n")[0] ?? "";
-          const message =
-            `${header} Where should this memory be stored? ` +
-            `"project" stores in the shared project vault for all contributors; ` +
-            `"global" stores in the private main vault for this machine only.`;
+          const conflictMessage =
+            policyScope === "ask"
+              ? `The saved memory policy for ${describeProject(project)} is set to always ask, but scope="${scope}" was passed explicitly. ` +
+                `Where should this memory be stored? "project" stores in the shared project vault for all contributors; ` +
+                `"global" stores in the private main vault for this machine only.`
+              : `Explicit scope="${scope}" contradicts the saved memory policy for ${describeProject(project)} (defaultScope="${policyScope}"). ` +
+                `Where should this memory be stored? "${policyScope}" follows the saved policy; "${scope}" overrides it.`;
+          const message = scopeConflictsWithPolicy
+            ? conflictMessage
+            : (() => {
+                const header = formatAskForWriteScope(project, unadopted).split("\n")[0] ?? "";
+                return (
+                  `${header} Where should this memory be stored? ` +
+                  `"project" stores in the shared project vault for all contributors; ` +
+                  `"global" stores in the private main vault for this machine only.`
+                );
+              })();
           return scopeSelectionDecision(requestCtx, message);
         }
       }
@@ -443,7 +485,12 @@ export function registerRememberTool(server: McpServer, ctx: ServerContext): voi
       });
 
       const vaultLabel = ` [${storageLabel(vault)}]`;
-      const textContent = `Remembered as \`${id}\` [${projectScope}, stored=${writeScope}]${vaultLabel}\n${formatPersistenceSummary(persistence)}`;
+      const policyMarker = policyScope
+        ? writeScope === policyScope || scope === undefined
+          ? ` [policy=${policyScope}]`
+          : ` [policy=${policyScope}→${writeScope}, override]`
+        : "";
+      const textContent = `Remembered as \`${id}\` [${projectScope}, stored=${writeScope}]${policyMarker}${vaultLabel}\n${formatPersistenceSummary(persistence)}`;
 
       const structuredContent: RememberResult = {
         action: "remembered",
@@ -451,6 +498,7 @@ export function registerRememberTool(server: McpServer, ctx: ServerContext): voi
         title,
         project: project ? { id: project.id, name: project.name } : undefined,
         scope: writeScope,
+        policyScope,
         vault: storageLabel(vault),
         tags: tags || [],
         lifecycle: note.lifecycle,

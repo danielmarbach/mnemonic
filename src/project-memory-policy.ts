@@ -117,3 +117,21 @@ export function resolveWriteScope(
 
   return hasProjectContext ? "project" : "global";
 }
+
+/**
+ * Whether an explicitly passed `scope` contradicts the project's saved
+ * write-scope policy. An explicit scope that matches the policy agrees with
+ * it, but an "ask" policy is contradicted by any explicit scope because the
+ * user asked to choose every time. Agents habitually pass the schema default
+ * explicitly, so without this check a saved routing rule can be silently
+ * overridden (see the kimi/NServiceBus incident).
+ */
+export function explicitScopeConflictsWithPolicy(
+  explicitScope: WriteScope | undefined,
+  policyScope: ProjectPolicyScope | undefined,
+): boolean {
+  if (explicitScope === undefined || policyScope === undefined) {
+    return false;
+  }
+  return policyScope === "ask" || explicitScope !== policyScope;
+}

@@ -257,6 +257,73 @@ describe("MRTR native round-trips (modern 2026-07-28 client)", () => {
     }
   }, 60000);
 
+  it("elicits a scope choice when explicit scope contradicts the saved policy", async () => {
+    const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mrtr-vault-"));
+    const repoDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-mrtr-repo-"));
+    tempDirs.push(vaultDir, repoDir);
+
+    await initTestVaultRepo(vaultDir);
+    await initTestRepo(repoDir);
+    const embeddingServer = await startFakeEmbeddingServer();
+
+    try {
+      const session = await createModernMcpSession(vaultDir, {
+        ollamaUrl: embeddingServer.url,
+        disableGit: false,
+      });
+
+      try {
+        await session.callTool(
+          "set_project_memory_policy",
+          {
+            cwd: repoDir,
+            defaultScope: "global",
+          },
+          () => ({}),
+        );
+
+        const raw = (await session.callToolRaw("remember", {
+          title: "MRTR policy conflict note",
+          content: "Conflict between explicit scope and saved policy.",
+          tags: ["integration", "mrtr"],
+          summary: "MRTR policy conflict test",
+          cwd: repoDir,
+          scope: "project",
+        })) as ToolCallResult;
+
+        expect(raw.resultType).toBe("input_required");
+        const scopeRequest = raw.inputRequests?.["writeScope"] as {
+          params?: { message?: string };
+        };
+        expect(scopeRequest?.params?.message).toContain("contradicts the saved memory policy");
+
+        const chosen = (await session.callTool(
+          "remember",
+          {
+            title: "MRTR policy conflict note",
+            content: "Conflict between explicit scope and saved policy.",
+            tags: ["integration", "mrtr"],
+            summary: "MRTR policy conflict test",
+            cwd: repoDir,
+            scope: "project",
+          },
+          () => ({
+            writeScope: elicitAccept({ scope: "global" }),
+          }),
+        )) as ToolCallResult;
+
+        const chosenId = extractRememberedId(chosen.content?.[0]?.text ?? "");
+        expect(chosen.content?.[0]?.text).toContain("stored=global");
+        expect(chosen.content?.[0]?.text).toContain("[policy=global]");
+        await expect(stat(path.join(vaultDir, "notes", `${chosenId}.md`))).resolves.toBeDefined();
+      } finally {
+        await session.close();
+      }
+    } finally {
+      await embeddingServer.close();
+    }
+  }, 60000);
+
   it("writes into a writable attached vault when the vault picker selects it", async () => {
     const { vaultDir, repoDir, attachedDir } = await setupWritableAttachedVaultFixture();
     const embeddingServer = await startFakeEmbeddingServer();
