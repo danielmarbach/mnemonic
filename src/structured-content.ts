@@ -113,6 +113,8 @@ export interface RememberResult extends Record<string, unknown> {
   title: string;
   project?: { id: string; name: string };
   scope: "project" | "global";
+  /** Saved project write-scope policy that governed this write, if one exists. */
+  policyScope?: "project" | "global" | "ask";
   vault: string;
   tags: string[];
   lifecycle: NoteLifecycle;
@@ -914,6 +916,7 @@ export const RememberResultSchema = z.object({
   title: z.string(),
   project: ProjectRefSchema.optional(),
   scope: z.enum(["project", "global"]),
+  policyScope: z.enum(["project", "global", "ask"]).optional(),
   vault: _VaultLabel,
   tags: z.array(z.string()),
   lifecycle: _NoteLifecycle,

@@ -44,9 +44,16 @@ export function registerMoveMemoryTool(server: McpServer, ctx: ServerContext): v
           "Exact memory id, or a document/chunk handle (doc:... / chunk:...). Document entities are read-only and rejected. Use an id returned by `recall`, `list`, `recent_memories`, or `where_is`.",
         ),
         target: z
-          .enum(["main-vault", "project-vault"])
+          .enum(["main-vault", "project-vault", "global", "project"])
+          .optional()
           .describe(
-            "Destination: 'main-vault' for private/global storage, 'project-vault' for shared project storage",
+            "Destination: 'main-vault' (or 'global') for private/global storage, 'project-vault' (or 'project') for shared project storage. 'global'/'project' mirror remember's scope vocabulary.",
+          ),
+        scope: z
+          .enum(["global", "project"])
+          .optional()
+          .describe(
+            "Alias for `target` using remember's scope vocabulary: 'global' = main vault, 'project' = project vault. Pass either `target` or `scope`, not both.",
           ),
         vaultFolder: z
           .string()
@@ -67,11 +74,62 @@ export function registerMoveMemoryTool(server: McpServer, ctx: ServerContext): v
       outputSchema: MoveResultSchema,
     },
     async (
-      { id, target, vaultFolder, cwd, allowProtectedBranch: allowProtectedBranchArg = false },
+      {
+        id,
+        target,
+        scope,
+        vaultFolder,
+        cwd,
+        allowProtectedBranch: allowProtectedBranchArg = false,
+      },
       requestCtx,
     ) => {
       const branchConsent = readProtectedBranchConsentState(requestCtx);
       const allowProtectedBranch = allowProtectedBranchArg || branchConsent === "granted";
+
+      // Accept remember's scope vocabulary alongside the native target names:
+      // 'global'/'project' normalize to 'main-vault'/'project-vault'. Exactly
+      // one of target/scope must be provided.
+      if (target !== undefined && scope !== undefined) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: "Pass either `target` or `scope`, not both. They are aliases for the destination vault.",
+            },
+          ],
+          isError: true,
+        };
+      }
+      const rawTarget = target ?? scope;
+      if (rawTarget === undefined) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: "Missing destination: pass `target` ('main-vault' or 'project-vault') or its alias `scope` ('global' or 'project').",
+            },
+          ],
+          isError: true,
+        };
+      }
+      const normalizedTarget =
+        rawTarget === "global"
+          ? ("main-vault" as const)
+          : rawTarget === "project"
+            ? ("project-vault" as const)
+            : rawTarget;
+      if (normalizedTarget !== "main-vault" && normalizedTarget !== "project-vault") {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Invalid destination '${String(rawTarget)}'. Use 'main-vault'/'global' or 'project-vault'/'project'.`,
+            },
+          ],
+          isError: true,
+        };
+      }
       await ensureBranchSynced(ctx, cwd);
       guardAgainstDocumentSourceMutation(id, "move");
 
@@ -111,7 +169,7 @@ export function registerMoveMemoryTool(server: McpServer, ctx: ServerContext): v
 
       let targetVault: Vault;
       let targetProject: Awaited<ReturnType<typeof resolveProject>> | undefined;
-      if (target === "main-vault") {
+      if (normalizedTarget === "main-vault") {
         targetVault = ctx.vaultManager.main;
       } else {
         if (!cwd) {
@@ -184,7 +242,7 @@ export function registerMoveMemoryTool(server: McpServer, ctx: ServerContext): v
 
       let noteToWrite = found.note;
       let metadataRewritten = false;
-      if (target === "project-vault" && targetProject) {
+      if (normalizedTarget === "project-vault" && targetProject) {
         const rewrittenProject = targetProject.id;
         const rewrittenProjectName = targetProject.name;
         metadataRewritten =

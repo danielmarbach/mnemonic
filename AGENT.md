@@ -39,7 +39,7 @@ Before calling `remember`:
 4. Consider lifecycle: use `lifecycle: temporary` for plans and WIP; use `permanent` for decisions and durable knowledge.
 5. If you've made several closely-related captures in this session, consider `consolidate` before wrapping up.
 6. Write the note summary-first: put the main fact, decision, or outcome in the opening sentences, then follow with supporting detail.
-7. Pass `cwd` for anything about the current repo, even if you intend to store it in the main vault with `scope: "global"`.
+7. Pass `cwd` for anything about the current repo. Prefer omitting `scope` on writes: the saved project policy is authoritative when one exists, and an explicit `scope` that contradicts it triggers a user confirmation (or an error asking you to omit `scope` / pass `scopePolicyOverride: true` only when the user explicitly requested the deviation).
 8. Omit `cwd` only for truly cross-project or personal memories; missing `cwd` makes the note global and unassociated.
 9. After `remember`, `update`, `move_memory`, or consolidation writes, inspect the returned structured persistence status before doing extra verification calls. It tells you the note path, embedding path, embedding outcome, and git commit/push outcome, including when push is intentionally skipped by config.
 10. Memory work is not complete after `remember`, `update`, or `consolidate` alone. If the note extends, implements, or was informed by an existing note surfaced via `recall`, `list`, `recent_memories`, or `get`, explicitly decide whether to `relate` or `consolidate` before finishing.
@@ -245,6 +245,8 @@ When `recall` called with `cwd`, project notes get a small **tiebreaker boost** 
 - `remember` + `scope: "project"` → project vault (creates `.mnemonic/`)
 - `remember` + `scope: "global"` → main vault (keeps project in frontmatter)
 - `scope` omitted (writes) → use saved policy or fallback to `project` with `cwd`
+- Explicit `scope` contradicting the saved policy → nothing is written: MRTR clients get a user confirmation prompt, legacy clients an error listing `scopePolicyOverride: true` as the explicit-deviation escape hatch; an "ask" policy conflicts with any explicit `scope`
+- Successful writes record the governing policy: `[policy=global]` in the result text (or `[policy=global→project, override]`) and `policyScope` in structured output
 - `recall` with `scope` omitted and a detected project → derived `all` with project-anchored precision: weakly-matching unassociated global notes are held back from the semantic channel unless `alwaysLoad`-curated, strongly matching, or admitted via lexical/graph evidence; suppressed matches are reported and an empty pool widens back to everything. Explicit `scope` values never gate.
 - Explicit `scope: "global"` on recall → main-vault notes by location: project-tagged personal notes are included ("repo you don't own" case), attached vault notes are excluded
 - Read tools without `cwd` (`recall`/`list`/`recent_memories`/`memory_graph`) → main vault only, with a hint telling the caller to pass `cwd`; `get`/`update`/`forget`/`where_is_memory` add the hint to not-found responses
@@ -252,6 +254,7 @@ When `recall` called with `cwd`, project notes get a small **tiebreaker boost** 
 - `remember` without `cwd` → main vault
 - `move_memory` main-vault → project-vault rewrites `project` / `projectName` from `cwd`
 - `move_memory` project-vault → main-vault preserves project association while changing storage
+- `move_memory` destination accepts `target` (`main-vault`/`project-vault`) or the `scope` alias (`global`/`project`); `target` also accepts both vocabularies
 - project-vault commits from mutating tools (`remember`, `update`, `forget`, `move_memory`, mutating `consolidate`) honor protected-branch policy (`ask` | `block` | `allow`)
 - `recall`, `list`, `get`, `sync` → project vault first, then main
 - `relate`/`unrelate`/`forget` → any vault, commit per vault
@@ -341,7 +344,7 @@ Skills are loaded via the `skill` tool and extend agent capabilities with specia
 | `project_memory_summary` | Session-start entrypoint: themes, anchors, orientation, maintenance warnings, and working-state recovery hints |
 | `recall` | Semantic search with optional project boost plus `temporal` and `workflow` modes; `storedIn: "attached"` filters to attached-repo notes. Returns `documentChunks` from document-source attachments alongside memory results for project and all scope. Omitted `scope` with a detected project derives project-anchored precision (weak global matches gated; alwaysLoad/strong/lexical/graph-linked notes still surface; explicit `all` ungated). |
 | `recent_memories` | Show most recently updated notes for scope |
-| `remember` | Write note + embedding; `cwd` sets context, `scope` picks storage, `lifecycle` picks temporary vs permanent |
+| `remember` | Write note + embedding; `cwd` sets context, `scope` picks storage (prefer omitting so the saved policy governs; contradicting it requires confirmation or `scopePolicyOverride`), `lifecycle` picks temporary vs permanent |
 | `relate` | Create typed relationship between notes (bidirectional) |
 | `remove_attachment` | Remove an attached repository; requires `projectSlug` of the attachment |
 | `set_attachment_branch` | Change the branch an attached repository reads from; requires `projectSlug` and `branch` |

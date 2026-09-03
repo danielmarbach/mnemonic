@@ -4048,11 +4048,21 @@ Typical next step:
           "pattern": "^([a-zA-Z0-9_-]+|(doc|chunk):.+)$",
           "type": "string",
         },
+        "scope": {
+          "description": "Alias for \`target\` using remember's scope vocabulary: 'global' = main vault, 'project' = project vault. Pass either \`target\` or \`scope\`, not both.",
+          "enum": [
+            "global",
+            "project",
+          ],
+          "type": "string",
+        },
         "target": {
-          "description": "Destination: 'main-vault' for private/global storage, 'project-vault' for shared project storage",
+          "description": "Destination: 'main-vault' (or 'global') for private/global storage, 'project-vault' (or 'project') for shared project storage. 'global'/'project' mirror remember's scope vocabulary.",
           "enum": [
             "main-vault",
             "project-vault",
+            "global",
+            "project",
           ],
           "type": "string",
         },
@@ -4063,7 +4073,6 @@ Typical next step:
       },
       "required": [
         "id",
-        "target",
       ],
       "type": "object",
     },
@@ -6250,12 +6259,16 @@ Typical next step:
           "type": "string",
         },
         "scope": {
-          "description": "Where to store: 'project' writes to the shared project vault visible to all contributors; 'global' writes to the private main vault visible only on this machine. When writable attached vaults exist for the project, you may be asked to pick the write target. When omitted, uses the project's saved policy or defaults to 'project'.",
+          "description": "Where to store: 'project' writes to the shared project vault visible to all contributors; 'global' writes to the private main vault visible only on this machine. Prefer omitting this: the project's saved policy (see set_project_memory_policy) is authoritative when one exists, and passing a value that contradicts it triggers a user confirmation (or an error on clients without prompts; retry with scopePolicyOverride=true only when the user explicitly requested the deviation). When writable attached vaults exist for the project, you may be asked to pick the write target. When omitted and no policy exists, defaults to 'project' when cwd is present, otherwise 'global'.",
           "enum": [
             "project",
             "global",
           ],
           "type": "string",
+        },
+        "scopePolicyOverride": {
+          "description": "One-time override for the saved write-scope policy. Set true only when the user explicitly asked to store somewhere that contradicts the project's saved policy; the result then records the override.",
+          "type": "boolean",
         },
         "summary": {
           "description": "Git commit summary only. Imperative mood, concise, and focused on why the change matters.",
