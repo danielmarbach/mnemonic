@@ -7,12 +7,14 @@ tags:
   - scaling
 lifecycle: permanent
 createdAt: '2026-03-08T08:36:41.517Z'
-updatedAt: '2026-09-05T21:31:37.892Z'
+updatedAt: '2026-09-05T21:32:00.860Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
   - id: dynamic-project-context-loading-plan-9f2ed29c
     type: related-to
+  - id: canonical-design-bounded-rrf-hybrid-recall-172a96ab
+    type: supersedes
 memoryVersion: 1
 ---
 The project-first selection heuristic in this historical decision is superseded by `canonical-design-bounded-rrf-hybrid-recall-172a96ab`. Current recall uses score ordering with bounded project priors, not project-first slot filling. The user approved this reconciliation during the measured performance and code-quality pass; it does not authorize a ranking behavior change.
