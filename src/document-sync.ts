@@ -22,6 +22,7 @@ import type { DocumentGeneration, RetrievalChunk } from "./retrieval-document.js
 import { ChunkEmbeddingStorage } from "./chunk-embedding-storage.js";
 import type { ChunkEmbeddingRecord } from "./chunk-embedding-storage.js";
 import { attempt, getErrorMessage } from "./error-utils.js";
+import { mapWithConcurrency } from "./concurrency.js";
 import {
   checkEmbeddingCompatibility,
   currentEmbeddingIdentity,
@@ -414,15 +415,18 @@ export async function syncDocumentSource(
         return true;
       });
 
-      // Read blob contents
-      const files: Array<{ path: string; bytes: Uint8Array }> = [];
-      for (const filePath of matchedFiles) {
-        const showResult = await git.raw(["show", `${indexedCommit}:${filePath}`]);
-        const bytes = new TextEncoder().encode(showResult);
-        files.push({ path: filePath, bytes });
-      }
-
-      return files;
+      // Read blob contents with the same bounded concurrency used for other
+      // independent sync work. `mapWithConcurrency` preserves matchedFiles
+      // order, and a read failure still rejects the whole enumeration exactly as
+      // the previous serial loop did.
+      return mapWithConcurrency(
+        matchedFiles,
+        ctx.config.reindexEmbedConcurrency,
+        async (filePath) => {
+          const showResult = await git.raw(["show", `${indexedCommit}:${filePath}`]);
+          return { path: filePath, bytes: new TextEncoder().encode(showResult) };
+        },
+      );
     });
 
     if (!enumerateResult.ok) {
