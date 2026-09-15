@@ -95,7 +95,7 @@ describe("AttachedStorage", () => {
   });
 
   afterEach(async () => {
-    await fs.rm(tempDir, { recursive: true, force: true });
+    await fs.rm(tempDir, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
     if (originalDisableGit === undefined) {
       delete process.env.DISABLE_GIT;
     } else {
@@ -183,7 +183,9 @@ describe("AttachedStorage", () => {
     });
 
     afterEach(async () => {
-      await fs.rm(repoDir, { recursive: true, force: true }).catch(() => {});
+      await fs
+        .rm(repoDir, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 })
+        .catch(() => {});
     });
 
     it("listNoteIds reads from git branch using ls-tree", async () => {
@@ -460,7 +462,9 @@ Branch note body`;
 
         process.env.DISABLE_GIT = "true";
       } finally {
-        await fs.rm(repoDir, { recursive: true, force: true }).catch(() => {});
+        await fs
+          .rm(repoDir, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 })
+          .catch(() => {});
       }
     });
 
@@ -751,7 +755,9 @@ Branch note body`;
         expect(ids).toEqual([]);
       } finally {
         process.env.DISABLE_GIT = "true";
-        await fs.rm(repoDir, { recursive: true, force: true }).catch(() => {});
+        await fs
+          .rm(repoDir, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 })
+          .catch(() => {});
       }
     });
 
@@ -775,7 +781,9 @@ Branch note body`;
         expect(note).toBeNull();
       } finally {
         process.env.DISABLE_GIT = "true";
-        await fs.rm(repoDir, { recursive: true, force: true }).catch(() => {});
+        await fs
+          .rm(repoDir, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 })
+          .catch(() => {});
       }
     });
   });
@@ -822,7 +830,9 @@ describe("detectDefaultBranch", () => {
   });
 
   afterEach(async () => {
-    await fs.rm(repoDir, { recursive: true, force: true }).catch(() => {});
+    await fs
+      .rm(repoDir, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 })
+      .catch(() => {});
     if (originalDisableGit === undefined) {
       delete process.env.DISABLE_GIT;
     } else {
@@ -884,7 +894,9 @@ describe("detectDefaultBranch", () => {
     const branch = await detectDefaultBranch(repoDir);
     expect(branch).toBe("main");
 
-    await fs.rm(bareDir, { recursive: true, force: true }).catch(() => {});
+    await fs
+      .rm(bareDir, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 })
+      .catch(() => {});
   });
 
   it("falls back to master when origin/master exists and origin/main does not", async () => {
@@ -903,7 +915,9 @@ describe("detectDefaultBranch", () => {
     const branch = await detectDefaultBranch(repoDir);
     expect(branch).toBe("master");
 
-    await fs.rm(bareDir, { recursive: true, force: true }).catch(() => {});
+    await fs
+      .rm(bareDir, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 })
+      .catch(() => {});
   });
 
   it("defaults to main when no remote branches match", async () => {

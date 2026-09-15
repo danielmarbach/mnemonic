@@ -8,7 +8,11 @@ import { ensureBuiltEntryPointReady } from "./helpers/mcp.js";
 const tempDirs: string[] = [];
 
 afterEach(async () => {
-  await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })));
+  await Promise.all(
+    tempDirs
+      .splice(0)
+      .map((dir) => rm(dir, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 })),
+  );
 });
 
 describe("ensureBuiltEntryPointReady", () => {
@@ -65,7 +69,7 @@ describe("ensureBuiltEntryPointReady", () => {
     setTimeout(async () => {
       await mkdir(path.dirname(entryPoint), { recursive: true });
       await writeFile(entryPoint, "export {};", "utf8");
-      await rm(lockDir, { recursive: true, force: true });
+      await rm(lockDir, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
     }, 100);
 
     await waiter;

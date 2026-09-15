@@ -18,7 +18,7 @@ describe("normalizeProjectAttachments", () => {
   });
 
   afterEach(async () => {
-    await fs.rm(tempDir, { recursive: true, force: true });
+    await fs.rm(tempDir, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
   });
 
   async function writeConfig(data: Record<string, unknown>): Promise<void> {
@@ -428,7 +428,7 @@ describe("maxAttachmentsPerProject", () => {
   });
 
   afterEach(async () => {
-    await fs.rm(tempDir, { recursive: true, force: true });
+    await fs.rm(tempDir, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
   });
 
   async function writeConfig(data: Record<string, unknown>): Promise<void> {
@@ -540,7 +540,7 @@ describe("Schema migration for projectAttachments", () => {
   });
 
   afterEach(async () => {
-    await fs.rm(tempDir, { recursive: true, force: true });
+    await fs.rm(tempDir, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
   });
 
   async function writeConfig(data: Record<string, unknown>): Promise<void> {
@@ -623,7 +623,7 @@ describe("getProjectAttachments / setProjectAttachments", () => {
   });
 
   afterEach(async () => {
-    await fs.rm(tempDir, { recursive: true, force: true });
+    await fs.rm(tempDir, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
   });
 
   it("returns empty array for unknown project", async () => {

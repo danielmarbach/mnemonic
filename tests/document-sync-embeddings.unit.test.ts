@@ -73,7 +73,11 @@ const DEFAULT_EMBED_VECTOR = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8] as const;
 const tempDirs: string[] = [];
 
 afterEach(async () => {
-  await Promise.all(tempDirs.splice(0).map((dir) => fs.rm(dir, { recursive: true, force: true })));
+  await Promise.all(
+    tempDirs
+      .splice(0)
+      .map((dir) => fs.rm(dir, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 })),
+  );
 });
 
 beforeEach(() => {

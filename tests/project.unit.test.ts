@@ -11,7 +11,11 @@ const execFileAsync = promisify(execFile);
 const tempDirs: string[] = [];
 
 afterEach(async () => {
-  await Promise.all(tempDirs.splice(0).map((dir) => fs.rm(dir, { recursive: true, force: true })));
+  await Promise.all(
+    tempDirs
+      .splice(0)
+      .map((dir) => fs.rm(dir, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 })),
+  );
 });
 
 async function makeTempDir(prefix: string): Promise<string> {

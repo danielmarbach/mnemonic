@@ -28,7 +28,11 @@ const git = (repo: string, ...args: string[]) => execFileAsync("git", ["-C", rep
 const tempDirs: string[] = [];
 
 afterEach(async () => {
-  await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })));
+  await Promise.all(
+    tempDirs
+      .splice(0)
+      .map((dir) => rm(dir, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 })),
+  );
 });
 
 beforeEach(() => {
@@ -421,5 +425,7 @@ describe("lazyLoadGeneration", () => {
     expect(generation).not.toBeNull();
     expect(generation!.documents.size).toBe(120);
     expect(generation!.chunks.size).toBe(120);
-  });
+    // Creating and committing 120 files via makeGitRepo is slower than the
+    // default 5000ms test timeout allows on some CI runners (esp. Windows).
+  }, 15000);
 });
