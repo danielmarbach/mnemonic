@@ -68,7 +68,7 @@ describe("VaultManager staleness detection", () => {
   });
 
   afterEach(async () => {
-    await fs.rm(tempDir, { recursive: true, force: true });
+    await fs.rm(tempDir, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
     if (originalDisableGit === undefined) {
       delete process.env.DISABLE_GIT;
     } else {
@@ -249,7 +249,9 @@ describe("removeStaleEmbeddings", () => {
 
   afterEach(async () => {
     await Promise.all(
-      tempDirs.splice(0).map((dir) => fs.rm(dir, { recursive: true, force: true })),
+      tempDirs
+        .splice(0)
+        .map((dir) => fs.rm(dir, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 })),
     );
   });
 
@@ -369,7 +371,7 @@ describe("VaultManager clearAttachmentCaches and reload", () => {
   });
 
   afterEach(async () => {
-    await fs.rm(tempDir, { recursive: true, force: true });
+    await fs.rm(tempDir, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
     if (originalDisableGit === undefined) {
       delete process.env.DISABLE_GIT;
     } else {

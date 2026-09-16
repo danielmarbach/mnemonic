@@ -225,7 +225,7 @@ describe("document-source attachment integration", () => {
     } finally {
       await session.close();
       await embedding.close();
-      await rm(env.base, { recursive: true, force: true });
+      await rm(env.base, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
     }
   }, 60000);
 
@@ -252,7 +252,7 @@ describe("document-source attachment integration", () => {
     } finally {
       await session.close();
       await embedding.close();
-      await rm(env.base, { recursive: true, force: true });
+      await rm(env.base, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
     }
   }, 60000);
 
@@ -290,7 +290,7 @@ describe("document-source attachment integration", () => {
     } finally {
       await session.close();
       await failing.close();
-      await rm(env.base, { recursive: true, force: true });
+      await rm(env.base, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
     }
   }, 60000);
 
@@ -363,7 +363,7 @@ describe("document-source attachment integration", () => {
     } finally {
       await session.close();
       await embedding.close();
-      await rm(env.base, { recursive: true, force: true });
+      await rm(env.base, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
     }
   }, 60000);
 
@@ -396,7 +396,7 @@ describe("document-source attachment integration", () => {
     } finally {
       await session.close();
       await embedding.close();
-      await rm(env.base, { recursive: true, force: true });
+      await rm(env.base, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
     }
   }, 60000);
 
@@ -460,7 +460,7 @@ describe("document-source attachment integration", () => {
     } finally {
       await session.close();
       await embedding.close();
-      await rm(env.base, { recursive: true, force: true });
+      await rm(env.base, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
     }
   }, 60000);
 
@@ -524,7 +524,7 @@ describe("document-source attachment integration", () => {
     } finally {
       await session2.close();
       await embedding.close();
-      await rm(env.base, { recursive: true, force: true });
+      await rm(env.base, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
     }
   }, 60000);
 
@@ -584,7 +584,7 @@ describe("document-source attachment integration", () => {
     } finally {
       await session2.close();
       await embedding.close();
-      await rm(env.base, { recursive: true, force: true });
+      await rm(env.base, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
     }
   }, 60000);
 
@@ -633,7 +633,7 @@ describe("document-source attachment integration", () => {
     } finally {
       await session.close();
       await embedding.close();
-      await rm(env.base, { recursive: true, force: true });
+      await rm(env.base, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
     }
   }, 60000);
 
@@ -682,7 +682,7 @@ describe("document-source attachment integration", () => {
     } finally {
       await session.close();
       await embedding.close();
-      await rm(env.base, { recursive: true, force: true });
+      await rm(env.base, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
     }
   }, 60000);
 
@@ -734,7 +734,7 @@ describe("document-source attachment integration", () => {
     } finally {
       await session2.close();
       await failing.close();
-      await rm(env.base, { recursive: true, force: true });
+      await rm(env.base, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
     }
   }, 60000);
 });

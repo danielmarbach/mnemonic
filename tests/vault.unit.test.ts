@@ -33,7 +33,7 @@ describe("VaultManager", () => {
   });
 
   afterEach(async () => {
-    await fs.rm(tempDir, { recursive: true, force: true });
+    await fs.rm(tempDir, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
     if (originalDisableGit === undefined) {
       delete process.env.DISABLE_GIT;
     } else {
@@ -353,7 +353,10 @@ describe("VaultManager", () => {
       const realVaultPath = await fs.realpath(vault!.storage.vaultPath);
       expect(realVaultPath).toContain(realParentDir);
       expect(realVaultPath).not.toContain("vendor/submodule");
-    });
+      // `git submodule add` clones the submodule and can be noticeably slower
+      // than a plain `git init`/`git commit`, especially on Windows CI
+      // runners. The default 5000ms test timeout is too tight for this.
+    }, 20000);
 
     it("should return the same project vault whether cwd is in the superproject or its submodule", async () => {
       const parentDir = path.join(tempDir, "parent-repo-2");
@@ -375,7 +378,7 @@ describe("VaultManager", () => {
       expect(vaultFromSubmodule).toBeTruthy();
       // Both must resolve to the same vault instance (same superproject git root)
       expect(vaultFromParent!.storage.vaultPath).toBe(vaultFromSubmodule!.storage.vaultPath);
-    });
+    }, 20000);
   });
 
   describe("Search Order", () => {

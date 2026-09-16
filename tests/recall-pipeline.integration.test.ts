@@ -20,7 +20,9 @@ afterEach(async () => {
     tempDirs
       .splice(0)
       .map((dir) =>
-        import("fs/promises").then((fs) => fs.rm(dir, { recursive: true, force: true })),
+        import("fs/promises").then((fs) =>
+          fs.rm(dir, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 }),
+        ),
       ),
   );
 });

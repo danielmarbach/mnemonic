@@ -864,7 +864,7 @@ Main content 2`,
         expect(mainVersion).toBe("1.4");
         expect(otherVersion).toBe("1.4");
       } finally {
-        await fs.rm(otherTempDir, { recursive: true, force: true });
+        await fs.rm(otherTempDir, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
       }
     });
 
@@ -962,7 +962,12 @@ Main content 2`,
       } finally {
         // Cleanup
         for (let i = 1; i < tempDirs.length; i++) {
-          await fs.rm(tempDirs[i]!, { recursive: true, force: true });
+          await fs.rm(tempDirs[i]!, {
+            recursive: true,
+            force: true,
+            maxRetries: 3,
+            retryDelay: 100,
+          });
         }
       }
     });

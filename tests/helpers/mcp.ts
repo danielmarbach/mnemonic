@@ -71,7 +71,7 @@ async function ensureBuiltEntryPointReadyInternal(options?: {
       try {
         await runBuild();
       } finally {
-        await rm(lockDir, { recursive: true, force: true });
+        await rm(lockDir, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
       }
       await access(entryPoint);
       return;
@@ -106,7 +106,11 @@ export async function initTestVaultRepo(vaultDir: string): Promise<void> {
 }
 
 afterEach(async () => {
-  await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })));
+  await Promise.all(
+    tempDirs
+      .splice(0)
+      .map((dir) => rm(dir, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 })),
+  );
 });
 
 beforeAll(async () => {
