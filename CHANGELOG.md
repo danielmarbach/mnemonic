@@ -4,6 +4,12 @@ All notable changes to `mnemonic` will be documented in this file.
 
 The format is loosely based on Keep a Changelog and uses semver-style version headings.
 
+## [0.45.1] - 2026-09-16
+
+### Changed
+
+- Re-syncing a document source with many files is faster: file contents are now read from git with the same bounded concurrency used for embedding work instead of one at a time.
+
 ## [0.45.0] - 2026-09-03
 
 ### Added

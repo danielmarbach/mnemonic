@@ -22,6 +22,7 @@ import type { DocumentGeneration, RetrievalChunk } from "./retrieval-document.js
 import { ChunkEmbeddingStorage } from "./chunk-embedding-storage.js";
 import type { ChunkEmbeddingRecord } from "./chunk-embedding-storage.js";
 import { attempt, getErrorMessage } from "./error-utils.js";
+import { mapWithConcurrency } from "./concurrency.js";
 import {
   checkEmbeddingCompatibility,
   currentEmbeddingIdentity,
@@ -414,15 +415,31 @@ export async function syncDocumentSource(
         return true;
       });
 
-      // Read blob contents
-      const files: Array<{ path: string; bytes: Uint8Array }> = [];
-      for (const filePath of matchedFiles) {
-        const showResult = await git.raw(["show", `${indexedCommit}:${filePath}`]);
-        const bytes = new TextEncoder().encode(showResult);
-        files.push({ path: filePath, bytes });
-      }
+      let hasFailure = false;
+      let firstError: unknown;
+      const readResults = await mapWithConcurrency<
+        string,
+        { path: string; bytes: Uint8Array<ArrayBufferLike> } | null
+      >(matchedFiles, ctx.config.reindexEmbedConcurrency, async (filePath) => {
+        if (hasFailure) return null;
 
-      return files;
+        const readResult = await attempt(`sync:doc-source-read:${filePath}`, async () => {
+          const showResult = await git.raw(["show", `${indexedCommit}:${filePath}`]);
+          return { path: filePath, bytes: new TextEncoder().encode(showResult) };
+        });
+        if (!readResult.ok) {
+          if (!hasFailure) {
+            hasFailure = true;
+            firstError = readResult.error;
+          }
+          return null;
+        }
+        return readResult.value;
+      });
+      if (hasFailure) throw firstError;
+      return readResults.filter(
+        (file): file is { path: string; bytes: Uint8Array<ArrayBufferLike> } => file !== null,
+      );
     });
 
     if (!enumerateResult.ok) {
