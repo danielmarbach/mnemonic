@@ -22,6 +22,7 @@ import type { DocumentGeneration, RetrievalChunk } from "./retrieval-document.js
 import { ChunkEmbeddingStorage } from "./chunk-embedding-storage.js";
 import type { ChunkEmbeddingRecord } from "./chunk-embedding-storage.js";
 import { attempt, getErrorMessage } from "./error-utils.js";
+import { mapWithConcurrency } from "./concurrency.js";
 import {
   checkEmbeddingCompatibility,
   currentEmbeddingIdentity,
@@ -414,40 +415,31 @@ export async function syncDocumentSource(
         return true;
       });
 
-      // Read blob contents with bounded concurrency while stopping queued work
-      // after the first observed failure. This local scheduler is intentional:
-      // enumeration must drain already-started reads before releasing the
-      // generation lock, while the shared map helper rejects immediately.
-      const files = new Array<{ path: string; bytes: Uint8Array }>(matchedFiles.length);
-      let nextIndex = 0;
       let hasFailure = false;
       let firstError: unknown;
-      const workerCount = Math.min(ctx.config.reindexEmbedConcurrency, matchedFiles.length);
-      const workers = Array.from({ length: workerCount }, async () => {
-        while (true) {
-          if (hasFailure) return;
-          const index = nextIndex++;
-          if (index >= matchedFiles.length) return;
-          const filePath = matchedFiles[index];
-          if (filePath === undefined) return;
+      const readResults = await mapWithConcurrency<
+        string,
+        { path: string; bytes: Uint8Array<ArrayBufferLike> } | null
+      >(matchedFiles, ctx.config.reindexEmbedConcurrency, async (filePath) => {
+        if (hasFailure) return null;
 
-          const readResult = await attempt(`sync:doc-source-read:${filePath}`, async () => {
-            const showResult = await git.raw(["show", `${indexedCommit}:${filePath}`]);
-            return { path: filePath, bytes: new TextEncoder().encode(showResult) };
-          });
-          if (!readResult.ok) {
-            if (!hasFailure) {
-              hasFailure = true;
-              firstError = readResult.error;
-            }
-            return;
+        const readResult = await attempt(`sync:doc-source-read:${filePath}`, async () => {
+          const showResult = await git.raw(["show", `${indexedCommit}:${filePath}`]);
+          return { path: filePath, bytes: new TextEncoder().encode(showResult) };
+        });
+        if (!readResult.ok) {
+          if (!hasFailure) {
+            hasFailure = true;
+            firstError = readResult.error;
           }
-          files[index] = readResult.value;
+          return null;
         }
+        return readResult.value;
       });
-      await Promise.all(workers);
       if (hasFailure) throw firstError;
-      return files;
+      return readResults.filter(
+        (file): file is { path: string; bytes: Uint8Array<ArrayBufferLike> } => file !== null,
+      );
     });
 
     if (!enumerateResult.ok) {

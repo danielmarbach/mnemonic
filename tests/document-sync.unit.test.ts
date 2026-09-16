@@ -70,28 +70,41 @@ function configureGit(
   return { showCalls, getMaxActiveReads: () => maxActiveReads };
 }
 
+async function nextTurn(): Promise<void> {
+  await new Promise<void>((resolve) => setImmediate(resolve));
+}
+
 function configureControlledGit(
   paths: string[],
-  failurePath: string,
+  failures: Map<string, unknown>,
   blockedPath: string,
 ): {
   events: string[];
+  showCalls: string[];
   waitForShowCalls: (count: number) => Promise<void>;
+  waitForFailure: (filePath: string) => Promise<void>;
   releaseReads: () => void;
 } {
   const events: string[] = [];
-  const waiters: Array<{ count: number; resolve: () => void }> = [];
+  const showCalls: string[] = [];
+  const showWaiters: Array<{ count: number; resolve: () => void }> = [];
+  const failureWaiters = new Map<string, Array<() => void>>();
   let readsReleased = false;
   const blockedReads: Array<() => void> = [];
 
-  const notifyWaiters = (): void => {
-    for (let index = waiters.length - 1; index >= 0; index -= 1) {
-      const waiter = waiters[index];
-      if (waiter && events.filter((event) => event.startsWith("show:")).length >= waiter.count) {
-        waiters.splice(index, 1);
+  const notifyShowWaiters = (): void => {
+    for (let index = showWaiters.length - 1; index >= 0; index -= 1) {
+      const waiter = showWaiters[index];
+      if (waiter && showCalls.length >= waiter.count) {
+        showWaiters.splice(index, 1);
         waiter.resolve();
       }
     }
+  };
+
+  const notifyFailureWaiters = (filePath: string): void => {
+    for (const resolve of failureWaiters.get(filePath) ?? []) resolve();
+    failureWaiters.delete(filePath);
   };
 
   git.fetch.mockResolvedValue(undefined);
@@ -100,13 +113,17 @@ function configureControlledGit(
     if (args[0] === "ls-tree") return `${paths.join("\n")}\n`;
     if (args[0] === "show") {
       const filePath = args[1]?.split(":")[1] ?? "";
+      showCalls.push(filePath);
       events.push(`show:${filePath}`);
-      notifyWaiters();
-      if (filePath === failurePath) {
-        throw new Error(`cannot read ${filePath}`);
-      }
+      notifyShowWaiters();
       if (filePath === blockedPath && !readsReleased) {
         await new Promise<void>((resolve) => blockedReads.push(resolve));
+      }
+      events.push(`complete:${filePath}`);
+      if (failures.has(filePath)) {
+        events.push(`failure:${filePath}`);
+        notifyFailureWaiters(filePath);
+        throw failures.get(filePath);
       }
       return `# ${filePath}\n\nDocument content.`;
     }
@@ -116,10 +133,16 @@ function configureControlledGit(
 
   return {
     events,
+    showCalls,
     waitForShowCalls: (count) => {
-      const showCount = events.filter((event) => event.startsWith("show:")).length;
-      if (showCount >= count) return Promise.resolve();
-      return new Promise<void>((resolve) => waiters.push({ count, resolve }));
+      if (showCalls.length >= count) return Promise.resolve();
+      return new Promise<void>((resolve) => showWaiters.push({ count, resolve }));
+    },
+    waitForFailure: (filePath) => {
+      if (events.includes(`failure:${filePath}`)) return Promise.resolve();
+      const waiters = failureWaiters.get(filePath) ?? [];
+      failureWaiters.set(filePath, waiters);
+      return new Promise<void>((resolve) => waiters.push(resolve));
     },
     releaseReads: () => {
       readsReleased = true;
@@ -172,14 +195,30 @@ describe("syncDocumentSource blob reads", () => {
 
   it("stops scheduling after an early failure, drains reads, and orders the generation lock", async () => {
     const paths = ["docs/a.md", "docs/b.md", "docs/c.md", "docs/d.md"];
-    const reads = configureControlledGit(paths, "docs/a.md", "docs/b.md");
+    const reads = configureControlledGit(
+      paths,
+      new Map([["docs/a.md", new Error("cannot read docs/a.md")]]),
+      "docs/b.md",
+    );
     const config = makeConfig("att-early-failure");
-
+    let firstSettled = false;
     const firstResultPromise = syncDocumentSource(config, makeContext(2), undefined, "project-1");
-    await reads.waitForShowCalls(2);
-    const secondResultPromise = syncDocumentSource(config, makeContext(2), undefined, "project-1");
-    reads.releaseReads();
+    void firstResultPromise.then(() => {
+      firstSettled = true;
+      reads.events.push("first-return");
+    });
 
+    await reads.waitForShowCalls(2);
+    await reads.waitForFailure("docs/a.md");
+    await nextTurn();
+    expect(firstSettled).toBe(false);
+
+    const secondResultPromise = syncDocumentSource(config, makeContext(2), undefined, "project-1");
+    await nextTurn();
+    expect(firstSettled).toBe(false);
+    expect(reads.showCalls).toEqual(["docs/a.md", "docs/b.md"]);
+
+    reads.releaseReads();
     const [firstResult, secondResult] = await Promise.all([
       firstResultPromise,
       secondResultPromise,
@@ -188,39 +227,56 @@ describe("syncDocumentSource blob reads", () => {
     expect(firstResult.status).toBe("failed");
     expect(firstResult.errors[0]).toContain("cannot read docs/a.md");
     expect(secondResult.status).toBe("failed");
-    expect(reads.events).toEqual([
-      "show:docs/a.md",
-      "show:docs/b.md",
-      "release",
-      "show:docs/a.md",
-      "show:docs/b.md",
-    ]);
+    expect(reads.showCalls).toEqual(["docs/a.md", "docs/b.md", "docs/a.md", "docs/b.md"]);
+    expect(reads.showCalls).not.toContain("docs/c.md");
+    expect(reads.events.indexOf("complete:docs/b.md")).toBeLessThan(
+      reads.events.indexOf("first-return"),
+    );
+    expect(reads.events.indexOf("complete:docs/b.md")).toBeLessThan(
+      reads.events.indexOf("show:docs/a.md", 2),
+    );
     expect(getCurrentGeneration("project-1", "att-early-failure")).toBeNull();
   });
 
-  it("stops scheduling after a middle failure while draining the sibling read", async () => {
+  it("preserves an undefined first failure while draining a different sibling failure", async () => {
     const paths = ["docs/a.md", "docs/b.md", "docs/c.md", "docs/d.md", "docs/e.md"];
-    const reads = configureControlledGit(paths, "docs/c.md", "docs/d.md");
-
+    const reads = configureControlledGit(
+      paths,
+      new Map([
+        ["docs/c.md", undefined],
+        ["docs/d.md", new Error("cannot read docs/d.md")],
+      ]),
+      "docs/d.md",
+    );
+    let resultSettled = false;
     const resultPromise = syncDocumentSource(
       makeConfig("att-middle-failure"),
       makeContext(2),
       undefined,
       "project-1",
     );
+    void resultPromise.then(() => {
+      resultSettled = true;
+      reads.events.push("first-return");
+    });
+
     await reads.waitForShowCalls(4);
+    await reads.waitForFailure("docs/c.md");
+    await nextTurn();
+    expect(resultSettled).toBe(false);
+    expect(reads.showCalls).toEqual(["docs/a.md", "docs/b.md", "docs/c.md", "docs/d.md"]);
+
     reads.releaseReads();
     const result = await resultPromise;
 
     expect(result.status).toBe("failed");
-    expect(result.errors[0]).toContain("cannot read docs/c.md");
-    expect(reads.events).toEqual([
-      "show:docs/a.md",
-      "show:docs/b.md",
-      "show:docs/c.md",
-      "show:docs/d.md",
-      "release",
-    ]);
+    expect(result.errors[0]).toBe("enumerate-failed: undefined");
+    expect(result.errors[0]).not.toContain("docs/d.md");
+    expect(reads.showCalls).toEqual(["docs/a.md", "docs/b.md", "docs/c.md", "docs/d.md"]);
+    expect(reads.showCalls).not.toContain("docs/e.md");
+    expect(reads.events.indexOf("complete:docs/d.md")).toBeLessThan(
+      reads.events.indexOf("first-return"),
+    );
     expect(getCurrentGeneration("project-1", "att-middle-failure")).toBeNull();
   });
 
