@@ -17,3 +17,12 @@ jobs:
     name: build-and-test (${{ matrix.os.name }})
     steps:
       - run: echo "Formula-only change — skipping build and tests"
+
+  verify-formula:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Verify formula checksum against the published tarball
+        run: node scripts/ci/verify-formula.mjs
