@@ -6,6 +6,10 @@ The format is loosely based on Keep a Changelog and uses semver-style version he
 
 ## [0.45.1] - 2026-09-16
 
+### Fixed
+
+- The Homebrew formula for 0.45.1 recorded the checksum of an empty file, so `brew install mnemonic-mcp` failed verification. The formula now carries the correct tarball checksum; the published npm tarball was always valid.
+
 ### Changed
 
 - Re-syncing a document source with many files is faster: file contents are now read from git with the same bounded concurrency used for embedding work instead of one at a time.
