@@ -21,8 +21,6 @@ relatedTo:
     type: related-to
   - id: dogfooding-test-suite-reusable-prompt-for-phases-1-8-validat-c7c702d8
     type: derives-from
-  - id: document-source-attachments-design-delivery-and-verification-1517e52b
-    type: related-to
 memoryVersion: 1
 ---
 ## Consolidated from:

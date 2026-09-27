@@ -15,9 +15,6 @@ updatedAt: '2026-08-03T09:57:46.882Z'
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
-relatedTo:
-  - id: plan-deliver-document-source-chunk-semantic-retrieval-embedd-dba90b71
-    type: derives-from
 memoryVersion: 1
 ---
 The canonical design note `document-source-attachments-design-delivery-and-verification-1517e52b` explicitly specified that document-source chunks be embedded, with lexical-only as the fail-soft fallback. Line 41: "embedding failures publish with lexical-only coverage" — a contract that only makes sense if embeddings are the primary path. Line 42 lists `embeddingCompatibilityIdentity` as part of the generation manifest, implying embeddings are produced and need a compatibility fingerprint for invalidation. Line 43 frames document chunks as full participants in recall ranking ("result diversity enforced after final scoring"), consistent with semantic+lexical hybrid fusion.

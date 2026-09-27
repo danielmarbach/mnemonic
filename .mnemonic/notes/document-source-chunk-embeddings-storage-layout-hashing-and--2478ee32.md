@@ -18,8 +18,6 @@ updatedAt: '2026-09-27T20:54:35.706Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
-  - id: plan-deliver-document-source-chunk-semantic-retrieval-embedd-dba90b71
-    type: derives-from
   - id: vault-creation-audit-which-tools-can-create-mnemonic-and-whi-d0388691
     type: related-to
   - id: review-lazy-document-generation-loading-needs-concurrency-an-b49cd0cd
