@@ -12,7 +12,7 @@ tags:
   - tool-surface
 lifecycle: permanent
 createdAt: '2026-09-27T12:00:37.780Z'
-updatedAt: '2026-09-27T12:01:24.332Z'
+updatedAt: '2026-09-27T12:06:37.781Z'
 role: plan
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -26,6 +26,8 @@ relatedTo:
     type: derives-from
   - id: duckdb-as-a-derived-retrieval-index-evaluation-and-recommend-6c4c32b9
     type: follows
+  - id: request-token-efficiency-and-recall-accuracy-wave-1-ce6f830c
+    type: derives-from
 memoryVersion: 1
 ---
 Research on making mnemonic more token-efficient and more accurate, including for weaker models. Measured on 2026-09-27 against the live project vault (256 visible notes) and a fresh `build/index.js`. Work happens on branch `improve/token-efficiency-and-recall-accuracy`.
