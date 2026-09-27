@@ -336,7 +336,7 @@ Skills are loaded via the `skill` tool and extend agent capabilities with specia
 | `get` | Fetch one or more notes by exact id; `includeRelationships: true` adds bounded 1-hop previews. Also resolves `doc:` and `chunk:` retrieval handles for exact document content from indexed document-source attachments. |
 | `get_project_identity` | Show effective project identity and remote override |
 | `get_project_memory_policy` | Show saved write scope, consolidation mode, protected-branch settings, and `maxAttachmentsPerProject` |
-| `list` | List notes filtered by scope/tags/storage; `storedIn: "attached"` filters to attached-repo notes only, `storedIn: "any"` includes attachments |
+| `list` | List notes filtered by scope/tags/storage, one page at a time (`limit` default 50, max 200; current project first, then other projects, then global, alphabetical by title). `total` counts all matches; pass `nextCursor` back as `cursor` with the same filters for the next page. Prefer `recall` over paging through everything. `storedIn: "attached"` filters to attached-repo notes only, `storedIn: "any"` includes attachments |
 | `list_attachments` | List all attached repositories for the current project with status (enabled, path-exists, branch, note count) |
 | `list_migrations` | List available migrations and pending count |
 | `memory_graph` | Show compact adjacency list of relationships |

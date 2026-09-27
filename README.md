@@ -560,7 +560,7 @@ Imported notes are written to the main vault with `lifecycle: permanent` and `sc
 | `get`                       | Fetch one or more notes by exact id; `includeRelationships: true` adds bounded 1-hop previews. Also resolves `doc:` and `chunk:` retrieval handles for exact document content from indexed document-source attachments.                                                       |
 | `get_project_identity`      | Show effective project identity and remote override                                                                                                 |
 | `get_project_memory_policy` | Show saved write scope, consolidation mode, protected-branch settings, and `maxAttachmentsPerProject`                                               |
-| `list`                      | List notes filtered by scope/tags/storage; `storedIn: "attached"` filters to attached-repo notes                                                    |
+| `list`                      | List notes filtered by scope/tags/storage, 50 per page by default (current project first, then alphabetical); follow `nextCursor` for more. `storedIn: "attached"` filters to attached-repo notes |
 | `list_attachments`          | List all attached repositories for the current project with status                                                                                  |
 | `list_migrations`           | List available migrations and pending count                                                                                                         |
 | `memory_graph`              | Show compact adjacency list of relationships                                                                                                        |

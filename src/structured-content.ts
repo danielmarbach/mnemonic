@@ -239,7 +239,11 @@ export interface RetrievalEvidence {
 
 export interface ListResult extends Record<string, unknown> {
   action: "listed";
+  /** Notes on this page. */
   count: number;
+  /** Notes matching the filters across all pages. */
+  total: number;
+  nextCursor?: string;
   scope: "project" | "global" | "all";
   storedIn: "project-vault" | "main-vault" | "any" | "attached";
   project?: ProjectRef;
@@ -1262,7 +1266,16 @@ export const RecallResultSchema = z.object({
 
 export const ListResultSchema = z.object({
   action: z.literal("listed"),
-  count: z.number(),
+  count: z.number().describe("Number of notes returned on this page."),
+  total: z
+    .number()
+    .describe("Number of notes matching the filters across all pages. Always present."),
+  nextCursor: z
+    .string()
+    .optional()
+    .describe(
+      "Pass as cursor with the same filters to get the next page. Absent on the last page.",
+    ),
   scope: z.enum(["project", "global", "all"]),
   storedIn: z.enum(["project-vault", "main-vault", "any", "attached"]),
   project: ProjectRefSchema.optional(),

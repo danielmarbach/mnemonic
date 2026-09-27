@@ -134,7 +134,11 @@ export async function collectVisibleNotes(
   entries.sort((a, b) => {
     const aRank = project && a.note.project === project.id ? 0 : a.note.project ? 1 : 2;
     const bRank = project && b.note.project === project.id ? 0 : b.note.project ? 1 : 2;
-    return aRank - bRank || a.note.title.localeCompare(b.note.title);
+    return (
+      aRank - bRank ||
+      a.note.title.localeCompare(b.note.title) ||
+      a.note.id.localeCompare(b.note.id)
+    );
   });
 
   return { project, entries };

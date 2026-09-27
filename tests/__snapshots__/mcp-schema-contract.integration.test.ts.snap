@@ -3394,13 +3394,17 @@ Do not use this when:
 - You want topic-based semantic search; use \`recall\`
 - You already know the exact id; use \`get\`
 
-Returns: matching memories with ids, titles, scope/storage context, metadata.
+Returns: one page of matching memories (ids, titles, scope/storage context, metadata), current project first, then other projects, then global, alphabetical by title; count (notes on this page), total (all matches), and nextCursor when more pages exist. Pass nextCursor as cursor to continue.
 
 Typical next step:
 - Use \`get\` for exact inspection or \`update\` / \`consolidate\` for cleanup.",
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "properties": {
+        "cursor": {
+          "description": "Opaque nextCursor from a previous list call with the same filters.",
+          "type": "string",
+        },
         "cwd": {
           "description": "Absolute path of the project working directory. Required for project-scoped routing, vault selection, and search boosting. Without it, only the global main vault is used: project memories are invisible to reads, and writes land in the main vault.",
           "type": "string",
@@ -3424,6 +3428,13 @@ Typical next step:
           "default": false,
           "description": "Include last-updated timestamp for each note",
           "type": "boolean",
+        },
+        "limit": {
+          "default": 50,
+          "description": "Maximum notes per page (default 50, max 200). Use recall for topic search instead of paging through everything.",
+          "maximum": 200,
+          "minimum": 1,
+          "type": "integer",
         },
         "scope": {
           "default": "all",
@@ -3466,7 +3477,12 @@ Typical next step:
           "type": "string",
         },
         "count": {
+          "description": "Number of notes returned on this page.",
           "type": "number",
+        },
+        "nextCursor": {
+          "description": "Pass as cursor with the same filters to get the next page. Absent on the last page.",
+          "type": "string",
         },
         "notes": {
           "items": {
@@ -3593,10 +3609,15 @@ Typical next step:
           ],
           "type": "string",
         },
+        "total": {
+          "description": "Number of notes matching the filters across all pages. Always present.",
+          "type": "number",
+        },
       },
       "required": [
         "action",
         "count",
+        "total",
         "scope",
         "storedIn",
         "notes",

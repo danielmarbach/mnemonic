@@ -11,6 +11,19 @@ import {
 } from "../helpers/project.js";
 import { collectVisibleNotes, formatListEntry, storageLabel } from "../helpers/vault.js";
 
+const DEFAULT_LIST_LIMIT = 50;
+const MAX_LIST_LIMIT = 200;
+const CURSOR_PREFIX = "offset:";
+
+function encodeCursor(offset: number): string {
+  return Buffer.from(`${CURSOR_PREFIX}${offset}`).toString("base64url");
+}
+
+function decodeCursor(cursor: string): number | undefined {
+  const match = /^offset:(\d+)$/.exec(Buffer.from(cursor, "base64url").toString("utf-8"));
+  return match ? Number(match[1]) : undefined;
+}
+
 export function registerListTool(server: McpServer, ctx: ServerContext): void {
   server.registerTool(
     "list",
@@ -24,7 +37,7 @@ export function registerListTool(server: McpServer, ctx: ServerContext): void {
         "Do not use this when:\n" +
         "- You want topic-based semantic search; use `recall`\n" +
         "- You already know the exact id; use `get`\n\n" +
-        "Returns: matching memories with ids, titles, scope/storage context, metadata.\n\n" +
+        "Returns: one page of matching memories (ids, titles, scope/storage context, metadata), current project first, then other projects, then global, alphabetical by title; count (notes on this page), total (all matches), and nextCursor when more pages exist. Pass nextCursor as cursor to continue.\n\n" +
         "Typical next step:\n" +
         "- Use `get` for exact inspection or `update` / `consolidate` for cleanup.",
       annotations: {
@@ -78,6 +91,20 @@ export function registerListTool(server: McpServer, ctx: ServerContext): void {
           .optional()
           .default(false)
           .describe("Include last-updated timestamp for each note"),
+        limit: z
+          .number()
+          .int()
+          .min(1)
+          .max(MAX_LIST_LIMIT)
+          .optional()
+          .default(DEFAULT_LIST_LIMIT)
+          .describe(
+            `Maximum notes per page (default ${DEFAULT_LIST_LIMIT}, max ${MAX_LIST_LIMIT}). Use recall for topic search instead of paging through everything.`,
+          ),
+        cursor: z
+          .string()
+          .optional()
+          .describe("Opaque nextCursor from a previous list call with the same filters."),
       }),
       outputSchema: ListResultSchema,
     },
@@ -90,8 +117,23 @@ export function registerListTool(server: McpServer, ctx: ServerContext): void {
       includePreview,
       includeStorage,
       includeUpdated,
+      limit,
+      cursor,
     }) => {
       await ensureBranchSynced(ctx, cwd);
+
+      const offset = cursor === undefined ? 0 : decodeCursor(cursor);
+      if (offset === undefined) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: "Invalid cursor. Call list again without cursor to start from the first page.",
+            },
+          ],
+          isError: true,
+        };
+      }
 
       const { project, entries } = await collectVisibleNotes(ctx, cwd, scope, tags, storedIn);
 
@@ -102,6 +144,7 @@ export function registerListTool(server: McpServer, ctx: ServerContext): void {
           scope: scope || "all",
           storedIn: storedIn || "any",
           project: project ? { id: project.id, name: project.name } : undefined,
+          total: 0,
           notes: [],
         };
         return {
@@ -110,7 +153,12 @@ export function registerListTool(server: McpServer, ctx: ServerContext): void {
         };
       }
 
-      const lines = entries.map((entry) =>
+      const total = entries.length;
+      const page = entries.slice(offset, offset + limit);
+      const nextOffset = offset + page.length;
+      const nextCursor = nextOffset < total ? encodeCursor(nextOffset) : undefined;
+
+      const lines = page.map((entry) =>
         formatListEntry(entry, {
           includeRelations,
           includePreview,
@@ -121,10 +169,19 @@ export function registerListTool(server: McpServer, ctx: ServerContext): void {
 
       const header =
         project && scope !== "global"
-          ? `${entries.length} memories (project: ${project.name}, scope: ${scope}, storedIn: ${storedIn}):`
-          : `${entries.length} memories (scope: ${scope}, storedIn: ${storedIn}):`;
+          ? `${total} memories (project: ${project.name}, scope: ${scope}, storedIn: ${storedIn}):`
+          : `${total} memories (scope: ${scope}, storedIn: ${storedIn}):`;
+      const pageLine =
+        page.length === 0
+          ? `\nno notes on this page: the cursor is past the last of ${total}`
+          : page.length < total
+            ? `\nshowing ${offset + 1}-${nextOffset} of ${total}`
+            : "";
+      const moreLine = nextCursor
+        ? `\n\nMore: call list again with the same filters and cursor: "${nextCursor}"`
+        : "";
 
-      const textContent = `${header}\n\n${lines.join("\n")}${missingCwdHint(cwd)}`;
+      const textContent = `${header}${pageLine}\n\n${lines.join("\n")}${moreLine}${missingCwdHint(cwd)}`;
 
       const structuredNotes: Array<{
         id: string;
@@ -136,7 +193,7 @@ export function registerListTool(server: McpServer, ctx: ServerContext): void {
         vault: string;
         updatedAt: string;
         hasRelated?: boolean;
-      }> = entries.map(({ note, vault }) => ({
+      }> = page.map(({ note, vault }) => ({
         id: note.id,
         title: note.title,
         project: noteProjectRef(note),
@@ -150,7 +207,9 @@ export function registerListTool(server: McpServer, ctx: ServerContext): void {
 
       const structuredContent: ListResult = {
         action: "listed",
-        count: entries.length,
+        count: page.length,
+        total,
+        nextCursor,
         scope: scope || "all",
         storedIn: storedIn || "any",
         project: project ? { id: project.id, name: project.name } : undefined,
