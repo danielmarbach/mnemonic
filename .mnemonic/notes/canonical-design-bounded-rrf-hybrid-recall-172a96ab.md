@@ -26,8 +26,6 @@ relatedTo:
     type: related-to
   - id: apply-bounded-rrf-hybrid-recall-alignment-consolidated-2ece69b3
     type: related-to
-  - id: research-token-efficiency-and-recall-accuracy-improvements-m-fe9233c8
-    type: related-to
 memoryVersion: 1
 ---
 Supersede fragmented RRF and hybrid-recall notes with the current implemented design and its product constraints.
