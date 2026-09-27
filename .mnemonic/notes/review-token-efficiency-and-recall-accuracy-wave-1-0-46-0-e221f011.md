@@ -7,7 +7,7 @@ tags:
   - recall
 lifecycle: temporary
 createdAt: '2026-09-27T13:58:57.491Z'
-updatedAt: '2026-09-27T13:59:12.015Z'
+updatedAt: '2026-09-27T14:12:39.951Z'
 role: review
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -46,11 +46,27 @@ Review of wave 1 / release 0.46.0 against plan `plan-token-efficiency-and-recall
 
 ## Findings for wave 2
 
-- P1 fusion policy: an exact identifier match is a single lexical rank and loses to notes matching its camelCase parts in both channels, and to the role metadata prior (0.012 vs a 0.0023 RRF gap). Real vault: `recallScopeNoteCount` holders at #3 and #7. Candidate: a bounded exact-identifier prior, measured with `eval:recall --explain`; needs an update to the canonical RRF design.
-- P2 latency: +8-11% warm recall; profile tokenize in recall.ts coverage scoring and snippet selection.
+- P1 fusion policy: RESOLVED in `8489805`. A prior would have been retrieval evidence disguised as policy, against the rank-only canonical design, so the fix is a fourth equally weighted RRF channel for exact identifiers. Canonical design note updated.
+- P2 latency: after `8489805` warm recall is 162 -> 169 ms (+4%); identifier queries show no measurable extra cost.
 - P2 relationship previews are now the largest part of brief recall output.
 - Still open from research: project-affinity gating (fixture S@1 0.88), superseded collapse, chunk embeddings for long notes, output-schema trimming, cwd description dedupe, model-matrix dogfood.
 
 ## Unchecked items
 
 None from the plan. Delegated execution and Opus review were not performed (infrastructure blocker, user redirected).
+
+## Addendum: ranking fix and alignment check (`8489805`)
+
+Checked against the canonical RRF design, the RRF alignment apply note and the DuckDB decision:
+
+| Decision | Status | Evidence |
+| --- | --- | --- |
+| Retrieval evidence is rank-only; priors are bounded policy | pass | Identifier evidence enters as `identifierRank` in `computeHybridScore`, no new prior |
+| Equal channel weighting, K=60, 100-rank window | pass | Same `1/(RRF_K + rank)` term and `assignDenseRanks` window |
+| Missing channels contribute zero | pass | Natural-language queries produce no identifier keys, so no rank |
+| Lexical channel stays in-process TF-IDF, no BM25 | pass | TF-IDF scoring unchanged; identifier matching reads the same cached tokens |
+| Exact identifiers must be recallable with weak semantic similarity | pass | Holders outside the lexical top 25 still reach fusion |
+| Language independence | pass after fix | Snippet selection used an English stopword list; replaced by inverse paragraph frequency |
+| Deterministic ordering | pass | Identifier ranks tie-break on lexical evidence, then note id; eval rows identical across runs |
+
+Fresh verification after the fix: `npm run verify:release` pass (96 files, 1516 tests, dogfood exit 0 with the pre-existing advisory); tarball smoke test 16/16; eval baseline updated.
