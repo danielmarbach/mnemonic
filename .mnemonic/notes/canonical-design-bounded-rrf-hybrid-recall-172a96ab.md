@@ -10,7 +10,7 @@ tags:
   - retrieval
 lifecycle: permanent
 createdAt: '2026-07-20T16:48:31.449Z'
-updatedAt: '2026-09-27T12:01:23.594Z'
+updatedAt: '2026-09-27T14:12:26.419Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
@@ -39,6 +39,7 @@ Mnemonic recall uses a bounded, fail-soft hybrid ranking pipeline designed aroun
 1. Semantic retrieval scans compatible embeddings and applies the caller's `minSimilarity` gate. Candidates receive deterministic semantic ranks from raw cosine ordering; raw semantic magnitude is retained for diagnostics and bounded confidence only.
 2. Lexical retrieval runs for every recall over compact derived projection text. TF-IDF with title, weighted coverage, and lexical overlap signals produces a bounded top-25 channel with a minimum positive signal threshold. It is independent of semantic admission, so exact identifiers, phrases, names, error codes, and version strings can enter even when semantic similarity is weak. Lexical/projection failures fail soft.
 3. Graph expansion is intentionally bounded and semantic-conditioned: the top five semantic entries with score at least 0.5 seed one-hop typed relationship spreading. Graph activation receives its own rank and never mutates semantic score or semantic rank.
+4. Exact-identifier retrieval (since 0.46.0) exists only when the query contains a compound identifier (camelCase, snake_case, SCREAMING_SNAKE, kebab-case, dotted versions). Notes whose lexical tokens contain the identifier's joined form (so `RRF_K`, `rrf-k` and `rrfK` share `rrfk`) are ranked by number of query identifiers matched, then lexical evidence, then id. Holders outside the lexical top 25 still enter fusion. Identifier-only holders get no lexical rank. The channel reuses session-cached tokens and adds no I/O.
 
 Candidates are unioned by stable note id. Missing channel ranks contribute zero.
 
@@ -47,7 +48,7 @@ Candidates are unioned by stable note id. Missing channel ranks contribute zero.
 For K=60, scaled RRF is:
 
 ```text
-rrfScore = 3.0 * (1/(60 + semanticRank) + 1/(60 + lexicalRank) + 1/(60 + graphRank))
+rrfScore = 3.0 * (1/(60 + semanticRank) + 1/(60 + lexicalRank) + 1/(60 + graphRank) + 1/(60 + identifierRank))
 ```
 
 The final score is bounded RRF plus explicit adjustments:
@@ -69,6 +70,10 @@ Channel sorts use stable note-id tie breakers. Tied scores use deterministic com
 
 ## Diagnostics and constraints
 
-`evidence: compact` optionally exposes semantic, lexical, and graph ranks plus RRF, semantic-confidence, project, temporal, metadata, canonical, and final-score contributions. Default output remains compact. The implementation uses existing markdown/projection/embedding storage and session caches; it adds no database, daemon, synced index, raw-note persistence, or hidden counters.
+`evidence: compact` optionally exposes semantic, lexical, graph, and identifier ranks plus RRF, semantic-confidence, project, temporal, metadata, canonical, and final-score contributions. Default output remains compact. The implementation uses existing markdown/projection/embedding storage and session caches; it adds no database, daemon, synced index, raw-note persistence, or hidden counters.
 
 The design is informed by the supplied RRF reference: RRF fuses independent ranked lists, uses zero for missing channels, commonly uses K=60, and requires deterministic upstream ordering and bounded rank windows. Parameters remain evaluation-tunable, but changes must preserve exact-identifier recall, semantic quality, graph discovery, project awareness, language independence, and fail-soft behavior.
+
+## Exact-identifier channel decision (0.46.0)
+
+Exact identifier matches are retrieval evidence, so they enter as an equally weighted RRF rank rather than a prior; priors stay reserved for policy (project, temporal, metadata, canonical). Before the channel, an exact holder was a single lexical rank and lost to notes matching the identifier's camelCase parts in both semantic and lexical channels, or to a role metadata prior (0.012 vs a 0.0023 rank gap). Equal weight was kept deliberately instead of a tuned channel weight. Measured with `npm run eval:recall`: identifier S@1 0.58 -> 0.92, MRR@10 0.79 -> 0.96, all other query kinds unchanged. Real vault: `recallScopeNoteCount` top 3 are all holders. For `RRF_K` the holders reach #3/#4 behind two notes with semantic+lexical agreement that discuss K=60; accepted, since those are the most relevant notes about the concept.
