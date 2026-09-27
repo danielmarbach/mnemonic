@@ -1,26 +1,72 @@
 ---
-title: mnemonic — role suggestions are read-only runtime hints (consolidated)
+title: 'mnemonic — role suggestions: language-independent read-only runtime hints'
 tags:
   - roles
-  - inference
+  - heuristics
+  - language-independence
   - design
+  - inference
   - decision
 lifecycle: permanent
-createdAt: '2026-04-04T22:09:20.109Z'
-updatedAt: '2026-05-25T17:35:43.310Z'
+createdAt: '2026-09-27T20:54:38.579Z'
+updatedAt: '2026-09-27T20:54:38.579Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
+  - id: mcp-workflow-ux-hint-prompt-tool-descriptions-and-session-st-e89a18fc
+    type: related-to
   - id: enrichment-layer-design-provenance-temporal-recall-projectio-7af26f06
     type: explains
   - id: enrichment-layer-design-provenance-temporal-recall-projectio-7af26f06
     type: related-to
   - id: rpir-workflow-design-for-mnemonic-research-plan-implement-re-80b00851
     type: explains
-  - id: mnemonic-language-independent-role-heuristics-f66619c1
-    type: related-to
 memoryVersion: 1
 ---
+## Consolidated from:
+### mnemonic — language-independent role heuristics
+*Source: `mnemonic-language-independent-role-heuristics-f66619c1`*
+
+Phase 7 role suggestions prioritize language-independent structural and graph signals over wording cues.
+
+Rationale:
+
+- mnemonic is a general-purpose MCP and must work for mixed-language and non-English notes
+- overfitting to English note titles or mnemonic-specific vocabulary would make the feature brittle and misleading
+- graph shape, heading breadth, list structure, and relationship patterns generalize better than keyword spotting
+
+Primary signals:
+
+- relationship centrality and inbound/outbound shape
+- connection diversity across visible project notes
+- heading count and breadth
+- ordered-list, task-list, and lookup-style structure
+- baseline anchor candidacy only as a weak secondary signal
+
+Secondary signals:
+
+- wording cues may be used only as weak optional boosts
+- wording alone must not push an ambiguous note over the threshold
+
+Tradeoffs:
+
+- lower recall for some thin notes with little structure
+- higher precision and better cross-language behavior
+
+Constraints:
+
+- language-neutral structure and graph evidence remains primary
+- unsupported-language notes should behave the same as cue-word variants when structure is identical
+- tuning decisions must not optimize only for mnemonic's own notes
+
+Future considerations:
+
+- additional structural signals may improve precision later
+- multilingual wording support can be added only as supplementary evidence, never as the backbone of inference
+
+### mnemonic — role suggestions are read-only runtime hints (consolidated)
+*Source: `mnemonic-role-suggestions-are-read-only-runtime-hints-consol-532d5d9b`*
+
 Roles and importance suggestions in mnemonic are **read-only runtime hints**, not a required schema, and must never mutate notes.
 
 ## Current role/lifecycle model (concrete)

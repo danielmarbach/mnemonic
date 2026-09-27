@@ -17,8 +17,6 @@ relatedTo:
     type: related-to
   - id: mnemonic-explicit-metadata-outranks-inferred-prioritization-6d3a6da0
     type: explains
-  - id: mnemonic-language-independent-role-heuristics-f66619c1
-    type: related-to
   - id: phase-2-design-workflow-hint-first-working-state-continuity-07153fcb
     type: related-to
   - id: rpir-workflow-design-for-mnemonic-research-plan-implement-re-80b00851

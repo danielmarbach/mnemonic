@@ -14,8 +14,6 @@ alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
-  - id: mnemonic-role-suggestions-are-read-only-runtime-hints-consol-532d5d9b
-    type: explains
   - id: mcp-workflow-ux-hint-prompt-tool-descriptions-and-session-st-e89a18fc
     type: related-to
   - id: phase-2-design-workflow-hint-first-working-state-continuity-07153fcb
