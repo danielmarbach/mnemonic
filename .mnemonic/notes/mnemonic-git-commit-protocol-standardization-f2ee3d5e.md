@@ -16,8 +16,6 @@ projectName: mnemonic
 relatedTo:
   - id: mnemonic-key-design-decisions-3f2a6273
     type: related-to
-  - id: manual-exact-git-recovery-contract-for-partial-mnemonic-pers-ffae4896
-    type: related-to
   - id: vault-commit-discipline-single-branch-delivery-and-cwd-scopi-acb7659a
     type: related-to
 memoryVersion: 1

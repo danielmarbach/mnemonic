@@ -18,8 +18,6 @@ projectName: mnemonic
 relatedTo:
   - id: persistence-status-reporting-design-and-implementation-8a50b95a
     type: related-to
-  - id: manual-exact-git-recovery-contract-for-partial-mnemonic-pers-ffae4896
-    type: explains
 memoryVersion: 1
 ---
 Observed a gap in the git retry/persistence contract during conservative note consolidation on branch `cleanup`.
