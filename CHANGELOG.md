@@ -4,6 +4,12 @@ All notable changes to `mnemonic` will be documented in this file.
 
 The format is loosely based on Keep a Changelog and uses semver-style version headings.
 
+## [Unreleased]
+
+### Fixed
+
+- `remember` no longer reports a schema error after saving a note in a project with a saved memory policy. Clients rejected the response even though the note was written and committed, which led agents to retry and create duplicates.
+
 ## [0.45.1] - 2026-09-16
 
 ### Fixed

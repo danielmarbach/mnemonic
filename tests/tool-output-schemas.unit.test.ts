@@ -19,6 +19,30 @@ describe("tool output schemas", () => {
       expect(parsed.success).toBe(false);
     });
 
+    it("keeps policyScope on remembered payloads", () => {
+      const parsed = RememberToolResultSchema.safeParse({
+        action: "remembered",
+        id: "note-1",
+        title: "Note",
+        scope: "project",
+        policyScope: "project",
+        vault: "project-vault",
+        tags: [],
+        lifecycle: "permanent",
+        timestamp: "2026-09-27T00:00:00.000Z",
+        persistence: {
+          notePath: "notes/note-1.md",
+          embeddingPath: "embeddings/note-1.json",
+          embedding: { status: "written", model: "test" },
+          git: { commit: "committed", push: "skipped" },
+          durability: "committed",
+        },
+      });
+
+      expect(parsed.success).toBe(true);
+      expect(parsed.data?.policyScope).toBe("project");
+    });
+
     it("rejects lint_error payload without tool field", () => {
       const parsed = RememberToolResultSchema.safeParse({
         action: "lint_error",

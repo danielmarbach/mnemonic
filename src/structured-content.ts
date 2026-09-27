@@ -944,6 +944,12 @@ export const RememberToolResultSchema = z
       .enum(["project", "global"])
       .optional()
       .describe("Storage scope, present when action is remembered."),
+    policyScope: z
+      .enum(["project", "global", "ask"])
+      .optional()
+      .describe(
+        "Saved project write-scope policy that governed this write. Present when action is remembered and the project has a saved policy; compare with scope to see whether an override applied.",
+      ),
     vault: _VaultLabel.optional().describe("Vault label, present when action is remembered."),
     tags: z.array(z.string()).optional().describe("Note tags, present when action is remembered."),
     lifecycle: _NoteLifecycle
@@ -1384,6 +1390,26 @@ export const UpdateToolResultSchema = z
         });
     }
   });
+
+// The flattened tool schemas are strict, so a handler field they lack is rejected by
+// MCP clients after the mutation already happened. Fail the build instead.
+type KnownKeys<T> = T extends unknown
+  ? keyof { [K in keyof T as string extends K ? never : K]: T[K] }
+  : never;
+type UncoveredKeys<Result, Schema extends z.ZodType> = Exclude<
+  KnownKeys<Result>,
+  keyof z.infer<Schema>
+>;
+type AssertCovered<Missing> = [Missing] extends [never] ? true : { uncoveredKeys: Missing };
+
+const rememberToolSchemaCoversResult: AssertCovered<
+  UncoveredKeys<RememberResult | RememberLintErrorResult, typeof RememberToolResultSchema>
+> = true;
+const updateToolSchemaCoversResult: AssertCovered<
+  UncoveredKeys<UpdateResult | UpdateLintErrorResult, typeof UpdateToolResultSchema>
+> = true;
+void rememberToolSchemaCoversResult;
+void updateToolSchemaCoversResult;
 
 export const ForgetResultSchema = z.object({
   action: z.literal("forgotten"),

@@ -1,11 +1,18 @@
 import { afterEach, beforeAll } from "vitest";
-import { access, mkdir, rm } from "fs/promises";
+import { access, mkdir, mkdtemp, rm } from "fs/promises";
+import os from "os";
 import path from "path";
 import { spawn } from "child_process";
 import http from "http";
 import { fileURLToPath } from "url";
 import { promisify } from "util";
 import { execFile } from "child_process";
+
+import {
+  assertStructuredContentMatchesOutputSchema,
+  compileOutputSchemaValidators,
+  type OutputSchemaValidators,
+} from "./output-schema-validator.js";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 export const execFileAsync = promisify(execFile);
@@ -375,6 +382,24 @@ export async function callLocalMcp(
   return response.text;
 }
 
+let sharedOutputValidators: Promise<OutputSchemaValidators> | undefined;
+
+// Output schemas do not depend on the vault, so one throwaway vault serves every test.
+function loadSharedOutputValidators(): Promise<OutputSchemaValidators> {
+  sharedOutputValidators ??= (async () => {
+    const vaultDir = await mkdtemp(path.join(os.tmpdir(), "mnemonic-schema-vault-"));
+    try {
+      const response = await callLocalMcpMethod(vaultDir, 1, "tools/list", {});
+      const tools = response.result?.["tools"] as
+        Array<{ name: string; outputSchema?: Record<string, unknown> }> | undefined;
+      return compileOutputSchemaValidators(tools ?? []);
+    } finally {
+      await rm(vaultDir, { recursive: true, force: true });
+    }
+  })();
+  return sharedOutputValidators;
+}
+
 export async function callLocalMcpResponse(
   vaultDir: string,
   toolName: string,
@@ -397,6 +422,12 @@ export async function callLocalMcpResponse(
   if (!text) {
     throw new Error(`Missing tool response for ${toolName}`);
   }
+
+  assertStructuredContentMatchesOutputSchema(
+    await loadSharedOutputValidators(),
+    toolName,
+    response.result,
+  );
 
   return {
     text,
@@ -525,6 +556,8 @@ export async function createPersistentMcpSession(
     return resultPromise;
   };
 
+  let sessionOutputValidators: Promise<OutputSchemaValidators> | undefined;
+
   return {
     callMethod,
     callTool: async (toolName, arguments_) => {
@@ -534,6 +567,13 @@ export async function createPersistentMcpSession(
       if (!text) {
         throw new Error(`Missing tool response for ${toolName}`);
       }
+      sessionOutputValidators ??= callMethod("tools/list", {}).then((listed) =>
+        compileOutputSchemaValidators(
+          (listed["tools"] as Array<{ name: string; outputSchema?: Record<string, unknown> }>) ??
+            [],
+        ),
+      );
+      assertStructuredContentMatchesOutputSchema(await sessionOutputValidators, toolName, result);
       return {
         text,
         structuredContent: result?.structuredContent as Record<string, unknown> | undefined,

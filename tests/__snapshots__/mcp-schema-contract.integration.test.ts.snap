@@ -6205,7 +6205,7 @@ Do not use this when:
 - You need to change an existing memory; use \`update\`
 - Several overlapping notes should be merged; use \`consolidate\`
 
-Returns: created id, scope, vault label, lifecycle, persistence status. On lint failure, returns action=lint_error with the list of unfixable issues.
+Returns: created id, scope, policyScope (saved policy that governed the write, when one exists), vault label, lifecycle, persistence status. On lint failure, returns action=lint_error with the list of unfixable issues.
 
 Writable attachments: set \`writable: true\` on \`add_attachment\` to enable writes.
 
@@ -6564,6 +6564,15 @@ Typical next step:
             "durability",
           ],
           "type": "object",
+        },
+        "policyScope": {
+          "description": "Saved project write-scope policy that governed this write. Present when action is remembered and the project has a saved policy; compare with scope to see whether an override applied.",
+          "enum": [
+            "project",
+            "global",
+            "ask",
+          ],
+          "type": "string",
         },
         "project": {
           "additionalProperties": false,
