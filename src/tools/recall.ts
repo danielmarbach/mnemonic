@@ -53,10 +53,12 @@ import {
 } from "../cache.js";
 import {
   buildLexicalText,
+  extractProjectionSummary,
   getOrBuildProjection,
   getProjection,
   isProjectionStale,
 } from "../projections.js";
+import { selectQuerySnippet } from "../recall-snippet.js";
 import { embedMissingNotes } from "../helpers/embed.js";
 import {
   ensureBranchSynced,
@@ -68,6 +70,7 @@ import {
 import { storageLabel } from "../helpers/vault.js";
 import {
   formatNote,
+  formatNoteBrief,
   formatTemporalHistory,
   formatRelationshipPreview,
   toRecallFreshness,
@@ -113,7 +116,7 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
         "Do not use this when:\n" +
         "- You already know the exact id; use `get`\n" +
         "- You just want to browse by tags or scope; use `list`\n\n" +
-        "Returns: ranked matches (id, title, score, vault, tags, lifecycle, updatedAt), 1-hop relationship previews on top results, temporal history (mode: temporal), retrieval evidence (evidence: compact), including optional score decomposition, diagnostics: recallScopeNoteCount, diversity, retrievalCoverage, signalStrength, plus derived-scope gating fields: suppressedGlobalCount (weak global matches held back) and widenedScope (recall widened after an empty admitted pool).\n" +
+        'Returns: ranked matches (id, title, score, vault, tags, lifecycle, updatedAt). By default (`detail: "brief"`) the text shows each note\'s summary plus the passage that best matches the query, not the full body; call `get` with the listed ids for full content, or pass `detail: "full"` to inline full bodies. Also 1-hop relationship previews on top results, temporal history (mode: temporal), retrieval evidence (evidence: compact), including optional score decomposition, diagnostics: recallScopeNoteCount, diversity, retrievalCoverage, signalStrength, plus derived-scope gating fields: suppressedGlobalCount (weak global matches held back) and widenedScope (recall widened after an empty admitted pool).\n' +
         "Document-source attachments return documentChunks (kind, chunkId, documentId, score, boosted, semanticScore, lexicalScore, sourcePath, headingAncestry, excerpt, attachmentId, sourceMediaType, extractionMetadata, indexedCommit, generationId, retrievalHandle); chunks rank below memories by default and render inline in the ranked list.\n\n" +
         "Typical next step:\n" +
         "- Use `get`, `update`, `relate`, or `consolidate` based on the results.",
@@ -160,6 +163,13 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
           .describe(
             "Optional retrieval rationale. Omit for default output; use `compact` for bounded rank and lineage signals.",
           ),
+        detail: z
+          .enum(["brief", "full"])
+          .optional()
+          .default("brief")
+          .describe(
+            "Text detail per result. `brief` (default) shows the summary and the best-matching passage; call `get` for full content. `full` inlines every note body and costs far more tokens.",
+          ),
         tags: z
           .array(z.string())
           .optional()
@@ -193,6 +203,7 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
       mode,
       verbose,
       evidence,
+      detail,
       tags,
       scope,
       lifecycle,
@@ -815,6 +826,19 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
         retrievalEvidence?: RetrievalEvidence;
       }> = [];
 
+      const renderNote = (note: Note, score: number, showRawRelated: boolean): string => {
+        if (detail === "full") {
+          return formatNote(note, score, showRawRelated);
+        }
+        const summary = extractProjectionSummary(note);
+        return formatNoteBrief(note, {
+          score,
+          showRawRelated,
+          summary,
+          snippet: selectQuerySnippet(note.content, query, summary),
+        });
+      };
+
       // Determine how many top results get relationship expansion
       // Top 1 by default, top 3 if result count is small
       const recallRelationshipLimit = top.length <= 3 ? 3 : 1;
@@ -944,17 +968,18 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
                   supersededCount:
                     supersededRelations.length > 0 ? supersededRelations.length : undefined,
                   scoreDecomposition: {
-                    semanticScore,
+                    semanticScore:
+                      semanticScore === undefined ? undefined : roundScore(semanticScore),
                     semanticRank,
                     lexicalRank,
                     graphRank,
-                    rrfScore: candidate.rrfScore ?? 0,
-                    semanticConfidencePrior: candidate.semanticConfidencePrior ?? 0,
-                    projectPrior: candidate.projectPrior ?? 0,
-                    temporalPrior: candidate.temporalPrior ?? 0,
-                    metadataPrior: candidate.metadataPrior ?? 0,
-                    canonicalPrior: candidate.canonicalPrior ?? 0,
-                    finalScore: candidate.finalScore ?? finalScore,
+                    rrfScore: roundPrior(candidate.rrfScore ?? 0),
+                    semanticConfidencePrior: roundPrior(candidate.semanticConfidencePrior ?? 0),
+                    projectPrior: roundPrior(candidate.projectPrior ?? 0),
+                    temporalPrior: roundPrior(candidate.temporalPrior ?? 0),
+                    metadataPrior: roundPrior(candidate.metadataPrior ?? 0),
+                    canonicalPrior: roundPrior(candidate.canonicalPrior ?? 0),
+                    finalScore: roundPrior(candidate.finalScore ?? finalScore),
                   },
                 }
               : undefined;
@@ -966,14 +991,14 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
             kind: "note",
             score: finalScore,
             sortKey: id,
-            text: `${formatNote(note, score, relationships === undefined)}${provenanceLine}${evidenceLine}${formattedHistory}${formattedRelationships}`,
+            text: `${renderNote(note, score, relationships === undefined)}${provenanceLine}${evidenceLine}${formattedHistory}${formattedRelationships}`,
           });
 
           structuredResults.push({
             id,
             title: note.title,
-            score,
-            boosted,
+            score: roundScore(score),
+            boosted: roundScore(boosted),
             project: noteProjectRef(note),
             vault: storageLabel(vault),
             tags: note.tags,
@@ -982,7 +1007,7 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
             updatedAt: note.updatedAt,
             provenance,
             confidence,
-            signalStrength,
+            signalStrength: signalStrength === undefined ? undefined : roundScore(signalStrength),
             history,
             historySummary,
             relationships,
@@ -1077,7 +1102,14 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
       }
       const diagnosticsLine =
         diagnosticsParts.length > 0 ? `\n${diagnosticsParts.join(" | ")}` : "";
-      const textContent = `${header}${diagnosticsLine}${gatingNoticeLine}\n\n${unifiedText}${cwdHint}`;
+      const hints = buildRecallHints(top);
+      const hintLine = hints.length > 0 ? `\n${hints.join(" | ")}` : "";
+      const noteIds = structuredResults.map((result) => `\`${result.id}\``);
+      const getHint =
+        detail === "brief" && noteIds.length > 0
+          ? `\n\nFor full note content call \`get\` with ids: ${noteIds.join(", ")}`
+          : "";
+      const textContent = `${header}${diagnosticsLine}${gatingNoticeLine}${hintLine}\n\n${unifiedText}${getHint}${cwdHint}`;
 
       const structuredContent: RecallResult = {
         action: "recalled",
@@ -1099,4 +1131,28 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
       };
     },
   );
+}
+
+const SCORE_DECIMALS = 1_000;
+const PRIOR_DECIMALS = 10_000;
+// Below this, the best semantic match is only loosely related to the query.
+const WEAK_SEMANTIC_SCORE = 0.5;
+
+function roundScore(value: number): number {
+  return Math.round(value * SCORE_DECIMALS) / SCORE_DECIMALS;
+}
+
+// Priors are small (0.0025-0.05), so they keep one more digit than scores.
+function roundPrior(value: number): number {
+  return Math.round(value * PRIOR_DECIMALS) / PRIOR_DECIMALS;
+}
+
+function buildRecallHints(top: readonly ScoredRecallCandidate[]): string[] {
+  const hints: string[] = [];
+  const hasLexicalMatch = top.some((candidate) => candidate.lexicalRank !== undefined);
+  const bestSemantic = Math.max(0, ...top.map((candidate) => candidate.semanticScore ?? 0));
+  if (top.length > 0 && !hasLexicalMatch && bestSemantic < WEAK_SEMANTIC_SCORE) {
+    hints.push("weak matches: try more specific terms or an exact identifier");
+  }
+  return hints;
 }

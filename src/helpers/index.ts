@@ -23,7 +23,7 @@ export function describeLifecycle(lifecycle: NoteLifecycle): string {
   return `lifecycle: ${lifecycle}`;
 }
 
-export function formatNote(note: Note, score?: number, showRawRelated = true): string {
+function formatNoteHeader(note: Note, score: number | undefined, showRawRelated: boolean): string {
   const scoreStr = score !== undefined ? ` | similarity: ${score.toFixed(3)}` : "";
   const projectStr = note.project ? ` | project: ${note.projectName ?? note.project}` : " | global";
   const roleStr = note.role ? ` | **role: ${note.role}**` : "";
@@ -34,9 +34,22 @@ export function formatNote(note: Note, score?: number, showRawRelated = true): s
   return (
     `## ${note.title}\n` +
     `**id:** \`${note.id}\`${projectStr}${scoreStr}\n` +
-    `**tags:** ${note.tags.join(", ") || "none"} | **${describeLifecycle(note.lifecycle)}**${roleStr} | **updated:** ${note.updatedAt}${relStr}\n\n` +
-    note.content
+    `**tags:** ${note.tags.join(", ") || "none"} | **${describeLifecycle(note.lifecycle)}**${roleStr} | **updated:** ${note.updatedAt}${relStr}`
   );
+}
+
+export function formatNote(note: Note, score?: number, showRawRelated = true): string {
+  return `${formatNoteHeader(note, score, showRawRelated)}\n\n${note.content}`;
+}
+
+/** Header plus summary and an optional query-focused snippet instead of the full body. */
+export function formatNoteBrief(
+  note: Note,
+  options: { score?: number; showRawRelated: boolean; summary: string; snippet?: string },
+): string {
+  const summaryLine = options.summary ? `\n\n${options.summary}` : "";
+  const snippetLine = options.snippet ? `\n> ${options.snippet}` : "";
+  return `${formatNoteHeader(note, options.score, options.showRawRelated)}${summaryLine}${snippetLine}`;
 }
 
 export function formatTemporalHistory(

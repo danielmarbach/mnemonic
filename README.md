@@ -386,6 +386,12 @@ Recall modes:
 - `mode: "temporal"`: enrich top matches with compact git-backed history (no raw diffs by default).
 - `mode: "workflow"`: prioritize RPIR-style chain reconstruction while remaining compatible with legacy `related-to` links.
 
+Recall detail:
+
+- `detail: "brief"` (default): each result shows its summary and the passage that best matches the query instead of the full body, and the response ends with the ids to pass to `get` for full content. On a real project vault this cut recall text by about three quarters.
+- `detail: "full"`: inline every matching note body, as recall did before.
+- Scores in structured output are rounded (3 decimals, 4 for score-decomposition priors).
+
 Recall evidence:
 
 - `evidence: "compact"` (optional recall): add compact retrieval rationale per result in text and structured output.
@@ -560,7 +566,7 @@ Imported notes are written to the main vault with `lifecycle: permanent` and `sc
 | `memory_graph`              | Show compact adjacency list of relationships                                                                                                        |
 | `move_memory`               | Move note between vaults without changing id                                                                                                        |
 | `project_memory_summary`    | Session-start entrypoint: themes, anchors, orientation, maintenance warnings, and working-state recovery hints                                      |
-| `recall`                    | Hybrid semantic, exact-wording, and relationship search with temporal/workflow modes and optional `evidence: "compact"` rationale. Returns `documentChunks` from document-source attachments alongside memory results.                   |
+| `recall`                    | Hybrid semantic, exact-wording, and relationship search with temporal/workflow modes and optional `evidence: "compact"` rationale. Shows summaries and the best-matching passage by default (`detail: "full"` inlines bodies; use `get` for full content). Returns `documentChunks` from document-source attachments alongside memory results. |
 | `recent_memories`           | Show most recently updated notes for scope                                                                                                          |
 | `remember`                  | Write note + embedding; `cwd` sets context, `scope` picks storage (prefer omitting so the saved policy governs; contradicting it requires confirmation or `scopePolicyOverride`), `lifecycle` picks temporary vs permanent                                         |
 | `relate`                    | Create typed relationship between notes (bidirectional)                                                                                             |

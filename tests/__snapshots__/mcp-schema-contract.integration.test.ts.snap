@@ -5021,7 +5021,7 @@ Do not use this when:
 - You already know the exact id; use \`get\`
 - You just want to browse by tags or scope; use \`list\`
 
-Returns: ranked matches (id, title, score, vault, tags, lifecycle, updatedAt), 1-hop relationship previews on top results, temporal history (mode: temporal), retrieval evidence (evidence: compact), including optional score decomposition, diagnostics: recallScopeNoteCount, diversity, retrievalCoverage, signalStrength, plus derived-scope gating fields: suppressedGlobalCount (weak global matches held back) and widenedScope (recall widened after an empty admitted pool).
+Returns: ranked matches (id, title, score, vault, tags, lifecycle, updatedAt). By default (\`detail: "brief"\`) the text shows each note's summary plus the passage that best matches the query, not the full body; call \`get\` with the listed ids for full content, or pass \`detail: "full"\` to inline full bodies. Also 1-hop relationship previews on top results, temporal history (mode: temporal), retrieval evidence (evidence: compact), including optional score decomposition, diagnostics: recallScopeNoteCount, diversity, retrievalCoverage, signalStrength, plus derived-scope gating fields: suppressedGlobalCount (weak global matches held back) and widenedScope (recall widened after an empty admitted pool).
 Document-source attachments return documentChunks (kind, chunkId, documentId, score, boosted, semanticScore, lexicalScore, sourcePath, headingAncestry, excerpt, attachmentId, sourceMediaType, extractionMetadata, indexedCommit, generationId, retrievalHandle); chunks rank below memories by default and render inline in the ranked list.
 
 Typical next step:
@@ -5031,6 +5031,15 @@ Typical next step:
       "properties": {
         "cwd": {
           "description": "Absolute path of the project working directory. Required for project-scoped routing, vault selection, and search boosting. Without it, only the global main vault is used: project memories are invisible to reads, and writes land in the main vault.",
+          "type": "string",
+        },
+        "detail": {
+          "default": "brief",
+          "description": "Text detail per result. \`brief\` (default) shows the summary and the best-matching passage; call \`get\` for full content. \`full\` inlines every note body and costs far more tokens.",
+          "enum": [
+            "brief",
+            "full",
+          ],
           "type": "string",
         },
         "evidence": {

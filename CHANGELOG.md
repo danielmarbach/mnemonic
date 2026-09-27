@@ -6,6 +6,11 @@ The format is loosely based on Keep a Changelog and uses semver-style version he
 
 ## [Unreleased]
 
+### Changed
+
+- `recall` now shows each note's summary and the passage that best matches the query instead of the full body, and lists the ids to pass to `get` for full content. On a real project vault this cut recall output by about three quarters. Pass `detail: "full"` for the previous behavior.
+- `recall` prints a hint when every match is weak and nothing matched lexically, and rounds scores in structured output.
+
 ### Fixed
 
 - `recall` now finds exact identifiers such as function names, constants and config keys that only appear deep in a note body, and matches `OUTBOX_POLL_INTERVAL_MS` and `outboxPollIntervalMs` style spellings of the same name. Existing notes pick this up automatically the next time they are recalled.
