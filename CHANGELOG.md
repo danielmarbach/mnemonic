@@ -4,7 +4,7 @@ All notable changes to `mnemonic` will be documented in this file.
 
 The format is loosely based on Keep a Changelog and uses semver-style version headings.
 
-## [Unreleased]
+## [0.46.0] - 2026-09-27
 
 ### Added
 
@@ -15,7 +15,7 @@ The format is loosely based on Keep a Changelog and uses semver-style version he
 
 - `recall` now shows each note's summary and the passage that best matches the query instead of the full body, and lists the ids to pass to `get` for full content. On a real project vault this cut recall output by about three quarters. Pass `detail: "full"` for the previous behavior.
 - `recall` prints a hint when every match is weak and nothing matched lexically, and rounds scores in structured output.
-- `list` returns 50 notes per page by default, with `total` and a `nextCursor` for the next page. Previously it returned every visible note at once, which on a few hundred notes ran past 170 KB. Pass `limit` (up to 200) to change the page size.
+- `list` returns 50 notes per page by default, with `total` and a `nextCursor` for the next page. Previously it returned every visible note at once, which on a few hundred notes ran past 170 KB. Pass `limit` (up to 200) to change the page size. `count` now reports the notes on the current page; use `total` for all matches.
 
 ### Fixed
 
