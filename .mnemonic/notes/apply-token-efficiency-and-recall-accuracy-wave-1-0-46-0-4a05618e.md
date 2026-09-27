@@ -7,11 +7,14 @@ tags:
   - recall
 lifecycle: temporary
 createdAt: '2026-09-27T13:58:33.730Z'
-updatedAt: '2026-09-27T13:58:33.730Z'
+updatedAt: '2026-09-27T13:59:11.661Z'
 role: context
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: plan-token-efficiency-and-recall-accuracy-wave-1-lanes-l1-l6-0470831c
+    type: follows
 memoryVersion: 1
 ---
 Implementation record for wave 1. Plan: `plan-token-efficiency-and-recall-accuracy-wave-1-lanes-l1-l6-0470831c`. Branch `improve/token-efficiency-and-recall-accuracy`, released as 0.46.0 (`1af620b`).
