@@ -17,9 +17,6 @@ role: review
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
-relatedTo:
-  - id: document-source-embeddings-for-global-policy-projects-main-v-ff2954f1
-    type: follows
 memoryVersion: 1
 ---
 ## Verdict

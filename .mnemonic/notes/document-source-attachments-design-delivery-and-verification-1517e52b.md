@@ -23,8 +23,6 @@ relatedTo:
     type: explains
   - id: plan-deliver-document-source-chunk-semantic-retrieval-embedd-dba90b71
     type: follows
-  - id: document-source-embeddings-for-global-policy-projects-main-v-ff2954f1
-    type: related-to
 memoryVersion: 1
 ---
 Consolidates the completed document-source attachment workflow (request, research, two design reviews, six-stage plan, stage review) into one permanent canonical note. Source notes are deleted; durable detail remains in the related permanent notes.

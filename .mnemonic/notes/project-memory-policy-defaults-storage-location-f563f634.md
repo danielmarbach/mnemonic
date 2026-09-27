@@ -18,8 +18,6 @@ relatedTo:
     type: related-to
   - id: mutation-push-mode-defaults-for-project-vault-writes-ab095db1
     type: related-to
-  - id: document-source-embeddings-for-global-policy-projects-main-v-ff2954f1
-    type: related-to
 memoryVersion: 1
 ---
 Decision: project context and storage location are separate, and each project can keep a default write policy so agents only need to ask when necessary.
