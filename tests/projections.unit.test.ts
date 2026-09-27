@@ -2,9 +2,11 @@ import { describe, expect, it } from "vitest";
 import { isoDateString, memoryId } from "../src/brands.js";
 import type { Note, NoteStorage } from "../src/storage.js";
 import {
+  buildLexicalText,
   buildProjection,
   buildProjectionText,
   extractHeadings,
+  extractIdentifiers,
   extractProjectionSummary,
   getOrBuildProjection,
   isProjectionStale,
@@ -277,6 +279,7 @@ describe("isProjectionStale", () => {
       projectionText: "Title: Test Note",
       generatedAt: "2026-01-15T01:00:00.000Z",
       contentSignals: signals,
+      identifiers: [],
       ...overrides,
     };
   }
@@ -531,5 +534,97 @@ Use \`updatedAt\` comparison to detect stale embeddings.
     const proj = buildProjection(note);
     expect(proj.tags).toEqual([]);
     expect(proj.projectionText).not.toContain("Tags:");
+  });
+});
+
+// ── Body identifiers ──────────────────────────────────────────────────────────
+
+const LONG_FILLER = "This paragraph keeps the identifier far away from the summary. ".repeat(60);
+
+describe("extractIdentifiers", () => {
+  it("collects inline code spans and compound words from the whole body", () => {
+    const identifiers = extractIdentifiers(
+      `Intro.\n\n${LONG_FILLER}\n\nTune \`OUTBOX_POLL_INTERVAL_MS\` and call buildNoteWarnings, see payment-gateway-timeout.`,
+    );
+    expect(identifiers).toEqual([
+      "OUTBOX_POLL_INTERVAL_MS",
+      "buildNoteWarnings",
+      "payment-gateway-timeout",
+    ]);
+  });
+
+  it("keeps multi-word code spans as separate identifiers and deduplicates", () => {
+    expect(extractIdentifiers("Run `make dev-up` then `make dev-up` again, dev-up works.")).toEqual(
+      ["make", "dev-up"],
+    );
+  });
+
+  it("ignores fenced code blocks and URLs", () => {
+    const content =
+      "See https://example.com/some-path for details.\n\n```ts\nconst fencedOnly = someCall();\n```\n\nPlain prose.";
+    expect(extractIdentifiers(content)).toEqual([]);
+  });
+
+  it("bounds the number and length of identifiers", () => {
+    const many = Array.from({ length: 250 }, (_, index) => `name_${index}`).join(" ");
+    const tooLong = `a_${"b".repeat(100)}`;
+    const identifiers = extractIdentifiers(`${many} ${tooLong}`);
+    expect(identifiers).toHaveLength(200);
+    expect(identifiers).not.toContain(tooLong);
+  });
+});
+
+describe("buildProjection identifiers", () => {
+  it("persists body identifiers without changing the embedding text", () => {
+    const withIdentifier = makeNote({
+      content: `Short summary.\n\n${LONG_FILLER}\n\nThe \`IdempotencyKeyStore\` dedupes deliveries.`,
+    });
+    const withoutIdentifier = makeNote({
+      content: `Short summary.\n\n${LONG_FILLER}\n\nThe store dedupes deliveries.`,
+    });
+
+    const projection = buildProjection(withIdentifier);
+
+    expect(projection.identifiers).toEqual(["IdempotencyKeyStore"]);
+    expect(projection.projectionText).toBe(buildProjection(withoutIdentifier).projectionText);
+    expect(projection.projectionText).not.toContain("IdempotencyKeyStore");
+  });
+
+  it("appends identifiers to the lexical text only", () => {
+    const projection = buildProjection(
+      makeNote({ content: `Summary.\n\n${LONG_FILLER}\n\nUse \`validateLineItems\`.` }),
+    );
+    expect(buildLexicalText(projection)).toBe(
+      `${projection.projectionText}\nIdentifiers: validateLineItems`,
+    );
+    expect(buildLexicalText({ projectionText: "Title: X", identifiers: [] })).toBe("Title: X");
+  });
+
+  it("round-trips identifiers through projection validation", () => {
+    const projection = buildProjection(makeNote({ content: "Use `fooBar` here." }));
+    expect(validateNoteProjection(JSON.parse(JSON.stringify(projection)))?.identifiers).toEqual([
+      "fooBar",
+    ]);
+  });
+});
+
+describe("isProjectionStale identifiers", () => {
+  it("treats a legacy projection without identifiers as stale", () => {
+    const note = makeNote({ content: "Body." });
+    const projection = buildProjection(note);
+    delete projection.identifiers;
+    expect(isProjectionStale(note, projection)).toBe(true);
+  });
+
+  it("detects a deep body identifier change that leaves projectionText unchanged", () => {
+    const before = makeNote({ content: `Summary.\n\n${LONG_FILLER}\n\nUse \`oldName\`.` });
+    const after = makeNote({
+      content: `Summary.\n\n${LONG_FILLER}\n\nUse \`newName\`.`,
+      updatedAt: isoDateString("2026-03-01T00:00:00.000Z"),
+    });
+    const projection = buildProjection(before);
+
+    expect(buildProjection(after).projectionText).toBe(projection.projectionText);
+    expect(isProjectionStale(after, projection)).toBe(true);
   });
 });

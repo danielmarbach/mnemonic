@@ -48,6 +48,7 @@ export const NoteProjectionSchema = z.object({
   projectionText: z.string(),
   generatedAt: z.string(),
   contentSignals: NoteContentSignalsSchema.optional(),
+  identifiers: z.array(z.string()).optional(),
 });
 
 const RelationshipSchema = z.object({

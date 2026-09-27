@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Deterministic recall-quality eval over tests/fixtures/recall-eval.
-// Usage: node scripts/eval-recall.mjs [--json] [--ollama <url>] [--update-baseline]
+// Usage: node scripts/eval-recall.mjs [--json] [--explain] [--ollama <url>] [--update-baseline]
 
 import { execFile, spawn } from "child_process";
 import { cp, mkdtemp, readFile, rm, writeFile } from "fs/promises";
@@ -183,7 +183,7 @@ function summarize(rows) {
 
 /**
  * Runs every fixture query through recall and returns per-kind metrics plus per-query rows.
- * @param {{ entryPoint?: string, ollamaUrl?: string }} [options]
+ * @param {{ entryPoint?: string, ollamaUrl?: string, explain?: boolean }} [options]
  */
 export async function runRecallEval(options = {}) {
   const fixture = JSON.parse(await readFile(path.join(fixtureDir, "queries.json"), "utf-8"));
@@ -211,20 +211,25 @@ export async function runRecallEval(options = {}) {
         query: item.query,
         cwd: env.repoDir,
         limit: RECALL_LIMIT,
+        ...(options.explain ? { evidence: "compact" } : {}),
       });
       const ids = (result.structuredContent?.results ?? []).map((entry) => entry.id);
       const position = ids.indexOf(item.expected);
       const rank = position >= 0 ? position + 1 : undefined;
       const outrankedPosition = item.mustOutrank ? ids.indexOf(item.mustOutrank) : -1;
       const passed = rank !== undefined && (outrankedPosition < 0 || position < outrankedPosition);
-      rows.push({
+      const row = {
         kind: item.kind,
         query: item.query,
         expected: item.expected,
         rank,
         passed,
         top: ids[0],
-      });
+      };
+      if (options.explain) {
+        row.explain = (result.structuredContent?.results ?? []).slice(0, 3).map(explainResult);
+      }
+      rows.push(row);
     }
 
     return { embedder: options.ollamaUrl ? "ollama" : "hash", metrics: summarize(rows), rows };
@@ -233,6 +238,17 @@ export async function runRecallEval(options = {}) {
     await embedder?.close();
     await rm(env.root, { recursive: true, force: true });
   }
+}
+
+function explainResult(entry) {
+  const d = entry.retrievalEvidence?.scoreDecomposition ?? {};
+  const format = (value) => (typeof value === "number" ? value.toFixed(4) : "-");
+  return [
+    entry.id,
+    `ranks sem=${d.semanticRank ?? "-"} lex=${d.lexicalRank ?? "-"} graph=${d.graphRank ?? "-"}`,
+    `rrf=${format(d.rrfScore)} project=${format(d.projectPrior)} metadata=${format(d.metadataPrior)}`,
+    `canonical=${format(d.canonicalPrior)} final=${format(d.finalScore)}`,
+  ].join(" ");
 }
 
 function formatReport(report) {
@@ -250,6 +266,9 @@ function formatReport(report) {
       lines.push(
         `  [${row.kind}] "${row.query}" -> rank ${row.rank ?? "miss"}${row.passed ? "" : " (fail)"}, top: ${row.top ?? "none"}`,
       );
+      for (const detail of row.explain ?? []) {
+        lines.push(`      ${detail}`);
+      }
     }
   }
   return lines.join("\n");
@@ -260,7 +279,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   const ollamaIndex = args.indexOf("--ollama");
   const ollamaUrl =
     ollamaIndex >= 0 ? (args[ollamaIndex + 1] ?? "http://localhost:11434") : undefined;
-  const report = await runRecallEval({ ollamaUrl });
+  const report = await runRecallEval({ ollamaUrl, explain: args.includes("--explain") });
   if (args.includes("--update-baseline")) {
     if (ollamaUrl) {
       throw new Error("The baseline is recorded with hash embeddings only; drop --ollama.");

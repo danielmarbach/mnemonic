@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  isCompoundIdentifier,
   normalizeText,
   tokenize,
   jaccardSimilarity,
@@ -57,6 +58,63 @@ describe("tokenize", () => {
   it("normalizes before splitting", () => {
     expect(tokenize("Hello, World!")).toEqual(["hello", "world"]);
   });
+
+  it("tokenizes prose without identifiers exactly like normalizeText", () => {
+    const prose = "Retry only on transport errors, never on declines. It (mostly) works!";
+    expect(tokenize(prose)).toEqual(normalizeText(prose).split(" "));
+  });
+
+  it("adds the separator-free joined form for snake, kebab, colon and version compounds", () => {
+    expect(tokenize("set RRF_K")).toEqual(["set", "rrf", "k", "rrfk"]);
+    expect(tokenize("payment-gateway-timeout")).toContain("paymentgatewaytimeout");
+    expect(tokenize("run migrate:contract")).toContain("migratecontract");
+    expect(tokenize("pinned to node-22.4.1.")).toContain("node2241");
+  });
+
+  it("adds camelCase parts, which normalizeText keeps glued together", () => {
+    expect(tokenize("call buildNoteWarnings()")).toEqual([
+      "call",
+      "buildnotewarnings",
+      "build",
+      "note",
+      "warnings",
+    ]);
+    expect(tokenize("HTTPServerError")).toEqual(["httpservererror", "http", "server", "error"]);
+  });
+
+  it("gives SCREAMING_SNAKE and camelCase spellings of one name a shared token", () => {
+    const joined = "outboxpollintervalms";
+    expect(tokenize("OUTBOX_POLL_INTERVAL_MS")).toContain(joined);
+    expect(tokenize("outboxPollIntervalMs")).toContain(joined);
+  });
+
+  it("adds each extra token once, keeping base token frequencies intact", () => {
+    const tokens = tokenize("RRF_K and RRF_K again");
+    expect(tokens.filter((token) => token === "rrf")).toHaveLength(2);
+    expect(tokens.filter((token) => token === "rrfk")).toHaveLength(1);
+  });
+});
+
+describe("isCompoundIdentifier", () => {
+  it.each([
+    "buildNoteWarnings",
+    "HTTPServer",
+    "RRF_K",
+    "snake_case",
+    "kebab-case",
+    "v2.1.0",
+    "migrate:contract",
+    "`OutboxDispatcher`,",
+  ])("treats %s as a compound identifier", (word) => {
+    expect(isCompoundIdentifier(word)).toBe(true);
+  });
+
+  it.each(["hello", "Hello", "API", "done.", "(mostly)", "3,600,000", "-"])(
+    "does not treat %s as a compound identifier",
+    (word) => {
+      expect(isCompoundIdentifier(word)).toBe(false);
+    },
+  );
 });
 
 describe("jaccardSimilarity", () => {

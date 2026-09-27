@@ -3,10 +3,14 @@ import { hasNoteContent } from "./storage.js";
 import type { NoteContentSignals, NoteProjection } from "./structured-content.js";
 import { analyzeNoteContent } from "./role-suggestions.js";
 import { memoryId } from "./brands.js";
+import { isCompoundIdentifier } from "./lexical.js";
 
 const MAX_SUMMARY_LENGTH = 280;
 const MAX_HEADINGS = 8;
 const MAX_PROJECTION_TEXT_LENGTH = 1200;
+// Bounds keep a pasted code dump from bloating the projection file and the lexical corpus.
+const MAX_IDENTIFIERS = 200;
+const MAX_IDENTIFIER_LENGTH = 80;
 
 // ── Summary extraction ────────────────────────────────────────────────────────
 
@@ -96,6 +100,53 @@ export function extractHeadings(markdown: string): string[] {
   return headings;
 }
 
+// ── Identifier extraction ─────────────────────────────────────────────────────
+
+/**
+ * Extract code-like identifiers from the full note body: inline code spans and
+ * compound words (camelCase, snake_case, SCREAMING_SNAKE, kebab-case, versions).
+ * Returned in document order, deduplicated, original casing preserved.
+ */
+export function extractIdentifiers(markdown: string): string[] {
+  const seen = new Set<string>();
+  const identifiers: string[] = [];
+  const add = (candidate: string): void => {
+    const trimmed = candidate.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, "");
+    if (!trimmed || trimmed.length > MAX_IDENTIFIER_LENGTH || seen.has(trimmed)) {
+      return;
+    }
+    seen.add(trimmed);
+    identifiers.push(trimmed);
+  };
+
+  const withoutFences = markdown.replace(/^```[^\n]*\n[\s\S]*?^```/gm, " ");
+  for (const match of withoutFences.matchAll(/`([^`\n]+)`/g)) {
+    for (const word of (match[1] ?? "").split(/\s+/)) {
+      add(word);
+    }
+  }
+  for (const word of withoutFences.replace(/`[^`\n]+`/g, " ").split(/\s+/)) {
+    if (isCompoundIdentifier(word) && !/^[a-z][a-z0-9+.-]*:\/\//i.test(word)) {
+      add(word);
+    }
+  }
+
+  return identifiers.slice(0, MAX_IDENTIFIERS);
+}
+
+/**
+ * Text the lexical recall channel scores: the projection text plus body identifiers.
+ * Embeddings keep using projectionText alone, so identifiers never trigger re-embedding.
+ */
+export function buildLexicalText(
+  projection: Pick<NoteProjection, "projectionText" | "identifiers">,
+): string {
+  const identifiers = projection.identifiers ?? [];
+  return identifiers.length > 0
+    ? `${projection.projectionText}\nIdentifiers: ${identifiers.join(" ")}`
+    : projection.projectionText;
+}
+
 // ── Projection text ───────────────────────────────────────────────────────────
 
 /**
@@ -140,6 +191,7 @@ export function buildProjection(note: Note): NoteProjection {
   const summary = extractProjectionSummary(note);
   const headings = extractHeadings(note.content);
   const contentSignals = analyzeNoteContent(note.content);
+  const identifiers = extractIdentifiers(note.content);
   const partial = {
     title: note.title,
     lifecycle: note.lifecycle,
@@ -160,6 +212,7 @@ export function buildProjection(note: Note): NoteProjection {
     projectionText,
     generatedAt: new Date().toISOString(),
     contentSignals,
+    identifiers,
   };
 }
 
@@ -169,8 +222,8 @@ export function buildProjection(note: Note): NoteProjection {
  * A projection is stale when:
  * - projection is missing → stale (caller handles null case)
  * - projection.updatedAt missing → stale
- * - projection lacks persisted contentSignals → stale (one-time lazy migration
- *   of legacy projections written before content signals were persisted)
+ * - projection lacks persisted contentSignals or identifiers → stale (one-time
+ *   lazy migration of legacy projections written before those fields existed)
  * - updatedAt differs AND projected content actually changed
  *
  * Relationship-only changes bump note.updatedAt without affecting projectionText
@@ -184,7 +237,7 @@ export function isProjectionStale(note: NoteMetadata, projection: NoteProjection
   if (!projection.updatedAt) return true;
 
   // Force a one-time lazy rebuild of legacy projections.
-  if (!projection.contentSignals) return true;
+  if (!projection.contentSignals || !projection.identifiers) return true;
 
   if (projection.updatedAt === note.updatedAt) return false;
   if (!hasNoteContent(note)) return true;
@@ -196,7 +249,15 @@ export function isProjectionStale(note: NoteMetadata, projection: NoteProjection
     headings: extractHeadings(note.content),
   });
   if (currentText !== projection.projectionText) return true;
-  return !contentSignalsEqual(analyzeNoteContent(note.content), projection.contentSignals);
+  if (!contentSignalsEqual(analyzeNoteContent(note.content), projection.contentSignals)) {
+    return true;
+  }
+  // Identifiers come from the whole body, so they can change while projectionText does not.
+  return !stringArraysEqual(extractIdentifiers(note.content), projection.identifiers);
+}
+
+function stringArraysEqual(a: readonly string[], b: readonly string[]): boolean {
+  return a.length === b.length && a.every((value, index) => value === b[index]);
 }
 
 function contentSignalsEqual(a: NoteContentSignals, b: NoteContentSignals): boolean {

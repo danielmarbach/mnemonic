@@ -9,15 +9,15 @@
     },
     "body": {
       "queries": 10,
-      "mrrAt10": 0.275,
-      "successAt1": 0.2,
-      "successAt5": 0.3
+      "mrrAt10": 0.374,
+      "successAt1": 0.3,
+      "successAt5": 0.4
     },
     "identifier": {
       "queries": 12,
-      "mrrAt10": 0.417,
-      "successAt1": 0.333,
-      "successAt5": 0.5
+      "mrrAt10": 0.792,
+      "successAt1": 0.583,
+      "successAt5": 1
     },
     "project-affinity": {
       "queries": 8,

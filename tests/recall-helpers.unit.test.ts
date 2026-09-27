@@ -139,9 +139,11 @@ describe("collectLexicalCandidates projection I/O behavior", () => {
       projectionText: "Title: Shared Note\nSummary: shared summary about test recall",
       generatedAt: NOW,
       contentSignals: signals,
+      identifiers: [],
     };
     if (opts.legacy) {
       delete p.contentSignals;
+      delete p.identifiers;
     }
     return p;
   }

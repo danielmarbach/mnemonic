@@ -12,11 +12,63 @@ export function normalizeText(text: string): string {
     .trim();
 }
 
+const COMPOUND_SEPARATOR = /[_\-.:/]/u;
+const CAMEL_BOUNDARY = /\p{Ll}\p{Lu}|\p{Lu}\p{Lu}\p{Ll}/u;
+const EDGE_PUNCTUATION = /^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu;
+
+/**
+ * True for code-like words: camelCase, PascalCase with inner capitals, or alphanumeric
+ * segments joined by `_`, `-`, `.`, `:` or `/` (snake_case, kebab-case, versions, paths).
+ */
+export function isCompoundIdentifier(word: string): boolean {
+  const core = word.replace(EDGE_PUNCTUATION, "");
+  if (core.length < 3) return false;
+  if (CAMEL_BOUNDARY.test(core)) return true;
+  return (
+    core.split(COMPOUND_SEPARATOR).filter((segment) => /[\p{L}\p{N}]/u.test(segment)).length > 1
+  );
+}
+
+/**
+ * Extra tokens for one compound identifier: the separator-free joined form, so
+ * `OUTBOX_POLL_INTERVAL_MS` and `outboxPollIntervalMs` share `outboxpollintervalms`,
+ * plus camelCase parts, which normalizeText keeps glued together.
+ */
+function compoundIdentifierTokens(word: string): string[] {
+  const core = word.replace(EDGE_PUNCTUATION, "");
+  const joined = core.toLowerCase().replace(/[^\p{L}\p{N}]/gu, "");
+  const camelParts = core
+    .split(COMPOUND_SEPARATOR)
+    .filter((segment) => CAMEL_BOUNDARY.test(segment))
+    .flatMap((segment) =>
+      segment
+        .replace(/(\p{Ll})(\p{Lu})/gu, "$1 $2")
+        .replace(/(\p{Lu})(\p{Lu}\p{Ll})/gu, "$1 $2")
+        .toLowerCase()
+        .split(" "),
+    );
+  return [joined, ...camelParts].filter(Boolean);
+}
+
 /**
  * Tokenize normalized text into individual tokens.
+ *
+ * Compound identifiers additionally contribute their joined form and camelCase parts;
+ * text without identifiers tokenizes exactly as `normalizeText(text).split(" ")`.
  */
 export function tokenize(text: string): string[] {
-  return normalizeText(text).split(" ").filter(Boolean);
+  const tokens = normalizeText(text).split(" ").filter(Boolean);
+  const seen = new Set(tokens);
+  for (const word of text.split(/\s+/)) {
+    if (!isCompoundIdentifier(word)) continue;
+    for (const token of compoundIdentifierTokens(word)) {
+      if (!seen.has(token)) {
+        seen.add(token);
+        tokens.push(token);
+      }
+    }
+  }
+  return tokens;
 }
 
 /**

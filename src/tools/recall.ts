@@ -51,7 +51,12 @@ import {
   getSessionCachedNote,
   setSessionCachedEmbeddings,
 } from "../cache.js";
-import { getOrBuildProjection, getProjection, isProjectionStale } from "../projections.js";
+import {
+  buildLexicalText,
+  getOrBuildProjection,
+  getProjection,
+  isProjectionStale,
+} from "../projections.js";
 import { embedMissingNotes } from "../helpers/embed.js";
 import {
   ensureBranchSynced,
@@ -509,7 +514,7 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
           continue;
         }
 
-        projectionTexts.set(identityKey, projection.projectionText);
+        projectionTexts.set(identityKey, buildLexicalText(projection));
       }
 
       // Apply lexical reranking over semantic candidates (fail-soft)
@@ -528,7 +533,7 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
             candidate.vault.storage.vaultPath,
             id,
           );
-          if (cached) return cached.projectionText;
+          if (cached) return buildLexicalText(cached);
         }
         return undefined;
       };

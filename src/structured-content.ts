@@ -765,6 +765,11 @@ export interface NoteProjection {
    * projection files remain readable; rebuilt lazily on first use.
    */
   contentSignals?: NoteContentSignals;
+  /**
+   * Code-like identifiers from the full body, scored by the lexical channel only.
+   * Optional so legacy projection files remain readable; rebuilt lazily on first use.
+   */
+  identifiers?: string[];
 }
 
 /**

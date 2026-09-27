@@ -8,6 +8,7 @@ The format is loosely based on Keep a Changelog and uses semver-style version he
 
 ### Fixed
 
+- `recall` now finds exact identifiers such as function names, constants and config keys that only appear deep in a note body, and matches `OUTBOX_POLL_INTERVAL_MS` and `outboxPollIntervalMs` style spellings of the same name. Existing notes pick this up automatically the next time they are recalled.
 - `remember` no longer reports a schema error after saving a note in a project with a saved memory policy. Clients rejected the response even though the note was written and committed, which led agents to retry and create duplicates.
 
 ## [0.45.1] - 2026-09-16

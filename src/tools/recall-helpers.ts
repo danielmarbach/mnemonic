@@ -12,7 +12,12 @@ import {
   computeTemporalRecencyBoost,
   isWithinTemporalFilterWindow,
 } from "../recall.js";
-import { getOrBuildProjection, getProjection, isProjectionStale } from "../projections.js";
+import {
+  buildLexicalText,
+  getOrBuildProjection,
+  getProjection,
+  isProjectionStale,
+} from "../projections.js";
 import { attempt } from "../error-utils.js";
 import {
   getSessionCachedProjection,
@@ -115,7 +120,7 @@ export async function collectLexicalCandidates(
     isCurrentProject: boolean;
     isAttachedVault: boolean;
     updatedAt: string;
-    projectionText: string;
+    lexicalText: string;
     projectionTokens: string[];
     context: ReturnType<typeof buildRecallCandidateContext>;
   }> = [];
@@ -179,14 +184,15 @@ export async function collectLexicalCandidates(
       }
       if (!projection) continue;
 
+      const lexicalText = buildLexicalText(projection);
       const projectionTokens = projectId
         ? (getSessionCachedProjectionTokens(
             projectId,
             vault.storage.vaultPath,
             note.id,
-            projection.projectionText,
-          ) ?? tokenize(projection.projectionText))
-        : tokenize(projection.projectionText);
+            lexicalText,
+          ) ?? tokenize(lexicalText))
+        : tokenize(lexicalText);
       lexicalPool.push({
         id: note.id,
         identityKey,
@@ -194,7 +200,7 @@ export async function collectLexicalCandidates(
         isCurrentProject: Boolean(isCurrentProject),
         isAttachedVault: Boolean(isAttachedVault),
         updatedAt: note.updatedAt,
-        projectionText: projection.projectionText,
+        lexicalText,
         projectionTokens,
         context: buildRecallCandidateContext(note, projection.contentSignals),
       });
@@ -210,7 +216,7 @@ export async function collectLexicalCandidates(
           projectId,
           vault.storage.vaultPath,
           note.id,
-          projection.projectionText,
+          lexicalText,
           projectionTokens,
         );
       }
@@ -219,12 +225,12 @@ export async function collectLexicalCandidates(
 
   const documents = lexicalPool.map((candidate) => ({
     id: candidate.identityKey,
-    text: candidate.projectionText,
+    text: candidate.lexicalText,
   }));
   const preparedCorpus = prepareTfIdfCorpusFromTokenizedDocuments(
     lexicalPool.map((candidate) => ({
       id: candidate.identityKey,
-      text: candidate.projectionText,
+      text: candidate.lexicalText,
       tokens: candidate.projectionTokens,
     })),
   );
@@ -261,7 +267,7 @@ export async function collectLexicalCandidates(
       semanticScoreForPromotion: 0,
       semanticScore: undefined,
       semanticConfidencePrior: 0,
-      lexicalScore: computeLexicalScore(query, candidate.projectionText),
+      lexicalScore: computeLexicalScore(query, candidate.lexicalText),
       lexicalChannelScore,
       lexicalChannelCandidate: true,
       boosted: projectPrior + metadataPrior + temporalPrior,
