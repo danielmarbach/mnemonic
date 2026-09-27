@@ -302,8 +302,30 @@ export async function callLocalMcpMethod(
 
     let stdoutData = "";
     let stderrData = "";
+    let stdinEnded = false;
+    const endStdin = () => {
+      if (stdinEnded) return;
+      stdinEnded = true;
+      child.stdin.end();
+    };
+    // Closing stdin tears the stdio transport down and aborts requests still in
+    // flight, so wait for the response rather than racing it with a fixed timer.
+    const endStdinWhenAnswered = () => {
+      for (const line of stdoutData.split("\n")) {
+        if (!line.trim()) continue;
+        try {
+          if ((JSON.parse(line) as { id?: number }).id === id) {
+            endStdin();
+            return;
+          }
+        } catch {
+          // partial line; wait for the rest
+        }
+      }
+    };
     child.stdout.on("data", (chunk) => {
       stdoutData += chunk.toString();
+      endStdinWhenAnswered();
     });
     child.stderr.on("data", (chunk) => {
       stderrData += chunk.toString();
@@ -318,7 +340,9 @@ export async function callLocalMcpMethod(
     });
 
     child.stdin.write(messages.map((message) => JSON.stringify(message)).join("\n") + "\n", () => {
-      setTimeout(() => child.stdin.end(), 200);
+      // Safety net for a server that never answers; the response normally ends
+      // stdin first.
+      setTimeout(endStdin, 10_000);
     });
   });
 
