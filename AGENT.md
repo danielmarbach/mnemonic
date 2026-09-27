@@ -365,6 +365,9 @@ Skills are loaded via the `skill` tool and extend agent capabilities with specia
 | `EMBED_MODEL` | `nomic-embed-text-v2-moe` | Embedding model |
 | `EMBED_MAX_CHUNK_CHARS` | `4000` | Max chars per document-source chunk (200–100000); non-default invalidates chunk generations |
 | `DISABLE_GIT` | `false` | Skip git ops if `"true"` |
+| `MNEMONIC_TOOLSET` | `full` | `core` registers only recall, get, remember, update, relate, list, sync, project_memory_summary and consolidate; unknown values fall back to `full` |
+
+The server sends a short usage protocol as MCP `instructions` (`src/server-instructions.ts`). Keep it naming core tools only; in `core` mode it adds a line saying which tools need `MNEMONIC_TOOLSET=full`. When a tool is added, register it in `TOOL_REGISTRATIONS` (`src/tools/index.ts`) and decide whether it belongs in `CORE_TOOLS` (`src/toolset.ts`).
 
 ## Stack
 

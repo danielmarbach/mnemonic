@@ -279,6 +279,9 @@ For local development against this repository's source tree, use `npm run mcp:lo
 | `GEMINI_BASE_URL`  | `https://generativelanguage.googleapis.com` | Native Gemini API base URL                                                                                                                                                     |
 | `GEMINI_API_KEY`   | unset                                       | Required for `EMBED_PROVIDER=gemini`; never persisted by mnemonic                                                                                                              |
 | `DISABLE_GIT`      | `false`                                     | Set `true` to skip all git ops                                                                                                                                                 |
+| `MNEMONIC_TOOLSET` | `full`                                      | `core` registers only the nine everyday tools (`recall`, `get`, `remember`, `update`, `relate`, `list`, `sync`, `project_memory_summary`, `consolidate`). That halves the tool definitions every session loads, which helps smaller models pick the right tool. Unknown values fall back to `full` |
+
+The server also sends MCP `instructions` in its initialize response: a short usage protocol (always pass `cwd`, `recall` before `remember`, `get` for full content, `relate` after `remember`). Most clients add it to the model's context automatically, so agents follow the basic workflow without extra setup.
 
 Provider configuration is read from the process environment at startup. Only non-secret compatibility metadata is stored in local gitignored embedding JSON files: provider, model, dimensions, metric, optional input mode, and compatibility key.
 

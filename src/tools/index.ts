@@ -1,5 +1,6 @@
 import type { McpServer } from "@modelcontextprotocol/server";
 import type { ServerContext } from "../server-context.js";
+import { CORE_TOOLS, isToolEnabled, type Toolset } from "../toolset.js";
 
 import { registerDetectProjectTool } from "./detect-project.js";
 import { registerGetProjectIdentityTool } from "./get-project-identity.js";
@@ -31,33 +32,61 @@ import { registerListAttachmentsTool } from "./list-attachments.js";
 import { registerSetAttachmentEnabledTool } from "./set-attachment-enabled.js";
 import { registerSetAttachmentBranchTool } from "./set-attachment-branch.js";
 
-export function registerAllTools(server: McpServer, ctx: ServerContext): void {
-  registerDetectProjectTool(server, ctx);
-  registerGetProjectIdentityTool(server, ctx);
-  registerSetProjectIdentityTool(server, ctx);
-  registerListMigrationsTool(server, ctx);
-  registerExecuteMigrationTool(server, ctx);
-  registerSetProjectMemoryPolicyTool(server, ctx);
-  registerGetProjectMemoryPolicyTool(server, ctx);
-  registerRememberTool(server, ctx);
-  registerRecallTool(server, ctx);
-  registerUpdateTool(server, ctx);
-  registerForgetTool(server, ctx);
-  registerGetTool(server, ctx);
-  registerWhereIsMemoryTool(server, ctx);
-  registerListTool(server, ctx);
-  registerDiscoverTagsTool(server, ctx);
-  registerRecentMemoriesTool(server, ctx);
-  registerMemoryGraphTool(server, ctx);
-  registerProjectMemorySummaryTool(server, ctx);
-  registerSyncTool(server, ctx);
-  registerMoveMemoryTool(server, ctx);
-  registerRelateTool(server, ctx);
-  registerUnrelateTool(server, ctx);
-  registerConsolidateTool(server, ctx);
-  registerAddAttachmentTool(server, ctx);
-  registerRemoveAttachmentTool(server, ctx);
-  registerListAttachmentsTool(server, ctx);
-  registerSetAttachmentEnabledTool(server, ctx);
-  registerSetAttachmentBranchTool(server, ctx);
+type ToolRegistration = readonly [
+  name: string,
+  register: (server: McpServer, ctx: ServerContext) => void,
+];
+
+// Registration order is the tools/list order clients see.
+const TOOL_REGISTRATIONS = [
+  ["detect_project", registerDetectProjectTool],
+  ["get_project_identity", registerGetProjectIdentityTool],
+  ["set_project_identity", registerSetProjectIdentityTool],
+  ["list_migrations", registerListMigrationsTool],
+  ["execute_migration", registerExecuteMigrationTool],
+  ["set_project_memory_policy", registerSetProjectMemoryPolicyTool],
+  ["get_project_memory_policy", registerGetProjectMemoryPolicyTool],
+  ["remember", registerRememberTool],
+  ["recall", registerRecallTool],
+  ["update", registerUpdateTool],
+  ["forget", registerForgetTool],
+  ["get", registerGetTool],
+  ["where_is_memory", registerWhereIsMemoryTool],
+  ["list", registerListTool],
+  ["discover_tags", registerDiscoverTagsTool],
+  ["recent_memories", registerRecentMemoriesTool],
+  ["memory_graph", registerMemoryGraphTool],
+  ["project_memory_summary", registerProjectMemorySummaryTool],
+  ["sync", registerSyncTool],
+  ["move_memory", registerMoveMemoryTool],
+  ["relate", registerRelateTool],
+  ["unrelate", registerUnrelateTool],
+  ["consolidate", registerConsolidateTool],
+  ["add_attachment", registerAddAttachmentTool],
+  ["remove_attachment", registerRemoveAttachmentTool],
+  ["list_attachments", registerListAttachmentsTool],
+  ["set_attachment_enabled", registerSetAttachmentEnabledTool],
+  ["set_attachment_branch", registerSetAttachmentBranchTool],
+] as const satisfies readonly ToolRegistration[];
+
+type RegisteredToolName = (typeof TOOL_REGISTRATIONS)[number][0];
+
+export const REGISTERED_TOOL_NAMES: readonly RegisteredToolName[] = TOOL_REGISTRATIONS.map(
+  ([name]) => name,
+);
+
+// Fails to compile if a core tool name is not in the registry.
+const coreToolsAreRegistered: readonly RegisteredToolName[] = CORE_TOOLS;
+void coreToolsAreRegistered;
+
+export function registerAllTools(
+  server: McpServer,
+  ctx: ServerContext,
+  toolset: Toolset = "full",
+): void {
+  for (const [name, register] of TOOL_REGISTRATIONS) {
+    if (isToolEnabled(toolset, name)) {
+      register(server, ctx);
+    }
+  }
 }

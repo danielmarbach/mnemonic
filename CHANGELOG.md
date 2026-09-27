@@ -6,6 +6,11 @@ The format is loosely based on Keep a Changelog and uses semver-style version he
 
 ## [Unreleased]
 
+### Added
+
+- The server now sends MCP `instructions` with a short usage protocol (always pass `cwd`, `recall` before `remember`, `get` for full content, `relate` after `remember`). Clients that support instructions give it to the model automatically, so agents follow the workflow without pasting AGENT.md.
+- `MNEMONIC_TOOLSET=core` exposes only the nine everyday memory tools. This cuts the tool definitions every session loads roughly in half, which helps smaller models choose the right tool. The default stays `full`.
+
 ### Changed
 
 - `recall` now shows each note's summary and the passage that best matches the query instead of the full body, and lists the ids to pass to `get` for full content. On a real project vault this cut recall output by about three quarters. Pass `detail: "full"` for the previous behavior.

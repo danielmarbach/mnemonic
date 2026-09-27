@@ -5,6 +5,8 @@ import { registerAllTools } from "./tools/index.js";
 import { registerPrompts } from "./prompts.js";
 import { createServerContext, readPackageVersion } from "./context.js";
 import { startServer } from "./startup.js";
+import { buildServerInstructions } from "./server-instructions.js";
+import { resolveToolset } from "./toolset.js";
 
 // Register built-in document-source extractors at server startup.
 // Must run before any tool that depends on extractor registry (sync, recall).
@@ -36,6 +38,7 @@ if (cliArg !== undefined && cliArg.startsWith("-")) {
 // ── MCP Server ────────────────────────────────────────────────────────────────
 
 const ctx = await createServerContext();
+const toolset = resolveToolset(process.env["MNEMONIC_TOOLSET"]);
 
 const server = new McpServer(
   {
@@ -43,13 +46,14 @@ const server = new McpServer(
     version: await readPackageVersion(),
   },
   {
+    instructions: buildServerInstructions(toolset),
     cacheHints: {
       "tools/list": { ttlMs: 3_600_000, cacheScope: "private" as const },
     },
   },
 );
 
-registerAllTools(server, ctx);
+registerAllTools(server, ctx, toolset);
 registerPrompts(server);
 
 await startServer(server, ctx);
