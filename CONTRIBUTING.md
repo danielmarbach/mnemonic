@@ -176,9 +176,18 @@ npm test -- --reporter=verbose    # detailed output
 
 If you add MCP integration tests, follow the same hermetic pattern unless you explicitly need end-to-end Ollama verification.
 
-When changing a tool's `structuredContent` shape or zod `outputSchema`, add or update a schema-audit test that parses the real MCP response with the exported schema. Treat handler/schema drift as a regression class to guard explicitly.
+When changing a tool's `structuredContent` shape or zod `outputSchema`, add or update a schema-audit test that parses the real MCP response with the exported schema. Treat handler/schema drift as a regression class to guard explicitly. The shared helpers in `tests/helpers/mcp.ts` validate every `tools/call` response against the tool's registered `outputSchema`, the same check MCP clients perform, so any integration test that calls a tool also catches drift.
 
 When changing structured output fields, also keep human-readable text output in sync. Add or update at least one integration assertion that checks both `structuredContent` and text for the same user-visible field so text/schema parity does not drift.
+
+### Recall quality eval
+
+`npm run eval:recall` runs a fixed set of known-item queries against the fixture vault in `tests/fixtures/recall-eval/` and prints MRR@10, Success@1 and Success@5 per query kind (title paraphrases, phrases from deep in note bodies, exact identifiers, current-project affinity, supersession), plus every query that did not rank first.
+
+- Embeddings come from a deterministic feature-hashing embedder, so results are reproducible and need no Ollama. Pass `--ollama [url]` to compare against a real model locally.
+- `tests/recall-eval.integration.test.ts` fails when any metric drops below `tests/fixtures/recall-eval/baseline.json`.
+- Ranking changes must not regress the baseline. When a change improves it, record the new numbers with `node scripts/eval-recall.mjs --update-baseline` and commit the baseline together with the change.
+- The fixture is plain markdown notes plus `queries.json`. Keep identifier and body queries out of titles, opening paragraphs and headings, otherwise they stop testing body retrieval.
 
 ### Release confidence gate
 

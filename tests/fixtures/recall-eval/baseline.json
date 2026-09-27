@@ -1,0 +1,35 @@
+{
+  "embedder": "hash",
+  "metrics": {
+    "title": {
+      "queries": 16,
+      "mrrAt10": 1,
+      "successAt1": 1,
+      "successAt5": 1
+    },
+    "body": {
+      "queries": 10,
+      "mrrAt10": 0.275,
+      "successAt1": 0.2,
+      "successAt5": 0.3
+    },
+    "identifier": {
+      "queries": 12,
+      "mrrAt10": 0.417,
+      "successAt1": 0.333,
+      "successAt5": 0.5
+    },
+    "project-affinity": {
+      "queries": 8,
+      "mrrAt10": 0.938,
+      "successAt1": 0.875,
+      "successAt5": 1
+    },
+    "supersession": {
+      "queries": 1,
+      "mrrAt10": 1,
+      "successAt1": 1,
+      "successAt5": 1
+    }
+  }
+}

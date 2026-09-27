@@ -1,0 +1,292 @@
+{
+  "version": 1,
+  "currentProject": {
+    "remote": "https://github.com/acme/alpha.git",
+    "id": "https-github-com-acme-alpha"
+  },
+  "queries": [
+    {
+      "project": "alpha",
+      "kind": "title",
+      "query": "how is the alpha order service structured",
+      "expected": "alpha-service-architecture-overview-1a2b3c4d"
+    },
+    {
+      "project": "alpha",
+      "kind": "title",
+      "query": "why do we use an outbox table for order events",
+      "expected": "decision-transactional-outbox-for-order-events-2b3c4d5e"
+    },
+    {
+      "project": "alpha",
+      "kind": "title",
+      "query": "retrying payment gateway requests",
+      "expected": "retry-policy-for-payment-gateway-calls-4d5e6f70"
+    },
+    {
+      "project": "alpha",
+      "kind": "title",
+      "query": "duplicate shipments caused by duplicate events",
+      "expected": "bug-duplicate-order-events-idempotency-6f708192"
+    },
+    {
+      "project": "alpha",
+      "kind": "title",
+      "query": "caching dependencies in the CI pipeline",
+      "expected": "ci-pipeline-dependency-caching-708192a3"
+    },
+    {
+      "project": "alpha",
+      "kind": "title",
+      "query": "expand and contract schema migrations",
+      "expected": "database-migration-strategy-expand-contract-8192a3b4"
+    },
+    {
+      "project": "alpha",
+      "kind": "title",
+      "query": "how do we roll out feature flags",
+      "expected": "feature-flag-rollout-process-92a3b4c5"
+    },
+    {
+      "project": "alpha",
+      "kind": "title",
+      "query": "json logging conventions",
+      "expected": "structured-logging-conventions-a3b4c5d6"
+    },
+    {
+      "project": "alpha",
+      "kind": "title",
+      "query": "distributed tracing with opentelemetry",
+      "expected": "opentelemetry-tracing-setup-b4c5d6e7"
+    },
+    {
+      "project": "alpha",
+      "kind": "title",
+      "query": "when do we bump the API version",
+      "expected": "public-api-versioning-policy-c5d6e7f8"
+    },
+    {
+      "project": "alpha",
+      "kind": "title",
+      "query": "postmortem for the payment outage in august",
+      "expected": "incident-2026-08-payment-outage-postmortem-6f708193"
+    },
+    {
+      "project": "alpha",
+      "kind": "title",
+      "query": "slow validation of orders with many line items",
+      "expected": "order-validation-hot-path-optimisation-f8091a2b"
+    },
+    {
+      "project": "alpha",
+      "kind": "title",
+      "query": "how secrets are stored and rotated",
+      "expected": "secrets-handling-and-rotation-091a2b3c"
+    },
+    {
+      "project": "alpha",
+      "kind": "title",
+      "query": "rabbitmq consumer concurrency and prefetch",
+      "expected": "queue-consumer-concurrency-limits-3c4d5e6f"
+    },
+    {
+      "project": "alpha",
+      "kind": "title",
+      "query": "rate limiting order creation per merchant",
+      "expected": "api-rate-limiting-token-bucket-708192a4"
+    },
+    {
+      "project": "alpha",
+      "kind": "title",
+      "query": "returning errors as values instead of exceptions",
+      "expected": "error-handling-conventions-result-types-2b3c4d5f"
+    },
+    {
+      "project": "alpha",
+      "kind": "body",
+      "query": "claimed with skip locked so two replicas never publish",
+      "expected": "decision-transactional-outbox-for-order-events-2b3c4d5e"
+    },
+    {
+      "project": "alpha",
+      "kind": "body",
+      "query": "retrying a decline can trigger fraud rules",
+      "expected": "retry-policy-for-payment-gateway-calls-4d5e6f70"
+    },
+    {
+      "project": "alpha",
+      "kind": "body",
+      "query": "keys expire after fourteen days redelivery window",
+      "expected": "bug-duplicate-order-events-idempotency-6f708192"
+    },
+    {
+      "project": "alpha",
+      "kind": "body",
+      "query": "lock timeouts fail fast instead of blocking writes",
+      "expected": "database-migration-strategy-expand-contract-8192a3b4"
+    },
+    {
+      "project": "alpha",
+      "kind": "body",
+      "query": "unit mix-up between seconds and milliseconds slipped through review",
+      "expected": "incident-2026-08-payment-outage-postmortem-6f708193"
+    },
+    {
+      "project": "alpha",
+      "kind": "body",
+      "query": "raising prefetch above the database pool size caused connection starvation",
+      "expected": "queue-consumer-concurrency-limits-3c4d5e6f"
+    },
+    {
+      "project": "alpha",
+      "kind": "body",
+      "query": "benchmark validates a 10,000 line order",
+      "expected": "order-validation-hot-path-optimisation-f8091a2b"
+    },
+    {
+      "project": "alpha",
+      "kind": "body",
+      "query": "validation failures were thrown and caught in five different places",
+      "expected": "error-handling-conventions-result-types-2b3c4d5f"
+    },
+    {
+      "project": "alpha",
+      "kind": "body",
+      "query": "floating to the latest minor release changed fetch behaviour",
+      "expected": "ci-pipeline-dependency-caching-708192a3"
+    },
+    {
+      "project": "alpha",
+      "kind": "body",
+      "query": "delayed event can never write a stale price back",
+      "expected": "product-catalog-cache-invalidation-3c4d5e60"
+    },
+    {
+      "project": "alpha",
+      "kind": "identifier",
+      "query": "OUTBOX_POLL_INTERVAL_MS",
+      "expected": "decision-transactional-outbox-for-order-events-2b3c4d5e"
+    },
+    {
+      "project": "alpha",
+      "kind": "identifier",
+      "query": "OutboxDispatcher",
+      "expected": "decision-transactional-outbox-for-order-events-2b3c4d5e"
+    },
+    {
+      "project": "alpha",
+      "kind": "identifier",
+      "query": "exponentialBackoffCapMs",
+      "expected": "retry-policy-for-payment-gateway-calls-4d5e6f70"
+    },
+    {
+      "project": "alpha",
+      "kind": "identifier",
+      "query": "payment-gateway-timeout",
+      "expected": "retry-policy-for-payment-gateway-calls-4d5e6f70"
+    },
+    {
+      "project": "alpha",
+      "kind": "identifier",
+      "query": "IdempotencyKeyStore",
+      "expected": "bug-duplicate-order-events-idempotency-6f708192"
+    },
+    {
+      "project": "alpha",
+      "kind": "identifier",
+      "query": "ERR_DUPLICATE_ORDER_KEY",
+      "expected": "bug-duplicate-order-events-idempotency-6f708192"
+    },
+    {
+      "project": "alpha",
+      "kind": "identifier",
+      "query": "migrate:contract",
+      "expected": "database-migration-strategy-expand-contract-8192a3b4"
+    },
+    {
+      "project": "alpha",
+      "kind": "identifier",
+      "query": "circuitBreakerHalfOpenAfterMs",
+      "expected": "incident-2026-08-payment-outage-postmortem-6f708193"
+    },
+    {
+      "project": "alpha",
+      "kind": "identifier",
+      "query": "CONSUMER_CONCURRENCY",
+      "expected": "queue-consumer-concurrency-limits-3c4d5e6f"
+    },
+    {
+      "project": "alpha",
+      "kind": "identifier",
+      "query": "validateLineItems",
+      "expected": "order-validation-hot-path-optimisation-f8091a2b"
+    },
+    {
+      "project": "alpha",
+      "kind": "identifier",
+      "query": "DomainError",
+      "expected": "error-handling-conventions-result-types-2b3c4d5f"
+    },
+    {
+      "project": "alpha",
+      "kind": "identifier",
+      "query": "node-22.4.1",
+      "expected": "ci-pipeline-dependency-caching-708192a3"
+    },
+    {
+      "project": "alpha",
+      "kind": "project-affinity",
+      "query": "retry policy with exponential backoff",
+      "expected": "retry-policy-for-payment-gateway-calls-4d5e6f70"
+    },
+    {
+      "project": "alpha",
+      "kind": "project-affinity",
+      "query": "transactional outbox decision",
+      "expected": "decision-transactional-outbox-for-order-events-2b3c4d5e"
+    },
+    {
+      "project": "alpha",
+      "kind": "project-affinity",
+      "query": "structured logging conventions",
+      "expected": "structured-logging-conventions-a3b4c5d6"
+    },
+    {
+      "project": "alpha",
+      "kind": "project-affinity",
+      "query": "ci dependency caching",
+      "expected": "ci-pipeline-dependency-caching-708192a3"
+    },
+    {
+      "project": "alpha",
+      "kind": "project-affinity",
+      "query": "feature flag rollout",
+      "expected": "feature-flag-rollout-process-92a3b4c5"
+    },
+    {
+      "project": "alpha",
+      "kind": "project-affinity",
+      "query": "local development setup",
+      "expected": "local-development-environment-setup-d6e7f809"
+    },
+    {
+      "project": "alpha",
+      "kind": "project-affinity",
+      "query": "database migrations",
+      "expected": "database-migration-strategy-expand-contract-8192a3b4"
+    },
+    {
+      "project": "alpha",
+      "kind": "project-affinity",
+      "query": "api rate limiting",
+      "expected": "api-rate-limiting-token-bucket-708192a4"
+    },
+    {
+      "project": "alpha",
+      "kind": "supersession",
+      "query": "payment gateway retry policy",
+      "expected": "retry-policy-for-payment-gateway-calls-4d5e6f70",
+      "mustOutrank": "retry-policy-v1-fixed-delay-for-payment-gateway-5e6f7081"
+    }
+  ]
+}
