@@ -12,11 +12,14 @@ tags:
   - tool-surface
 lifecycle: permanent
 createdAt: '2026-09-27T12:00:37.780Z'
-updatedAt: '2026-09-27T12:00:37.780Z'
+updatedAt: '2026-09-27T12:01:23.220Z'
 role: plan
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: mnemonic-key-design-decisions-3f2a6273
+    type: derives-from
 memoryVersion: 1
 ---
 Research on making mnemonic more token-efficient and more accurate, including for weaker models. Measured on 2026-09-27 against the live project vault (256 visible notes) and a fresh `build/index.js`. Work happens on branch `improve/token-efficiency-and-recall-accuracy`.
