@@ -7,11 +7,14 @@ tags:
   - recall
 lifecycle: temporary
 createdAt: '2026-09-27T13:58:57.491Z'
-updatedAt: '2026-09-27T13:58:57.491Z'
+updatedAt: '2026-09-27T13:59:12.015Z'
 role: review
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: apply-token-efficiency-and-recall-accuracy-wave-1-0-46-0-4a05618e
+    type: derives-from
 memoryVersion: 1
 ---
 Outcome: continue
