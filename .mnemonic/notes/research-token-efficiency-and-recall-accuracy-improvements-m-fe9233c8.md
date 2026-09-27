@@ -12,7 +12,7 @@ tags:
   - tool-surface
 lifecycle: permanent
 createdAt: '2026-09-27T12:00:37.780Z'
-updatedAt: '2026-09-27T12:01:23.594Z'
+updatedAt: '2026-09-27T12:01:23.965Z'
 role: plan
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -22,6 +22,8 @@ relatedTo:
     type: derives-from
   - id: canonical-design-bounded-rrf-hybrid-recall-172a96ab
     type: related-to
+  - id: implementation-principles-for-mnemonic-mcp-2e178bba
+    type: derives-from
 memoryVersion: 1
 ---
 Research on making mnemonic more token-efficient and more accurate, including for weaker models. Measured on 2026-09-27 against the live project vault (256 visible notes) and a fresh `build/index.js`. Work happens on branch `improve/token-efficiency-and-recall-accuracy`.
