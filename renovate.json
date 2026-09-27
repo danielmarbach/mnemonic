@@ -2,5 +2,12 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
     "config:recommended"
+  ],
+  "packageRules": [
+    {
+      "description": "gh-aw lock files are compiler output; upgrade with `gh aw upgrade` + `gh aw compile` instead",
+      "matchFileNames": [".github/workflows/*.lock.yml"],
+      "enabled": false
+    }
   ]
 }

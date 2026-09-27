@@ -8,23 +8,25 @@ as structured notes in `.mnemonic/notes/`.
 
 ## PR title and description generation
 
-When generating or updating a PR title and description, always look for mnemonic design decision
-notes changed in the PR.
+Describe the PR from the diff and commit messages; use mnemonic notes changed in the PR for the
+"why". The `/update-pr` comment command (`.github/workflows/update-pr-description.md`) follows the
+same rules.
 
 ### How to find relevant context
 
-1. Check the PR diff for any files under `.mnemonic/notes/` — these are structured design decision
-   notes written by the author during the session that produced the PR.
-2. Read the YAML frontmatter (`title`, `tags`, `lifecycle`) and the markdown body of each note.
-3. Notes tagged `decision`, `design`, `architecture`, or `rationale` are the most relevant for
-   PR descriptions. Notes tagged `plan` or `wip` provide context for work still in progress.
+1. Read the diff and commit messages first — they are the source of truth for what changed.
+2. Check the PR for files under `.mnemonic/notes/` — structured notes written by the author during
+   the session that produced the PR. Read the YAML frontmatter (`title`, `tags`, `role`,
+   `lifecycle`) and the markdown body of each note.
+3. Permanent notes (no `role`) carry decisions and rationale. Notes with a `role`
+   (`research`, `plan`, `review`, `context`) or `lifecycle: temporary` are process artifacts:
+   mine them for facts, but never use their titles (`Plan: …`, `Apply: …`) as the PR title.
 
 ### PR title format
 
 - Imperative mood, present tense (e.g. "Add", "Fix", "Implement", "Refactor", "Extract")
 - Specific: what changed and why it matters
-- If a single primary mnemonic note exists, its `title` field can directly guide the PR title
-- If multiple notes exist, derive the title from the dominant theme across notes
+- Name the change, not the process that produced it
 - Under 72 characters
 
 **Examples from this repo:**
@@ -34,26 +36,32 @@ notes changed in the PR.
 
 ### PR description format
 
-Use this structure when writing a PR description from mnemonic notes:
+Use these sections, omitting any that would only be padding:
 
 ```markdown
 ## Summary
 
-[1–2 sentences: the core change and its motivation, derived from the notes]
+[2–4 sentences: what changes for users or maintainers, and why]
 
-## Design Decisions
+## Changes
 
-[For each mnemonic note changed in the PR:]
+[Bullets grouped by behavior or component, naming key functions, config keys, env vars, tools]
 
-### [Note title]
+## Design decisions
 
-[Key decisions and rationale from the note body. Preserve the note's own structure
-(headings, bullet points). Focus on the "why" — alternatives considered, constraints,
-tradeoffs — not just what was implemented.]
+[Choices and their reasons: alternatives, constraints, tradeoffs — mostly from permanent notes]
 
----
+## Compatibility and risk
 
-_Generated from N design decision note(s) in `.mnemonic/notes/`. Run `/update-pr` to regenerate._
+[Breaking changes, migrations, changed defaults, re-index/re-embed requirements]
+
+## Testing
+
+[What the tests cover and any verification recorded in the notes]
+
+## Related
+
+[`Fixes #N` lines, then a collapsed <details> list of the mnemonic notes]
 ```
 
 ### What to emphasise
