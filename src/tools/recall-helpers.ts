@@ -29,6 +29,7 @@ import {
 import {
   tokenize,
   computeLexicalScore,
+  queryIdentifierKeys,
   prepareTfIdfCorpusFromTokenizedDocuments,
   rankDocumentsByTfIdf,
   LEXICAL_RETRIEVAL_CANDIDATE_LIMIT,
@@ -108,6 +109,7 @@ export async function collectLexicalCandidates(
   options: LexicalCandidateOptions = ALWAYS_ON_LEXICAL_OPTIONS,
 ): Promise<ScoredRecallCandidate[]> {
   const projectId = project?.id;
+  const identifierKeys = queryIdentifierKeys(query);
   const applyTemporalFilter = shouldApplyTemporalFiltering(temporalQueryHint);
   const temporalFilterWindowDays = applyTemporalFilter
     ? temporalQueryHint?.filterWindowDays
@@ -122,6 +124,7 @@ export async function collectLexicalCandidates(
     updatedAt: string;
     lexicalText: string;
     projectionTokens: string[];
+    identifierMatchCount: number;
     context: ReturnType<typeof buildRecallCandidateContext>;
   }> = [];
 
@@ -202,6 +205,7 @@ export async function collectLexicalCandidates(
         updatedAt: note.updatedAt,
         lexicalText,
         projectionTokens,
+        identifierMatchCount: countIdentifierMatches(identifierKeys, projectionTokens),
         context: buildRecallCandidateContext(note, projection.contentSignals),
       });
 
@@ -241,15 +245,15 @@ export async function collectLexicalCandidates(
   );
 
   const candidates: ScoredRecallCandidate[] = [];
+  const identifierHolders: ScoredRecallCandidate[] = [];
   for (const candidate of lexicalPool) {
-    const lexicalChannelScore = rankedScores.get(candidate.identityKey);
-    if (
-      lexicalChannelScore === undefined ||
-      lexicalChannelScore <= 0 ||
-      lexicalChannelScore < options.minimumScore
-    ) {
+    const rankedScore = rankedScores.get(candidate.identityKey);
+    const passesLexicalChannel =
+      rankedScore !== undefined && rankedScore > 0 && rankedScore >= options.minimumScore;
+    if (!passesLexicalChannel && candidate.identifierMatchCount === 0) {
       continue;
     }
+    const lexicalChannelScore = passesLexicalChannel ? rankedScore : undefined;
 
     const temporalPrior = temporalQueryHint
       ? computeTemporalRecencyBoost(candidate.updatedAt, temporalQueryHint)
@@ -260,7 +264,7 @@ export async function collectLexicalCandidates(
         ? ATTACHMENT_BOOST
         : 0;
     const metadataPrior = candidate.context.metadataBoost;
-    candidates.push({
+    const scored: ScoredRecallCandidate = {
       id: candidate.id,
       identityKey: `${candidate.vault.storage.vaultPath}::${candidate.id}`,
       score: 0,
@@ -269,7 +273,9 @@ export async function collectLexicalCandidates(
       semanticConfidencePrior: 0,
       lexicalScore: computeLexicalScore(query, candidate.lexicalText),
       lexicalChannelScore,
-      lexicalChannelCandidate: true,
+      lexicalChannelCandidate: passesLexicalChannel,
+      identifierMatchCount:
+        candidate.identifierMatchCount > 0 ? candidate.identifierMatchCount : undefined,
       boosted: projectPrior + metadataPrior + temporalPrior,
       projectPrior,
       temporalPrior,
@@ -281,17 +287,41 @@ export async function collectLexicalCandidates(
       connectionDiversity: candidate.context.connectionDiversity,
       structureScore: candidate.context.structureScore,
       metadata: candidate.context.metadata,
-    });
+    };
+    (passesLexicalChannel ? candidates : identifierHolders).push(scored);
   }
 
-  return candidates
-    .sort((a, b) => {
-      const scoreDelta = (b.lexicalChannelScore ?? 0) - (a.lexicalChannelScore ?? 0);
-      return scoreDelta !== 0
-        ? scoreDelta
-        : recallCandidateIdentity(a).localeCompare(recallCandidateIdentity(b));
-    })
+  const byIdentity = (a: ScoredRecallCandidate, b: ScoredRecallCandidate): number =>
+    recallCandidateIdentity(a).localeCompare(recallCandidateIdentity(b));
+  const lexicalResults = candidates
+    .sort((a, b) => (b.lexicalChannelScore ?? 0) - (a.lexicalChannelScore ?? 0) || byIdentity(a, b))
     .slice(0, options.resultLimit);
+  // Holders outside the lexical top list still reach fusion through the identifier channel.
+  const lexicalIdentities = new Set(lexicalResults.map(recallCandidateIdentity));
+  const extraHolders = [...candidates.slice(options.resultLimit), ...identifierHolders]
+    .filter(
+      (candidate) =>
+        (candidate.identifierMatchCount ?? 0) > 0 &&
+        !lexicalIdentities.has(recallCandidateIdentity(candidate)),
+    )
+    .map((candidate) => ({
+      ...candidate,
+      lexicalChannelCandidate: false,
+      lexicalChannelScore: undefined,
+    }))
+    .sort(
+      (a, b) => (b.identifierMatchCount ?? 0) - (a.identifierMatchCount ?? 0) || byIdentity(a, b),
+    )
+    .slice(0, options.resultLimit);
+  return [...lexicalResults, ...extraHolders];
+}
+
+function countIdentifierMatches(keys: readonly string[], tokens: readonly string[]): number {
+  if (keys.length === 0) {
+    return 0;
+  }
+  const tokenSet = new Set(tokens);
+  return keys.filter((key) => tokenSet.has(key)).length;
 }
 
 // ── Tag discovery helpers ─────────────────────────────────────────────────────

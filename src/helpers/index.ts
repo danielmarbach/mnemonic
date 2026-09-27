@@ -111,8 +111,9 @@ export function toRecallRankBand(
   semanticRank?: number,
   lexicalRank?: number,
   graphRank?: number,
+  identifierRank?: number,
 ): "top3" | "top10" | "lower" {
-  const ranks = [semanticRank, lexicalRank, graphRank].filter(
+  const ranks = [semanticRank, lexicalRank, graphRank, identifierRank].filter(
     (rank): rank is number => rank !== undefined,
   );
   const bestRank = ranks.length > 0 ? Math.min(...ranks) : undefined;

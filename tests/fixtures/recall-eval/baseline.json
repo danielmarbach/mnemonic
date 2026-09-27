@@ -15,8 +15,8 @@
     },
     "identifier": {
       "queries": 12,
-      "mrrAt10": 0.792,
-      "successAt1": 0.583,
+      "mrrAt10": 0.958,
+      "successAt1": 0.917,
       "successAt5": 1
     },
     "project-affinity": {

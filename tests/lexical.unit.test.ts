@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   isCompoundIdentifier,
+  queryIdentifierKeys,
   normalizeText,
   tokenize,
   jaccardSimilarity,
@@ -416,5 +417,21 @@ describe("lexical constants", () => {
   it("has reasonable result limit", () => {
     expect(LEXICAL_RESCUE_RESULT_LIMIT).toBeGreaterThan(0);
     expect(LEXICAL_RESCUE_RESULT_LIMIT).toBeLessThanOrEqual(10);
+  });
+});
+
+describe("queryIdentifierKeys", () => {
+  it("returns joined keys for compound identifiers only", () => {
+    expect(queryIdentifierKeys("where is RRF_K and buildNoteWarnings used")).toEqual([
+      "rrfk",
+      "buildnotewarnings",
+    ]);
+    expect(queryIdentifierKeys("OUTBOX_POLL_INTERVAL_MS outboxPollIntervalMs")).toEqual([
+      "outboxpollintervalms",
+    ]);
+  });
+
+  it("returns nothing for natural-language queries", () => {
+    expect(queryIdentifierKeys("how does recall ranking work")).toEqual([]);
   });
 });

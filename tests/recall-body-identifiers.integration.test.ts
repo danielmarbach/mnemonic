@@ -89,12 +89,30 @@ describe("recall body identifiers", () => {
         const parsed = RecallResultSchema.parse(response.structuredContent);
         const position = parsed.results.findIndex((result) => result.title === note.title);
 
-        expect(position, `${note.identifier} rank`).toBeGreaterThanOrEqual(0);
-        expect(position, `${note.identifier} rank`).toBeLessThan(3);
+        const evidence = parsed.results[position]?.retrievalEvidence;
+        expect(position, `${note.identifier} rank`).toBe(0);
+        expect(evidence?.scoreDecomposition?.lexicalRank, `${note.identifier} lexical rank`).toBe(
+          1,
+        );
         expect(
-          parsed.results[position]?.retrievalEvidence?.scoreDecomposition?.lexicalRank,
-          `${note.identifier} lexical rank`,
+          evidence?.scoreDecomposition?.identifierRank,
+          `${note.identifier} identifier rank`,
         ).toBe(1);
+        expect(evidence?.channels).toContain("identifier");
+        expect(response.text).toContain("identifier");
+      }
+
+      const prose = await callLocalMcpResponse(
+        vaultDir,
+        "recall",
+        { query: "deployment tuning notes", cwd: repoDir, limit: 5, evidence: "compact" },
+        options,
+      );
+      const proseResults = RecallResultSchema.parse(prose.structuredContent).results;
+      expect(proseResults.length).toBeGreaterThan(0);
+      for (const result of proseResults) {
+        expect(result.retrievalEvidence?.scoreDecomposition?.identifierRank).toBeUndefined();
+        expect(result.retrievalEvidence?.channels).not.toContain("identifier");
       }
     } finally {
       await embeddingServer.close();

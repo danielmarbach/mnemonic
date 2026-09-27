@@ -208,7 +208,7 @@ export interface RecallRetrievalCoverage {
 }
 
 export type RetrievalEvidenceChannel =
-  "semantic" | "lexical" | "graph-rank" | "temporal-boost" | "canonical" | "rescue";
+  "semantic" | "lexical" | "identifier" | "graph-rank" | "temporal-boost" | "canonical" | "rescue";
 export type RetrievalEvidenceRankBand = "top3" | "top10" | "lower";
 export type RetrievalEvidenceFreshness = "today" | "thisWeek" | "thisMonth" | "older";
 
@@ -217,6 +217,7 @@ export interface RetrievalScoreDecomposition {
   semanticRank?: number;
   lexicalRank?: number;
   graphRank?: number;
+  identifierRank?: number;
   rrfScore: number;
   semanticConfidencePrior: number;
   projectPrior: number;
@@ -1163,7 +1164,19 @@ export const RecallResultSchema = z.object({
       retrievalEvidence: z
         .object({
           channels: z.array(
-            z.enum(["semantic", "lexical", "graph-rank", "temporal-boost", "canonical", "rescue"]),
+            z
+              .enum([
+                "semantic",
+                "lexical",
+                "identifier",
+                "graph-rank",
+                "temporal-boost",
+                "canonical",
+                "rescue",
+              ])
+              .describe(
+                "Channels with evidence for this result; 'identifier' means the note contains an exact identifier from the query",
+              ),
           ),
           rankBand: z.enum(["top3", "top10", "lower"]),
           projectRelevant: z.boolean(),
@@ -1190,11 +1203,21 @@ export const RecallResultSchema = z.object({
                 .optional()
                 .describe("1-based lexical channel rank"),
               graphRank: z.number().int().min(1).optional().describe("1-based graph channel rank"),
+              identifierRank: z
+                .number()
+                .int()
+                .min(1)
+                .optional()
+                .describe(
+                  "1-based exact-identifier channel rank; present only when the query contains a compound identifier the note contains",
+                ),
               rrfScore: z
                 .number()
                 .min(0)
-                .max(0.1476)
-                .describe("Scaled reciprocal-rank fusion contribution"),
+                .max(0.1968)
+                .describe(
+                  "Scaled reciprocal-rank fusion contribution across semantic, lexical, graph and identifier channels",
+                ),
               semanticConfidencePrior: z
                 .number()
                 .min(0)

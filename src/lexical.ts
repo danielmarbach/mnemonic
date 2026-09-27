@@ -51,6 +51,23 @@ function compoundIdentifierTokens(word: string): string[] {
 }
 
 /**
+ * Joined-form keys for the compound identifiers in a query, e.g. `rrfk` for `RRF_K`.
+ * Documents carry the same keys as tokens, so a key match means the exact identifier
+ * (in any spelling) appears in the note.
+ */
+export function queryIdentifierKeys(query: string): string[] {
+  const keys = new Set<string>();
+  for (const word of query.split(/\s+/)) {
+    if (!isCompoundIdentifier(word)) continue;
+    const [joined] = compoundIdentifierTokens(word);
+    if (joined) {
+      keys.add(joined);
+    }
+  }
+  return [...keys];
+}
+
+/**
  * Tokenize normalized text into individual tokens.
  *
  * Compound identifiers additionally contribute their joined form and camelCase parts;

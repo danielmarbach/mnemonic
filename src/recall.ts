@@ -11,9 +11,9 @@ const RRF_K = 60;
 const RRF_RANK_WINDOW = 100;
 const CANONICAL_HYBRID_WEIGHT = 0.05;
 
-// RRF scaling factor: with K=60 and three channels, max RRF ≈ 3/60 ≈ 0.050.
-// Multiplied by 3.0 ≈ 0.150, matching the old additive lexical weight's order-of-magnitude
-// while remaining calibration-free.
+// RRF scaling factor: with K=60, each channel contributes at most 1/61. With the three
+// always-available channels max RRF ≈ 0.049, times 3.0 ≈ 0.148; the exact-identifier
+// channel only exists for identifier queries and adds one more equally weighted rank.
 const RRF_SCALING_FACTOR = 3.0;
 const MAX_SEMANTIC_CONFIDENCE_PRIOR = 0.05;
 
@@ -68,6 +68,10 @@ export interface ScoredRecallCandidate {
   graphScore?: number;
   /** Rank from the graph spreading activation channel (1-based). */
   graphRank?: number;
+  /** How many of the query's compound identifiers the note contains exactly (any spelling). */
+  identifierMatchCount?: number;
+  /** Rank from the exact-identifier channel (1-based). Only set for identifier queries. */
+  identifierRank?: number;
   /** Backward-compatible raw semantic score plus policy boosts for output/diagnostics. */
   boosted: number;
   vault: Vault;
@@ -308,7 +312,10 @@ export function computeHybridScore(candidate: ScoredRecallCandidate): number {
     candidate.lexicalRank !== undefined ? 1 / (RRF_K + candidate.lexicalRank) : 0;
   const graphContribution =
     candidate.graphRank !== undefined ? 1 / (RRF_K + candidate.graphRank) : 0;
-  const rrf = semanticContribution + lexicalContribution + graphContribution;
+  const identifierContribution =
+    candidate.identifierRank !== undefined ? 1 / (RRF_K + candidate.identifierRank) : 0;
+  const rrf =
+    semanticContribution + lexicalContribution + graphContribution + identifierContribution;
 
   const derivedSemanticConfidencePrior =
     (candidate.semanticScore ??
@@ -446,8 +453,24 @@ export function applyCanonicalExplanationPromotion(
   assignDenseRanks(sortedByLexical, computeLexicalRankSignal, (candidate, rank) => {
     candidate.lexicalRank = rank;
   });
+  assignIdentifierRanks(candidates);
 
   return [...candidates].sort(compareByHybridScore);
+}
+
+/**
+ * Exact-identifier channel: notes containing more of the query's identifiers rank
+ * higher, ties broken by lexical evidence, then id. Notes without a match get no rank.
+ */
+function assignIdentifierRanks(candidates: ScoredRecallCandidate[]): void {
+  const identifierSignal = (candidate: ScoredRecallCandidate): number =>
+    (candidate.identifierMatchCount ?? 0) + Math.min(computeLexicalRankSignal(candidate), 0.999);
+  const holders = candidates
+    .filter((candidate) => (candidate.identifierMatchCount ?? 0) > 0)
+    .sort((a, b) => identifierSignal(b) - identifierSignal(a) || compareIds(a, b));
+  assignDenseRanks(holders, identifierSignal, (candidate, rank) => {
+    candidate.identifierRank = rank;
+  });
 }
 
 function computeSignificantPhraseScore(query: string, candidateText: string): number {

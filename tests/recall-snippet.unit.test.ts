@@ -24,8 +24,19 @@ describe("selectQuerySnippet", () => {
     expect(selectQuerySnippet(BODY, "kubernetes autoscaling", "")).toBeUndefined();
   });
 
-  it("ignores stopwords, headings and fenced code", () => {
-    expect(selectQuerySnippet(BODY, "the tuning", "")).toBeUndefined();
+  it("ignores headings and fenced code", () => {
+    expect(selectQuerySnippet(BODY, "tuning", "")).toBeUndefined();
+    expect(selectQuerySnippet(BODY, "const", "")).toBeUndefined();
+  });
+
+  it("weighs terms unique to one paragraph above terms that appear everywhere", () => {
+    const body = [
+      "Die Tabelle wird in der Transaktion geschrieben und der Dispatcher liest die Tabelle.",
+      "Die Zeilen werden mit SKIP LOCKED gesperrt und der Dispatcher veröffentlicht die Zeilen.",
+      "Die Aufbewahrung der Zeilen dauert sieben Tage und die Tabelle wird der Reihe nach bereinigt.",
+    ].join("\n\n");
+    // "die" and "der" appear in every paragraph; "locked" in one.
+    expect(selectQuerySnippet(body, "die der locked", "")).toContain("SKIP LOCKED");
   });
 
   it("does not repeat the summary", () => {

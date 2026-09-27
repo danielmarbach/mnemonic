@@ -381,7 +381,7 @@ Every result carries structured quality signals to help agents decide what to tr
 - **`diversity`:** the theme count, role mix, and lifecycle mix across selected results.
 - **`retrievalCoverage`:** the fraction of high-priority anchors (alwaysLoad and summary notes) represented in results.
 
-**Hybrid recall** combines semantic similarity, exact wording, and relationship context on every query. It can now find exact names, identifiers, phrases, error codes, and version strings even when they are not semantically similar. Code-like identifiers match wherever they appear in a note body, and `SCREAMING_SNAKE`, `camelCase` and `kebab-case` spellings of the same name match each other, while still favoring conceptually relevant and well-connected notes. The ranking remains bounded and fail-soft, uses compact projections without new infrastructure, and preserves canonical explanation promotion and temporal recency hints.
+**Hybrid recall** combines semantic similarity, exact wording, and relationship context on every query. It can now find exact names, identifiers, phrases, error codes, and version strings even when they are not semantically similar. Code-like identifiers match wherever they appear in a note body, `SCREAMING_SNAKE`, `camelCase` and `kebab-case` spellings of the same name match each other, and notes containing the exact identifier from the query get an extra rank in fusion (shown as the `identifier` channel in `evidence: "compact"`), while still favoring conceptually relevant and well-connected notes. The ranking remains bounded and fail-soft, uses compact projections without new infrastructure, and preserves canonical explanation promotion and temporal recency hints.
 
 Recall modes:
 

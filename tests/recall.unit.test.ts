@@ -1311,3 +1311,73 @@ describe("partitionGatedCandidates and derived-scope selection", () => {
     expect(selectRecallResults(scored, 5, "all").map((c) => c.id)).toEqual(["a", "b"]);
   });
 });
+
+describe("exact-identifier channel", () => {
+  const candidate = (
+    id: string,
+    overrides: Partial<ScoredRecallCandidate> = {},
+  ): ScoredRecallCandidate => ({
+    id,
+    score: 0,
+    boosted: 0,
+    vault,
+    isCurrentProject: true,
+    lexicalChannelCandidate: false,
+    ...overrides,
+  });
+
+  it("adds one equally weighted RRF rank, like any other channel", () => {
+    const withIdentifier = candidate("a", { lexicalRank: 1, identifierRank: 1 });
+    const lexicalOnly = candidate("b", { lexicalRank: 1 });
+    const semanticAndLexical = candidate("c", { semanticRank: 1, lexicalRank: 1 });
+
+    computeHybridScore(withIdentifier);
+    computeHybridScore(lexicalOnly);
+    computeHybridScore(semanticAndLexical);
+
+    expect(withIdentifier.rrfScore).toBeCloseTo(semanticAndLexical.rrfScore ?? 0, 10);
+    expect(withIdentifier.rrfScore).toBeCloseTo(2 * (lexicalOnly.rrfScore ?? 0), 10);
+  });
+
+  it("ranks only identifier holders, more matches first, then lexical evidence", () => {
+    const promoted = applyCanonicalExplanationPromotion([
+      candidate("none", { lexicalChannelCandidate: true, lexicalChannelScore: 0.9 }),
+      candidate("one-weak", {
+        identifierMatchCount: 1,
+        lexicalChannelCandidate: true,
+        lexicalChannelScore: 0.2,
+      }),
+      candidate("one-strong", {
+        identifierMatchCount: 1,
+        lexicalChannelCandidate: true,
+        lexicalChannelScore: 0.6,
+      }),
+      candidate("two", { identifierMatchCount: 2 }),
+    ]);
+    const rankOf = (id: string): number | undefined =>
+      promoted.find((entry) => entry.id === id)?.identifierRank;
+
+    expect(rankOf("two")).toBe(1);
+    expect(rankOf("one-strong")).toBe(2);
+    expect(rankOf("one-weak")).toBe(3);
+    expect(rankOf("none")).toBeUndefined();
+    // Identifier-only holders gain no lexical rank.
+    expect(promoted.find((entry) => entry.id === "two")?.lexicalRank).toBeUndefined();
+  });
+
+  it("lets an exact holder outrank a role-boosted note with a slightly better lexical rank", () => {
+    const promoted = applyCanonicalExplanationPromotion([
+      candidate("partial", {
+        lexicalChannelCandidate: true,
+        lexicalChannelScore: 0.5,
+        metadataPrior: 0.012,
+      }),
+      candidate("holder", {
+        lexicalChannelCandidate: true,
+        lexicalChannelScore: 0.49,
+        identifierMatchCount: 1,
+      }),
+    ]);
+    expect(promoted[0]?.id).toBe("holder");
+  });
+});

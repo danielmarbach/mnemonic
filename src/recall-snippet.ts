@@ -1,42 +1,10 @@
 import { tokenize } from "./lexical.js";
 
 const DEFAULT_SNIPPET_LENGTH = 300;
-const MIN_QUERY_TOKEN_LENGTH = 2;
-const SNIPPET_STOPWORDS = new Set([
-  "a",
-  "an",
-  "and",
-  "are",
-  "as",
-  "at",
-  "be",
-  "by",
-  "do",
-  "does",
-  "for",
-  "from",
-  "how",
-  "in",
-  "is",
-  "it",
-  "of",
-  "on",
-  "or",
-  "the",
-  "to",
-  "we",
-  "what",
-  "when",
-  "why",
-  "with",
-]);
-
-function significantQueryTokens(query: string): Set<string> {
-  return new Set(
-    tokenize(query).filter(
-      (token) => token.length >= MIN_QUERY_TOKEN_LENGTH && !SNIPPET_STOPWORDS.has(token),
-    ),
-  );
+// No stopword list, so it works in any language: terms that occur in many of the note's
+// paragraphs weigh little, terms unique to one paragraph weigh most.
+function queryTokens(query: string): Set<string> {
+  return new Set(tokenize(query));
 }
 
 function isHeadingOnly(paragraph: string): boolean {
@@ -83,21 +51,28 @@ export function selectQuerySnippet(
   summary: string,
   maxLength = DEFAULT_SNIPPET_LENGTH,
 ): string | undefined {
-  const queryTokens = significantQueryTokens(query);
-  if (queryTokens.size === 0) {
+  const tokens = queryTokens(query);
+  if (tokens.size === 0) {
     return undefined;
   }
 
-  let best: { text: string; matched: string[] } | undefined;
-  for (const paragraph of content.split(/\n\s*\n/)) {
-    const trimmed = paragraph.trim();
-    if (!trimmed || trimmed.startsWith("```") || isHeadingOnly(trimmed)) {
-      continue;
-    }
-    const paragraphTokens = new Set(tokenize(trimmed));
-    const matched = [...queryTokens].filter((token) => paragraphTokens.has(token));
-    if (matched.length > (best?.matched.length ?? 0)) {
-      best = { text: trimmed.replace(/\s+/g, " "), matched };
+  const paragraphs = content
+    .split(/\n\s*\n/)
+    .map((paragraph) => paragraph.trim())
+    .filter((paragraph) => paragraph && !paragraph.startsWith("```") && !isHeadingOnly(paragraph))
+    .map((paragraph) => ({ text: paragraph, tokens: new Set(tokenize(paragraph)) }));
+
+  const paragraphFrequency = new Map<string, number>();
+  for (const token of tokens) {
+    paragraphFrequency.set(token, paragraphs.filter((p) => p.tokens.has(token)).length);
+  }
+
+  let best: { text: string; matched: string[]; score: number } | undefined;
+  for (const paragraph of paragraphs) {
+    const matched = [...tokens].filter((token) => paragraph.tokens.has(token));
+    const score = matched.reduce((sum, token) => sum + 1 / (paragraphFrequency.get(token) ?? 1), 0);
+    if (score > (best?.score ?? 0)) {
+      best = { text: paragraph.text.replace(/\s+/g, " "), matched, score };
     }
   }
 
