@@ -16,8 +16,6 @@ alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
-  - id: document-source-attachment-five-bugs-found-and-fixed-via-pac-24bedd4b
-    type: related-to
   - id: plan-deliver-document-source-chunk-semantic-retrieval-embedd-dba90b71
     type: derives-from
 memoryVersion: 1

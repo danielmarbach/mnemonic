@@ -13,11 +13,7 @@ updatedAt: '2026-08-03T09:57:46.881Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
-  - id: document-source-attachment-five-bugs-found-and-fixed-via-pac-24bedd4b
-    type: follows
   - id: docs-gap-fixed-attachment-configuration-documented-in-readme-93c55f0d
-    type: related-to
-  - id: pack-d-document-source-attachment-dogfood-pack-and-a-b-c-con-4f75a70c
     type: related-to
   - id: document-source-chunk-embeddings-specified-but-never-deliver-6e867617
     type: explains

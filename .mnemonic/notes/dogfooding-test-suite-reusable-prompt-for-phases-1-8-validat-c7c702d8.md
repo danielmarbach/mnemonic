@@ -15,8 +15,6 @@ projectName: mnemonic
 relatedTo:
   - id: implementation-principles-for-mnemonic-mcp-2e178bba
     type: related-to
-  - id: pack-d-document-source-attachment-dogfood-pack-and-a-b-c-con-4f75a70c
-    type: derives-from
 memoryVersion: 1
 ---
 # Dogfooding test packs: reusable prompts and scorecards
