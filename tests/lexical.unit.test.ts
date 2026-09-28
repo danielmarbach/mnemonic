@@ -457,6 +457,18 @@ describe("rankDocumentsByQueryCoverage", () => {
     expect(ranked.map((entry) => entry.id)).toEqual(["full", "common-only"]);
   });
 
+  it("gives words shared by every document no weight, so broad queries rank nothing", () => {
+    const shared = [
+      { id: "a", tokens: tokenize("how recall ranking works replicas") },
+      { id: "b", tokens: tokenize("how recall ranking works cooking") },
+      { id: "c", tokens: tokenize("how recall ranking works menu") },
+    ];
+    expect(rankDocumentsByQueryCoverage("how recall ranking works", shared, 10, 0.5)).toEqual([]);
+    expect(rankDocumentsByQueryCoverage("how recall replicas", shared, 10, 0.9)).toEqual([
+      { id: "a", score: 1 },
+    ]);
+  });
+
   it("returns nothing for an empty query or corpus", () => {
     expect(rankDocumentsByQueryCoverage("", documents, 10, 0)).toEqual([]);
     expect(rankDocumentsByQueryCoverage("replicas", [], 10, 0)).toEqual([]);

@@ -200,6 +200,24 @@ export function computeInverseDocumentFrequency(documents: string[][]): Map<stri
 }
 
 /**
+ * IDF without smoothing: a token in every document weighs 0, so words most notes
+ * share cannot give a broad query full coverage.
+ */
+function computeUnsmoothedInverseDocumentFrequency(documents: string[][]): Map<string, number> {
+  const documentFrequencies = new Map<string, number>();
+  for (const document of documents) {
+    for (const token of new Set(document)) {
+      documentFrequencies.set(token, (documentFrequencies.get(token) ?? 0) + 1);
+    }
+  }
+  const idf = new Map<string, number>();
+  for (const [token, frequency] of documentFrequencies) {
+    idf.set(token, Math.log(documents.length / frequency));
+  }
+  return idf;
+}
+
+/**
  * Compute cosine similarity between a query and document TF-IDF vectors.
  */
 export function computeTfIdfCosineSimilarity(
@@ -382,7 +400,9 @@ export function rankDocumentsByQueryCoverage(
   if (limit <= 0 || documents.length === 0 || queryTokens.length === 0) {
     return [];
   }
-  const idf = computeInverseDocumentFrequency(documents.map((document) => document.tokens));
+  const idf = computeUnsmoothedInverseDocumentFrequency(
+    documents.map((document) => document.tokens),
+  );
   return documents
     .map((document) => ({
       id: document.id,
@@ -423,9 +443,10 @@ export const LEXICAL_RETRIEVAL_THRESHOLD = 0.05;
 export const FULL_TEXT_RETRIEVAL_RESULT_LIMIT = 25;
 
 /**
- * Minimum IDF-weighted query coverage for the full-text channel.
+ * Minimum IDF-weighted query coverage for the full-text channel. Near-complete coverage
+ * separates quoted wording from broad questions whose words many long notes share.
  */
-export const FULL_TEXT_RETRIEVAL_THRESHOLD = 0.5;
+export const FULL_TEXT_RETRIEVAL_THRESHOLD = 0.9;
 
 /**
  * Maximum number of candidates to consider for lexical rescue compatibility.

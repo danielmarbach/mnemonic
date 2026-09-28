@@ -4,6 +4,12 @@ All notable changes to `mnemonic` will be documented in this file.
 
 The format is loosely based on Keep a Changelog and uses semver-style version headings.
 
+## [Unreleased]
+
+### Fixed
+
+- Broad questions such as "how does recall ranking work" no longer get reshuffled by the 0.47.0 full-text channel. It now only ranks notes containing nearly all of the query's distinctive words, so quoted wording deep in a note still surfaces while broad questions return the same results as before 0.47.0.
+
 ## [0.47.0] - 2026-09-28
 
 ### Changed

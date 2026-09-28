@@ -21,8 +21,8 @@
     },
     "project-affinity": {
       "queries": 8,
-      "mrrAt10": 0.938,
-      "successAt1": 0.875,
+      "mrrAt10": 1,
+      "successAt1": 1,
       "successAt5": 1
     },
     "supersession": {
