@@ -368,6 +368,31 @@ function computeTfIdfWeightedQueryCoverage(
   return totalWeight === 0 ? 0 : matchedWeight / totalWeight;
 }
 
+/**
+ * Rank documents by IDF-weighted share of the query's tokens they contain, for the
+ * full-text channel. Documents below the minimum score get no rank.
+ */
+export function rankDocumentsByQueryCoverage(
+  query: string,
+  documents: Array<{ id: string; tokens: string[] }>,
+  limit: number,
+  minimumScore: number,
+): Array<{ id: string; score: number }> {
+  const queryTokens = tokenize(query);
+  if (limit <= 0 || documents.length === 0 || queryTokens.length === 0) {
+    return [];
+  }
+  const idf = computeInverseDocumentFrequency(documents.map((document) => document.tokens));
+  return documents
+    .map((document) => ({
+      id: document.id,
+      score: computeTfIdfWeightedQueryCoverage(queryTokens, document.tokens, idf),
+    }))
+    .filter((entry) => entry.score > 0 && entry.score >= minimumScore)
+    .sort((a, b) => b.score - a.score || a.id.localeCompare(b.id))
+    .slice(0, limit);
+}
+
 function extractProjectionTitle(text: string): string {
   const titleLine = text.split("\n", 1)[0]?.trim();
   if (!titleLine) {
@@ -391,6 +416,16 @@ export const LEXICAL_RETRIEVAL_RESULT_LIMIT = 25;
  * Minimum positive lexical signal for the always-on channel.
  */
 export const LEXICAL_RETRIEVAL_THRESHOLD = 0.05;
+
+/**
+ * Maximum number of candidates returned by the full-text channel.
+ */
+export const FULL_TEXT_RETRIEVAL_RESULT_LIMIT = 25;
+
+/**
+ * Minimum IDF-weighted query coverage for the full-text channel.
+ */
+export const FULL_TEXT_RETRIEVAL_THRESHOLD = 0.5;
 
 /**
  * Maximum number of candidates to consider for lexical rescue compatibility.

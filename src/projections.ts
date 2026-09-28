@@ -3,7 +3,7 @@ import { hasNoteContent } from "./storage.js";
 import type { NoteContentSignals, NoteProjection } from "./structured-content.js";
 import { analyzeNoteContent } from "./role-suggestions.js";
 import { memoryId } from "./brands.js";
-import { isCompoundIdentifier } from "./lexical.js";
+import { isCompoundIdentifier, normalizeText } from "./lexical.js";
 
 const MAX_SUMMARY_LENGTH = 280;
 const MAX_HEADINGS = 8;
@@ -11,6 +11,9 @@ const MAX_PROJECTION_TEXT_LENGTH = 1200;
 // Bounds keep a pasted code dump from bloating the projection file and the lexical corpus.
 const MAX_IDENTIFIERS = 200;
 const MAX_IDENTIFIER_LENGTH = 80;
+const MAX_BODY_TERMS = 400;
+// Longer runs are hashes, base64 or unsegmented scripts that never match a query word.
+const MAX_BODY_TERM_LENGTH = 40;
 
 // ── Summary extraction ────────────────────────────────────────────────────────
 
@@ -134,6 +137,25 @@ export function extractIdentifiers(markdown: string): string[] {
   return identifiers.slice(0, MAX_IDENTIFIERS);
 }
 
+// ── Body term extraction ──────────────────────────────────────────────────────
+
+/**
+ * Distinct body words that projectionText does not already carry, so the lexical
+ * channel can match wording deep in a note. Kept in first-occurrence order up to
+ * the cap, then sorted: the result is a vocabulary, not recoverable note text.
+ */
+export function extractBodyTerms(markdown: string, projectionText: string): string[] {
+  const projected = new Set(normalizeText(projectionText).split(" "));
+  const withoutFences = markdown.replace(/^```[^\n]*\n[\s\S]*?^```/gm, " ");
+  const terms = new Set<string>();
+  for (const term of normalizeText(withoutFences).split(" ")) {
+    if (!term || term.length > MAX_BODY_TERM_LENGTH || projected.has(term)) continue;
+    terms.add(term);
+    if (terms.size >= MAX_BODY_TERMS) break;
+  }
+  return [...terms].sort();
+}
+
 /**
  * Text the lexical recall channel scores: the projection text plus body identifiers.
  * Embeddings keep using projectionText alone, so identifiers never trigger re-embedding.
@@ -200,6 +222,7 @@ export function buildProjection(note: Note): NoteProjection {
     headings,
   };
   const projectionText = buildProjectionText(partial);
+  const bodyTerms = extractBodyTerms(note.content, projectionText);
 
   return {
     noteId: note.id,
@@ -213,6 +236,7 @@ export function buildProjection(note: Note): NoteProjection {
     generatedAt: new Date().toISOString(),
     contentSignals,
     identifiers,
+    bodyTerms,
   };
 }
 
@@ -222,7 +246,7 @@ export function buildProjection(note: Note): NoteProjection {
  * A projection is stale when:
  * - projection is missing → stale (caller handles null case)
  * - projection.updatedAt missing → stale
- * - projection lacks persisted contentSignals or identifiers → stale (one-time
+ * - projection lacks persisted contentSignals, identifiers or bodyTerms → stale (one-time
  *   lazy migration of legacy projections written before those fields existed)
  * - updatedAt differs AND projected content actually changed
  *
@@ -237,7 +261,7 @@ export function isProjectionStale(note: NoteMetadata, projection: NoteProjection
   if (!projection.updatedAt) return true;
 
   // Force a one-time lazy rebuild of legacy projections.
-  if (!projection.contentSignals || !projection.identifiers) return true;
+  if (!projection.contentSignals || !projection.identifiers || !projection.bodyTerms) return true;
 
   if (projection.updatedAt === note.updatedAt) return false;
   if (!hasNoteContent(note)) return true;
@@ -252,8 +276,12 @@ export function isProjectionStale(note: NoteMetadata, projection: NoteProjection
   if (!contentSignalsEqual(analyzeNoteContent(note.content), projection.contentSignals)) {
     return true;
   }
-  // Identifiers come from the whole body, so they can change while projectionText does not.
-  return !stringArraysEqual(extractIdentifiers(note.content), projection.identifiers);
+  // Identifiers and body terms come from the whole body, so they can change while
+  // projectionText does not.
+  return (
+    !stringArraysEqual(extractIdentifiers(note.content), projection.identifiers) ||
+    !stringArraysEqual(extractBodyTerms(note.content, currentText), projection.bodyTerms)
+  );
 }
 
 function stringArraysEqual(a: readonly string[], b: readonly string[]): boolean {

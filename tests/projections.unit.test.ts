@@ -5,6 +5,7 @@ import {
   buildLexicalText,
   buildProjection,
   buildProjectionText,
+  extractBodyTerms,
   extractHeadings,
   extractIdentifiers,
   extractProjectionSummary,
@@ -280,6 +281,7 @@ describe("isProjectionStale", () => {
       generatedAt: "2026-01-15T01:00:00.000Z",
       contentSignals: signals,
       identifiers: [],
+      bodyTerms: [],
       ...overrides,
     };
   }
@@ -620,6 +622,92 @@ describe("isProjectionStale identifiers", () => {
     const before = makeNote({ content: `Summary.\n\n${LONG_FILLER}\n\nUse \`oldName\`.` });
     const after = makeNote({
       content: `Summary.\n\n${LONG_FILLER}\n\nUse \`newName\`.`,
+      updatedAt: isoDateString("2026-03-01T00:00:00.000Z"),
+    });
+    const projection = buildProjection(before);
+
+    expect(buildProjection(after).projectionText).toBe(projection.projectionText);
+    expect(isProjectionStale(after, projection)).toBe(true);
+  });
+});
+
+describe("extractBodyTerms", () => {
+  it("collects body words missing from the projection text, sorted", () => {
+    const terms = extractBodyTerms(
+      "Rows are claimed with SKIP LOCKED so replicas never publish twice.",
+      "Title: Outbox\nSummary: rows are claimed",
+    );
+    expect(terms).toEqual([
+      "locked",
+      "never",
+      "publish",
+      "replicas",
+      "skip",
+      "so",
+      "twice",
+      "with",
+    ]);
+  });
+
+  it("ignores fenced code and bounds the number and length of terms", () => {
+    const fenced = "```ts\nconst hiddenInFence = 1;\n```\n";
+    const tooLong = "x".repeat(41);
+    const many = Array.from({ length: 450 }, (_, i) => `word${i}`).join(" ");
+    const terms = extractBodyTerms(`${fenced}${tooLong} ${many}`, "Title: X");
+
+    expect(terms).toHaveLength(400);
+    expect(terms).not.toContain("hiddeninfence");
+    expect(terms).not.toContain(tooLong);
+    expect(terms).toContain("word399");
+    expect(terms).not.toContain("word400");
+  });
+
+  it("keeps non-latin words", () => {
+    expect(extractBodyTerms("Wiederholungen mit Rückoff überprüfen.", "Title: X")).toEqual([
+      "mit",
+      "rückoff",
+      "wiederholungen",
+      "überprüfen",
+    ]);
+  });
+});
+
+describe("buildProjection body terms", () => {
+  it("persists deep body terms without changing embedding or lexical text", () => {
+    const withTerm = makeNote({
+      content: `Short summary.\n\n${LONG_FILLER}\n\nReplicas never double publish.`,
+    });
+    const withoutTerm = makeNote({ content: `Short summary.\n\n${LONG_FILLER}` });
+
+    const projection = buildProjection(withTerm);
+
+    expect(projection.bodyTerms).toContain("replicas");
+    expect(projection.projectionText).toBe(buildProjection(withoutTerm).projectionText);
+    expect(buildLexicalText(projection)).not.toContain("replicas");
+  });
+
+  it("round-trips body terms through projection validation", () => {
+    const projection = buildProjection(
+      makeNote({ content: "Summary.\n\n## Detail\n\nDeep words." }),
+    );
+    expect(validateNoteProjection(JSON.parse(JSON.stringify(projection)))?.bodyTerms).toEqual(
+      projection.bodyTerms,
+    );
+  });
+});
+
+describe("isProjectionStale body terms", () => {
+  it("treats a legacy projection without body terms as stale", () => {
+    const note = makeNote({ content: "Body." });
+    const projection = buildProjection(note);
+    delete projection.bodyTerms;
+    expect(isProjectionStale(note, projection)).toBe(true);
+  });
+
+  it("detects a deep body word change that leaves projectionText unchanged", () => {
+    const before = makeNote({ content: `Summary.\n\n${LONG_FILLER}\n\nUse polling.` });
+    const after = makeNote({
+      content: `Summary.\n\n${LONG_FILLER}\n\nUse notifications.`,
       updatedAt: isoDateString("2026-03-01T00:00:00.000Z"),
     });
     const projection = buildProjection(before);

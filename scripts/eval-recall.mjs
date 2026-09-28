@@ -245,7 +245,7 @@ function explainResult(entry) {
   const format = (value) => (typeof value === "number" ? value.toFixed(4) : "-");
   return [
     entry.id,
-    `ranks sem=${d.semanticRank ?? "-"} lex=${d.lexicalRank ?? "-"} id=${d.identifierRank ?? "-"} graph=${d.graphRank ?? "-"}`,
+    `ranks sem=${d.semanticRank ?? "-"} lex=${d.lexicalRank ?? "-"} id=${d.identifierRank ?? "-"} ft=${d.fullTextRank ?? "-"} graph=${d.graphRank ?? "-"}`,
     `rrf=${format(d.rrfScore)} project=${format(d.projectPrior)} metadata=${format(d.metadataPrior)}`,
     `canonical=${format(d.canonicalPrior)} final=${format(d.finalScore)}`,
   ].join(" ");

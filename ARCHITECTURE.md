@@ -103,7 +103,7 @@ sequenceDiagram
 
 When `cwd` is present, recall searches the project vault first and then widens to the main vault. Current-project matches receive a bounded policy prior (+0.005). Results remain score-ordered, so project affinity cannot displace a strong global match.
 
-The ranking pipeline is bounded and fail-soft. Semantic embeddings, an always-on lexical channel over compact projections, and semantic-conditioned graph expansion each produce channel ranks. RRF fuses those ranks, then applies bounded semantic-confidence, project, metadata, temporal, and canonical adjustments. Explicit high-confidence temporal windows still filter candidates before ranking. Lexical candidate generation reuses the existing session projection/token cache and TF-IDF machinery, without introducing a database or synced index. Projections also persist the code-like identifiers found anywhere in the note body (code spans, camelCase, snake_case, kebab-case, versions). The lexical channel scores them alongside the projection text, and compound identifiers tokenize to both their joined form and their parts. Embeddings keep using the projection text alone, so identifiers never cause re-embedding. When the query contains a compound identifier, an exact-identifier channel ranks the notes that contain it (joined form, any spelling) and fuses that rank with the same RRF weight as the other channels. It is retrieval evidence, not a prior, and it is absent for natural-language queries.
+The ranking pipeline is bounded and fail-soft. Semantic embeddings, an always-on lexical channel over compact projections, and semantic-conditioned graph expansion each produce channel ranks. RRF fuses those ranks, then applies bounded semantic-confidence, project, metadata, temporal, and canonical adjustments. Explicit high-confidence temporal windows still filter candidates before ranking. Lexical candidate generation reuses the existing session projection/token cache and TF-IDF machinery, without introducing a database or synced index. Projections also persist the code-like identifiers found anywhere in the note body (code spans, camelCase, snake_case, kebab-case, versions). The lexical channel scores them alongside the projection text, and compound identifiers tokenize to both their joined form and their parts. Embeddings keep using the projection text alone, so identifiers never cause re-embedding. When the query contains a compound identifier, an exact-identifier channel ranks the notes that contain it (joined form, any spelling) and fuses that rank with the same RRF weight as the other channels. It is retrieval evidence, not a prior, and it is absent for natural-language queries. Projections also persist a capped, sorted set of distinct body words that the projection text lacks (`bodyTerms`), a vocabulary rather than recoverable note text. A full-text channel ranks notes by IDF-weighted query coverage over projection tokens plus body terms (top 25, coverage at least 0.5) and fuses that rank with the same RRF weight. Body terms never enter the lexical channel or the embedding input, so the lexical ranking and embeddings are unchanged.
 
 Document-source attachments feed document chunks into the same unified ranking. Each chunk is scored semantically (cosine against the query vector, when a persisted chunk embedding exists) and lexically (content + heading ancestry + source path), fused via RRF on the note-ranking scale, and given a bounded prior smaller than the attachment boost so memories outrank chunks by default. Chunks render inline in the ranked list rather than in a separate section.
 
@@ -116,9 +116,11 @@ flowchart TD
     ProjectEmbeddings --> Semantic[semantic channel rank]
     MainEmbeddings --> Semantic
     Search --> Lexical[bounded lexical projection channel]
+    Search --> FullText[bounded full-text channel over projection + body terms]
     Search --> Graph[bounded graph expansion from semantic entry points]
-    Semantic --> Fusion[RRF: semantic + lexical + graph ranks]
+    Semantic --> Fusion[RRF: semantic + lexical + identifier + full-text + graph ranks]
     Lexical --> Fusion
+    FullText --> Fusion
     Graph --> Fusion
     Fusion --> Rank[bounded confidence + policy priors]
     Rank --> Filter[scope / tags / semantic minSimilarity\n+ optional temporal strict filter]

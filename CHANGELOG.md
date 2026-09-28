@@ -4,6 +4,12 @@ All notable changes to `mnemonic` will be documented in this file.
 
 The format is loosely based on Keep a Changelog and uses semver-style version headings.
 
+## [Unreleased]
+
+### Changed
+
+- `recall` now finds notes by wording deep in their body, not only in the title, summary and headings. Notes containing most of the query's words anywhere get an extra fusion rank, shown as the `full-text` channel with `fullTextRank` in `evidence: "compact"`. Existing projections rebuild once on first recall; embeddings are untouched.
+
 ## [0.46.0] - 2026-09-27
 
 ### Added

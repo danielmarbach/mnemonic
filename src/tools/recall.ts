@@ -116,7 +116,7 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
         "Do not use this when:\n" +
         "- You already know the exact id; use `get`\n" +
         "- You just want to browse by tags or scope; use `list`\n\n" +
-        'Returns: ranked matches (id, title, score, vault, tags, lifecycle, updatedAt). By default (`detail: "brief"`) the text shows each note\'s summary plus the passage that best matches the query, not the full body; call `get` with the listed ids for full content, or pass `detail: "full"` to inline full bodies. Also 1-hop relationship previews on top results, temporal history (mode: temporal), retrieval evidence (evidence: compact), including optional score decomposition and an `identifier` channel with identifierRank when the query contains an exact identifier such as `buildNoteWarnings` or `RRF_K`, diagnostics: recallScopeNoteCount, diversity, retrievalCoverage, signalStrength, plus derived-scope gating fields: suppressedGlobalCount (weak global matches held back) and widenedScope (recall widened after an empty admitted pool).\n' +
+        'Returns: ranked matches (id, title, score, vault, tags, lifecycle, updatedAt). By default (`detail: "brief"`) the text shows each note\'s summary plus the passage that best matches the query, not the full body; call `get` with the listed ids for full content, or pass `detail: "full"` to inline full bodies. Also 1-hop relationship previews on top results, temporal history (mode: temporal), retrieval evidence (evidence: compact), including optional score decomposition and an `identifier` channel with identifierRank when the query contains an exact identifier such as `buildNoteWarnings` or `RRF_K`, and a `full-text` channel with fullTextRank when most query words appear anywhere in the note body, diagnostics: recallScopeNoteCount, diversity, retrievalCoverage, signalStrength, plus derived-scope gating fields: suppressedGlobalCount (weak global matches held back) and widenedScope (recall widened after an empty admitted pool).\n' +
         "Document-source attachments return documentChunks (kind, chunkId, documentId, score, boosted, semanticScore, lexicalScore, sourcePath, headingAncestry, excerpt, attachmentId, sourceMediaType, extractionMetadata, indexedCommit, generationId, retrievalHandle); chunks rank below memories by default and render inline in the ranked list.\n\n" +
         "Typical next step:\n" +
         "- Use `get`, `update`, `relate`, or `consolidate` based on the results.",
@@ -638,6 +638,7 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
             existing.lexicalChannelScore = lexicalCandidate.lexicalChannelScore;
           }
           existing.identifierMatchCount = lexicalCandidate.identifierMatchCount;
+          existing.fullTextScore = lexicalCandidate.fullTextScore;
           existing.lexicalScore = lexicalCandidate.lexicalScore;
           existing.projectPrior = existing.projectPrior ?? lexicalCandidate.projectPrior;
           existing.temporalPrior = existing.temporalPrior ?? lexicalCandidate.temporalPrior;
@@ -857,6 +858,7 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
           lexicalRank,
           graphRank,
           identifierRank,
+          fullTextRank,
           canonicalExplanationScore,
           metadata,
           isCurrentProject,
@@ -956,6 +958,7 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
                     semanticRank !== undefined ? "semantic" : undefined,
                     lexicalRank !== undefined ? "lexical" : undefined,
                     identifierRank !== undefined ? "identifier" : undefined,
+                    fullTextRank !== undefined ? "full-text" : undefined,
                     graphRank !== undefined ? "graph-rank" : undefined,
                     canonicalExplanationScore !== undefined && canonicalExplanationScore > 0
                       ? "canonical"
@@ -964,7 +967,13 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
                   ].filter(
                     (value): value is RetrievalEvidence["channels"][number] => value !== undefined,
                   ),
-                  rankBand: toRecallRankBand(semanticRank, lexicalRank, graphRank, identifierRank),
+                  rankBand: toRecallRankBand(
+                    semanticRank,
+                    lexicalRank,
+                    graphRank,
+                    identifierRank,
+                    fullTextRank,
+                  ),
                   projectRelevant: isCurrentProject,
                   freshness: toRecallFreshness(note.updatedAt),
                   superseded: supersededRelations.length > 0,
@@ -979,6 +988,7 @@ export function registerRecallTool(server: McpServer, ctx: ServerContext): void 
                     lexicalRank,
                     graphRank,
                     identifierRank,
+                    fullTextRank,
                     rrfScore: roundPrior(candidate.rrfScore ?? 0),
                     semanticConfidencePrior: roundPrior(candidate.semanticConfidencePrior ?? 0),
                     projectPrior: roundPrior(candidate.projectPrior ?? 0),

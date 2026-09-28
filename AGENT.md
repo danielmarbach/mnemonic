@@ -530,6 +530,6 @@ ESLint + Prettier enforce code quality and formatting. Run `npm run lint` to che
 ## Known limitations
 
 - **Bounded parallel embedding** — small concurrency limit during sync embedding backfill
-- **No full-text fallback** — fails if Ollama down (could add keyword search)
+- **Recall without embeddings is word-based** — if Ollama is down, recall still matches exact wording, identifiers and whole-note words, but conceptual matches need embeddings
 - **Embedding provider/model mismatch** — call the `sync` MCP tool with `force: true` to rebuild local embeddings
 - **No web UI** — vault is just files; use any markdown editor

@@ -208,7 +208,14 @@ export interface RecallRetrievalCoverage {
 }
 
 export type RetrievalEvidenceChannel =
-  "semantic" | "lexical" | "identifier" | "graph-rank" | "temporal-boost" | "canonical" | "rescue";
+  | "semantic"
+  | "lexical"
+  | "identifier"
+  | "full-text"
+  | "graph-rank"
+  | "temporal-boost"
+  | "canonical"
+  | "rescue";
 export type RetrievalEvidenceRankBand = "top3" | "top10" | "lower";
 export type RetrievalEvidenceFreshness = "today" | "thisWeek" | "thisMonth" | "older";
 
@@ -218,6 +225,7 @@ export interface RetrievalScoreDecomposition {
   lexicalRank?: number;
   graphRank?: number;
   identifierRank?: number;
+  fullTextRank?: number;
   rrfScore: number;
   semanticConfidencePrior: number;
   projectPrior: number;
@@ -775,6 +783,11 @@ export interface NoteProjection {
    * Optional so legacy projection files remain readable; rebuilt lazily on first use.
    */
   identifiers?: string[];
+  /**
+   * Distinct body words missing from projectionText, sorted so the body cannot be
+   * reconstructed. Lexical channel only; rebuilt lazily when absent.
+   */
+  bodyTerms?: string[];
 }
 
 /**
@@ -1169,13 +1182,14 @@ export const RecallResultSchema = z.object({
                 "semantic",
                 "lexical",
                 "identifier",
+                "full-text",
                 "graph-rank",
                 "temporal-boost",
                 "canonical",
                 "rescue",
               ])
               .describe(
-                "Channels with evidence for this result; 'identifier' means the note contains an exact identifier from the query",
+                "Channels with evidence for this result; 'identifier' means the note contains an exact identifier from the query; 'full-text' means most of the query's words appear somewhere in the note, body included",
               ),
           ),
           rankBand: z.enum(["top3", "top10", "lower"]),
@@ -1211,12 +1225,20 @@ export const RecallResultSchema = z.object({
                 .describe(
                   "1-based exact-identifier channel rank; present only when the query contains a compound identifier the note contains",
                 ),
+              fullTextRank: z
+                .number()
+                .int()
+                .min(1)
+                .optional()
+                .describe(
+                  "1-based full-text channel rank; present when most of the query's words (IDF-weighted) appear anywhere in the note, including deep body text",
+                ),
               rrfScore: z
                 .number()
                 .min(0)
-                .max(0.1968)
+                .max(0.246)
                 .describe(
-                  "Scaled reciprocal-rank fusion contribution across semantic, lexical, graph and identifier channels",
+                  "Scaled reciprocal-rank fusion contribution across semantic, lexical, graph, identifier and full-text channels",
                 ),
               semanticConfidencePrior: z
                 .number()

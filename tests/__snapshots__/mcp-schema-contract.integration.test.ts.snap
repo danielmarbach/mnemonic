@@ -5042,7 +5042,7 @@ Do not use this when:
 - You already know the exact id; use \`get\`
 - You just want to browse by tags or scope; use \`list\`
 
-Returns: ranked matches (id, title, score, vault, tags, lifecycle, updatedAt). By default (\`detail: "brief"\`) the text shows each note's summary plus the passage that best matches the query, not the full body; call \`get\` with the listed ids for full content, or pass \`detail: "full"\` to inline full bodies. Also 1-hop relationship previews on top results, temporal history (mode: temporal), retrieval evidence (evidence: compact), including optional score decomposition and an \`identifier\` channel with identifierRank when the query contains an exact identifier such as \`buildNoteWarnings\` or \`RRF_K\`, diagnostics: recallScopeNoteCount, diversity, retrievalCoverage, signalStrength, plus derived-scope gating fields: suppressedGlobalCount (weak global matches held back) and widenedScope (recall widened after an empty admitted pool).
+Returns: ranked matches (id, title, score, vault, tags, lifecycle, updatedAt). By default (\`detail: "brief"\`) the text shows each note's summary plus the passage that best matches the query, not the full body; call \`get\` with the listed ids for full content, or pass \`detail: "full"\` to inline full bodies. Also 1-hop relationship previews on top results, temporal history (mode: temporal), retrieval evidence (evidence: compact), including optional score decomposition and an \`identifier\` channel with identifierRank when the query contains an exact identifier such as \`buildNoteWarnings\` or \`RRF_K\`, and a \`full-text\` channel with fullTextRank when most query words appear anywhere in the note body, diagnostics: recallScopeNoteCount, diversity, retrievalCoverage, signalStrength, plus derived-scope gating fields: suppressedGlobalCount (weak global matches held back) and widenedScope (recall widened after an empty admitted pool).
 Document-source attachments return documentChunks (kind, chunkId, documentId, score, boosted, semanticScore, lexicalScore, sourcePath, headingAncestry, excerpt, attachmentId, sourceMediaType, extractionMetadata, indexedCommit, generationId, retrievalHandle); chunks rank below memories by default and render inline in the ranked list.
 
 Typical next step:
@@ -5515,11 +5515,12 @@ Typical next step:
                 "properties": {
                   "channels": {
                     "items": {
-                      "description": "Channels with evidence for this result; 'identifier' means the note contains an exact identifier from the query",
+                      "description": "Channels with evidence for this result; 'identifier' means the note contains an exact identifier from the query; 'full-text' means most of the query's words appear somewhere in the note, body included",
                       "enum": [
                         "semantic",
                         "lexical",
                         "identifier",
+                        "full-text",
                         "graph-rank",
                         "temporal-boost",
                         "canonical",
@@ -5565,6 +5566,12 @@ Typical next step:
                         "minimum": 0,
                         "type": "number",
                       },
+                      "fullTextRank": {
+                        "description": "1-based full-text channel rank; present when most of the query's words (IDF-weighted) appear anywhere in the note, including deep body text",
+                        "maximum": 9007199254740991,
+                        "minimum": 1,
+                        "type": "integer",
+                      },
                       "graphRank": {
                         "description": "1-based graph channel rank",
                         "maximum": 9007199254740991,
@@ -5596,8 +5603,8 @@ Typical next step:
                         "type": "number",
                       },
                       "rrfScore": {
-                        "description": "Scaled reciprocal-rank fusion contribution across semantic, lexical, graph and identifier channels",
-                        "maximum": 0.1968,
+                        "description": "Scaled reciprocal-rank fusion contribution across semantic, lexical, graph, identifier and full-text channels",
+                        "maximum": 0.246,
                         "minimum": 0,
                         "type": "number",
                       },

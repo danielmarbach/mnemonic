@@ -72,6 +72,10 @@ export interface ScoredRecallCandidate {
   identifierMatchCount?: number;
   /** Rank from the exact-identifier channel (1-based). Only set for identifier queries. */
   identifierRank?: number;
+  /** IDF-weighted share of query tokens found anywhere in the note, body included. */
+  fullTextScore?: number;
+  /** Rank from the full-text channel (1-based). */
+  fullTextRank?: number;
   /** Backward-compatible raw semantic score plus policy boosts for output/diagnostics. */
   boosted: number;
   vault: Vault;
@@ -314,8 +318,14 @@ export function computeHybridScore(candidate: ScoredRecallCandidate): number {
     candidate.graphRank !== undefined ? 1 / (RRF_K + candidate.graphRank) : 0;
   const identifierContribution =
     candidate.identifierRank !== undefined ? 1 / (RRF_K + candidate.identifierRank) : 0;
+  const fullTextContribution =
+    candidate.fullTextRank !== undefined ? 1 / (RRF_K + candidate.fullTextRank) : 0;
   const rrf =
-    semanticContribution + lexicalContribution + graphContribution + identifierContribution;
+    semanticContribution +
+    lexicalContribution +
+    graphContribution +
+    identifierContribution +
+    fullTextContribution;
 
   const derivedSemanticConfidencePrior =
     (candidate.semanticScore ??
@@ -454,8 +464,19 @@ export function applyCanonicalExplanationPromotion(
     candidate.lexicalRank = rank;
   });
   assignIdentifierRanks(candidates);
+  assignFullTextRanks(candidates);
 
   return [...candidates].sort(compareByHybridScore);
+}
+
+function assignFullTextRanks(candidates: ScoredRecallCandidate[]): void {
+  const fullTextSignal = (candidate: ScoredRecallCandidate): number => candidate.fullTextScore ?? 0;
+  const holders = candidates
+    .filter((candidate) => candidate.fullTextScore !== undefined)
+    .sort((a, b) => fullTextSignal(b) - fullTextSignal(a) || compareIds(a, b));
+  assignDenseRanks(holders, fullTextSignal, (candidate, rank) => {
+    candidate.fullTextRank = rank;
+  });
 }
 
 /**

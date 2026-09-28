@@ -140,10 +140,12 @@ describe("collectLexicalCandidates projection I/O behavior", () => {
       generatedAt: NOW,
       contentSignals: signals,
       identifiers: [],
+      bodyTerms: [],
     };
     if (opts.legacy) {
       delete p.contentSignals;
       delete p.identifiers;
+      delete p.bodyTerms;
     }
     return p;
   }

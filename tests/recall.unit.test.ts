@@ -1312,6 +1312,47 @@ describe("partitionGatedCandidates and derived-scope selection", () => {
   });
 });
 
+describe("full-text channel", () => {
+  const candidate = (
+    id: string,
+    overrides: Partial<ScoredRecallCandidate> = {},
+  ): ScoredRecallCandidate => ({
+    id,
+    score: 0,
+    boosted: 0,
+    vault,
+    isCurrentProject: true,
+    lexicalChannelCandidate: false,
+    ...overrides,
+  });
+
+  it("adds one equally weighted RRF rank, like any other channel", () => {
+    const withFullText = candidate("a", { lexicalRank: 1, fullTextRank: 1 });
+    const semanticAndLexical = candidate("b", { semanticRank: 1, lexicalRank: 1 });
+
+    computeHybridScore(withFullText);
+    computeHybridScore(semanticAndLexical);
+
+    expect(withFullText.rrfScore).toBeCloseTo(semanticAndLexical.rrfScore ?? 0, 10);
+  });
+
+  it("ranks only full-text holders by coverage, then id, without granting a lexical rank", () => {
+    const promoted = applyCanonicalExplanationPromotion([
+      candidate("none", { lexicalChannelCandidate: true, lexicalChannelScore: 0.9 }),
+      candidate("partial", { fullTextScore: 0.6 }),
+      candidate("full-b", { fullTextScore: 1 }),
+      candidate("full-a", { fullTextScore: 1 }),
+    ]);
+    const entry = (id: string) => promoted.find((c) => c.id === id);
+
+    expect(entry("full-a")?.fullTextRank).toBe(1);
+    expect(entry("full-b")?.fullTextRank).toBe(1);
+    expect(entry("partial")?.fullTextRank).toBe(3);
+    expect(entry("none")?.fullTextRank).toBeUndefined();
+    expect(entry("partial")?.lexicalRank).toBeUndefined();
+  });
+});
+
 describe("exact-identifier channel", () => {
   const candidate = (
     id: string,

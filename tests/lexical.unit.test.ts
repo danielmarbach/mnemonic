@@ -15,6 +15,7 @@ import {
   prepareTfIdfCorpusFromTokenizedDocuments,
   prepareTfIdfCorpus,
   rankDocumentsByTfIdf,
+  rankDocumentsByQueryCoverage,
   shouldTriggerLexicalRescue,
   LEXICAL_RETRIEVAL_CANDIDATE_LIMIT,
   LEXICAL_RETRIEVAL_RESULT_LIMIT,
@@ -433,5 +434,31 @@ describe("queryIdentifierKeys", () => {
 
   it("returns nothing for natural-language queries", () => {
     expect(queryIdentifierKeys("how does recall ranking work")).toEqual([]);
+  });
+});
+
+describe("rankDocumentsByQueryCoverage", () => {
+  const documents = [
+    { id: "full", tokens: tokenize("replicas never publish twice skip locked") },
+    { id: "rare-only", tokens: tokenize("replicas cooking recipes") },
+    { id: "common-only", tokens: tokenize("never twice cooking") },
+    { id: "unrelated", tokens: tokenize("weekly menu") },
+  ];
+
+  it("ranks by IDF-weighted query coverage and drops documents below the threshold", () => {
+    const ranked = rankDocumentsByQueryCoverage("replicas skip locked", documents, 10, 0.5);
+    expect(ranked.map((entry) => entry.id)).toEqual(["full"]);
+    expect(ranked[0]?.score).toBeCloseTo(1);
+  });
+
+  it("orders partial matches by coverage, then id, within the limit", () => {
+    // Both words appear in two documents, so the partial matches tie and break by id.
+    const ranked = rankDocumentsByQueryCoverage("replicas never", documents, 2, 0.1);
+    expect(ranked.map((entry) => entry.id)).toEqual(["full", "common-only"]);
+  });
+
+  it("returns nothing for an empty query or corpus", () => {
+    expect(rankDocumentsByQueryCoverage("", documents, 10, 0)).toEqual([]);
+    expect(rankDocumentsByQueryCoverage("replicas", [], 10, 0)).toEqual([]);
   });
 });

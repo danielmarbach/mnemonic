@@ -32,6 +32,9 @@ import {
   queryIdentifierKeys,
   prepareTfIdfCorpusFromTokenizedDocuments,
   rankDocumentsByTfIdf,
+  rankDocumentsByQueryCoverage,
+  FULL_TEXT_RETRIEVAL_RESULT_LIMIT,
+  FULL_TEXT_RETRIEVAL_THRESHOLD,
   LEXICAL_RETRIEVAL_CANDIDATE_LIMIT,
   LEXICAL_RETRIEVAL_RESULT_LIMIT,
   LEXICAL_RETRIEVAL_THRESHOLD,
@@ -124,6 +127,7 @@ export async function collectLexicalCandidates(
     updatedAt: string;
     lexicalText: string;
     projectionTokens: string[];
+    bodyTerms: string[];
     identifierMatchCount: number;
     context: ReturnType<typeof buildRecallCandidateContext>;
   }> = [];
@@ -205,6 +209,7 @@ export async function collectLexicalCandidates(
         updatedAt: note.updatedAt,
         lexicalText,
         projectionTokens,
+        bodyTerms: projection.bodyTerms ?? [],
         identifierMatchCount: countIdentifierMatches(identifierKeys, projectionTokens),
         context: buildRecallCandidateContext(note, projection.contentSignals),
       });
@@ -238,6 +243,17 @@ export async function collectLexicalCandidates(
       tokens: candidate.projectionTokens,
     })),
   );
+  const fullTextScores = new Map(
+    rankDocumentsByQueryCoverage(
+      query,
+      lexicalPool.map((candidate) => ({
+        id: candidate.identityKey,
+        tokens: [...candidate.projectionTokens, ...candidate.bodyTerms],
+      })),
+      FULL_TEXT_RETRIEVAL_RESULT_LIMIT,
+      FULL_TEXT_RETRIEVAL_THRESHOLD,
+    ).map((candidate) => [candidate.id, candidate.score]),
+  );
   const rankedScores = new Map(
     rankDocumentsByTfIdf(query, documents, options.candidateLimit, preparedCorpus).map(
       (candidate) => [candidate.id, candidate.score],
@@ -250,7 +266,12 @@ export async function collectLexicalCandidates(
     const rankedScore = rankedScores.get(candidate.identityKey);
     const passesLexicalChannel =
       rankedScore !== undefined && rankedScore > 0 && rankedScore >= options.minimumScore;
-    if (!passesLexicalChannel && candidate.identifierMatchCount === 0) {
+    const fullTextScore = fullTextScores.get(candidate.identityKey);
+    if (
+      !passesLexicalChannel &&
+      candidate.identifierMatchCount === 0 &&
+      fullTextScore === undefined
+    ) {
       continue;
     }
     const lexicalChannelScore = passesLexicalChannel ? rankedScore : undefined;
@@ -276,6 +297,7 @@ export async function collectLexicalCandidates(
       lexicalChannelCandidate: passesLexicalChannel,
       identifierMatchCount:
         candidate.identifierMatchCount > 0 ? candidate.identifierMatchCount : undefined,
+      fullTextScore,
       boosted: projectPrior + metadataPrior + temporalPrior,
       projectPrior,
       temporalPrior,
@@ -296,12 +318,13 @@ export async function collectLexicalCandidates(
   const lexicalResults = candidates
     .sort((a, b) => (b.lexicalChannelScore ?? 0) - (a.lexicalChannelScore ?? 0) || byIdentity(a, b))
     .slice(0, options.resultLimit);
-  // Holders outside the lexical top list still reach fusion through the identifier channel.
+  // Holders outside the lexical top list still reach fusion through the identifier
+  // and full-text channels.
   const lexicalIdentities = new Set(lexicalResults.map(recallCandidateIdentity));
   const extraHolders = [...candidates.slice(options.resultLimit), ...identifierHolders]
     .filter(
       (candidate) =>
-        (candidate.identifierMatchCount ?? 0) > 0 &&
+        ((candidate.identifierMatchCount ?? 0) > 0 || candidate.fullTextScore !== undefined) &&
         !lexicalIdentities.has(recallCandidateIdentity(candidate)),
     )
     .map((candidate) => ({
@@ -310,9 +333,12 @@ export async function collectLexicalCandidates(
       lexicalChannelScore: undefined,
     }))
     .sort(
-      (a, b) => (b.identifierMatchCount ?? 0) - (a.identifierMatchCount ?? 0) || byIdentity(a, b),
+      (a, b) =>
+        (b.identifierMatchCount ?? 0) - (a.identifierMatchCount ?? 0) ||
+        (b.fullTextScore ?? 0) - (a.fullTextScore ?? 0) ||
+        byIdentity(a, b),
     )
-    .slice(0, options.resultLimit);
+    .slice(0, options.resultLimit + FULL_TEXT_RETRIEVAL_RESULT_LIMIT);
   return [...lexicalResults, ...extraHolders];
 }
 
