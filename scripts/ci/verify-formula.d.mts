@@ -30,7 +30,10 @@ export interface DownloadChecksum {
 export interface DownloadChecksumOptions {
   fetchImpl?: (url: string) => Promise<FetchLikeResponse>;
   attempts?: number;
+  /** First retry delay; doubles per attempt up to `maxDelayMs`. */
   delayMs?: number;
+  maxDelayMs?: number;
+  sleepImpl?: (ms: number) => Promise<unknown>;
 }
 
 /** Reads the first `url` and `sha256` assignments from a formula. */

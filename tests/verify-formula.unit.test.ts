@@ -80,4 +80,38 @@ describe("downloadChecksum", () => {
       downloadChecksum("https://example.test/m.tgz", { fetchImpl, attempts: 3, delayMs: 0 }),
     ).rejects.toThrow("https://example.test/m.tgz: HTTP 404 (after 3 attempts)");
   });
+
+  it("backs off exponentially up to the delay cap between attempts", async () => {
+    const fetchImpl = vi.fn(async () => errorResponse(404));
+    const delays: number[] = [];
+
+    await expect(
+      downloadChecksum("https://example.test/m.tgz", {
+        fetchImpl,
+        attempts: 6,
+        delayMs: 5000,
+        maxDelayMs: 30000,
+        sleepImpl: async (ms) => {
+          delays.push(ms);
+        },
+      }),
+    ).rejects.toThrow(/after 6 attempts/);
+    expect(delays).toEqual([5000, 10000, 20000, 30000, 30000]);
+  });
+
+  it("waits several minutes in total by default before giving up", async () => {
+    const fetchImpl = vi.fn(async () => errorResponse(404));
+    let waited = 0;
+
+    await expect(
+      downloadChecksum("https://example.test/m.tgz", {
+        fetchImpl,
+        sleepImpl: async (ms) => {
+          waited += ms;
+        },
+      }),
+    ).rejects.toThrow(/after 15 attempts/);
+    // 0.46.0's tarball was still missing after the old 54 s window.
+    expect(waited).toBeGreaterThanOrEqual(5 * 60_000);
+  });
 });

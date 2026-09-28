@@ -25,8 +25,11 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 const DEFAULT_FORMULA = "Formula/mnemonic-mcp.rb";
-const ATTEMPTS = 10;
-const RETRY_DELAY_MS = 6000;
+// npm's CDN can take minutes to serve a just-published tarball; 0.46.0 outlasted a
+// fixed 54 s window. Backoff 5 s, 10 s, 20 s, then 30 s waits about six minutes.
+const ATTEMPTS = 15;
+const RETRY_DELAY_MS = 5000;
+const MAX_RETRY_DELAY_MS = 30000;
 
 export function parseFormula(content) {
   return {
@@ -41,7 +44,13 @@ export function sha256Of(bytes) {
 
 export async function downloadChecksum(
   url,
-  { fetchImpl = fetch, attempts = ATTEMPTS, delayMs = RETRY_DELAY_MS } = {},
+  {
+    fetchImpl = fetch,
+    attempts = ATTEMPTS,
+    delayMs = RETRY_DELAY_MS,
+    maxDelayMs = MAX_RETRY_DELAY_MS,
+    sleepImpl = sleep,
+  } = {},
 ) {
   for (let attempt = 1; attempt <= attempts; attempt++) {
     try {
@@ -61,7 +70,7 @@ export async function downloadChecksum(
       if (!process.env.GITHUB_ACTIONS) {
         console.error(`${url}: attempt ${attempt}/${attempts} failed (${error.message}), retrying`);
       }
-      await sleep(delayMs);
+      await sleepImpl(Math.min(delayMs * 2 ** (attempt - 1), maxDelayMs));
     }
   }
 }
