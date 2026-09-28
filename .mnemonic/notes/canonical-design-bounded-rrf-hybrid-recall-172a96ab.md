@@ -10,7 +10,7 @@ tags:
   - retrieval
 lifecycle: permanent
 createdAt: '2026-07-20T16:48:31.449Z'
-updatedAt: '2026-09-28T13:11:46.710Z'
+updatedAt: '2026-09-28T13:12:11.633Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
@@ -25,6 +25,8 @@ relatedTo:
   - id: duckdb-as-a-derived-retrieval-index-evaluation-and-recommend-6c4c32b9
     type: related-to
   - id: apply-bounded-rrf-hybrid-recall-alignment-consolidated-2ece69b3
+    type: related-to
+  - id: decision-keep-embeddings-after-agentic-search-critique-add-f-f3b08681
     type: related-to
 memoryVersion: 1
 ---
