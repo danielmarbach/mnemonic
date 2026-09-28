@@ -10,7 +10,7 @@ tags:
   - document-source
 lifecycle: permanent
 createdAt: '2026-08-03T10:42:54.827Z'
-updatedAt: '2026-08-03T10:46:29.885Z'
+updatedAt: '2026-09-28T13:12:11.984Z'
 role: decision
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -21,6 +21,8 @@ relatedTo:
   - id: canonical-design-bounded-rrf-hybrid-recall-172a96ab
     type: related-to
   - id: embedding-model-selection-and-compatibility-4d870300
+    type: related-to
+  - id: decision-keep-embeddings-after-agentic-search-critique-add-f-f3b08681
     type: related-to
 memoryVersion: 1
 ---

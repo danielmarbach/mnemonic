@@ -11,13 +11,15 @@ tags:
   - research
 lifecycle: permanent
 createdAt: '2026-09-28T13:12:03.621Z'
-updatedAt: '2026-09-28T13:12:11.633Z'
+updatedAt: '2026-09-28T13:12:11.984Z'
 role: decision
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
   - id: canonical-design-bounded-rrf-hybrid-recall-172a96ab
+    type: related-to
+  - id: duckdb-as-a-derived-retrieval-index-evaluation-and-recommend-6c4c32b9
     type: related-to
 memoryVersion: 1
 ---
