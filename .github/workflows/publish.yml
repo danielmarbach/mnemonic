@@ -252,8 +252,10 @@ jobs:
             --delete-branch
 
   create-release:
-    needs: [verify, publish-npm, publish-docker, publish-homebrew-tap]
-    if: ${{ always() && (github.event_name == 'push' || inputs.run_release) && (needs.verify.result == 'success' || needs.verify.result == 'skipped') && (needs.publish-npm.result == 'success' || needs.publish-npm.result == 'skipped') && (needs.publish-docker.result == 'success' || needs.publish-docker.result == 'skipped') && (needs.publish-homebrew-tap.result == 'success' || needs.publish-homebrew-tap.result == 'skipped') }}
+    # Not gated on publish-homebrew-tap: once npm and Docker ship, a formula PR failure
+    # must not hide the release (0.46.0 lost its release to a tarball propagation delay).
+    needs: [verify, publish-npm, publish-docker]
+    if: ${{ always() && (github.event_name == 'push' || inputs.run_release) && (needs.verify.result == 'success' || needs.verify.result == 'skipped') && (needs.publish-npm.result == 'success' || needs.publish-npm.result == 'skipped') && (needs.publish-docker.result == 'success' || needs.publish-docker.result == 'skipped') }}
     runs-on: ubuntu-latest
     permissions:
       contents: write  # Required to create GitHub releases
