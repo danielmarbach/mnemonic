@@ -8,7 +8,7 @@ tags:
   - branch-protection
 lifecycle: permanent
 createdAt: '2026-03-14T13:29:09.280Z'
-updatedAt: '2026-03-14T13:29:12.762Z'
+updatedAt: '2026-09-28T13:16:06.317Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
@@ -16,6 +16,13 @@ relatedTo:
     type: related-to
 memoryVersion: 1
 ---
-`publish.yml` now creates a pull request for `Formula/mnemonic-mcp.rb` updates instead of pushing commits directly to `main`. This avoids `GH013` repository rule failures when `main` requires the `build-and-test` status check and blocks direct workflow pushes.
+`publish.yml` creates a pull request for `Formula/mnemonic-mcp.rb` updates instead of pushing commits directly to `main`. This avoids `GH013` repository rule failures when `main` requires the `build-and-test` status check and blocks direct workflow pushes.
 
-Implementation detail: the `publish-homebrew-tap` job now grants `pull-requests: write`, updates the formula file in-place, and uses `peter-evans/create-pull-request@v7` to commit to an automation branch and open a PR with version and tarball metadata.
+Implementation detail: the `publish-homebrew-tap` job grants `pull-requests: write`, updates the formula `url` and `sha256` in place, pushes an `automation/homebrew-tap-<version>` branch, opens the PR with `gh pr create`, and enables squash auto-merge.
+
+## Tarball checksum reliability
+
+- `scripts/ci/verify-formula.mjs` hashes the downloaded tarball in-process and rejects empty bodies; a shell pipeline once put the SHA256 of zero bytes into the 0.45.1 formula.
+- 0.46.0 (run 36327448079): `publish-npm` succeeded, but registry.npmjs.org still returned 404 for the tarball after 10 attempts 6 s apart (~54 s). The step failed, and because `create-release` needs `publish-homebrew-tap`, no GitHub release was created and the `v0.46.0` milestone stayed open. Renovate later updated the formula (#382).
+- Fix `df5f4ea` (0.47.0): exponential backoff 5 s, 10 s, 20 s, then 30 s, 15 attempts (~6 min); sleep is injectable for unit tests.
+- Recovery for a failed run: once the tarball resolves, `gh run rerun <id> --failed` reruns the homebrew job (formula unchanged skips the PR) and then `create-release`.
