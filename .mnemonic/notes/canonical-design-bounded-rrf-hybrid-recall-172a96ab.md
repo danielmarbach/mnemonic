@@ -10,7 +10,7 @@ tags:
   - retrieval
 lifecycle: permanent
 createdAt: '2026-07-20T16:48:31.449Z'
-updatedAt: '2026-09-28T13:13:01.747Z'
+updatedAt: '2026-09-28T13:53:33.500Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
@@ -40,7 +40,7 @@ Mnemonic recall uses a bounded, fail-soft hybrid ranking pipeline designed aroun
 2. Lexical retrieval runs for every recall over compact derived projection text. TF-IDF with title, weighted coverage, and lexical overlap signals produces a bounded top-25 channel with a minimum positive signal threshold. It is independent of semantic admission, so exact identifiers, phrases, names, error codes, and version strings can enter even when semantic similarity is weak. Lexical/projection failures fail soft.
 3. Graph expansion is intentionally bounded and semantic-conditioned: the top five semantic entries with score at least 0.5 seed one-hop typed relationship spreading. Graph activation receives its own rank and never mutates semantic score or semantic rank.
 4. Exact-identifier retrieval (since 0.46.0) exists only when the query contains a compound identifier (camelCase, snake_case, SCREAMING_SNAKE, kebab-case, dotted versions). Notes whose lexical tokens contain the identifier's joined form (so `RRF_K`, `rrf-k` and `rrfK` share `rrfk`) are ranked by number of query identifiers matched, then lexical evidence, then id. Holders outside the lexical top 25 still enter fusion. Identifier-only holders get no lexical rank. The channel reuses session-cached tokens and adds no I/O.
-5. Full-text retrieval (since 0.47.0) ranks notes by IDF-weighted query coverage over projection tokens plus `bodyTerms`: a persisted, capped (400), sorted set of distinct body words the projection text lacks. Top 25, coverage at least 0.5, note-id tie breaker. Holders outside the lexical top 25 still enter fusion; full-text-only holders get no lexical rank. Body terms never enter the lexical channel or the embedding input, so both stay unchanged; legacy projections rebuild lazily once.
+5. Full-text retrieval (since 0.47.0) ranks notes by IDF-weighted query coverage over projection tokens plus `bodyTerms`: a persisted, capped (400), sorted set of distinct body words the projection text lacks. Top 25, coverage at least 0.9 (since 0.47.1), unsmoothed IDF `log(N/df)` so a word in every note weighs 0, note-id tie breaker. Holders outside the lexical top 25 still enter fusion; full-text-only holders get no lexical rank. Body terms never enter the lexical channel or the embedding input, so both stay unchanged; legacy projections rebuild lazily once.
 
 Candidates are unioned by stable note id. Missing channel ranks contribute zero.
 
@@ -89,3 +89,11 @@ Rejected first: folding body terms into the lexical channel (as lexical text, or
 Measured (MRR@10, main -> full-text channel): body 0.374 -> 0.920 (hash), 0.456 -> 0.783 (Ollama), 0.374 -> 0.920 (no embeddings); title with no embeddings 0.711 -> 0.938; supersession with no embeddings 0.5 -> 1.0; no kind regresses in any mode. Real project vault copy (103 notes): deep-body phrase ranks [3,miss,1,miss,1,1,1,4] -> [1,miss,1,4,1,1,1,1]; 4 of 6 natural-question top-3 lists unchanged; warm recall median 174 -> 178 ms; projections 484 -> 716 KB.
 
 Accepted limitation: a note whose only evidence is full-text rank 1 (0.049) still loses to notes with semantic+lexical agreement (~0.09); the remaining real-vault miss is exactly that case. Rescuing it would need a channel weight or prior change, which is the deferred fusion-policy decision from wave 1, not a full-text concern.
+
+## Full-text regression in 0.47.0, fixed in 0.47.1
+
+0.47.0 shipped with threshold 0.5 and the smoothed IDF (+1 floor). Long notes contain most words of a broad question, so many reached full coverage and the channel added a near-uniform bonus: on the real project vault "how does recall ranking work" and "how are embeddings stored and rebuilt" reordered for the worse (long, weakly semantic notes rose to #1-#2). The eval missed it because every fixture body query copies distinctive wording; the release check compared only 6 natural questions and dismissed changed top-3 lists instead of explaining them.
+
+Measured selectivity on the vault (104 notes): 7 of 8 quoted deep-body phrases reach coverage 1.00 with a single holder; the broad questions that regressed peak at 0.59-0.84. Fix: unsmoothed IDF plus threshold 0.9. Result: 9 of 10 broad questions return the exact 0.46.0 top 5 and the tenth improves; deep-body gains kept except one loose paraphrase. Eval MRR@10 stays above 0.46.0 in every mode but title drops versus 0.47.0 (Ollama 0.969 -> 0.938, no embeddings 0.938 -> 0.836) because the loose channel had helped the short fixture notes; the real vault is the deciding evidence.
+
+Release check for any future channel or fusion change: compare top 5 for at least 10 broad natural questions on a real vault copy against the previous release, and explain every changed list before shipping.
