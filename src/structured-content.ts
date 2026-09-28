@@ -1189,7 +1189,7 @@ export const RecallResultSchema = z.object({
                 "rescue",
               ])
               .describe(
-                "Channels with evidence for this result; 'identifier' means the note contains an exact identifier from the query; 'full-text' means most of the query's words appear somewhere in the note, body included",
+                "Channels with evidence for this result; 'identifier' means the note contains an exact identifier from the query; 'full-text' means nearly all of the query's distinctive words appear somewhere in the note, body included",
               ),
           ),
           rankBand: z.enum(["top3", "top10", "lower"]),
@@ -1231,7 +1231,7 @@ export const RecallResultSchema = z.object({
                 .min(1)
                 .optional()
                 .describe(
-                  "1-based full-text channel rank; present when most of the query's words (IDF-weighted) appear anywhere in the note, including deep body text",
+                  "1-based full-text channel rank; present when at least 90% of the query's IDF-weighted words appear anywhere in the note, including deep body text; words shared by most notes carry little weight",
                 ),
               rrfScore: z
                 .number()
