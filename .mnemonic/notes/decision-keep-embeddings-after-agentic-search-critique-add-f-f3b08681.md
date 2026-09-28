@@ -11,7 +11,7 @@ tags:
   - research
 lifecycle: permanent
 createdAt: '2026-09-28T13:12:03.621Z'
-updatedAt: '2026-09-28T13:12:12.343Z'
+updatedAt: '2026-09-28T13:13:02.296Z'
 role: decision
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -25,7 +25,7 @@ relatedTo:
     type: follows
 memoryVersion: 1
 ---
-Decision: an agentic-search critique of vector RAG does not justify dropping embeddings from mnemonic; it exposed that recall could not see deep body wording, fixed by the full-text RRF channel (72f07e7).
+Decision: an agentic-search critique of vector RAG does not justify dropping embeddings from mnemonic; it exposed that recall could not see deep body wording, fixed by the full-text RRF channel shipped in 0.47.0 (72f07e7).
 
 ## Source and claim
 
