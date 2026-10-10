@@ -9,7 +9,7 @@ tags:
   - v1
 lifecycle: temporary
 createdAt: '2026-10-10T22:39:40.357Z'
-updatedAt: '2026-10-10T22:43:10.599Z'
+updatedAt: '2026-10-10T22:52:32.423Z'
 role: plan
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -74,3 +74,17 @@ Self-check: every research finding maps to a step (open skill items to A1 to A7,
 ## Progress
 
 - Lane A delivered 2026-10-11: A1 to A9 done; build, single-file vitest, lint and format:check pass; 71 insertions across the four allowed files. Orchestrator merged two adjacent closeout-template pointer lines in Consolidate into one.
+
+## Lane D and E: pre-1.0 fixes (workers: claude-bridge/claude-sonnet-5-5, sequential, same worktree)
+
+- [ ] D1 M2 config.json unreadable: refuse writes, atomic rename, tests.
+- [ ] D2 M4 attached readNote and readNoteMetadata return null on malformed notes, tests.
+- [ ] D3 W7 empty env vars count as unset, tests.
+- [ ] D4 W5 section selector only with replaceSection, tests.
+- [ ] D5 W6 heading text includes inline code and emphasis, tests.
+- [ ] E1 M3 NUL-separated git path listing so non-ASCII document paths index, tests.
+- [ ] E2 W1 read-only attachments never write into the attached repo, tests.
+- [ ] E3 W3 pushBranch pushes HEAD to refs/heads/branch and rejects leading-dash names, tests.
+- [ ] R2 fresh-context review of D and E; O1 verify:release rerun; CHANGELOG Fixed entries by the orchestrator; then the release commit.
+- Deferred with the user: M1 project id normalization (needs a migration). Deferred to follow-up issues: W2, W4, W8, W9, W10.
+- Lane C done: C1 to C3 complete, decisions in the bug-hunt review note.
