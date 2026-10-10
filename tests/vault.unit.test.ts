@@ -302,7 +302,7 @@ describe("VaultManager", () => {
 
       const projectVaults = vaults.filter((v) => v.provenance === "project-local");
       expect(projectVaults).toHaveLength(3);
-    });
+    }, 20000); // three sequential git repo setups exceed the 5s default on Windows runners
   });
 
   describe("Note Relative Path", () => {
