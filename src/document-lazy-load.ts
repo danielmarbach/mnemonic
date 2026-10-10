@@ -3,6 +3,7 @@ import { promisify } from "util";
 import path from "path";
 import type { DocumentGeneration } from "./retrieval-document.js";
 import { readManifest, computeAttachmentConfigHash } from "./document-manifest.js";
+import { canonicalProjectId } from "./project.js";
 import { buildGenerationFromFiles } from "./document-source-index.js";
 import {
   getCurrentGeneration,
@@ -263,7 +264,11 @@ export async function lazyLoadGeneration(
     // Validate manifest identity against function parameters and current config.
     // A mismatch means the manifest is stale (config changed, or the file was
     // copied from another project/attachment) — force a re-sync by returning null.
-    if (manifest.projectId !== projectId || manifest.attachmentId !== attachmentId) {
+    // Manifests written before project ids were unified carry the legacy scheme-prefixed id.
+    if (
+      canonicalProjectId(manifest.projectId) !== projectId ||
+      manifest.attachmentId !== attachmentId
+    ) {
       console.error(
         `[lazy-load] manifest binding mismatch for ${attachmentId} — run sync to index document sources`,
       );

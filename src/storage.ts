@@ -19,6 +19,7 @@ import type {
 } from "./brands.js";
 import { memoryId, isoDateString, isValidMemoryId } from "./brands.js";
 import { attempt } from "./error-utils.js";
+import { canonicalProjectId } from "./project.js";
 import { mapWithConcurrency } from "./concurrency.js";
 import {
   AtomicWriteInProgressError,
@@ -511,7 +512,10 @@ export class Storage implements NoteStorage {
       role: normalizeRole(parsed.data["role"]),
       importance: normalizeImportance(parsed.data["importance"]),
       alwaysLoad: normalizeAlwaysLoad(parsed.data["alwaysLoad"]),
-      project: typeof parsed.data["project"] === "string" ? parsed.data["project"] : undefined,
+      project:
+        typeof parsed.data["project"] === "string"
+          ? canonicalProjectId(parsed.data["project"])
+          : undefined,
       projectName:
         typeof parsed.data["projectName"] === "string" ? parsed.data["projectName"] : undefined,
       relatedTo: validateRelatedTo(parsed.data["relatedTo"]),

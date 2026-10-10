@@ -117,6 +117,35 @@ describe("Storage", () => {
       expect(read!.memoryVersion).toBe(0); // Legacy notes normalize to pre-v0.2.0 schema
     });
 
+    it("should canonicalize a legacy scheme-prefixed project id when parsing", async () => {
+      const notesDir = path.join(tempDir, "notes");
+      const content = `---
+title: Legacy project id
+tags: []
+lifecycle: permanent
+project: https-github-com-acme-myapp
+projectName: myapp
+createdAt: 2023-01-01T00:00:00.000Z
+updatedAt: 2023-01-01T00:00:00.000Z
+---
+
+Body`;
+      await fs.writeFile(path.join(notesDir, "legacy-project.md"), content, "utf-8");
+
+      const full = await storage.readNote("legacy-project" as MemoryId);
+      const metadata = await storage.readNoteMetadata("legacy-project" as MemoryId);
+      const listed = await storage.listNotesMetadata({ project: "github-com-acme-myapp" });
+
+      expect(full?.project).toBe("github-com-acme-myapp");
+      expect(metadata?.project).toBe("github-com-acme-myapp");
+      expect(listed.map((note) => note.id)).toEqual(["legacy-project"]);
+
+      await storage.writeNote(full!);
+      expect(await fs.readFile(path.join(notesDir, "legacy-project.md"), "utf-8")).toContain(
+        "project: github-com-acme-myapp",
+      );
+    });
+
     it("should normalize invalid lifecycle values to permanent", async () => {
       const notesDir = path.join(tempDir, "notes");
       const content = `---

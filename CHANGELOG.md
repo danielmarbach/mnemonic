@@ -10,6 +10,7 @@ The format is loosely based on Keep a Changelog and uses semver-style version he
 
 - mnemonic is now 1.0: the note format, vault layout, MCP tool surface and `mnemonic` CLI are considered stable. From 1.0 on, breaking changes to any of them bump the major version and ship with a migration that `list_migrations` reports per vault. Nothing changes for existing vaults when upgrading from 0.47.x.
 - The `mnemonic-rpi-workflow` skill and prompt gain an autonomous mode (user handoffs become recorded checkpoints when autonomy was granted), a commit hygiene gate with dirty-worktree rules, a review step that classifies failing heuristic checks before touching product code, a phase closeout checklist, and a finish stage that ends with a branch handshake instead of an unauthorized push or merge.
+- A repository now has the same project id whether it is cloned over SSH or HTTPS (`github-com-acme-myapp`), so its memories, policies, and attachments no longer split by remote form. Vaults from before 1.0 are rewritten by the `normalize-project-ids` migration (`list_migrations` shows it as pending, `execute_migration` or `mnemonic migrate` runs it); reads already understand the old ids until then.
 - `add_attachment` and `set_attachment_branch` reject branch names that git would read as flags, such as `-x` or `--force`, and `add_attachment` now validates `pushBranch` the same way as `branch`.
 
 ### Fixed

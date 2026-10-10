@@ -11,7 +11,8 @@ import type {
   DocumentSourceAttachmentConfig,
 } from "../vault.js";
 import { detectDefaultBranch, validateBranch } from "../attached-storage.js";
-import { attachmentSlug, type AttachmentSlug } from "../brands.js";
+import { attachmentSlug } from "../brands.js";
+import { normalizeRemoteUrl } from "../project.js";
 import { resolveProject as resolveProjectFromModule } from "../helpers/project.js";
 import { projectNotFoundResponse } from "../helpers/vault.js";
 import { formatCommitBody } from "../helpers/git-commit.js";
@@ -27,16 +28,6 @@ import { expandHomePath, collapseHomePath } from "../paths.js";
 
 function generateAttachmentId(): string {
   return crypto.randomUUID();
-}
-
-function normalizeRemote(remote: string): AttachmentSlug {
-  let s = remote.trim().toLowerCase();
-  s = s.replace(/^git@/, "").replace(/:/, "/");
-  s = s.replace(/^https?:\/\//, "").replace(/^ssh:\/\//, "");
-  s = s.replace(/^[^@]*@/, "");
-  s = s.replace(/\.git$/, "");
-  s = s.replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
-  return attachmentSlug(s);
 }
 
 function extractRepoName(remote: string): string {
@@ -214,7 +205,7 @@ export function registerAddAttachmentTool(server: McpServer, ctx: ServerContext)
       }
 
       const remoteUrl = remoteResult.trim();
-      const slug = normalizeRemote(remoteUrl);
+      const slug = attachmentSlug(normalizeRemoteUrl(remoteUrl));
       const name = extractRepoName(remoteUrl);
 
       const maxAttachments = await ctx.configStore.getMaxAttachmentsPerProject();

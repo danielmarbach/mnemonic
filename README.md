@@ -370,7 +370,7 @@ A saved write-scope policy is authoritative: when an explicitly passed `scope` c
 
 ### Project identity
 
-Project identity derives from the **git remote URL**, normalized to a stable slug: `git@github.com:acme/myapp.git` becomes `github-com-acme-myapp` and `https://github.com/acme/myapp` becomes `https-github-com-acme-myapp`. The same project is recognized consistently across machines regardless of local clone paths, as long as each clone uses the same remote form; a repo cloned over SSH on one machine and over HTTPS on another currently gets two project ids, so use `set_project_identity` or a matching remote URL to keep them aligned. The default remote is `origin`; use `set_project_identity` to switch to `upstream` for fork workflows. If no remote exists, the git root folder name is used; if not in a git repo, the directory name.
+Project identity derives from the **git remote URL**, normalized to a stable slug: `git@github.com:acme/myapp.git` and `https://github.com/acme/myapp` both become `github-com-acme-myapp`, so a repo cloned over SSH on one machine and over HTTPS on another is the same project, regardless of local clone paths. Vaults created before 1.0 stored HTTPS projects as `https-github-com-acme-myapp`; the `normalize-project-ids` migration rewrites those ids in notes and `config.json` (`list_migrations` shows it as pending, `execute_migration` or `mnemonic migrate` runs it), and reads already understand the old ids before the migration runs. The default remote is `origin`; use `set_project_identity` to switch to `upstream` for fork workflows. If no remote exists, the git root folder name is used; if not in a git repo, the directory name.
 
 ### Recall
 

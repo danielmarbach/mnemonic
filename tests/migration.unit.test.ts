@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { Migrator } from "../src/migration.js";
+import { MnemonicConfigStore } from "../src/config.js";
 import { Storage } from "../src/storage.js";
 import { GitOps } from "../src/git.js";
 import type { ISO8601DateString, MemoryId } from "../src/brands.js";
@@ -119,7 +120,7 @@ describe("Migrator", () => {
     });
 
     it("should return no migrations when already at latest version", async () => {
-      const pending = await migrator.getPendingMigrations("1.4");
+      const pending = await migrator.getPendingMigrations("1.5");
       expect(pending.length).toBe(0);
     });
   });
@@ -368,6 +369,351 @@ Content of ${title}`;
     });
   });
 
+  describe("v0.1.5-normalize-project-ids migration", () => {
+    const LEGACY_ID = "https-github-com-acme-myapp";
+    const CANONICAL_ID = "github-com-acme-myapp";
+
+    const writeProjectNote = async (id: string, project: string | undefined, dir = tempDir) => {
+      const projectLines = project ? `project: ${project}\nprojectName: myapp\n` : "";
+      const content = `---
+title: ${id}
+tags: []
+lifecycle: permanent
+${projectLines}createdAt: 2026-01-01T00:00:00.000Z
+updatedAt: 2026-01-02T00:00:00.000Z
+memoryVersion: 1
+---
+
+Content of ${id}`;
+      await fs.writeFile(path.join(dir, "notes", `${id}.md`), content, "utf-8");
+    };
+
+    const readRawNote = (id: string, dir = tempDir) =>
+      fs.readFile(path.join(dir, "notes", `${id}.md`), "utf-8");
+
+    const writeConfig = async (config: Record<string, unknown>, dir = tempDir) => {
+      await fs.writeFile(path.join(dir, "config.json"), JSON.stringify(config, null, 2), "utf-8");
+    };
+
+    const readConfig = async (dir = tempDir) =>
+      JSON.parse(await fs.readFile(path.join(dir, "config.json"), "utf-8")) as Record<
+        string,
+        Record<string, unknown>
+      >;
+
+    const getMigration = () =>
+      migrator.listAvailableMigrations().find((m) => m.name === "v0.1.5-normalize-project-ids")!;
+
+    beforeEach(async () => {
+      await fs.mkdir(path.join(tempDir, "notes"), { recursive: true });
+    });
+
+    it("is registered for schema 1.4 to 1.5", () => {
+      const migration = getMigration();
+      expect(migration.minSchemaVersion).toBe("1.4");
+      expect(migration.maxSchemaVersion).toBe("1.5");
+    });
+
+    it("reports pending changes in dry-run without writing notes or config", async () => {
+      await writeProjectNote("legacy-note", LEGACY_ID);
+      await writeConfig({
+        schemaVersion: "1.4",
+        projectMemoryPolicies: { [LEGACY_ID]: { projectId: LEGACY_ID, defaultScope: "global" } },
+      });
+      const noteBefore = await readRawNote("legacy-note");
+      const configBefore = await fs.readFile(path.join(tempDir, "config.json"), "utf-8");
+
+      const result = await getMigration().run(vault, true);
+
+      expect(result.errors).toEqual([]);
+      expect(result.notesProcessed).toBe(1);
+      expect(result.modifiedNoteIds).toEqual(["legacy-note"]);
+      // one note plus config.json
+      expect(result.notesModified).toBe(2);
+      expect(await readRawNote("legacy-note")).toBe(noteBefore);
+      expect(await fs.readFile(path.join(tempDir, "config.json"), "utf-8")).toBe(configBefore);
+    });
+
+    it("rewrites legacy project ids in notes without changing updatedAt", async () => {
+      await writeProjectNote("https-note", LEGACY_ID);
+      await writeProjectNote("http-note", "http-github-com-acme-myapp");
+      await writeProjectNote("ssh-note", "ssh-github-com-acme-myapp");
+
+      const result = await getMigration().run(vault, false);
+
+      expect(result.errors).toEqual([]);
+      expect(result.notesModified).toBe(3);
+      expect([...result.modifiedNoteIds].sort()).toEqual(["http-note", "https-note", "ssh-note"]);
+      for (const id of result.modifiedNoteIds) {
+        const note = await storage.readNote(id as MemoryId);
+        expect(note?.project).toBe(CANONICAL_ID);
+        expect(note?.projectName).toBe("myapp");
+        expect(note?.updatedAt).toBe("2026-01-02T00:00:00.000Z");
+        expect(await readRawNote(id)).toContain(`project: ${CANONICAL_ID}`);
+      }
+    });
+
+    it("leaves canonical notes and notes without a project untouched", async () => {
+      await writeProjectNote("canonical-note", CANONICAL_ID);
+      await writeProjectNote("folder-note", "plain-folder");
+      await writeProjectNote("no-project-note", undefined);
+      const before = {
+        canonical: await readRawNote("canonical-note"),
+        folder: await readRawNote("folder-note"),
+        none: await readRawNote("no-project-note"),
+      };
+
+      const result = await getMigration().run(vault, false);
+
+      expect(result.notesProcessed).toBe(3);
+      expect(result.notesModified).toBe(0);
+      expect(result.modifiedNoteIds).toEqual([]);
+      expect(await readRawNote("canonical-note")).toBe(before.canonical);
+      expect(await readRawNote("folder-note")).toBe(before.folder);
+      expect(await readRawNote("no-project-note")).toBe(before.none);
+    });
+
+    it("rewrites policy, override, and attachment ids in config.json", async () => {
+      await writeConfig({
+        schemaVersion: "1.4",
+        mutationPushMode: "none",
+        projectMemoryPolicies: {
+          [LEGACY_ID]: { projectId: LEGACY_ID, defaultScope: "global", updatedAt: "" },
+          "plain-folder": { projectId: "plain-folder", defaultScope: "project", updatedAt: "" },
+        },
+        projectIdentityOverrides: {
+          [LEGACY_ID]: { remoteName: "upstream", updatedAt: "2026-01-01T00:00:00.000Z" },
+        },
+        projectAttachments: {
+          [LEGACY_ID]: [
+            {
+              kind: "mnemonic-vault",
+              attachmentId: "att-1",
+              projectSlug: "https-github-com-acme-lib",
+              vaultFolder: ".mnemonic",
+              localPath: "/tmp/lib",
+            },
+          ],
+        },
+      });
+
+      const result = await getMigration().run(vault, false);
+
+      expect(result.errors).toEqual([]);
+      expect(result.notesModified).toBe(1);
+      expect(result.modifiedNoteIds).toEqual([]);
+
+      const config = await readConfig();
+      expect(config["mutationPushMode"]).toBe("none");
+      expect(Object.keys(config["projectMemoryPolicies"]!)).toEqual([CANONICAL_ID, "plain-folder"]);
+      expect(config["projectMemoryPolicies"]![CANONICAL_ID]).toMatchObject({
+        projectId: CANONICAL_ID,
+        defaultScope: "global",
+      });
+      expect(Object.keys(config["projectIdentityOverrides"]!)).toEqual([CANONICAL_ID]);
+      expect(Object.keys(config["projectAttachments"]!)).toEqual([CANONICAL_ID]);
+      expect(config["projectAttachments"]![CANONICAL_ID]).toEqual([
+        expect.objectContaining({ attachmentId: "att-1", projectSlug: "github-com-acme-lib" }),
+      ]);
+      expect(JSON.stringify(config)).not.toContain("https-");
+    });
+
+    it("resolves legacy and canonical key collisions in config.json", async () => {
+      const attachment = (attachmentId: string, projectSlug: string, vaultFolder: string) => ({
+        kind: "mnemonic-vault",
+        attachmentId,
+        projectSlug,
+        vaultFolder,
+        localPath: "/tmp/lib",
+      });
+      await writeConfig({
+        schemaVersion: "1.4",
+        projectMemoryPolicies: {
+          [CANONICAL_ID]: {
+            projectId: CANONICAL_ID,
+            defaultScope: "project",
+            updatedAt: "2026-01-01T00:00:00.000Z",
+          },
+          [LEGACY_ID]: {
+            projectId: LEGACY_ID,
+            defaultScope: "global",
+            updatedAt: "2026-02-01T00:00:00.000Z",
+          },
+          "https-github-com-acme-other": {
+            projectId: "https-github-com-acme-other",
+            defaultScope: "global",
+            updatedAt: "",
+          },
+          "github-com-acme-other": {
+            projectId: "github-com-acme-other",
+            defaultScope: "project",
+            updatedAt: "",
+          },
+        },
+        projectIdentityOverrides: {
+          [CANONICAL_ID]: { remoteName: "origin", updatedAt: "2026-03-01T00:00:00.000Z" },
+          [LEGACY_ID]: { remoteName: "upstream", updatedAt: "2026-01-01T00:00:00.000Z" },
+        },
+        projectAttachments: {
+          [CANONICAL_ID]: [attachment("canonical-lib", "github-com-acme-lib", ".mnemonic")],
+          [LEGACY_ID]: [
+            attachment("legacy-lib", "https-github-com-acme-lib", ".mnemonic"),
+            attachment("legacy-other-folder", "https-github-com-acme-lib", ".other"),
+          ],
+        },
+      });
+
+      const result = await getMigration().run(vault, false);
+
+      expect(result.errors).toEqual([]);
+      const config = await readConfig();
+      expect(Object.keys(config["projectMemoryPolicies"]!).sort()).toEqual([
+        CANONICAL_ID,
+        "github-com-acme-other",
+      ]);
+      expect(config["projectMemoryPolicies"]![CANONICAL_ID]).toMatchObject({
+        projectId: CANONICAL_ID,
+        defaultScope: "global",
+      });
+      expect(config["projectMemoryPolicies"]!["github-com-acme-other"]).toMatchObject({
+        defaultScope: "project",
+      });
+      expect(config["projectIdentityOverrides"]).toEqual({
+        [CANONICAL_ID]: { remoteName: "origin", updatedAt: "2026-03-01T00:00:00.000Z" },
+      });
+      const merged = config["projectAttachments"]![CANONICAL_ID] as unknown as Array<{
+        attachmentId: string;
+        projectSlug: string;
+      }>;
+      expect(merged.map((a) => a.attachmentId)).toEqual(["canonical-lib", "legacy-other-folder"]);
+      expect(merged.every((a) => a.projectSlug === "github-com-acme-lib")).toBe(true);
+    });
+
+    it("keeps the id of a legacy attachment without attachmentId stable across the slug rewrite", async () => {
+      await writeConfig({
+        schemaVersion: "1.4",
+        projectAttachments: {
+          [LEGACY_ID]: [{ projectSlug: "https-github-com-acme-lib", localPath: "/tmp/lib" }],
+        },
+      });
+      const legacyStore = new MnemonicConfigStore(tempDir);
+      const [before] = await legacyStore.getProjectAttachments(CANONICAL_ID);
+
+      await getMigration().run(vault, false);
+
+      const migratedStore = new MnemonicConfigStore(tempDir);
+      const [after] = await migratedStore.getProjectAttachments(CANONICAL_ID);
+      expect(after?.attachmentId).toBe(before?.attachmentId);
+      expect(after?.projectSlug).toBe("github-com-acme-lib");
+    });
+
+    it("handles a vault without config.json", async () => {
+      await writeProjectNote("legacy-note", LEGACY_ID);
+
+      const result = await getMigration().run(vault, false);
+
+      expect(result.errors).toEqual([]);
+      expect(result.modifiedNoteIds).toEqual(["legacy-note"]);
+      await expect(fs.access(path.join(tempDir, "config.json"))).rejects.toThrow();
+    });
+
+    it("is idempotent — second run modifies nothing", async () => {
+      await writeProjectNote("legacy-note", LEGACY_ID);
+      await writeConfig({
+        schemaVersion: "1.4",
+        projectMemoryPolicies: { [LEGACY_ID]: { projectId: LEGACY_ID, updatedAt: "" } },
+        projectIdentityOverrides: { [LEGACY_ID]: { remoteName: "upstream", updatedAt: "" } },
+        projectAttachments: {
+          [LEGACY_ID]: [{ attachmentId: "att-1", projectSlug: "https-github-com-acme-lib" }],
+        },
+      });
+      const migration = getMigration();
+
+      const first = await migration.run(vault, false);
+      expect(first.notesModified).toBe(2);
+
+      await assertMigrationIdempotent(migration, vault);
+    });
+
+    it("reports an error for a malformed config.json without touching notes in that vault", async () => {
+      await writeProjectNote("legacy-note", LEGACY_ID);
+      const noteBefore = await readRawNote("legacy-note");
+      await fs.writeFile(path.join(tempDir, "config.json"), "{ not json", "utf-8");
+
+      const result = await getMigration().run(vault, false);
+
+      expect(result.errors).toHaveLength(1);
+      expect(result.errors[0]?.noteId).toBe("config.json");
+      expect(result.notesModified).toBe(0);
+      expect(await readRawNote("legacy-note")).toBe(noteBefore);
+      expect(await fs.readFile(path.join(tempDir, "config.json"), "utf-8")).toBe("{ not json");
+    });
+
+    it("keeps vaults isolated when one vault has a malformed config.json", async () => {
+      const goodDir = await fs.mkdtemp(path.join(os.tmpdir(), "mnemonic-test-good-"));
+      const goodStorage = new Storage(goodDir);
+      await goodStorage.init();
+      const goodVault: Vault = {
+        storage: goodStorage,
+        git: new GitOps(goodDir, "notes"),
+        notesRelDir: "notes",
+        vaultFolderName: "",
+        writable: true,
+        provenance: "project-local",
+      };
+
+      try {
+        await writeProjectNote("bad-vault-note", LEGACY_ID);
+        await fs.writeFile(path.join(tempDir, "config.json"), "{ not json", "utf-8");
+        await writeProjectNote("good-vault-note", LEGACY_ID, goodDir);
+        await writeConfig({ schemaVersion: "1.4" }, goodDir);
+        const badNoteBefore = await readRawNote("bad-vault-note");
+
+        vi.spyOn(vault.git, "commit").mockResolvedValue(true);
+        vi.spyOn(vault.git, "push").mockResolvedValue(undefined);
+        vi.spyOn(goodVault.git, "commit").mockResolvedValue(true);
+        vi.spyOn(goodVault.git, "push").mockResolvedValue(undefined);
+        vaultManager.allKnownVaults = vi.fn().mockReturnValue([vault, goodVault]);
+
+        const { results } = await migrator.runMigration("v0.1.5-normalize-project-ids", {
+          dryRun: false,
+        });
+
+        expect(results.get(tempDir)?.errors).toHaveLength(1);
+        expect(results.get(goodDir)?.errors).toEqual([]);
+        expect(await readRawNote("bad-vault-note")).toBe(badNoteBefore);
+        expect(await readRawNote("good-vault-note", goodDir)).toContain(`project: ${CANONICAL_ID}`);
+        expect((await readConfig(goodDir))["schemaVersion"]).toBe("1.5");
+      } finally {
+        await fs.rm(goodDir, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
+      }
+    });
+
+    it("runs through runAllPending for a 1.4 vault and advances the schema version", async () => {
+      await writeProjectNote("legacy-note", LEGACY_ID);
+      await writeConfig({
+        schemaVersion: "1.4",
+        projectMemoryPolicies: { [LEGACY_ID]: { projectId: LEGACY_ID, updatedAt: "" } },
+      });
+      const commitSpy = vi.spyOn(vault.git, "commit").mockResolvedValue(true);
+      vi.spyOn(vault.git, "push").mockResolvedValue(undefined);
+
+      const { migrationResults } = await migrator.runAllPending({ dryRun: false });
+
+      const [entry] = migrationResults.get(tempDir) ?? [];
+      expect(entry?.migration).toBe("v0.1.5-normalize-project-ids");
+      expect(entry?.result.modifiedNoteIds).toEqual(["legacy-note"]);
+      expect(commitSpy).toHaveBeenCalledWith(
+        expect.stringContaining("migrate: apply pending migrations"),
+        expect.arrayContaining(["notes/legacy-note.md", "config.json"]),
+      );
+      const config = await readConfig();
+      expect(config["schemaVersion"]).toBe("1.5");
+      expect(Object.keys(config["projectMemoryPolicies"]!)).toEqual([CANONICAL_ID]);
+      expect(await readRawNote("legacy-note")).toContain(`project: ${CANONICAL_ID}`);
+    });
+  });
+
   describe("runMigration", () => {
     beforeEach(async () => {
       await fs.mkdir(path.join(tempDir, "notes"), { recursive: true });
@@ -514,7 +860,7 @@ Test content`;
       const config = JSON.parse(await fs.readFile(path.join(tempDir, "config.json"), "utf-8")) as {
         schemaVersion: string;
       };
-      expect(config.schemaVersion).toBe("1.4");
+      expect(config.schemaVersion).toBe("1.5");
     });
 
     it("does not persist schema version during dry-run", async () => {
@@ -535,17 +881,17 @@ Test content`;
       const config = JSON.parse(await fs.readFile(path.join(tempDir, "config.json"), "utf-8")) as {
         schemaVersion: string;
       };
-      expect(config.schemaVersion).toBe("1.4");
+      expect(config.schemaVersion).toBe("1.5");
     });
 
     it("only migrates vaults that are behind on schema version", async () => {
-      // Create a second vault already at 1.4
+      // Create a second vault already at 1.5
       const otherDir = await fs.mkdtemp(path.join(os.tmpdir(), "mnemonic-other-"));
       const otherStorage = new Storage(otherDir);
       await otherStorage.init();
       await fs.writeFile(
         path.join(otherDir, "config.json"),
-        JSON.stringify({ schemaVersion: "1.4" }),
+        JSON.stringify({ schemaVersion: "1.5" }),
         "utf-8",
       );
       const otherVault: Vault = {
@@ -861,8 +1207,8 @@ Main content 2`,
         const mainVersion = await readVersion(tempDir);
         const otherVersion = await readVersion(otherTempDir);
 
-        expect(mainVersion).toBe("1.4");
-        expect(otherVersion).toBe("1.4");
+        expect(mainVersion).toBe("1.5");
+        expect(otherVersion).toBe("1.5");
       } finally {
         await fs.rm(otherTempDir, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
       }
@@ -991,7 +1337,7 @@ Main content 2`,
       const config = JSON.parse(await fs.readFile(path.join(tempDir, "config.json"), "utf-8")) as {
         schemaVersion: string;
       };
-      expect(config.schemaVersion).toBe("1.4");
+      expect(config.schemaVersion).toBe("1.5");
     });
 
     it("skips a project vault that was already migrated in an earlier session", async () => {
@@ -1051,7 +1397,7 @@ Project content`,
       ) as {
         schemaVersion: string;
       };
-      expect(projectConfig.schemaVersion).toBe("1.4");
+      expect(projectConfig.schemaVersion).toBe("1.5");
 
       const sessionTwoVaultManager = {
         main: vault,
@@ -1078,18 +1424,19 @@ Project content`,
       ) as {
         schemaVersion: string;
       };
-      expect(projectConfig.schemaVersion).toBe("1.4");
+      expect(projectConfig.schemaVersion).toBe("1.5");
     });
   });
 
   describe("Version comparison", () => {
     it("should correctly compare version strings", async () => {
       const migratorAny = new Migrator(vaultManager);
-      expect(await migratorAny.getPendingMigrations("0.0")).toHaveLength(3);
-      expect(await migratorAny.getPendingMigrations("0.9")).toHaveLength(3);
-      expect(await migratorAny.getPendingMigrations("1.0")).toHaveLength(2);
-      expect(await migratorAny.getPendingMigrations("1.1")).toHaveLength(1);
-      expect(await migratorAny.getPendingMigrations("1.4")).toHaveLength(0);
+      expect(await migratorAny.getPendingMigrations("0.0")).toHaveLength(4);
+      expect(await migratorAny.getPendingMigrations("0.9")).toHaveLength(4);
+      expect(await migratorAny.getPendingMigrations("1.0")).toHaveLength(3);
+      expect(await migratorAny.getPendingMigrations("1.1")).toHaveLength(2);
+      expect(await migratorAny.getPendingMigrations("1.4")).toHaveLength(1);
+      expect(await migratorAny.getPendingMigrations("1.5")).toHaveLength(0);
     });
 
     it("rejects invalid schema versions", async () => {
@@ -1141,6 +1488,7 @@ Project content`,
         "v0.1.0-backfill-memory-versions", // maxSchemaVersion 1.0
         "v0.1.1-backfill-note-lifecycle", // maxSchemaVersion 1.1
         "v0.1.4-normalize-attachment-config", // maxSchemaVersion 1.4
+        "v0.1.5-normalize-project-ids", // maxSchemaVersion 1.5
         "upgrade-to-2.0", // maxSchemaVersion 2.0
         "upgrade-to-3.0", // maxSchemaVersion 3.0
       ]);
@@ -1183,6 +1531,7 @@ Project content`,
         "v0.1.0-backfill-memory-versions", // maxSchemaVersion 1.0
         "v0.1.1-backfill-note-lifecycle", // maxSchemaVersion 1.1
         "v0.1.4-normalize-attachment-config", // maxSchemaVersion 1.4
+        "v0.1.5-normalize-project-ids", // maxSchemaVersion 1.5
         "upgrade-to-2.0", // maxSchemaVersion 2.0
         "always-run-fixup", // unbounded — last
       ]);
@@ -1226,6 +1575,7 @@ Project content`,
         "v0.1.0-backfill-memory-versions", // maxSchemaVersion 1.0
         "v0.1.1-backfill-note-lifecycle", // maxSchemaVersion 1.1
         "v0.1.4-normalize-attachment-config", // maxSchemaVersion 1.4
+        "v0.1.5-normalize-project-ids", // maxSchemaVersion 1.5
         "upgrade-to-2.0", // maxSchemaVersion 2.0
         "min-only-at-3.0", // minSchemaVersion 3.0
       ]);

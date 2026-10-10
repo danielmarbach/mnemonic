@@ -5,7 +5,13 @@ import path from "path";
 import { promisify } from "util";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { detectProject, resolveProjectIdentity } from "../src/project.js";
+import {
+  canonicalProjectId,
+  detectProject,
+  normalizeRemoteUrl,
+  pickCollidingEntry,
+  resolveProjectIdentity,
+} from "../src/project.js";
 
 const execFileAsync = promisify(execFile);
 const tempDirs: string[] = [];
@@ -111,6 +117,21 @@ describe("detectProject", () => {
     });
   });
 
+  it("derives the same id from an https origin as from an ssh origin", async () => {
+    const dir = await makeTempDir("mnemonic-project-https-");
+    await execFileAsync("git", ["init"], { cwd: dir });
+    await execFileAsync("git", ["remote", "add", "origin", "https://github.com/acme/myapp.git"], {
+      cwd: dir,
+    });
+
+    await expect(detectProject(dir)).resolves.toEqual({
+      id: "github-com-acme-myapp",
+      name: "myapp",
+      source: "git-remote",
+      remoteName: "origin",
+    });
+  });
+
   it("can use a configured remote override for forked repos", async () => {
     const dir = await makeTempDir("mnemonic-project-fork-");
     await execFileAsync("git", ["init"], { cwd: dir });
@@ -211,5 +232,81 @@ describe("detectProject", () => {
       name: parentName,
       source: "git-folder",
     });
+  });
+});
+
+describe("normalizeRemoteUrl", () => {
+  const githubForms = [
+    "git@github.com:acme/myapp.git",
+    "https://github.com/acme/myapp",
+    "https://github.com/acme/myapp.git",
+    "http://github.com/acme/myapp",
+    "ssh://git@github.com/acme/myapp.git",
+    "ssh://git@github.com:22/acme/myapp.git",
+    "https://user:pw@github.com/acme/myapp.git",
+    "GIT@GitHub.com:Acme/MyApp.git",
+    "  https://github.com/acme/myapp.git  ",
+  ];
+
+  it.each(githubForms)("maps %s to github-com-acme-myapp", (remote) => {
+    expect(normalizeRemoteUrl(remote)).toBe("github-com-acme-myapp");
+  });
+
+  it.each([
+    ["git@gitlab.com:group/subgroup/project.git", "gitlab-com-group-subgroup-project"],
+    ["https://gitlab.com/group/subgroup/project", "gitlab-com-group-subgroup-project"],
+    ["ssh://git@codeberg.org/user/repo.git", "codeberg-org-user-repo"],
+    ["https://codeberg.org/user/repo", "codeberg-org-user-repo"],
+    ["ssh://git@git.example.com:2222/team/repo.git", "git-example-com-team-repo"],
+    ["https://git.example.com:8443/team/repo.git", "git-example-com-team-repo"],
+    ["git@bitbucket.org:team/repo.git", "bitbucket-org-team-repo"],
+  ])("maps %s to %s regardless of host", (remote, expected) => {
+    expect(normalizeRemoteUrl(remote)).toBe(expected);
+  });
+});
+
+describe("canonicalProjectId", () => {
+  it.each([
+    ["https-github-com-acme-myapp", "github-com-acme-myapp"],
+    ["http-github-com-acme-myapp", "github-com-acme-myapp"],
+    ["ssh-github-com-acme-myapp", "github-com-acme-myapp"],
+    ["git-ssh-github-com-acme-myapp", "github-com-acme-myapp"],
+    ["https-gitlab-com-group-project", "gitlab-com-group-project"],
+  ])("strips the legacy scheme prefix from %s", (legacy, canonical) => {
+    expect(canonicalProjectId(legacy)).toBe(canonical);
+  });
+
+  it.each([
+    "github-com-acme-myapp",
+    "gitlab-com-x",
+    "git-example-com-team-repo",
+    "plain-folder",
+    "https-",
+  ])("leaves %s unchanged", (id) => {
+    expect(canonicalProjectId(id)).toBe(id);
+  });
+
+  it("is idempotent", () => {
+    const once = canonicalProjectId("https-github-com-acme-myapp");
+    expect(canonicalProjectId(once)).toBe(once);
+  });
+});
+
+describe("pickCollidingEntry", () => {
+  const legacyOlder = { value: { updatedAt: "2026-01-01T00:00:00.000Z" }, wasLegacyKey: true };
+  const canonicalNewer = { value: { updatedAt: "2026-02-01T00:00:00.000Z" }, wasLegacyKey: false };
+
+  it("prefers the newer updatedAt when both entries have one", () => {
+    expect(pickCollidingEntry(legacyOlder, canonicalNewer)).toBe(canonicalNewer);
+    expect(pickCollidingEntry(canonicalNewer, legacyOlder)).toBe(canonicalNewer);
+    const legacyNewer = { value: { updatedAt: "2026-03-01T00:00:00.000Z" }, wasLegacyKey: true };
+    expect(pickCollidingEntry(canonicalNewer, legacyNewer)).toBe(legacyNewer);
+  });
+
+  it("falls back to the canonical entry when a timestamp is missing", () => {
+    const legacyUndated = { value: { updatedAt: "" }, wasLegacyKey: true };
+    const canonicalUndated = { value: { updatedAt: "" }, wasLegacyKey: false };
+    expect(pickCollidingEntry(legacyUndated, canonicalNewer)).toBe(canonicalNewer);
+    expect(pickCollidingEntry(canonicalUndated, legacyOlder)).toBe(canonicalUndated);
   });
 });

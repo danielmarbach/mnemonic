@@ -9,7 +9,7 @@ import {
   PROTECTED_BRANCH_BEHAVIORS,
   type ProjectMemoryPolicy,
 } from "./project-memory-policy.js";
-import type { ProjectIdentityOverride } from "./project.js";
+import { canonicalProjectId, pickCollidingEntry, type ProjectIdentityOverride } from "./project.js";
 import type {
   ProjectAttachmentConfig,
   MnemonicVaultAttachmentConfig,
@@ -33,7 +33,7 @@ const defaultConfig: MnemonicConfig = {
   // Keep this at the latest schema version. When adding a new latest-schema
   // migration, bump this value in the same change so fresh installs start at
   // the current schema instead of missing that migration.
-  schemaVersion: "1.4",
+  schemaVersion: "1.5",
   reindexEmbedConcurrency: 4,
   mutationPushMode: "main-only",
   projectMemoryPolicies: {},
@@ -78,7 +78,8 @@ function normalizeProjectIdentityOverrides(
   }
 
   const normalized: Record<string, ProjectIdentityOverride> = {};
-  for (const [projectId, override] of Object.entries(value)) {
+  const legacyKeys = new Set<string>();
+  for (const [rawProjectId, override] of Object.entries(value)) {
     if (!override || typeof override !== "object") {
       continue;
     }
@@ -89,10 +90,24 @@ function normalizeProjectIdentityOverrides(
     }
 
     const updatedAt = (override as { updatedAt?: unknown }).updatedAt;
-    normalized[projectId] = {
-      remoteName: remoteName.trim(),
-      updatedAt: typeof updatedAt === "string" ? updatedAt : "",
+    const projectId = canonicalProjectId(rawProjectId);
+    const candidate = {
+      value: {
+        remoteName: remoteName.trim(),
+        updatedAt: typeof updatedAt === "string" ? updatedAt : "",
+      },
+      wasLegacyKey: projectId !== rawProjectId,
     };
+    const existing = normalized[projectId];
+    const winner = existing
+      ? pickCollidingEntry({ value: existing, wasLegacyKey: legacyKeys.has(projectId) }, candidate)
+      : candidate;
+    normalized[projectId] = winner.value;
+    if (winner.wasLegacyKey) {
+      legacyKeys.add(projectId);
+    } else {
+      legacyKeys.delete(projectId);
+    }
   }
 
   return normalized;
@@ -104,7 +119,8 @@ function normalizeProjectMemoryPolicies(value: unknown): Record<string, ProjectM
   }
 
   const normalized: Record<string, ProjectMemoryPolicy> = {};
-  for (const [projectId, policy] of Object.entries(value)) {
+  const legacyKeys = new Set<string>();
+  for (const [rawProjectId, policy] of Object.entries(value)) {
     if (!policy || typeof policy !== "object") {
       continue;
     }
@@ -119,10 +135,12 @@ function normalizeProjectMemoryPolicies(value: unknown): Record<string, ProjectM
       updatedAt?: unknown;
     };
 
-    const normalizedProjectId =
+    const projectId = canonicalProjectId(rawProjectId);
+    const normalizedProjectId = canonicalProjectId(
       typeof policyRecord.projectId === "string" && policyRecord.projectId.trim().length > 0
         ? policyRecord.projectId.trim()
-        : projectId;
+        : projectId,
+    );
 
     const defaultScope = PROJECT_POLICY_SCOPES.includes(
       policyRecord.defaultScope as (typeof PROJECT_POLICY_SCOPES)[number],
@@ -149,16 +167,29 @@ function normalizeProjectMemoryPolicies(value: unknown): Record<string, ProjectM
           .filter((pattern) => pattern.length > 0)
       : undefined;
 
-    normalized[projectId] = {
-      projectId: normalizedProjectId,
-      projectName:
-        typeof policyRecord.projectName === "string" ? policyRecord.projectName : undefined,
-      defaultScope,
-      consolidationMode,
-      protectedBranchPatterns,
-      protectedBranchBehavior,
-      updatedAt: typeof policyRecord.updatedAt === "string" ? policyRecord.updatedAt : "",
+    const candidate = {
+      value: {
+        projectId: normalizedProjectId,
+        projectName:
+          typeof policyRecord.projectName === "string" ? policyRecord.projectName : undefined,
+        defaultScope,
+        consolidationMode,
+        protectedBranchPatterns,
+        protectedBranchBehavior,
+        updatedAt: typeof policyRecord.updatedAt === "string" ? policyRecord.updatedAt : "",
+      },
+      wasLegacyKey: projectId !== rawProjectId,
     };
+    const existing = normalized[projectId];
+    const winner = existing
+      ? pickCollidingEntry({ value: existing, wasLegacyKey: legacyKeys.has(projectId) }, candidate)
+      : candidate;
+    normalized[projectId] = winner.value;
+    if (winner.wasLegacyKey) {
+      legacyKeys.add(projectId);
+    } else {
+      legacyKeys.delete(projectId);
+    }
   }
 
   return normalized;
@@ -168,8 +199,9 @@ function normalizeProjectAttachments(value: unknown): Record<string, ProjectAtta
   if (!value || typeof value !== "object") return {};
 
   const normalized: Record<string, ProjectAttachmentConfig[]> = {};
-  for (const [projectId, attachments] of Object.entries(value as Record<string, unknown>)) {
+  for (const [rawProjectId, attachments] of Object.entries(value as Record<string, unknown>)) {
     if (!Array.isArray(attachments)) continue;
+    const projectId = canonicalProjectId(rawProjectId);
     const validAttachments: ProjectAttachmentConfig[] = [];
     for (const att of attachments) {
       if (!att || typeof att !== "object") continue;
@@ -182,6 +214,8 @@ function normalizeProjectAttachments(value: unknown): Record<string, ProjectAtta
         typeof a.attachmentId === "string" && a.attachmentId.trim()
           ? a.attachmentId.trim()
           : deriveLegacyAttachmentId(a.projectSlug.trim(), a.vaultFolder);
+      // Derived above from the stored slug so legacy attachment ids stay stable.
+      const canonicalSlug = attachmentSlug(canonicalProjectId(a.projectSlug.trim()));
 
       if (kind === "document-source") {
         const root =
@@ -207,7 +241,7 @@ function normalizeProjectAttachments(value: unknown): Record<string, ProjectAtta
         const docConfig: DocumentSourceAttachmentConfig = {
           kind: "document-source",
           attachmentId,
-          projectSlug: attachmentSlug(a.projectSlug.trim()),
+          projectSlug: canonicalSlug,
           projectName:
             typeof a.projectName === "string" ? a.projectName.trim() : a.projectSlug.trim(),
           localPath: a.localPath.trim(),
@@ -225,7 +259,7 @@ function normalizeProjectAttachments(value: unknown): Record<string, ProjectAtta
         const vaultConfig: MnemonicVaultAttachmentConfig = {
           kind: "mnemonic-vault",
           attachmentId,
-          projectSlug: attachmentSlug(a.projectSlug.trim()),
+          projectSlug: canonicalSlug,
           projectName:
             typeof a.projectName === "string" ? a.projectName.trim() : a.projectSlug.trim(),
           localPath: a.localPath.trim(),
@@ -245,17 +279,38 @@ function normalizeProjectAttachments(value: unknown): Record<string, ProjectAtta
       }
     }
     if (validAttachments.length > 0) {
-      normalized[projectId] = validAttachments;
+      normalized[projectId] = mergeAttachmentLists(normalized[projectId], validAttachments);
     }
   }
   return normalized;
+}
+
+function attachmentIdentityKey(attachment: ProjectAttachmentConfig): string {
+  const location =
+    attachment.kind === "document-source" ? attachment.localPath : attachment.vaultFolder;
+  return `${attachment.kind}::${attachment.projectSlug}::${location}`;
+}
+
+/** Concatenate attachment lists from colliding legacy/canonical keys, keeping the first duplicate. */
+function mergeAttachmentLists(
+  existing: ProjectAttachmentConfig[] | undefined,
+  incoming: ProjectAttachmentConfig[],
+): ProjectAttachmentConfig[] {
+  if (!existing) return incoming;
+  const seen = new Set<string>();
+  return [...existing, ...incoming].filter((attachment) => {
+    const key = attachmentIdentityKey(attachment);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 /**
  * Derive a deterministic legacy attachment ID from project association, slug, and vault folder.
  * Used for legacy configs that don't have a persisted attachmentId.
  */
-function deriveLegacyAttachmentId(projectSlug: string, vaultFolder: unknown): string {
+export function deriveLegacyAttachmentId(projectSlug: string, vaultFolder: unknown): string {
   const folder =
     typeof vaultFolder === "string" && vaultFolder.trim() ? vaultFolder.trim() : ".mnemonic";
   const raw = `${projectSlug}::${folder}`;

@@ -87,7 +87,7 @@ export async function resolveProjectIdentity(
 
   return {
     project: {
-      id: projectId(normalizeRemote(overrideRemote)),
+      id: projectId(normalizeRemoteUrl(overrideRemote)),
       name: extractRepoName(overrideRemote),
       source: "git-remote-override",
       remoteName: identityOverride.remoteName,
@@ -118,7 +118,7 @@ async function detectDefaultProject(cwd: string): Promise<ProjectInfo | null> {
   const remoteCwd = topLevelRoot ?? cwd;
   const remote = await getGitRemoteUrl(remoteCwd, "origin");
   if (remote) {
-    const id = projectId(normalizeRemote(remote));
+    const id = projectId(normalizeRemoteUrl(remote));
     const name = extractRepoName(remote);
     return { id, name, source: "git-remote", remoteName: "origin" };
   }
@@ -181,25 +181,57 @@ async function getGitRemoteUrl(cwd: string, remoteName: string): Promise<string 
 
 /**
  * Normalize a git remote URL to a stable lowercase identifier.
- * Strips protocol, auth, .git suffix, and converts separators to dashes.
+ * Strips scheme, auth, port, .git suffix, and converts separators to dashes,
+ * so every remote form of one repository yields the same id.
  *
  * Examples:
  *   git@github.com:acme/myapp.git  → github-com-acme-myapp
  *   https://github.com/acme/myapp  → github-com-acme-myapp
  */
-function normalizeRemote(remote: string): string {
+export function normalizeRemoteUrl(remote: string): string {
   let s = remote.trim().toLowerCase();
-  // SSH: git@github.com:user/repo.git
-  s = s.replace(/^git@/, "").replace(/:/, "/");
-  // Strip protocol
-  s = s.replace(/^https?:\/\//, "").replace(/^ssh:\/\//, "");
-  // Strip auth (user:pass@)
-  s = s.replace(/^[^@]*@/, "");
-  // Strip .git
+  s = s.replace(/^[a-z][a-z0-9+.-]*:\/\//, "");
+  s = s.replace(/^[^@/]*@/, "");
+  // host:port/path drops the port; otherwise the first colon is scp-like syntax (host:path)
+  s = /^[^/:]+:\d+\//.test(s) ? s.replace(/^([^/:]+):\d+\//, "$1/") : s.replace(/:/, "/");
   s = s.replace(/\.git$/, "");
-  // Normalise separators
-  s = s.replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
-  return s;
+  return slugify(s);
+}
+
+const LEGACY_PROJECT_ID_PREFIXES = ["https-", "http-", "ssh-", "git-ssh-"] as const;
+
+/**
+ * Map project ids derived from the pre-1.0 normalizer (which kept the scheme
+ * as a prefix) to the canonical id. Other ids are returned unchanged. A bare
+ * `git-` prefix is deliberately not stripped: it is a legitimate host prefix
+ * (`git.example.com`), and only rare `git://` remotes ever produced it.
+ */
+export function canonicalProjectId(id: string): string {
+  for (const prefix of LEGACY_PROJECT_ID_PREFIXES) {
+    if (id.startsWith(prefix) && id.length > prefix.length) {
+      return id.slice(prefix.length);
+    }
+  }
+  return id;
+}
+
+/**
+ * Pick the surviving entry when a legacy key and its canonical key collide:
+ * the newer `updatedAt` wins when both have one, otherwise the entry that was
+ * already stored under the canonical key.
+ */
+export function pickCollidingEntry<T extends { updatedAt?: unknown }>(
+  first: { value: T; wasLegacyKey: boolean },
+  second: { value: T; wasLegacyKey: boolean },
+): { value: T; wasLegacyKey: boolean } {
+  const firstTime =
+    typeof first.value.updatedAt === "string" ? Date.parse(first.value.updatedAt) : NaN;
+  const secondTime =
+    typeof second.value.updatedAt === "string" ? Date.parse(second.value.updatedAt) : NaN;
+  if (!Number.isNaN(firstTime) && !Number.isNaN(secondTime) && firstTime !== secondTime) {
+    return secondTime > firstTime ? second : first;
+  }
+  return first.wasLegacyKey && !second.wasLegacyKey ? second : first;
 }
 
 function extractRepoName(remote: string): string {

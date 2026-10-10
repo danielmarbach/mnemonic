@@ -2,7 +2,7 @@
   "version": 1,
   "currentProject": {
     "remote": "https://github.com/acme/alpha.git",
-    "id": "https-github-com-acme-alpha"
+    "id": "github-com-acme-alpha"
   },
   "queries": [
     {

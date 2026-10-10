@@ -11,7 +11,12 @@ import {
 
 import type { Vault, VaultManager } from "./vault.js";
 import type { Note } from "./storage.js";
-import { readVaultSchemaVersion, writeVaultSchemaVersion } from "./config.js";
+import {
+  deriveLegacyAttachmentId,
+  readVaultSchemaVersion,
+  writeVaultSchemaVersion,
+} from "./config.js";
+import { canonicalProjectId, pickCollidingEntry } from "./project.js";
 
 export interface MigrationResult {
   notesProcessed: number;
@@ -283,6 +288,7 @@ export class Migrator {
     this.registerMigration(createV010BackfillMemoryVersionMigration());
     this.registerMigration(createV011BackfillLifecycleMigration());
     this.registerMigration(createV014NormalizeAttachmentConfigMigration());
+    this.registerMigration(createV015NormalizeProjectIdsMigration());
   }
 
   private parseVersion(version: string): number[] {
@@ -552,6 +558,203 @@ function createV014NormalizeAttachmentConfigMigration(): Migration {
         const message = getErrorMessage(err);
         debugLog("migration:normalize-attachment-config", `failed: ${message}`);
         result.errors.push({ noteId: "config.json", error: message });
+      }
+
+      return result;
+    },
+  };
+}
+
+type JsonRecord = Record<string, unknown>;
+
+function isJsonRecord(value: unknown): value is JsonRecord {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isMissingFileError(err: unknown): boolean {
+  return err instanceof Error && (err as NodeJS.ErrnoException).code === "ENOENT";
+}
+
+function attachmentIdentityKey(attachment: JsonRecord): string {
+  const location =
+    attachment["kind"] === "document-source" ? attachment["localPath"] : attachment["vaultFolder"];
+  return `${String(attachment["kind"])}::${String(attachment["projectSlug"])}::${String(location)}`;
+}
+
+/** Rewrite the id-keyed maps of a main-vault config.json in place; returns the number of changed entries. */
+function canonicalizeConfigProjectIds(config: JsonRecord): number {
+  let changes = 0;
+
+  for (const section of ["projectMemoryPolicies", "projectIdentityOverrides"] as const) {
+    const entries = config[section];
+    if (!isJsonRecord(entries)) continue;
+
+    const rewritten: JsonRecord = {};
+    const legacyKeys = new Set<string>();
+    for (const [rawKey, entry] of Object.entries(entries)) {
+      const key = canonicalProjectId(rawKey);
+      let value = entry;
+      if (section === "projectMemoryPolicies" && isJsonRecord(entry)) {
+        const innerId = entry["projectId"];
+        if (typeof innerId === "string" && canonicalProjectId(innerId) !== innerId) {
+          value = { ...entry, projectId: canonicalProjectId(innerId) };
+          changes++;
+        }
+      }
+
+      if (key !== rawKey) changes++;
+      const candidate = { value: isJsonRecord(value) ? value : {}, wasLegacyKey: key !== rawKey };
+      const existing = rewritten[key];
+      if (existing === undefined) {
+        rewritten[key] = value;
+        if (candidate.wasLegacyKey) legacyKeys.add(key);
+        continue;
+      }
+
+      const winner = pickCollidingEntry(
+        { value: isJsonRecord(existing) ? existing : {}, wasLegacyKey: legacyKeys.has(key) },
+        candidate,
+      );
+      rewritten[key] = winner.value === candidate.value ? value : existing;
+      if (winner.wasLegacyKey) legacyKeys.add(key);
+      else legacyKeys.delete(key);
+    }
+    config[section] = rewritten;
+  }
+
+  const attachmentsByProject = config["projectAttachments"];
+  if (isJsonRecord(attachmentsByProject)) {
+    const rewritten: JsonRecord = {};
+    for (const [rawKey, attachments] of Object.entries(attachmentsByProject)) {
+      const key = canonicalProjectId(rawKey);
+      if (key !== rawKey) changes++;
+      if (!Array.isArray(attachments)) {
+        rewritten[key] = attachments;
+        continue;
+      }
+
+      const canonicalAttachments = attachments.map((attachment: unknown) => {
+        if (!isJsonRecord(attachment) || typeof attachment["projectSlug"] !== "string") {
+          return attachment;
+        }
+        const slug = attachment["projectSlug"];
+        const canonicalSlug = canonicalProjectId(slug);
+        if (canonicalSlug === slug) return attachment;
+
+        changes++;
+        const hasAttachmentId =
+          typeof attachment["attachmentId"] === "string" && attachment["attachmentId"].trim();
+        // Keep the id derived from the stored slug stable across the slug rewrite.
+        return {
+          ...attachment,
+          projectSlug: canonicalSlug,
+          ...(hasAttachmentId
+            ? {}
+            : { attachmentId: deriveLegacyAttachmentId(slug, attachment["vaultFolder"]) }),
+        };
+      });
+
+      const existing = rewritten[key];
+      if (!Array.isArray(existing)) {
+        rewritten[key] = canonicalAttachments;
+        continue;
+      }
+
+      const seen = new Set<string>();
+      rewritten[key] = [...existing, ...canonicalAttachments].filter((attachment: unknown) => {
+        if (!isJsonRecord(attachment)) return true;
+        const identity = attachmentIdentityKey(attachment);
+        if (seen.has(identity)) return false;
+        seen.add(identity);
+        return true;
+      });
+    }
+    config["projectAttachments"] = rewritten;
+  }
+
+  return changes;
+}
+
+function createV015NormalizeProjectIdsMigration(): Migration {
+  return {
+    name: "v0.1.5-normalize-project-ids",
+    description:
+      "Rewrites legacy scheme-prefixed project ids (https-github-com-…) to canonical ids in notes and config.json",
+    minSchemaVersion: "1.4",
+    maxSchemaVersion: "1.5",
+    async run(vault, dryRun): Promise<MigrationResult> {
+      const result: MigrationResult = {
+        notesProcessed: 0,
+        notesModified: 0,
+        modifiedNoteIds: [],
+        errors: [],
+        warnings: [],
+      };
+
+      const configPath = path.join(vault.storage.vaultPath, "config.json");
+      let config: JsonRecord | undefined;
+      try {
+        const parsedConfig: unknown = JSON.parse(await fs.readFile(configPath, "utf-8"));
+        if (!isJsonRecord(parsedConfig)) {
+          throw new Error("expected a JSON object");
+        }
+        config = parsedConfig;
+      } catch (err) {
+        if (!isMissingFileError(err)) {
+          const message = getErrorMessage(err);
+          debugLog("migration:normalize-project-ids", `config.json: ${message}`);
+          result.errors.push({ noteId: "config.json", error: message });
+          return result;
+        }
+      }
+
+      const notes = await vault.storage.listNotes();
+      result.notesProcessed = notes.length;
+
+      for (const note of notes) {
+        try {
+          const raw = await fs.readFile(
+            path.join(vault.storage.notesDir, `${note.id}.md`),
+            "utf-8",
+          );
+          const storedProject = matter(raw).data["project"];
+          if (
+            typeof storedProject !== "string" ||
+            canonicalProjectId(storedProject) === storedProject
+          ) {
+            continue;
+          }
+
+          result.notesModified++;
+          result.modifiedNoteIds.push(note.id);
+
+          if (!dryRun) {
+            // parseNote already canonicalized note.project; updatedAt is carried over unchanged.
+            await vault.storage.writeNote(note);
+          }
+        } catch (err) {
+          debugLog("migration:normalize-project-ids", `note ${note.id}: ${getErrorMessage(err)}`);
+          result.errors.push({
+            noteId: note.id,
+            error: getErrorMessage(err),
+          });
+        }
+      }
+
+      if (config && result.errors.length === 0) {
+        const configChanges = canonicalizeConfigProjectIds(config);
+        if (configChanges > 0) {
+          result.notesModified++;
+          if (!dryRun) {
+            try {
+              await fs.writeFile(configPath, JSON.stringify(config, null, 2) + "\n", "utf-8");
+            } catch (err) {
+              const message = getErrorMessage(err);
+              debugLog("migration:normalize-project-ids", `config.json write: ${message}`);
+              result.errors.push({ noteId: "config.json", error: message });
+            }
+          }
+        }
       }
 
       return result;

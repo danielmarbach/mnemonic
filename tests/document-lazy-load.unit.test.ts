@@ -268,6 +268,31 @@ describe("lazyLoadGeneration", () => {
     ).resolves.toBeNull();
   });
 
+  it("loads a manifest that stores the legacy scheme-prefixed project id", async () => {
+    const repo = await makeGitRepo();
+    const commit = await headCommit(repo);
+    const config = makeConfig(repo);
+    const docSourceBase = path.join(
+      await mkdtemp(path.join(os.tmpdir(), "mnemonic-lazyload-")),
+      "doc-source",
+    );
+    tempDirs.push(docSourceBase);
+    const attachmentDir = path.join(docSourceBase, config.attachmentId);
+    await writeManifest(
+      attachmentDir,
+      await makeManifest(config, commit, { projectId: "https-github-com-acme-myapp" }),
+    );
+
+    const generation = await lazyLoadGeneration(
+      "github-com-acme-myapp",
+      config.attachmentId,
+      config,
+      makeContext(),
+      docSourceBase,
+    );
+    expect(generation).not.toBeNull();
+  });
+
   it("returns null when manifest attachmentId does not match the caller's attachment", async () => {
     const repo = await makeGitRepo();
     const commit = await headCommit(repo);
