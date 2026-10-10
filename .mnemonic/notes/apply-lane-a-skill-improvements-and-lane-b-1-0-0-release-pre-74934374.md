@@ -9,11 +9,14 @@ tags:
   - v1
 lifecycle: temporary
 createdAt: '2026-10-10T22:46:42.560Z'
-updatedAt: '2026-10-10T22:46:42.560Z'
+updatedAt: '2026-10-10T22:46:43.062Z'
 role: context
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: plan-rpi-workflow-skill-improvements-and-1-0-0-release-prepa-1f9ed1ac
+    type: follows
 memoryVersion: 1
 ---
 # Apply: Lane A skill improvements and Lane B 1.0.0 release preparation
