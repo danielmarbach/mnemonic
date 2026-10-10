@@ -9,7 +9,7 @@ tags:
   - migration
 lifecycle: temporary
 createdAt: '2026-10-10T23:25:53.558Z'
-updatedAt: '2026-10-10T23:43:39.613Z'
+updatedAt: '2026-10-10T23:51:26.349Z'
 role: plan
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -48,3 +48,5 @@ Status: endorsed by the user (2026-10-11): "align the project identity for 1.0 a
 - G3b root cause (orchestrator, confirmed in src/config.ts readVaultSchemaVersion): a vault without config.json reports defaultConfig.schemaVersion, so it looks fully migrated. User decision: add .mnemonic/config.json with schemaVersion 1.4 to this repo now (uncommitted; the migration execute bumps it to 1.5 and commits it with the notes). Dry-run with --cwd now shows v0.1.5 pending: 107 processed, 105 to modify. Lane H after the review: missing config.json means unknown (run all pending), project vault creation writes config.json with the current schema version, tests, changelog line.
 
 - Review of 99261f5: block. Lane H dispatched for P1-a (only https- and http- prefixes, fixed-point producers), P1-b (port rule only after a scheme), P1-c (missing config.json counts as 0.0 everywhere; new project vaults write and commit config.json at creation), P2-a and P2-d (configModified flag, committed and printed), P2-b (canonical fixtures plus one legacy note), P2-c (loop until stable), docs. Execution on real vaults waits for Lane H and its review.
+
+- Lane H committed as 7a705ae after the orchestrator fixed one test typecheck error the worker missed (workers ran npm run build, which typechecks src only; the pre-commit hook caught tests/migration.unit.test.ts). Lesson: worker verification lists must include npm run typecheck. Re-review dispatched; migration execution on both vaults and verify:release follow a continue outcome.
