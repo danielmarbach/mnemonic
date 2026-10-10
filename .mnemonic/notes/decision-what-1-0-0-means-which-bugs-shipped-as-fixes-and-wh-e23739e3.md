@@ -10,7 +10,7 @@ tags:
   - orchestration
 lifecycle: permanent
 createdAt: '2026-10-10T23:16:37.091Z'
-updatedAt: '2026-10-10T23:16:38.901Z'
+updatedAt: '2026-10-10T23:16:39.682Z'
 role: decision
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -18,6 +18,8 @@ projectName: mnemonic
 relatedTo:
   - id: plan-rpi-workflow-skill-improvements-and-1-0-0-release-prepa-1f9ed1ac
     type: derives-from
+  - id: rpir-outcome-rpi-workflow-skill-revision-and-1-0-0-release-p-23037b96
+    type: related-to
 memoryVersion: 1
 ---
 # Decision: what 1.0.0 means, which bugs shipped as fixes, and what was deferred

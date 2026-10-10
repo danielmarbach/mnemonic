@@ -11,7 +11,7 @@ tags:
   - workflow
 lifecycle: permanent
 createdAt: '2026-10-10T23:16:38.451Z'
-updatedAt: '2026-10-10T23:16:39.295Z'
+updatedAt: '2026-10-10T23:16:39.682Z'
 role: summary
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -19,6 +19,8 @@ projectName: mnemonic
 relatedTo:
   - id: plan-rpi-workflow-skill-improvements-and-1-0-0-release-prepa-1f9ed1ac
     type: derives-from
+  - id: decision-what-1-0-0-means-which-bugs-shipped-as-fixes-and-wh-e23739e3
+    type: related-to
 memoryVersion: 1
 ---
 # RPIR outcome: rpi-workflow skill revision and 1.0.0 release prepared
