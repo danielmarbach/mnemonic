@@ -11,6 +11,8 @@ import "./helpers/mcp.js";
 
 type Baseline = { metrics: Partial<Record<RecallEvalKind, RecallEvalMetric>> };
 
+// The fixture notes use canonical project ids, except alpha-service-architecture-overview-1a2b3c4d,
+// which keeps the legacy `https-github-com-acme-alpha` id on purpose to exercise the legacy read path.
 describe("recall eval harness", () => {
   it("does not regress below the recorded baseline", async () => {
     const baseline = JSON.parse(await readFile(baselinePath, "utf-8")) as Baseline;

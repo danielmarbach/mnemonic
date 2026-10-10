@@ -1,7 +1,7 @@
 import { resolveUserPath, defaultVaultPath } from "../paths.js";
 import { VaultManager } from "../vault.js";
 import { Migrator } from "../migration.js";
-import { readVaultSchemaVersion } from "../config.js";
+import { readVaultSchemaVersionForMigration } from "../config.js";
 
 export async function runMigrateCli(): Promise<void> {
   const VAULT_PATH = process.env["VAULT_PATH"]
@@ -59,7 +59,7 @@ Examples:
     console.log("\nVault schema versions:");
     let totalPending = 0;
     for (const vault of vaultManager.allKnownVaults()) {
-      const version = await readVaultSchemaVersion(vault.storage.vaultPath);
+      const version = await readVaultSchemaVersionForMigration(vault.storage.vaultPath);
       const pending = await migrator.getPendingMigrations(version);
       totalPending += pending.length;
       const label = vault.provenance === "project-local" ? "project" : "main";
@@ -93,7 +93,10 @@ Examples:
       console.log(`  Migration ${migration}:`);
       console.log(`    Notes processed: ${result.notesProcessed}`);
       console.log(`    Notes modified: ${result.notesModified}`);
-      if (!dryRun && result.notesModified > 0) {
+      if (result.configModified) {
+        console.log("    Config modified: yes");
+      }
+      if (!dryRun && (result.notesModified > 0 || result.configModified)) {
         console.log(
           `    Auto-committed: ${result.warnings.length === 0 ? "✓" : "⚠ (see warnings)"}`,
         );

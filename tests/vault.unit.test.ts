@@ -1,9 +1,17 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import {
   VaultManager,
   type MnemonicVaultAttachmentConfig,
   type ProjectAttachmentConfig,
 } from "../src/vault.js";
+import { Migrator } from "../src/migration.js";
+import {
+  readVaultSchemaVersion,
+  readVaultSchemaVersionForMigration,
+  writeVaultSchemaVersion,
+} from "../src/config.js";
+import { warnAboutPendingMigrationsOnStartup } from "../src/startup.js";
+import type { ServerContext } from "../src/server-context.js";
 import { Storage, type Note, type EmbeddingRecord } from "../src/storage.js";
 import type { MemoryId, ISO8601DateString } from "../src/brands.js";
 import * as fs from "fs/promises";
@@ -115,6 +123,71 @@ describe("VaultManager", () => {
       const existsAfter = await vaultManager.getProjectVaultIfExists(projectDir);
       expect(existsAfter).toBeTruthy();
       expect(existsAfter!.storage.vaultPath).toBe(vault!.storage.vaultPath);
+    });
+
+    it("records the current schema version when creating a new project vault", async () => {
+      const projectDir = path.join(tempDir, "project-schema");
+      await fs.mkdir(projectDir, { recursive: true });
+      await initGitRepo(projectDir, "# Project Schema");
+
+      const vault = await vaultManager.getOrCreateProjectVault(projectDir);
+
+      expect(vault).toBeTruthy();
+      expect(await readVaultSchemaVersion(vault!.storage.vaultPath)).toBe("1.5");
+      const raw = await fs.readFile(path.join(projectDir, ".mnemonic", "config.json"), "utf-8");
+      expect(JSON.parse(raw)).toEqual({ schemaVersion: "1.5" });
+    });
+
+    it("reports no pending migrations on startup for a newly created project vault", async () => {
+      const projectDir = path.join(tempDir, "project-startup");
+      await fs.mkdir(projectDir, { recursive: true });
+      await initGitRepo(projectDir, "# Project Startup");
+      await writeVaultSchemaVersion(mainVaultPath, "1.5");
+      await vaultManager.getOrCreateProjectVault(projectDir);
+      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+      try {
+        await warnAboutPendingMigrationsOnStartup({
+          vaultManager,
+          migrator: new Migrator(vaultManager),
+        } as unknown as ServerContext);
+
+        expect(errorSpy).not.toHaveBeenCalled();
+      } finally {
+        errorSpy.mockRestore();
+      }
+    });
+
+    it("leaves an existing project vault without config.json pending for migration", async () => {
+      const projectDir = path.join(tempDir, "project-legacy-vault");
+      await fs.mkdir(path.join(projectDir, ".mnemonic", "notes"), { recursive: true });
+      await initGitRepo(projectDir, "# Project Legacy");
+
+      const vault = await vaultManager.getOrCreateProjectVault(projectDir);
+
+      await expect(fs.access(path.join(projectDir, ".mnemonic", "config.json"))).rejects.toThrow();
+      expect(await readVaultSchemaVersionForMigration(vault!.storage.vaultPath)).toBe("0.0");
+    });
+
+    it("commits the schema version when creating a project vault with git enabled", async () => {
+      delete process.env.DISABLE_GIT;
+      const projectDir = path.join(tempDir, "project-schema-commit");
+      await fs.mkdir(projectDir, { recursive: true });
+      await initGitRepoWithCommit(projectDir, "# Project Schema Commit");
+
+      const vaultMgr = new VaultManager(mainVaultPath);
+      await vaultMgr.initMain();
+      await vaultMgr.getOrCreateProjectVault(projectDir);
+
+      const log = await simpleGit(projectDir).log();
+      expect(log.all.map((entry) => entry.message)).toContain(
+        "config(init): record vault schema version 1.5",
+      );
+      expect((await simpleGit(projectDir).status()).files.map((f) => f.path)).not.toContain(
+        ".mnemonic/config.json",
+      );
+
+      process.env.DISABLE_GIT = "true";
     });
 
     it("should not detect main repo as project vault", async () => {

@@ -8,7 +8,7 @@ lifecycle: permanent
 createdAt: '2026-06-18T09:00:00.000Z'
 updatedAt: '2026-06-25T10:00:00.000Z'
 role: summary
-project: https-github-com-acme-alpha
+project: github-com-acme-alpha
 projectName: alpha
 relatedTo:
   - id: decision-transactional-outbox-for-order-events-2b3c4d5e

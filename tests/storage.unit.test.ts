@@ -6,6 +6,7 @@ import {
   validateNoteProjection,
 } from "../src/validation.js";
 import type { EmbeddingModelId, ISO8601DateString, MemoryId } from "../src/brands.js";
+import { canonicalProjectId, normalizeRemoteUrl } from "../src/project.js";
 import * as fs from "fs/promises";
 import * as path from "path";
 import os from "os";
@@ -145,6 +146,35 @@ Body`;
         "project: github-com-acme-myapp",
       );
     });
+
+    it.each([
+      ["git@ssh.dev.azure.com:v3/org/proj/repo", "ssh-dev-azure-com-v3-org-proj-repo"],
+      ["git@github.com:1234/repo.git", "github-com-1234-repo"],
+    ])(
+      "keeps the resolver id for %s unchanged through write and read",
+      async (remote, expectedId) => {
+        const id = normalizeRemoteUrl(remote);
+        const now = new Date().toISOString() as ISO8601DateString;
+        expect(id).toBe(expectedId);
+
+        await storage.writeNote({
+          id: "resolver-id-note" as MemoryId,
+          title: "Resolver id",
+          content: "Body",
+          tags: [],
+          lifecycle: "permanent",
+          project: id,
+          projectName: "repo",
+          createdAt: now,
+          updatedAt: now,
+          memoryVersion: 1,
+        });
+
+        const read = await storage.readNote("resolver-id-note" as MemoryId);
+        expect(read?.project).toBe(id);
+        expect(canonicalProjectId(id)).toBe(id);
+      },
+    );
 
     it("should normalize invalid lifecycle values to permanent", async () => {
       const notesDir = path.join(tempDir, "notes");

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { Migrator } from "../src/migration.js";
-import { MnemonicConfigStore } from "../src/config.js";
+import { MnemonicConfigStore, readVaultSchemaVersionForMigration } from "../src/config.js";
 import { Storage } from "../src/storage.js";
 import { GitOps } from "../src/git.js";
 import type { ISO8601DateString, MemoryId } from "../src/brands.js";
@@ -32,6 +32,7 @@ function createFailingAtomicityMigration() {
       const result = {
         notesProcessed: notes.length,
         notesModified: 0,
+        configModified: false,
         modifiedNoteIds: [] as string[],
         errors: [] as Array<{ noteId: string; error: string }>,
         warnings: [] as string[],
@@ -100,6 +101,7 @@ describe("Migrator", () => {
           return {
             notesProcessed: 0,
             notesModified: 0,
+            configModified: false,
             modifiedNoteIds: [],
             errors: [],
             warnings: [],
@@ -428,8 +430,8 @@ Content of ${id}`;
       expect(result.errors).toEqual([]);
       expect(result.notesProcessed).toBe(1);
       expect(result.modifiedNoteIds).toEqual(["legacy-note"]);
-      // one note plus config.json
-      expect(result.notesModified).toBe(2);
+      expect(result.notesModified).toBe(1);
+      expect(result.configModified).toBe(true);
       expect(await readRawNote("legacy-note")).toBe(noteBefore);
       expect(await fs.readFile(path.join(tempDir, "config.json"), "utf-8")).toBe(configBefore);
     });
@@ -437,13 +439,17 @@ Content of ${id}`;
     it("rewrites legacy project ids in notes without changing updatedAt", async () => {
       await writeProjectNote("https-note", LEGACY_ID);
       await writeProjectNote("http-note", "http-github-com-acme-myapp");
-      await writeProjectNote("ssh-note", "ssh-github-com-acme-myapp");
+      await writeProjectNote("stacked-note", "https-https-github-com-acme-myapp");
 
       const result = await getMigration().run(vault, false);
 
       expect(result.errors).toEqual([]);
       expect(result.notesModified).toBe(3);
-      expect([...result.modifiedNoteIds].sort()).toEqual(["http-note", "https-note", "ssh-note"]);
+      expect([...result.modifiedNoteIds].sort()).toEqual([
+        "http-note",
+        "https-note",
+        "stacked-note",
+      ]);
       for (const id of result.modifiedNoteIds) {
         const note = await storage.readNote(id as MemoryId);
         expect(note?.project).toBe(CANONICAL_ID);
@@ -500,7 +506,8 @@ Content of ${id}`;
       const result = await getMigration().run(vault, false);
 
       expect(result.errors).toEqual([]);
-      expect(result.notesModified).toBe(1);
+      expect(result.notesModified).toBe(0);
+      expect(result.configModified).toBe(true);
       expect(result.modifiedNoteIds).toEqual([]);
 
       const config = await readConfig();
@@ -607,13 +614,47 @@ Content of ${id}`;
       expect(after?.projectSlug).toBe("github-com-acme-lib");
     });
 
-    it("handles a vault without config.json", async () => {
+    it("migrates a vault without config.json through runAllPending and records the schema version", async () => {
       await writeProjectNote("legacy-note", LEGACY_ID);
+      await expect(fs.access(path.join(tempDir, "config.json"))).rejects.toThrow();
 
-      const result = await getMigration().run(vault, false);
+      const pendingBefore = await migrator.getPendingMigrations(
+        await readVaultSchemaVersionForMigration(tempDir),
+      );
+      expect(pendingBefore.map((m) => m.name)).toContain("v0.1.5-normalize-project-ids");
 
-      expect(result.errors).toEqual([]);
-      expect(result.modifiedNoteIds).toEqual(["legacy-note"]);
+      const commitSpy = vi.spyOn(vault.git, "commit").mockResolvedValue(true);
+      vi.spyOn(vault.git, "push").mockResolvedValue(undefined);
+
+      const { migrationResults } = await migrator.runAllPending({ dryRun: false });
+
+      const entries = migrationResults.get(tempDir) ?? [];
+      const normalize = entries.find((e) => e.migration === "v0.1.5-normalize-project-ids");
+      expect(entries.flatMap((e) => e.result.errors)).toEqual([]);
+      expect(normalize?.result.modifiedNoteIds).toEqual(["legacy-note"]);
+      expect(await readRawNote("legacy-note")).toContain(`project: ${CANONICAL_ID}`);
+      expect((await readConfig())["schemaVersion"]).toBe("1.5");
+      expect(commitSpy).toHaveBeenCalledWith(
+        expect.stringContaining("migrate: apply pending migrations"),
+        expect.arrayContaining(["notes/legacy-note.md", "config.json"]),
+      );
+
+      const second = await migrator.runAllPending({ dryRun: false });
+      expect(second.migrationResults.size).toBe(0);
+      await assertMigrationIdempotent(getMigration(), vault);
+    });
+
+    it("shows a vault without config.json as pending in dry-run without writing anything", async () => {
+      await writeProjectNote("legacy-note", LEGACY_ID);
+      const noteBefore = await readRawNote("legacy-note");
+
+      const { migrationResults } = await migrator.runAllPending({ dryRun: true });
+
+      const normalize = (migrationResults.get(tempDir) ?? []).find(
+        (e) => e.migration === "v0.1.5-normalize-project-ids",
+      );
+      expect(normalize?.result.modifiedNoteIds).toEqual(["legacy-note"]);
+      expect(await readRawNote("legacy-note")).toBe(noteBefore);
       await expect(fs.access(path.join(tempDir, "config.json"))).rejects.toThrow();
     });
 
@@ -630,9 +671,11 @@ Content of ${id}`;
       const migration = getMigration();
 
       const first = await migration.run(vault, false);
-      expect(first.notesModified).toBe(2);
+      expect(first.notesModified).toBe(1);
+      expect(first.configModified).toBe(true);
 
-      await assertMigrationIdempotent(migration, vault);
+      const second = await assertMigrationIdempotent(migration, vault);
+      expect(second.configModified).toBe(false);
     });
 
     it("reports an error for a malformed config.json without touching notes in that vault", async () => {
@@ -711,6 +754,41 @@ Content of ${id}`;
       expect(config["schemaVersion"]).toBe("1.5");
       expect(Object.keys(config["projectMemoryPolicies"]!)).toEqual([CANONICAL_ID]);
       expect(await readRawNote("legacy-note")).toContain(`project: ${CANONICAL_ID}`);
+    });
+  });
+
+  describe("config-only changes", () => {
+    it("commits config.json when a migration rewrites it without advancing the schema version", async () => {
+      await fs.mkdir(path.join(tempDir, "notes"), { recursive: true });
+      await fs.writeFile(
+        path.join(tempDir, "config.json"),
+        JSON.stringify({
+          schemaVersion: "1.5",
+          projectMemoryPolicies: {
+            "https-github-com-acme-myapp": { projectId: "https-github-com-acme-myapp" },
+          },
+        }),
+        "utf-8",
+      );
+      const commitSpy = vi.spyOn(vault.git, "commit").mockResolvedValue(true);
+      vi.spyOn(vault.git, "push").mockResolvedValue(undefined);
+
+      const { results } = await migrator.runMigration("v0.1.5-normalize-project-ids", {
+        dryRun: false,
+      });
+
+      const result = results.get(tempDir);
+      expect(result?.notesModified).toBe(0);
+      expect(result?.configModified).toBe(true);
+      expect(commitSpy).toHaveBeenCalledWith(expect.stringContaining("Schema: 1.5 -> 1.5"), [
+        "config.json",
+      ]);
+      const config = JSON.parse(await fs.readFile(path.join(tempDir, "config.json"), "utf-8")) as {
+        schemaVersion: string;
+        projectMemoryPolicies: Record<string, unknown>;
+      };
+      expect(config.schemaVersion).toBe("1.5");
+      expect(Object.keys(config.projectMemoryPolicies)).toEqual(["github-com-acme-myapp"]);
     });
   });
 
@@ -1006,6 +1084,7 @@ Broken content`,
           const result = {
             notesProcessed: notes.length,
             notesModified: 0,
+            configModified: false,
             modifiedNoteIds: [] as string[],
             errors: [] as Array<{ noteId: string; error: string }>,
             warnings: [] as string[],
@@ -1281,6 +1360,7 @@ Main content 2`,
               modifiedNoteIds: dryRun ? [] : modifiedNoteIds,
               errors: [],
               warnings: [],
+              configModified: false,
             };
           },
         });
@@ -1459,6 +1539,7 @@ Project content`,
           return {
             notesProcessed: 0,
             notesModified: 0,
+            configModified: false,
             modifiedNoteIds: [],
             errors: [],
             warnings: [],
@@ -1474,6 +1555,7 @@ Project content`,
           return {
             notesProcessed: 0,
             notesModified: 0,
+            configModified: false,
             modifiedNoteIds: [],
             errors: [],
             warnings: [],
@@ -1502,6 +1584,7 @@ Project content`,
           return {
             notesProcessed: 0,
             notesModified: 0,
+            configModified: false,
             modifiedNoteIds: [],
             errors: [],
             warnings: [],
@@ -1517,6 +1600,7 @@ Project content`,
           return {
             notesProcessed: 0,
             notesModified: 0,
+            configModified: false,
             modifiedNoteIds: [],
             errors: [],
             warnings: [],
@@ -1546,6 +1630,7 @@ Project content`,
           return {
             notesProcessed: 0,
             notesModified: 0,
+            configModified: false,
             modifiedNoteIds: [],
             errors: [],
             warnings: [],
@@ -1561,6 +1646,7 @@ Project content`,
           return {
             notesProcessed: 0,
             notesModified: 0,
+            configModified: false,
             modifiedNoteIds: [],
             errors: [],
             warnings: [],

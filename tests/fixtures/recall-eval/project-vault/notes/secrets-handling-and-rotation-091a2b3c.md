@@ -7,7 +7,7 @@ lifecycle: permanent
 createdAt: '2026-03-18T09:00:00.000Z'
 updatedAt: '2026-06-12T10:00:00.000Z'
 role: decision
-project: https-github-com-acme-alpha
+project: github-com-acme-alpha
 projectName: alpha
 ---
 

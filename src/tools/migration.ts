@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/server";
 import type { ServerContext } from "../server-context.js";
-import { readVaultSchemaVersion } from "../config.js";
+import { readVaultSchemaVersionForMigration } from "../config.js";
 import {
   MigrationListResultSchema,
   type MigrationListResult,
@@ -45,7 +45,7 @@ export function registerListMigrationsTool(server: McpServer, ctx: ServerContext
       let totalPending = 0;
       const vaultsInfo: MigrationListResult["vaults"] = [];
       for (const vault of ctx.vaultManager.allKnownVaults()) {
-        const version = await readVaultSchemaVersion(vault.storage.vaultPath);
+        const version = await readVaultSchemaVersionForMigration(vault.storage.vaultPath);
         const pending = await ctx.migrator.getPendingMigrations(version);
         totalPending += pending.length;
         const label = vault.provenance === "project-local" ? "project" : "main";

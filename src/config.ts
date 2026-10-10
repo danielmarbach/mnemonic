@@ -29,7 +29,7 @@ export interface MnemonicConfig {
   maxAttachmentsPerProject: number;
 }
 
-const defaultConfig: MnemonicConfig = {
+export const defaultConfig: MnemonicConfig = {
   // Keep this at the latest schema version. When adding a new latest-schema
   // migration, bump this value in the same change so fresh installs start at
   // the current schema instead of missing that migration.
@@ -353,6 +353,18 @@ export async function readVaultSchemaVersion(vaultPath: string): Promise<string>
   if (!jsonResult.ok) return defaultConfig.schemaVersion;
   const parsed = VaultSchemaVersionFragmentSchema.safeParse(jsonResult.value);
   return normalizeSchemaVersion(parsed.success ? parsed.data.schemaVersion : undefined);
+}
+
+/**
+ * Read the schema version used to compute pending migrations.
+ * A vault without config.json is treated as "0.0" so legacy project vaults
+ * that never had a config are still migrated; every other reader keeps
+ * readVaultSchemaVersion's default.
+ */
+export async function readVaultSchemaVersionForMigration(vaultPath: string): Promise<string> {
+  const filePath = path.join(path.resolve(vaultPath), "config.json");
+  const exists = await attempt("config:access-schema", () => fs.access(filePath));
+  return exists.ok ? readVaultSchemaVersion(vaultPath) : "0.0";
 }
 
 /**

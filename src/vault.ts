@@ -8,6 +8,7 @@ import { memoryId, type AttachmentSlug } from "./brands.js";
 import { GitOps } from "./git.js";
 import { AttachedStorage } from "./attached-storage.js";
 import { expandHomePath } from "./paths.js";
+import { defaultConfig, writeVaultSchemaVersion } from "./config.js";
 
 // ── Public types ──────────────────────────────────────────────────────────────
 
@@ -425,6 +426,8 @@ export class VaultManager {
 
     if (!create && !(await pathExists(mnemonicPath))) return null;
 
+    const isNewVault = create && !(await pathExists(mnemonicPath));
+
     const primaryVault = makeVault(
       mnemonicPath,
       resolved,
@@ -446,6 +449,15 @@ export class VaultManager {
           ".mnemonic/.gitignore",
         ]);
       }
+    }
+
+    if (isNewVault) {
+      // Record the schema version so a new vault is not reported as needing pending migrations
+      await writeVaultSchemaVersion(mnemonicPath, defaultConfig.schemaVersion);
+      await primaryVault.git.commit(
+        `config(init): record vault schema version ${defaultConfig.schemaVersion}`,
+        [".mnemonic/config.json"],
+      );
     }
 
     this.primaryProjectVaults.set(resolved, primaryVault);

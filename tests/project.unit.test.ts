@@ -105,6 +105,38 @@ describe("detectProject", () => {
     });
   });
 
+  it("returns ids that are fixed points of canonicalProjectId for folder-derived projects", async () => {
+    const parent = await makeTempDir("mnemonic-http-folder-parent-");
+    const gitDir = path.join(parent, "http-server");
+    const plainDir = path.join(parent, "https-tools");
+    await fs.mkdir(gitDir);
+    await fs.mkdir(plainDir);
+    await execFileAsync("git", ["init"], { cwd: gitDir });
+
+    const gitFolder = await detectProject(gitDir);
+    const folder = await detectProject(plainDir);
+
+    expect(gitFolder).toMatchObject({ id: "server", source: "git-folder" });
+    expect(folder).toMatchObject({ id: "tools", source: "folder" });
+    expect(canonicalProjectId(gitFolder!.id)).toBe(gitFolder!.id);
+    expect(canonicalProjectId(folder!.id)).toBe(folder!.id);
+  });
+
+  it("resolves an azure ssh remote to an id that survives canonicalization", async () => {
+    const dir = await makeTempDir("mnemonic-project-azure-");
+    await execFileAsync("git", ["init"], { cwd: dir });
+    await execFileAsync(
+      "git",
+      ["remote", "add", "origin", "git@ssh.dev.azure.com:v3/org/proj/repo"],
+      { cwd: dir },
+    );
+
+    const project = await detectProject(dir);
+
+    expect(project?.id).toBe("ssh-dev-azure-com-v3-org-proj-repo");
+    expect(canonicalProjectId(project!.id)).toBe(project!.id);
+  });
+
   it("falls back to the directory name outside git", async () => {
     const parent = await makeTempDir("mnemonic-folder-parent-");
     const dir = path.join(parent, "Plain Folder");
@@ -260,8 +292,35 @@ describe("normalizeRemoteUrl", () => {
     ["ssh://git@git.example.com:2222/team/repo.git", "git-example-com-team-repo"],
     ["https://git.example.com:8443/team/repo.git", "git-example-com-team-repo"],
     ["git@bitbucket.org:team/repo.git", "bitbucket-org-team-repo"],
+    ["git@ssh.dev.azure.com:v3/org/proj/repo", "ssh-dev-azure-com-v3-org-proj-repo"],
   ])("maps %s to %s regardless of host", (remote, expected) => {
     expect(normalizeRemoteUrl(remote)).toBe(expected);
+  });
+
+  it("keeps a numeric first path segment of an scp-like remote", () => {
+    expect(normalizeRemoteUrl("git@github.com:1234/repo.git")).toBe("github-com-1234-repo");
+    expect(normalizeRemoteUrl("git@github.com:1234/repo.git")).toBe(
+      normalizeRemoteUrl("https://github.com/1234/repo"),
+    );
+  });
+
+  it("still drops the port of a scheme:// URL", () => {
+    expect(normalizeRemoteUrl("ssh://git@git.example.com:2222/team/repo.git")).toBe(
+      "git-example-com-team-repo",
+    );
+  });
+
+  it.each([
+    ...githubForms,
+    "git@gitlab.com:group/subgroup/project.git",
+    "ssh://git@git.example.com:2222/team/repo.git",
+    "git@ssh.dev.azure.com:v3/org/proj/repo",
+    "git@github.com:1234/repo.git",
+    "https://http-server.example.com/team/repo.git",
+    "https://https-github.com/acme/myapp",
+  ])("returns a fixed point of canonicalProjectId for %s", (remote) => {
+    const id = normalizeRemoteUrl(remote);
+    expect(canonicalProjectId(id)).toBe(id);
   });
 });
 
@@ -269,9 +328,9 @@ describe("canonicalProjectId", () => {
   it.each([
     ["https-github-com-acme-myapp", "github-com-acme-myapp"],
     ["http-github-com-acme-myapp", "github-com-acme-myapp"],
-    ["ssh-github-com-acme-myapp", "github-com-acme-myapp"],
-    ["git-ssh-github-com-acme-myapp", "github-com-acme-myapp"],
     ["https-gitlab-com-group-project", "gitlab-com-group-project"],
+    ["https-https-github-com-acme-myapp", "github-com-acme-myapp"],
+    ["http-https-x", "x"],
   ])("strips the legacy scheme prefix from %s", (legacy, canonical) => {
     expect(canonicalProjectId(legacy)).toBe(canonical);
   });
@@ -280,6 +339,8 @@ describe("canonicalProjectId", () => {
     "github-com-acme-myapp",
     "gitlab-com-x",
     "git-example-com-team-repo",
+    "ssh-dev-azure-com-v3-org-proj-repo",
+    "git-ssh-github-com-acme-myapp",
     "plain-folder",
     "https-",
   ])("leaves %s unchanged", (id) => {
@@ -289,6 +350,11 @@ describe("canonicalProjectId", () => {
   it("is idempotent", () => {
     const once = canonicalProjectId("https-github-com-acme-myapp");
     expect(canonicalProjectId(once)).toBe(once);
+  });
+
+  it("strips stacked legacy prefixes until stable", () => {
+    expect(canonicalProjectId("https-https-x")).toBe("x");
+    expect(canonicalProjectId(canonicalProjectId("https-https-x"))).toBe("x");
   });
 });
 

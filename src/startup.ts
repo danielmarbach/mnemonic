@@ -1,4 +1,4 @@
-import { readVaultSchemaVersion } from "./config.js";
+import { readVaultSchemaVersionForMigration } from "./config.js";
 import type { ServerContext } from "./server-context.js";
 import { serveStdio } from "@modelcontextprotocol/server/stdio";
 import type { McpServer } from "@modelcontextprotocol/server";
@@ -8,7 +8,7 @@ export async function warnAboutPendingMigrationsOnStartup(ctx: ServerContext): P
   const details: string[] = [];
 
   for (const vault of ctx.vaultManager.allKnownVaults()) {
-    const version = await readVaultSchemaVersion(vault.storage.vaultPath);
+    const version = await readVaultSchemaVersionForMigration(vault.storage.vaultPath);
     const pending = await ctx.migrator.getPendingMigrations(version);
     if (pending.length === 0) {
       continue;

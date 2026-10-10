@@ -126,13 +126,13 @@ async function detectDefaultProject(cwd: string): Promise<ProjectInfo | null> {
   // Try git root folder name (repo without remote)
   if (topLevelRoot) {
     const name = path.basename(topLevelRoot);
-    return { id: projectId(slugify(name)), name, source: "git-folder" };
+    return { id: projectId(canonicalProjectId(slugify(name))), name, source: "git-folder" };
   }
 
   // Fallback: just use the directory name
   const name = path.basename(path.resolve(cwd));
   if (name) {
-    return { id: projectId(slugify(name)), name, source: "folder" };
+    return { id: projectId(canonicalProjectId(slugify(name))), name, source: "folder" };
   }
 
   return null;
@@ -190,29 +190,33 @@ async function getGitRemoteUrl(cwd: string, remoteName: string): Promise<string 
  */
 export function normalizeRemoteUrl(remote: string): string {
   let s = remote.trim().toLowerCase();
+  const hadScheme = /^[a-z][a-z0-9+.-]*:\/\//.test(s);
   s = s.replace(/^[a-z][a-z0-9+.-]*:\/\//, "");
   s = s.replace(/^[^@/]*@/, "");
-  // host:port/path drops the port; otherwise the first colon is scp-like syntax (host:path)
-  s = /^[^/:]+:\d+\//.test(s) ? s.replace(/^([^/:]+):\d+\//, "$1/") : s.replace(/:/, "/");
+  // Only a scheme:// URL carries host:port/; scp-like host:path keeps its first colon as a separator
+  s = hadScheme ? s.replace(/^([^/:]+):\d+\//, "$1/") : s.replace(/:/, "/");
   s = s.replace(/\.git$/, "");
-  return slugify(s);
+  return canonicalProjectId(slugify(s));
 }
 
-const LEGACY_PROJECT_ID_PREFIXES = ["https-", "http-", "ssh-", "git-ssh-"] as const;
+const LEGACY_PROJECT_ID_PREFIXES = ["https-", "http-"] as const;
 
 /**
  * Map project ids derived from the pre-1.0 normalizer (which kept the scheme
- * as a prefix) to the canonical id. Other ids are returned unchanged. A bare
- * `git-` prefix is deliberately not stripped: it is a legitimate host prefix
- * (`git.example.com`), and only rare `git://` remotes ever produced it.
+ * as a prefix) to the canonical id. Other ids are returned unchanged. Only
+ * `https-` and `http-` are stripped: `ssh-` and `git-` are legitimate host
+ * prefixes (`ssh.dev.azure.com`, `git.example.com`). Every id the resolver
+ * produces passes through this function, so it is a fixed point of it.
  */
 export function canonicalProjectId(id: string): string {
-  for (const prefix of LEGACY_PROJECT_ID_PREFIXES) {
-    if (id.startsWith(prefix) && id.length > prefix.length) {
-      return id.slice(prefix.length);
-    }
+  let current = id;
+  for (;;) {
+    const prefix = LEGACY_PROJECT_ID_PREFIXES.find(
+      (candidate) => current.startsWith(candidate) && current.length > candidate.length,
+    );
+    if (!prefix) return current;
+    current = current.slice(prefix.length);
   }
-  return id;
 }
 
 /**

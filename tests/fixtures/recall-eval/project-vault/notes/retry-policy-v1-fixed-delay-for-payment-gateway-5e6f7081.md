@@ -6,7 +6,7 @@ tags:
 lifecycle: permanent
 createdAt: '2026-03-20T09:00:00.000Z'
 updatedAt: '2026-05-04T09:00:00.000Z'
-project: https-github-com-acme-alpha
+project: github-com-acme-alpha
 projectName: alpha
 relatedTo:
   - id: retry-policy-for-payment-gateway-calls-4d5e6f70

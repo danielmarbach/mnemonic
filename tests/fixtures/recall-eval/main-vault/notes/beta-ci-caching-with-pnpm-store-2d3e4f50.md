@@ -6,7 +6,7 @@ tags:
 lifecycle: permanent
 createdAt: '2026-06-15T09:00:00.000Z'
 updatedAt: '2026-09-19T10:00:00.000Z'
-project: https-github-com-acme-beta
+project: github-com-acme-beta
 projectName: beta
 ---
 

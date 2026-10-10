@@ -13,7 +13,7 @@ import type { Vault, VaultManager } from "./vault.js";
 import type { Note } from "./storage.js";
 import {
   deriveLegacyAttachmentId,
-  readVaultSchemaVersion,
+  readVaultSchemaVersionForMigration,
   writeVaultSchemaVersion,
 } from "./config.js";
 import { canonicalProjectId, pickCollidingEntry } from "./project.js";
@@ -21,6 +21,8 @@ import { canonicalProjectId, pickCollidingEntry } from "./project.js";
 export interface MigrationResult {
   notesProcessed: number;
   notesModified: number;
+  /** True when the migration rewrote (or, in dry-run, would rewrite) config.json. */
+  configModified: boolean;
   modifiedNoteIds: string[];
   errors: Array<{ noteId: string; error: string }>;
   warnings: string[];
@@ -139,11 +141,17 @@ export class Migrator {
         const migrationResult = await this.runMigrationAtomically(vault, migration, options.dryRun);
 
         if (!options.dryRun && migrationResult.errors.length === 0) {
-          const currentSchemaVersion = await readVaultSchemaVersion(vault.storage.vaultPath);
+          const currentSchemaVersion = await readVaultSchemaVersionForMigration(
+            vault.storage.vaultPath,
+          );
           const nextSchemaVersion = this.getLatestSchemaVersion(currentSchemaVersion, [migration]);
           const filesToCommit = new Set(
             migrationResult.modifiedNoteIds.map((id) => `${vault.notesRelDir}/${id}.md`),
           );
+
+          if (migrationResult.configModified) {
+            filesToCommit.add(getConfigPathForVault(vault));
+          }
 
           if (nextSchemaVersion !== currentSchemaVersion) {
             await writeVaultSchemaVersion(vault.storage.vaultPath, nextSchemaVersion);
@@ -194,7 +202,7 @@ export class Migrator {
 
     for (const vault of vaults) {
       const vaultResults = await this.withVaultLock(vault.storage.vaultPath, async () => {
-        const vaultVersion = await readVaultSchemaVersion(vault.storage.vaultPath);
+        const vaultVersion = await readVaultSchemaVersionForMigration(vault.storage.vaultPath);
         const pending = await this.getPendingMigrations(vaultVersion);
         if (pending.length === 0) return null;
 
@@ -215,6 +223,10 @@ export class Migrator {
               for (const noteId of result.modifiedNoteIds) {
                 filesToCommit.add(`${vault.notesRelDir}/${noteId}.md`);
               }
+            }
+
+            if (!options.dryRun && result.configModified) {
+              filesToCommit.add(getConfigPathForVault(vault));
             }
 
             if (result.errors.length > 0) hasErrors = true;
@@ -392,6 +404,7 @@ function createV010BackfillMemoryVersionMigration(): Migration {
       const result: MigrationResult = {
         notesProcessed: 0,
         notesModified: 0,
+        configModified: false,
         modifiedNoteIds: [],
         errors: [],
         warnings: [],
@@ -438,6 +451,7 @@ function createV011BackfillLifecycleMigration(): Migration {
       const result: MigrationResult = {
         notesProcessed: 0,
         notesModified: 0,
+        configModified: false,
         modifiedNoteIds: [],
         errors: [],
         warnings: [],
@@ -491,6 +505,7 @@ function createV014NormalizeAttachmentConfigMigration(): Migration {
       const result: MigrationResult = {
         notesProcessed: 0,
         notesModified: 0,
+        configModified: false,
         modifiedNoteIds: [],
         errors: [],
         warnings: [],
@@ -548,13 +563,16 @@ function createV014NormalizeAttachmentConfigMigration(): Migration {
           }
         }
 
-        if (modified && !dryRun) {
-          await fs.writeFile(fullConfigPath, JSON.stringify(config, null, 2) + "\n", "utf-8");
-          result.notesModified = 1; // config.json was modified
+        if (modified) {
+          result.configModified = true;
+          if (!dryRun) {
+            await fs.writeFile(fullConfigPath, JSON.stringify(config, null, 2) + "\n", "utf-8");
+          }
         }
 
         result.notesProcessed = 1; // config.json processed
       } catch (err) {
+        if (isMissingFileError(err)) return result;
         const message = getErrorMessage(err);
         debugLog("migration:normalize-attachment-config", `failed: ${message}`);
         result.errors.push({ noteId: "config.json", error: message });
@@ -686,6 +704,7 @@ function createV015NormalizeProjectIdsMigration(): Migration {
       const result: MigrationResult = {
         notesProcessed: 0,
         notesModified: 0,
+        configModified: false,
         modifiedNoteIds: [],
         errors: [],
         warnings: [],
@@ -744,7 +763,7 @@ function createV015NormalizeProjectIdsMigration(): Migration {
       if (config && result.errors.length === 0) {
         const configChanges = canonicalizeConfigProjectIds(config);
         if (configChanges > 0) {
-          result.notesModified++;
+          result.configModified = true;
           if (!dryRun) {
             try {
               await fs.writeFile(configPath, JSON.stringify(config, null, 2) + "\n", "utf-8");
