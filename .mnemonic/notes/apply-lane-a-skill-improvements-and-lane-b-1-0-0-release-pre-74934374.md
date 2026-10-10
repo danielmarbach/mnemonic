@@ -9,7 +9,7 @@ tags:
   - v1
 lifecycle: temporary
 createdAt: '2026-10-10T22:46:42.560Z'
-updatedAt: '2026-10-10T22:56:00.293Z'
+updatedAt: '2026-10-10T23:02:28.110Z'
 role: context
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -57,3 +57,13 @@ Both lanes ran on claude-bridge/claude-sonnet-5-5 workers, sequentially in the s
 - Deviations: requireEnv keeps its own empty check (redundant, harmless).
 - Worker evidence: build, lint, format:check pass; 4 touched test files 127 tests; full suite 97 files 1541 tests in 67 s.
 - Work commit: fa6e519 fix: harden config writes, attached vault reads, env parsing, and semantic patch selectors.
+
+## Lane E (pre-1.0 fixes, worker claude-bridge/claude-sonnet-5-5)
+
+- [x] E1 NUL-separated git listings via new src/git-output.ts splitNulSeparated, used in document-sync (ls-tree and recency log), document-lazy-load and attached-storage listNoteIds. Tests: document-sync-nonascii.unit, document-lazy-load.unit, attached-storage.unit; document-sync mocks now emit NUL output.
+- [x] E2 Read-only attachments skip repoStorage.init and write their cache ignore rules to the attached repo's git info/exclude (ensureLocalExclude, best effort, idempotent). Writable attachments keep the tracked .gitignore. Supervisor decision B taken mid-task after the worker found the attachments dir lives inside the attached repo. Test in vault.unit.
+- [x] E3 pushBranch pushes HEAD:refs/heads/branch; VALID_BRANCH_PATTERN rejects a leading dash; add_attachment validates branch and pushBranch with isError responses; set_attachment_branch reuses validateBranch. Tests: git-push-branch.unit (real bare origin), attached-storage.unit, attached-vault.integration.
+- Deviations: add_attachment previously had no branch validation at all (added for both fields); computePerPathLastMod exported for a test; pushBranch trimmed on store; new tests not run against unfixed code except the mocks that broke.
+- Design follow-up recorded: attachment-side caches (attachments/<slug>, embeddings, projections) live inside the attached repository.
+- Worker evidence: build, lint, format:check pass; seven touched test files pass; full suite 99 files 1549 tests in 66 s.
+- Work commit: see git log (fix: index non-ASCII document paths, keep read-only attachments clean, and push configured branches).
