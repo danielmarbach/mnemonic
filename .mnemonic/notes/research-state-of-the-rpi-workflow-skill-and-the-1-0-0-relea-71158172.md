@@ -9,11 +9,14 @@ tags:
   - v1
 lifecycle: temporary
 createdAt: '2026-10-10T22:38:40.439Z'
-updatedAt: '2026-10-10T22:38:40.439Z'
+updatedAt: '2026-10-10T22:38:40.893Z'
 role: research
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: request-root-improve-mnemonic-rpi-workflow-skill-and-finaliz-fe7afdc6
+    type: derives-from
 memoryVersion: 1
 ---
 # Research: state of the rpi-workflow skill and the 1.0.0 release gate
