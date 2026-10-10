@@ -4,6 +4,25 @@ All notable changes to `mnemonic` will be documented in this file.
 
 The format is loosely based on Keep a Changelog and uses semver-style version headings.
 
+## [1.0.0] - 2026-10-11
+
+### Changed
+
+- mnemonic is now 1.0: the note format, vault layout, MCP tool surface and `mnemonic` CLI are considered stable. From 1.0 on, breaking changes to any of them bump the major version and ship with a migration that `list_migrations` reports per vault. Nothing changes for existing vaults when upgrading from 0.47.x.
+- The `mnemonic-rpi-workflow` skill and prompt gain an autonomous mode (user handoffs become recorded checkpoints when autonomy was granted), a commit hygiene gate with dirty-worktree rules, a review step that classifies failing heuristic checks before touching product code, a phase closeout checklist, and a finish stage that ends with a branch handshake instead of an unauthorized push or merge.
+- `add_attachment` and `set_attachment_branch` reject branch names that git would read as flags, such as `-x` or `--force`, and `add_attachment` now validates `pushBranch` the same way as `branch`.
+
+### Fixed
+
+- A hand-edited or truncated `config.json` that fails to parse no longer gets overwritten by the next policy or attachment write. Reads still fall back to defaults; writes refuse with the parse error until the file is fixed, and config writes are atomic.
+- One malformed note in an attached vault no longer breaks `list` or drops the whole attachment from `recall`; the note is skipped like in the main vault.
+- Empty environment variables such as `OLLAMA_URL=""` or `EMBED_MODEL=""`, common when MCP clients template unset values, now count as unset instead of crashing startup or selecting an empty model.
+- Document-source attachments index files whose names contain non-ASCII characters; git's quoted path output previously made them disappear silently.
+- Loading a read-only attachment no longer creates folders or edits the tracked `.gitignore` inside the attached repository; its cache paths are excluded through the repository's local git exclude file instead.
+- A writable attachment with a `pushBranch` that differs from the checked-out branch now pushes instead of failing with a refspec error.
+- Semantic patches with a `section` selector are rejected unless the operation is `replaceSection`, instead of silently acting on the heading alone. Headings containing inline code or emphasis can now be selected by their plain text.
+- Inserting a list item next to an existing list through a semantic patch merges it into that list. Previously the note re-parsed as one loose list and every later update spread the items with blank lines.
+
 ## [0.47.1] - 2026-09-28
 
 ### Fixed
