@@ -9,7 +9,7 @@ tags:
   - migration
 lifecycle: temporary
 createdAt: '2026-10-10T23:25:53.558Z'
-updatedAt: '2026-10-10T23:25:53.558Z'
+updatedAt: '2026-10-10T23:27:02.553Z'
 role: plan
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -35,3 +35,5 @@ Status: endorsed by the user (2026-10-11): "align the project identity for 1.0 a
 - [ ] P2 Worker implements normalization, boundaries, migration, tests, docs.
 - [ ] P3 Fresh-context review, verify:release, migration dry-run on both vaults, execute on the project vault.
 - [ ] P4 Commits reordered so Prepare release 1.0.0 is last; decision and summary notes updated.
+
+- Authorization added (user, 2026-10-11): execute the migration on the global main vault at \~/mnemonic-vault as well, not only dry-run. Sequence per vault: dry-run, inspect, execute, verify (project frontmatter in notes, config keys, list_migrations shows nothing pending). The main vault is the user's live git-synced vault: do it through the built CLI from this branch, confirm the commit it creates, and do not push.
