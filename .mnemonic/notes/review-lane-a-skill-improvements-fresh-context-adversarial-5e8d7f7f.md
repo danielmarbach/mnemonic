@@ -8,11 +8,14 @@ tags:
   - v1
 lifecycle: temporary
 createdAt: '2026-10-10T22:46:43.570Z'
-updatedAt: '2026-10-10T22:46:43.570Z'
+updatedAt: '2026-10-10T22:46:44.045Z'
 role: review
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: apply-lane-a-skill-improvements-and-lane-b-1-0-0-release-pre-74934374
+    type: derives-from
 memoryVersion: 1
 ---
 # Review: Lane A skill improvements (fresh-context adversarial)
