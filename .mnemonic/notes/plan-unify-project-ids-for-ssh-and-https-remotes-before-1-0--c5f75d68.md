@@ -9,7 +9,7 @@ tags:
   - migration
 lifecycle: temporary
 createdAt: '2026-10-10T23:25:53.558Z'
-updatedAt: '2026-10-10T23:28:11.438Z'
+updatedAt: '2026-10-10T23:37:49.701Z'
 role: plan
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -42,3 +42,5 @@ Status: endorsed by the user (2026-10-11): "align the project identity for 1.0 a
 - Authorization added (user, 2026-10-11): execute the migration on the global main vault at \~/mnemonic-vault as well, not only dry-run. Sequence per vault: dry-run, inspect, execute, verify (project frontmatter in notes, config keys, list_migrations shows nothing pending). The main vault is the user's live git-synced vault: do it through the built CLI from this branch, confirm the commit it creates, and do not push.
 
 - P1 done: scout map (artifact 28baefee) found a duplicate normalizeRemote in add-attachment.ts, config keys plus inner policy.projectId plus attachment projectSlug, attachment cache dirs named by the consuming project id, the document manifest storing projectId and a config hash, and the v011 and v014 migrations as templates. Lane G (worker) dispatched with G1 normalizer, G2 read-boundary canonicalizer, G3 migration normalize-project-ids with schema 1.5, G4 manifest check, G5 docs and changelog.
+
+- P2 done: Lane G committed as 99261f5 (normalizeRemoteUrl shared by project.ts and add_attachment, canonicalProjectId at parseNote and config readAll, migration v0.1.5-normalize-project-ids, schema 1.5, manifest legacy id fix, docs and changelog; full suite 99 files 1614 tests). Dry-run observations: main vault at schema 1.1 shows v0.1.4 (0 changes) and v0.1.5 (119 of 136 notes) pending; the project vault dry-run with --cwd printed no vault section although 100+ notes carry legacy ids and it has no config.json. Review dispatched with that as the top item (G3b).
