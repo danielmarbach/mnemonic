@@ -9,7 +9,7 @@ tags:
   - v1
 lifecycle: temporary
 createdAt: '2026-10-10T22:39:40.357Z'
-updatedAt: '2026-10-10T22:39:41.297Z'
+updatedAt: '2026-10-10T22:43:10.599Z'
 role: plan
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -64,3 +64,13 @@ Constraints: do not commit; do not touch Formula (the publish workflow updates i
 - [ ] O4 Finish: clean status, report; tag and push stay with the user.
 
 Self-check: every research finding maps to a step (open skill items to A1 to A7, prompt alignment to A8, release gate to B1 to B4 and O1, protected-branch policy to the branch already created); no placeholders; step references consistent.
+
+## Lane C: pre-1.0 bug hunt (fresh-context reviewer: claude-bridge/claude-sonnet-5-5, read-only, concurrent with Lane A)
+
+- [ ] C1 Extract open gaps and footguns from the memory notes and classify each as fixed, open, or by design against current code.
+- [ ] C2 Scan git, mutation guard, startup and stdio, semantic patch, migration, storage, tool input validation, config, and document sync for concrete defects with cited evidence.
+- [ ] C3 Orchestrator decides per must-fix finding: fix in this release (new worker lane, tests required) or record as a known limitation. Decision recorded in the decision note.
+
+## Progress
+
+- Lane A delivered 2026-10-11: A1 to A9 done; build, single-file vitest, lint and format:check pass; 71 insertions across the four allowed files. Orchestrator merged two adjacent closeout-template pointer lines in Consolidate into one.
