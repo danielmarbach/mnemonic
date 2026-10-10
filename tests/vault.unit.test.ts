@@ -688,6 +688,29 @@ describe("VaultManager", () => {
       );
     });
 
+    it("appends each read-only attachment exclude line exactly once across repeated loads", async () => {
+      await vaultManager.getOrCreateProjectVault(projectDir);
+      const attachedPath = path.join(tempDir, "attached-readonly-exclude");
+      await setupAttachedVault(attachedPath);
+      const excludePath = path.join(attachedPath, ".git", "info", "exclude");
+      // CRLF pre-existing content: the lines written by a first load must still be recognised
+      await fs.mkdir(path.dirname(excludePath), { recursive: true });
+      await fs.writeFile(excludePath, "# local\r\n/.mnemonic/embeddings/\r\n");
+
+      const config = makeAttachmentConfig({
+        projectSlug: "attached-readonly-exclude",
+        localPath: attachedPath,
+      });
+      vaultManager.setAttachmentConfigs("attach-project", [config]);
+      await vaultManager.loadAttachmentsForProject("attach-project");
+      await vaultManager.loadAttachmentsForProject("attach-project");
+
+      const lines = (await fs.readFile(excludePath, "utf-8")).split(/\r?\n/);
+      for (const dir of ["attachments", "embeddings", "projections"]) {
+        expect(lines.filter((line) => line === `/.mnemonic/${dir}/`)).toHaveLength(1);
+      }
+    });
+
     it("should have writable=true for project-local provenance", async () => {
       const vault = await vaultManager.getOrCreateProjectVault(projectDir);
       expect(vault).toBeTruthy();

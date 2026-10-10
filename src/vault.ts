@@ -589,7 +589,7 @@ async function ensureLocalExclude(repoPath: string, vaultFolder: string): Promis
     const gitPath = await simpleGit(repoPath).raw(["rev-parse", "--git-path", "info/exclude"]);
     const excludePath = path.resolve(repoPath, gitPath.trim());
     const existing = await fs.readFile(excludePath, "utf-8").catch(() => "");
-    const existingLines = existing.split("\n");
+    const existingLines = existing.split(/\r?\n/);
     const missing = ["attachments/", "embeddings/", "projections/"]
       .map((dir) => `/${vaultFolder}/${dir}`)
       .filter((line) => !existingLines.includes(line));

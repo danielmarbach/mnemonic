@@ -3,7 +3,7 @@ import os from "os";
 import path from "path";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { MnemonicConfigStore } from "../src/config.js";
+import { MnemonicConfigStore, writeVaultSchemaVersion } from "../src/config.js";
 
 const tempDirs: string[] = [];
 
@@ -208,6 +208,27 @@ describe("MnemonicConfigStore", () => {
     expect(await fs.readFile(configPath, "utf-8")).toBe(corrupt);
   });
 
+  it("does not keep a refused write's mutation in the cache", async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "mnemonic-config-"));
+    tempDirs.push(dir);
+    await fs.writeFile(path.join(dir, "config.json"), "{bad", "utf-8");
+
+    const store = new MnemonicConfigStore(dir);
+    await expect(store.setMaxAttachmentsPerProject(9)).rejects.toThrow(/not valid JSON/);
+    await expect(store.getMaxAttachmentsPerProject()).resolves.toBe(5);
+  });
+
+  it("removes the temp file when the rename fails", async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "mnemonic-config-"));
+    tempDirs.push(dir);
+    // A directory at the target path makes rename fail
+    await fs.mkdir(path.join(dir, "config.json"));
+
+    const store = new MnemonicConfigStore(dir);
+    await expect(store.setMaxAttachmentsPerProject(9)).rejects.toThrow();
+    await expect(fs.access(path.join(dir, "config.json.tmp"))).rejects.toThrow();
+  });
+
   it("writes a valid config atomically and leaves no temp file behind", async () => {
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), "mnemonic-config-"));
     tempDirs.push(dir);
@@ -259,5 +280,57 @@ describe("MnemonicConfigStore", () => {
       protectedBranchPatterns: ["main"],
       updatedAt: "2026-03-13T10:00:00.000Z",
     });
+  });
+});
+
+describe("writeVaultSchemaVersion", () => {
+  it("refuses to overwrite an unparseable config and leaves it byte-identical", async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "mnemonic-config-"));
+    tempDirs.push(dir);
+    const configPath = path.join(dir, "config.json");
+    const corrupt = '{ "projectAttachments": { ';
+    await fs.writeFile(configPath, corrupt, "utf-8");
+
+    await expect(writeVaultSchemaVersion(dir, "1.5")).rejects.toThrow(
+      /Refusing to write .*not valid JSON/,
+    );
+    expect(await fs.readFile(configPath, "utf-8")).toBe(corrupt);
+  });
+
+  it("refuses to overwrite a config that is not a JSON object", async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "mnemonic-config-"));
+    tempDirs.push(dir);
+    const configPath = path.join(dir, "config.json");
+    await fs.writeFile(configPath, "[1, 2]", "utf-8");
+
+    await expect(writeVaultSchemaVersion(dir, "1.5")).rejects.toThrow(/Refusing to write/);
+    expect(await fs.readFile(configPath, "utf-8")).toBe("[1, 2]");
+  });
+
+  it("creates the config when it is missing", async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "mnemonic-config-"));
+    tempDirs.push(dir);
+
+    await writeVaultSchemaVersion(dir, "1.5");
+
+    const parsed = JSON.parse(await fs.readFile(path.join(dir, "config.json"), "utf-8"));
+    expect(parsed).toEqual({ schemaVersion: "1.5" });
+  });
+
+  it("updates only schemaVersion and keeps other keys in a valid config", async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "mnemonic-config-"));
+    tempDirs.push(dir);
+    const configPath = path.join(dir, "config.json");
+    await fs.writeFile(
+      configPath,
+      JSON.stringify({ schemaVersion: "1.0", mutationPushMode: "none", custom: { a: 1 } }),
+      "utf-8",
+    );
+
+    await writeVaultSchemaVersion(dir, "1.5");
+
+    const parsed = JSON.parse(await fs.readFile(configPath, "utf-8"));
+    expect(parsed).toEqual({ schemaVersion: "1.5", mutationPushMode: "none", custom: { a: 1 } });
+    await expect(fs.access(`${configPath}.tmp`)).rejects.toThrow();
   });
 });

@@ -411,6 +411,55 @@ describe("semantic-patch", () => {
     expect(result.content).toBe("# Note\n\n## Using `code` and **bold**\n\nInserted.\n\nBody.");
   });
 
+  it("selects a heading containing an image by plain text including the alt text", async () => {
+    const note = "# Note\n\n## Logo ![alt text](x.png) here\n\nBody.\n";
+    const result = await applySemanticPatches(note, [
+      {
+        selector: { heading: "Logo alt text here" },
+        operation: { op: "insertAfter", value: "Inserted." },
+      },
+    ]);
+    expect(result.content).toBe("# Note\n\n## Logo ![alt text](x.png) here\n\nInserted.\n\nBody.");
+  });
+
+  it("merges an inserted list into the adjacent list so the list stays tight", async () => {
+    const first = await applySemanticPatches("## H\n\n- a\n- b\n", [
+      { selector: { lastChild: true }, operation: { op: "insertAfter", value: "- c" } },
+    ]);
+    expect(first.content).toBe("## H\n\n- a\n- b\n- c");
+
+    const second = await applySemanticPatches(first.content, [
+      { selector: { lastChild: true }, operation: { op: "insertAfter", value: "- d" } },
+    ]);
+    expect(second.content).toBe("## H\n\n- a\n- b\n- c\n- d");
+
+    const reapplied = await applySemanticPatches(second.content, [
+      { selector: { lastChild: true }, operation: { op: "insertAfter", value: "- e" } },
+    ]);
+    expect(reapplied.content).toBe("## H\n\n- a\n- b\n- c\n- d\n- e");
+  });
+
+  it("merges an inserted list before an adjacent list with insertBefore", async () => {
+    const result = await applySemanticPatches("## H\n\n- b\n- c\n", [
+      { selector: { lastChild: true }, operation: { op: "insertBefore", value: "- a" } },
+    ]);
+    expect(result.content).toBe("## H\n\n- a\n- b\n- c");
+  });
+
+  it("keeps a paragraph inserted after a list as a separate block", async () => {
+    const result = await applySemanticPatches("## H\n\n- a\n- b\n", [
+      { selector: { lastChild: true }, operation: { op: "insertAfter", value: "Note." } },
+    ]);
+    expect(result.content).toBe("## H\n\n- a\n- b\n\nNote.");
+  });
+
+  it("does not merge lists with different ordering", async () => {
+    const result = await applySemanticPatches("## H\n\n- a\n- b\n", [
+      { selector: { lastChild: true }, operation: { op: "insertAfter", value: "1. x" } },
+    ]);
+    expect(result.content).toBe("## H\n\n- a\n- b\n\n1. x");
+  });
+
   it("lists plain heading text in the available headings diagnostic", async () => {
     const note = "# Note\n\n## Using `code` and **bold**\n\nBody.\n";
     await expect(

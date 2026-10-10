@@ -138,6 +138,25 @@ function parseValueNodes(value: string): Content[] {
   return fragment.children;
 }
 
+// Adjacent lists re-parse as one loose list, so fold the new items into the existing list instead.
+function mergeIntoAdjacentList(
+  existing: Content | undefined,
+  incoming: Content | undefined,
+  position: "end" | "start",
+): boolean {
+  if (existing?.type !== "list" || incoming?.type !== "list") return false;
+  if (Boolean(existing.ordered) !== Boolean(incoming.ordered)) return false;
+  for (const item of incoming.children) {
+    item.spread = existing.spread;
+  }
+  if (position === "end") {
+    existing.children.push(...incoming.children);
+  } else {
+    existing.children.unshift(...incoming.children);
+  }
+  return true;
+}
+
 function throwIfHeadingReplaceLooksLikeSectionReplace(
   target: Content,
   selector: SemanticSelector,
@@ -221,6 +240,7 @@ export async function applySemanticPatches(
           throw new SemanticPatchError(`Cannot appendChild to node of type '${target.type}'`);
         }
         const newNodes = parseValueNodes(op.value);
+        if (mergeIntoAdjacentList(targetChildren.at(-1), newNodes[0], "end")) newNodes.shift();
         targetChildren.push(...newNodes);
         break;
       }
@@ -230,6 +250,7 @@ export async function applySemanticPatches(
           throw new SemanticPatchError(`Cannot prependChild to node of type '${target.type}'`);
         }
         const newNodes = parseValueNodes(op.value);
+        if (mergeIntoAdjacentList(targetChildren[0], newNodes.at(-1), "start")) newNodes.pop();
         targetChildren.unshift(...newNodes);
         break;
       }
@@ -258,11 +279,13 @@ export async function applySemanticPatches(
       }
       case "insertAfter": {
         const newNodes = parseValueNodes(op.value);
+        if (mergeIntoAdjacentList(target, newNodes[0], "end")) newNodes.shift();
         parent.children.splice(index + 1, 0, ...newNodes);
         break;
       }
       case "insertBefore": {
         const newNodes = parseValueNodes(op.value);
+        if (mergeIntoAdjacentList(target, newNodes.at(-1), "start")) newNodes.pop();
         parent.children.splice(index, 0, ...newNodes);
         break;
       }

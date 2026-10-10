@@ -11,7 +11,11 @@ import {
 import type { NoteProjection } from "./structured-content.js";
 import { attempt, attemptSync, debugLog, getErrorMessage } from "./error-utils.js";
 import { splitNulSeparated } from "./git-output.js";
-import { InvalidBranchNameError, AttachedVaultReadOnlyError } from "./domain-errors.js";
+import {
+  InvalidBranchNameError,
+  AttachedVaultReadOnlyError,
+  MalformedNoteError,
+} from "./domain-errors.js";
 
 const VALID_BRANCH_PATTERN = /^[a-zA-Z0-9._/][a-zA-Z0-9._/-]*$/;
 
@@ -130,6 +134,7 @@ export class AttachedStorage implements NoteStorage {
       this.baseStorage.parseNote(id, result.value.trim()),
     );
     if (!parsed.ok) {
+      if (!(parsed.error instanceof MalformedNoteError)) throw parsed.error;
       debugLog("attached-storage:read-note", `malformed ${id}: ${getErrorMessage(parsed.error)}`);
       return null;
     }
@@ -163,6 +168,7 @@ export class AttachedStorage implements NoteStorage {
       this.baseStorage.parseNote(id, result.value.trim()),
     );
     if (!parsed.ok) {
+      if (!(parsed.error instanceof MalformedNoteError)) throw parsed.error;
       debugLog(
         "attached-storage:read-note-metadata",
         `malformed ${id}: ${getErrorMessage(parsed.error)}`,

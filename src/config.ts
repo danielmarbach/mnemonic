@@ -315,10 +315,14 @@ export async function writeVaultSchemaVersion(
   );
   if (existingResult.ok) {
     const jsonResult = attemptSync("config:parse", () => JSON.parse(existingResult.value));
-    const parsed = jsonResult.ok
-      ? ConfigJsonObjectSchema.safeParse(jsonResult.value)
-      : { success: false as const, data: undefined };
-    existing = parsed.success ? parsed.data : {};
+    if (!jsonResult.ok) {
+      throw new Error(unparseableConfigMessage(filePath, getErrorMessage(jsonResult.error)));
+    }
+    const parsed = ConfigJsonObjectSchema.safeParse(jsonResult.value);
+    if (!parsed.success) {
+      throw new Error(unparseableConfigMessage(filePath, "expected a JSON object"));
+    }
+    existing = parsed.data;
   } else {
     debugLog(
       "config:write-schema-version",
@@ -326,7 +330,21 @@ export async function writeVaultSchemaVersion(
     );
   }
   existing.schemaVersion = normalizeSchemaVersion(schemaVersion);
-  await fs.writeFile(filePath, JSON.stringify(existing, null, 2) + "\n", "utf-8");
+  await writeConfigFileAtomically(filePath, existing);
+}
+
+function unparseableConfigMessage(filePath: string, reason: string): string {
+  return `Refusing to write ${filePath}: the existing file is not valid JSON (${reason}). Fix or remove it and retry.`;
+}
+
+async function writeConfigFileAtomically(filePath: string, content: unknown): Promise<void> {
+  const tmpPath = `${filePath}.tmp`;
+  await fs.writeFile(tmpPath, JSON.stringify(content, null, 2) + "\n", "utf-8");
+  const renamed = await attempt("config:rename", () => fs.rename(tmpPath, filePath));
+  if (!renamed.ok) {
+    await attempt("config:cleanup-tmp", () => fs.rm(tmpPath, { force: true }));
+    throw renamed.error;
+  }
 }
 
 export class MnemonicConfigStore {
@@ -432,7 +450,8 @@ export class MnemonicConfigStore {
       };
     } else {
       debugLog("config:read", `failed, returning defaults: ${getErrorMessage(readResult.error)}`);
-      config = { ...defaultConfig };
+      // Deep copy: setters mutate the cached object and must not leak into defaultConfig.
+      config = structuredClone(defaultConfig);
     }
 
     this.#cache = config;
@@ -441,13 +460,11 @@ export class MnemonicConfigStore {
 
   private async writeAll(config: MnemonicConfig): Promise<void> {
     if (this.#unparseableReason !== null) {
-      throw new Error(
-        `Refusing to write ${this.filePath}: the existing file is not valid JSON (${this.#unparseableReason}). Fix or remove it and retry.`,
-      );
+      // Setters mutate the cached object; drop it so a refused write is not visible in memory.
+      this.#cache = null;
+      throw new Error(unparseableConfigMessage(this.filePath, this.#unparseableReason));
     }
-    const tmpPath = `${this.filePath}.tmp`;
-    await fs.writeFile(tmpPath, JSON.stringify(config, null, 2) + "\n", "utf-8");
-    await fs.rename(tmpPath, this.filePath);
+    await writeConfigFileAtomically(this.filePath, config);
     this.#cache = config;
   }
 }
