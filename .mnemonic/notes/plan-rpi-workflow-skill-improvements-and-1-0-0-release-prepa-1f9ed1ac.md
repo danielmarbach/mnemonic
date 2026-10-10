@@ -9,7 +9,7 @@ tags:
   - v1
 lifecycle: temporary
 createdAt: '2026-10-10T22:39:40.357Z'
-updatedAt: '2026-10-10T22:52:32.423Z'
+updatedAt: '2026-10-10T22:56:00.849Z'
 role: plan
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -88,3 +88,5 @@ Self-check: every research finding maps to a step (open skill items to A1 to A7,
 - [ ] R2 fresh-context review of D and E; O1 verify:release rerun; CHANGELOG Fixed entries by the orchestrator; then the release commit.
 - Deferred with the user: M1 project id normalization (needs a migration). Deferred to follow-up issues: W2, W4, W8, W9, W10.
 - Lane C done: C1 to C3 complete, decisions in the bug-hunt review note.
+
+- Lane D delivered and committed as fa6e519 (D1 to D5 done). Lane E dispatched.
