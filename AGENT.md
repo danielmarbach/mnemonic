@@ -193,9 +193,9 @@ Human-readable summary.
 ### Project scoping via git remote URL
 ```
 git@github.com:acme/myapp.git → github-com-acme-myapp
-https://github.com/acme/myapp → github-com-acme-myapp
+https://github.com/acme/myapp → https-github-com-acme-myapp
 ```
-Ensures consistency across machines. Default remote is `origin`; for forks, `set_project_identity` can switch identity resolution to another remote such as `upstream`. Fallback: git remote → git root folder → directory name.
+Ensures consistency across machines when clones use the same remote form; SSH and HTTPS clones of one repo currently get different ids (unifying them needs a migration of `project:` frontmatter and config keys, tracked as a follow-up). Default remote is `origin`; for forks, `set_project_identity` can switch identity resolution to another remote such as `upstream`. Fallback: git remote → git root folder → directory name.
 
 ### Project-boosted recall
 When `recall` called with `cwd`, project notes get a small **tiebreaker boost** (not hard filter). Keeps global memories accessible while prioritizing project context.

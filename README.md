@@ -19,7 +19,7 @@ For the high-level system map, see [`ARCHITECTURE.md`](ARCHITECTURE.md). For rel
 
 ## Stability
 
-The storage format is stable with migration support for any future changes. Keep an eye on the changelog; `list_migrations` shows pending work per vault after each update.
+The storage format is stable with migration support for any future changes. Since 1.0, mnemonic follows semantic versioning: breaking changes to the note format, vault layout, tool surface or CLI bump the major version. Keep an eye on the changelog; `list_migrations` shows pending work per vault after each update.
 
 **Scale:** mnemonic favors simplicity and portability over large-scale knowledge bases.
 
@@ -94,7 +94,7 @@ Published to the public npm registry. No authentication required.
 npm install @danielmarbach/mnemonic-mcp
 
 # Specific release
-npm install @danielmarbach/mnemonic-mcp@0.2.0
+npm install @danielmarbach/mnemonic-mcp@1.0.0
 ```
 
 ### Install bundled skills (Claude/OpenCode)
@@ -281,6 +281,8 @@ For local development against this repository's source tree, use `npm run mcp:lo
 | `DISABLE_GIT`      | `false`                                     | Set `true` to skip all git ops                                                                                                                                                 |
 | `MNEMONIC_TOOLSET` | `full`                                      | `core` registers only the nine everyday tools (`recall`, `get`, `remember`, `update`, `relate`, `list`, `sync`, `project_memory_summary`, `consolidate`). That halves the tool definitions every session loads, which helps smaller models pick the right tool. Unknown values fall back to `full` |
 
+Empty values count as unset, so a client that templates `OLLAMA_URL=""` gets the default instead of a startup error.
+
 The server also sends MCP `instructions` in its initialize response: a short usage protocol (always pass `cwd`, `recall` before `remember`, `get` for full content, `relate` after `remember`). Most clients add it to the model's context automatically, so agents follow the basic workflow without extra setup.
 
 Provider configuration is read from the process environment at startup. Only non-secret compatibility metadata is stored in local gitignored embedding JSON files: provider, model, dimensions, metric, optional input mode, and compatibility key.
@@ -368,7 +370,7 @@ A saved write-scope policy is authoritative: when an explicitly passed `scope` c
 
 ### Project identity
 
-Project identity derives from the **git remote URL**, normalized to a stable slug (e.g. `github-com-acme-myapp`). The same project is recognized consistently across machines regardless of local clone paths. The default remote is `origin`; use `set_project_identity` to switch to `upstream` for fork workflows. If no remote exists, the git root folder name is used; if not in a git repo, the directory name.
+Project identity derives from the **git remote URL**, normalized to a stable slug: `git@github.com:acme/myapp.git` becomes `github-com-acme-myapp` and `https://github.com/acme/myapp` becomes `https-github-com-acme-myapp`. The same project is recognized consistently across machines regardless of local clone paths, as long as each clone uses the same remote form; a repo cloned over SSH on one machine and over HTTPS on another currently gets two project ids, so use `set_project_identity` or a matching remote URL to keep them aligned. The default remote is `origin`; use `set_project_identity` to switch to `upstream` for fork workflows. If no remote exists, the git root folder name is used; if not in a git repo, the directory name.
 
 ### Recall
 
@@ -622,7 +624,7 @@ relatedTo:
 
 ### Multi-repository attachments
 
-Multi-repo attachment support lets you link external repositories as **federated knowledge sources** alongside your own project vault. By default, attached repos are read-only; set `writable: true` on `add_attachment` to enable write-through.
+Multi-repo attachment support lets you link external repositories as **federated knowledge sources** alongside your own project vault. By default, attached repos are read-only; set `writable: true` on `add_attachment` to enable write-through. A read-only attachment never changes the attached repository's working tree: mnemonic reads notes from the configured branch through git and keeps its cache paths out of `git status` through the repository's local exclude file.
 
 Key concepts:
 
