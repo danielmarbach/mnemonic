@@ -17,16 +17,8 @@ import {
   type SetAttachmentBranchResult,
 } from "../structured-content.js";
 import { invalidateActiveProjectCache } from "../cache.js";
-import { InvalidBranchNameError } from "../domain-errors.js";
+import { validateBranch } from "../attached-storage.js";
 import { expandHomePath } from "../paths.js";
-
-const VALID_BRANCH_PATTERN = /^[a-zA-Z0-9._/-]+$/;
-
-function validateBranch(branch: string): void {
-  if (branch !== "" && !VALID_BRANCH_PATTERN.test(branch)) {
-    throw new InvalidBranchNameError(branch, VALID_BRANCH_PATTERN.source);
-  }
-}
 
 export function registerSetAttachmentBranchTool(server: McpServer, ctx: ServerContext): void {
   server.registerTool(
@@ -156,7 +148,7 @@ export function registerSetAttachmentBranchTool(server: McpServer, ctx: ServerCo
 
       const vaultAtt = att as MnemonicVaultAttachmentConfig;
       const effectiveBranch = branch.trim();
-      validateBranch(effectiveBranch);
+      if (effectiveBranch !== "") validateBranch(effectiveBranch);
 
       let branchTipHash = "";
       if (effectiveBranch) {

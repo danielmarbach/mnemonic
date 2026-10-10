@@ -10,7 +10,7 @@ import type {
   MnemonicVaultAttachmentConfig,
   DocumentSourceAttachmentConfig,
 } from "../vault.js";
-import { detectDefaultBranch } from "../attached-storage.js";
+import { detectDefaultBranch, validateBranch } from "../attached-storage.js";
 import { attachmentSlug, type AttachmentSlug } from "../brands.js";
 import { resolveProject as resolveProjectFromModule } from "../helpers/project.js";
 import { projectNotFoundResponse } from "../helpers/vault.js";
@@ -22,7 +22,7 @@ import {
 } from "../helpers/persistence.js";
 import { AddAttachmentResultSchema, type AddAttachmentResult } from "../structured-content.js";
 import { invalidateActiveProjectCache } from "../cache.js";
-import { attempt } from "../error-utils.js";
+import { attempt, attemptSync, getErrorMessage } from "../error-utils.js";
 import { expandHomePath, collapseHomePath } from "../paths.js";
 
 function generateAttachmentId(): string {
@@ -328,6 +328,19 @@ export function registerAddAttachmentTool(server: McpServer, ctx: ServerContext)
           };
         }
 
+        for (const name of [branch, pushBranch]) {
+          if (name === undefined || name.trim() === "") continue;
+          const validated = attemptSync("add-attachment:validate-branch", () =>
+            validateBranch(name.trim()),
+          );
+          if (!validated.ok) {
+            return {
+              content: [{ type: "text", text: getErrorMessage(validated.error) }],
+              isError: true,
+            };
+          }
+        }
+
         let effectiveBranch: string;
         if (branch !== undefined && branch.trim() !== "") {
           effectiveBranch = branch.trim();
@@ -354,7 +367,7 @@ export function registerAddAttachmentTool(server: McpServer, ctx: ServerContext)
           updatedAt: now,
           branchTipHash,
           writable: writable ?? false,
-          pushBranch: pushBranch ?? undefined,
+          pushBranch: pushBranch?.trim() || undefined,
         };
         config = vaultConfig;
       }

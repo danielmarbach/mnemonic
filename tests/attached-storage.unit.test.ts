@@ -64,6 +64,12 @@ describe("validateBranch", () => {
     expect(() => validateBranch("a-b-c_d/e")).not.toThrow();
   });
 
+  it("rejects branch names that git would parse as flags", () => {
+    expect(() => validateBranch("-x")).toThrow(InvalidBranchNameError);
+    expect(() => validateBranch("--force")).toThrow(InvalidBranchNameError);
+    expect(() => validateBranch("feature-x")).not.toThrow();
+  });
+
   it("rejects invalid branch names", () => {
     expect(() => validateBranch("branch with spaces")).toThrow(InvalidBranchNameError);
     expect(() => validateBranch("branch\twith\ttabs")).toThrow(InvalidBranchNameError);
@@ -78,7 +84,7 @@ describe("validateBranch", () => {
     } catch (err) {
       expect(err).toBeInstanceOf(InvalidBranchNameError);
       expect((err as InvalidBranchNameError).message).toContain("bad branch");
-      expect((err as InvalidBranchNameError).message).toContain("^[a-zA-Z0-9._/-]+$");
+      expect((err as InvalidBranchNameError).message).toContain("^[a-zA-Z0-9._/][a-zA-Z0-9._/-]*$");
     }
   });
 });
@@ -223,6 +229,35 @@ Test note body`;
 
       const ids = await attached.listNoteIds();
       expect(ids).toContain(memoryId("my-note"));
+
+      process.env.DISABLE_GIT = "true";
+    });
+
+    it("listNoteIds lists notes whose file names contain non-ASCII characters", async () => {
+      await initGitRepoWithCommit(repoDir, "# Init");
+      delete process.env.DISABLE_GIT;
+
+      const notesDir = path.join(repoDir, ".mnemonic", "notes");
+      await fs.mkdir(notesDir, { recursive: true });
+      await fs.writeFile(path.join(notesDir, "café-note.md"), "---\ntitle: Café\n---\n\nBody");
+      await fs.writeFile(path.join(notesDir, "plain-note.md"), "---\ntitle: Plain\n---\n\nBody");
+      const git = simpleGit(repoDir);
+      await git.add(".mnemonic/notes");
+      await git.commit("add notes");
+
+      baseStorage = new Storage(path.join(tempDir, "vault"));
+      await baseStorage.init();
+      const attached = new AttachedStorage(
+        baseStorage,
+        baseStorage,
+        repoDir,
+        "main",
+        ".mnemonic/notes",
+      );
+
+      const ids = await attached.listNoteIds();
+      expect(ids).toContain(memoryId("café-note"));
+      expect(ids).toContain(memoryId("plain-note"));
 
       process.env.DISABLE_GIT = "true";
     });

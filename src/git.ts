@@ -328,7 +328,7 @@ export class GitOps {
         const remotes = await this.git.getRemotes();
         if (remotes.length === 0) return { status: "skipped", reason: "no-remote" };
         await this.retryLockErrors("push", () =>
-          this.git.push(["--set-upstream", "origin", branch]),
+          this.git.push(["origin", `HEAD:refs/heads/${branch}`]),
         );
         console.error(`[git] Pushed to ${branch}`);
         return { status: "pushed" };

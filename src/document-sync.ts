@@ -22,6 +22,7 @@ import type { DocumentGeneration, RetrievalChunk } from "./retrieval-document.js
 import { ChunkEmbeddingStorage } from "./chunk-embedding-storage.js";
 import type { ChunkEmbeddingRecord } from "./chunk-embedding-storage.js";
 import { attempt, getErrorMessage } from "./error-utils.js";
+import { splitNulSeparated } from "./git-output.js";
 import { mapWithConcurrency } from "./concurrency.js";
 import {
   checkEmbeddingCompatibility,
@@ -122,7 +123,7 @@ const RECENCY_LOG_LINE_BUDGET = 200_000;
  * embed first when the per-sync embedding work cap bites. Fail-soft: any git
  * failure returns an empty map and callers fall back to source-path ordering.
  */
-async function computePerPathLastMod(
+export async function computePerPathLastMod(
   resolvedLocalPath: string,
   indexedCommit: string,
   paths: string[],
@@ -132,14 +133,13 @@ async function computePerPathLastMod(
 
   const result = await attempt("sync:doc-source-recency", async () => {
     const git = simpleGit(resolvedLocalPath);
-    const logOutput = await git.raw(["log", "--name-only", "--format=%cI", indexedCommit]);
+    const logOutput = await git.raw(["log", "-z", "--name-only", "--format=%cI", indexedCommit]);
     const lastModByPath = new Map<string, string>();
     let currentDate = "";
     let lineCount = 0;
-    for (const line of logOutput.split("\n")) {
+    for (const line of splitNulSeparated(logOutput)) {
       lineCount++;
       if (lineCount > RECENCY_LOG_LINE_BUDGET) break;
-      if (line.length === 0) continue;
       if (/^\d{4}-\d{2}-\d{2}T/.test(line)) {
         currentDate = line;
         continue;
@@ -398,8 +398,8 @@ export async function syncDocumentSource(
     const enumerateResult = await attempt("sync:doc-source-enumerate", async () => {
       const git = simpleGit(resolvedLocalPath);
       // List all tracked files at the commit
-      const lsTreeResult = await git.raw(["ls-tree", "-r", "--name-only", indexedCommit]);
-      const allFiles = lsTreeResult.trim().split("\n").filter(Boolean);
+      const lsTreeResult = await git.raw(["ls-tree", "-r", "-z", "--name-only", indexedCommit]);
+      const allFiles = splitNulSeparated(lsTreeResult);
 
       // Apply include/exclude patterns (path-aware globs relative to root)
       const root = config.root || ".";

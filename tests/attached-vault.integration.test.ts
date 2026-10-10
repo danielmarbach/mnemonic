@@ -144,6 +144,31 @@ describe("attached vault integration", () => {
       }
     }, 60000);
 
+    it("rejects branch and pushBranch names that start with a dash", async () => {
+      const { vaultDir, repoDir, attachedDir } = await createAttachmentFixture();
+      const embeddingServer = await startFakeEmbeddingServer();
+
+      try {
+        const badBranch = await callLocalMcpResponse(
+          vaultDir,
+          "add_attachment",
+          { cwd: repoDir, localPath: attachedDir, branch: "-x" },
+          { ollamaUrl: embeddingServer.url, disableGit: false },
+        );
+        expect(badBranch.text).toContain('Invalid branch name: "-x"');
+
+        const badPushBranch = await callLocalMcpResponse(
+          vaultDir,
+          "add_attachment",
+          { cwd: repoDir, localPath: attachedDir, writable: true, pushBranch: "--force" },
+          { ollamaUrl: embeddingServer.url, disableGit: false },
+        );
+        expect(badPushBranch.text).toContain('Invalid branch name: "--force"');
+      } finally {
+        await embeddingServer.close();
+      }
+    }, 60000);
+
     it("supports tilde expansion in localPath", async () => {
       const { vaultDir, repoDir, attachedDir } = await createAttachmentFixture();
       const homeRelativePath = attachedDir.replace(process.env.HOME || "", "~");

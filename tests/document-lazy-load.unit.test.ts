@@ -428,4 +428,34 @@ describe("lazyLoadGeneration", () => {
     // Creating and committing 120 files via makeGitRepo is slower than the
     // default 5000ms test timeout allows on some CI runners (esp. Windows).
   }, 15000);
+
+  it("indexes documents whose paths contain non-ASCII characters", async () => {
+    const repo = await makeGitRepo({
+      "docs/café.md": "# Café\n\nCafé section content.",
+      "docs/plain.md": "# Plain\n\nPlain section content.",
+    });
+    const commit = await headCommit(repo);
+    const config = makeConfig(repo);
+    const docSourceBase = path.join(
+      await mkdtemp(path.join(os.tmpdir(), "mnemonic-lazyload-")),
+      "doc-source",
+    );
+    tempDirs.push(docSourceBase);
+    await writeManifest(
+      path.join(docSourceBase, config.attachmentId),
+      await makeManifest(config, commit),
+    );
+
+    const generation = await lazyLoadGeneration(
+      "proj-1",
+      config.attachmentId,
+      config,
+      makeContext(),
+      docSourceBase,
+    );
+
+    expect(generation).not.toBeNull();
+    const sourcePaths = [...generation!.documents.values()].map((doc) => doc.sourcePath).sort();
+    expect(sourcePaths).toEqual(["docs/café.md", "docs/plain.md"]);
+  });
 });

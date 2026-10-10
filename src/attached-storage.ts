@@ -10,9 +10,10 @@ import {
 } from "./storage.js";
 import type { NoteProjection } from "./structured-content.js";
 import { attempt, attemptSync, debugLog, getErrorMessage } from "./error-utils.js";
+import { splitNulSeparated } from "./git-output.js";
 import { InvalidBranchNameError, AttachedVaultReadOnlyError } from "./domain-errors.js";
 
-const VALID_BRANCH_PATTERN = /^[a-zA-Z0-9._/-]+$/;
+const VALID_BRANCH_PATTERN = /^[a-zA-Z0-9._/][a-zA-Z0-9._/-]*$/;
 
 export function validateBranch(branch: string): void {
   if (!VALID_BRANCH_PATTERN.test(branch)) {
@@ -75,13 +76,16 @@ export class AttachedStorage implements NoteStorage {
 
     const result = await attempt("attached-storage:list-note-ids", async () => {
       const git = simpleGit(this.repoPath);
-      const output = await git.raw(["ls-tree", "--name-only", this.branch, this.notesRelDir + "/"]);
-      return output
-        .trim()
-        .split("\n")
+      const output = await git.raw([
+        "ls-tree",
+        "-z",
+        "--name-only",
+        this.branch,
+        this.notesRelDir + "/",
+      ]);
+      return splitNulSeparated(output)
         .filter((line) => line.endsWith(".md"))
-        .map((line) => {
-          const filename = line.trim();
+        .map((filename) => {
           const basename = path.basename(filename, ".md");
           return memoryId(basename);
         })

@@ -324,7 +324,9 @@ export class VaultManager {
       await baseStorage.init();
 
       const repoStorage = new Storage(path.join(resolvedLocalPath, config.vaultFolder));
-      await repoStorage.init();
+      const writable = config.writable === true;
+      // Read-only attachments must leave the attached repo's working tree untouched.
+      if (writable) await repoStorage.init();
 
       const storage = new AttachedStorage(
         baseStorage,
@@ -332,7 +334,7 @@ export class VaultManager {
         resolvedLocalPath,
         config.branch,
         `${config.vaultFolder}/notes`,
-        config.writable === true,
+        writable,
       );
 
       const git = new GitOps(resolvedLocalPath, `${config.vaultFolder}/notes`);
@@ -359,8 +361,12 @@ export class VaultManager {
         git,
       );
 
-      const gitignorePath = path.join(resolvedLocalPath, config.vaultFolder, ".gitignore");
-      await ensureGitignore(gitignorePath);
+      if (writable) {
+        const gitignorePath = path.join(resolvedLocalPath, config.vaultFolder, ".gitignore");
+        await ensureGitignore(gitignorePath);
+      } else {
+        await ensureLocalExclude(resolvedLocalPath, config.vaultFolder);
+      }
 
       return vault;
     });
@@ -575,6 +581,25 @@ export async function ensureGitignore(ignorePath: string): Promise<void> {
   if (missing.length === 0) return;
   const updated = existing.trimEnd() + "\n" + missing.join("\n") + "\n";
   await fs.writeFile(ignorePath, updated);
+}
+
+/** Hide attachment caches via the untracked info/exclude so read-only attached repos stay clean. */
+async function ensureLocalExclude(repoPath: string, vaultFolder: string): Promise<void> {
+  const result = await attempt("vault:ensure-local-exclude", async () => {
+    const gitPath = await simpleGit(repoPath).raw(["rev-parse", "--git-path", "info/exclude"]);
+    const excludePath = path.resolve(repoPath, gitPath.trim());
+    const existing = await fs.readFile(excludePath, "utf-8").catch(() => "");
+    const existingLines = existing.split("\n");
+    const missing = ["attachments/", "embeddings/", "projections/"]
+      .map((dir) => `/${vaultFolder}/${dir}`)
+      .filter((line) => !existingLines.includes(line));
+    if (missing.length === 0) return;
+    await fs.mkdir(path.dirname(excludePath), { recursive: true });
+    await fs.writeFile(excludePath, existing.trimEnd() + "\n" + missing.join("\n") + "\n");
+  });
+  if (!result.ok) {
+    debugLog("vault:ensure-local-exclude", `failed: ${getErrorMessage(result.error)}`);
+  }
 }
 
 async function pathExists(p: string): Promise<boolean> {

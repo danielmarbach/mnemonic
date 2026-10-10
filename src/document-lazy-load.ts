@@ -13,6 +13,7 @@ import { getExtractor } from "./document-extractor.js";
 import { markdownChunker } from "./markdown-chunker.js";
 import { ChunkEmbeddingStorage } from "./chunk-embedding-storage.js";
 import { attempt, getErrorMessage } from "./error-utils.js";
+import { splitNulSeparated } from "./git-output.js";
 import { expandHomePath } from "./paths.js";
 import { matchAnyGlob } from "./glob-match.js";
 import type { DocumentSourceAttachmentConfig } from "./vault.js";
@@ -44,7 +45,7 @@ async function enumerateFilesAtCommit(
     }).then((result) => result.stdout);
 
   const lsTreeResult = await attempt("lazy-load:ls-tree", () =>
-    run(["ls-tree", "-r", "--name-only", indexedCommit]),
+    run(["ls-tree", "-r", "-z", "--name-only", indexedCommit]),
   );
   if (!lsTreeResult.ok) {
     console.error(
@@ -53,7 +54,7 @@ async function enumerateFilesAtCommit(
     return null;
   }
 
-  const allFiles = lsTreeResult.value.trim().split("\n").filter(Boolean);
+  const allFiles = splitNulSeparated(lsTreeResult.value);
   const root = config.root || ".";
   const includePatterns = config.include.length > 0 ? config.include : ["**/*.md"];
   const excludePatterns = config.exclude || [];

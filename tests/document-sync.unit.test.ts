@@ -53,7 +53,7 @@ function configureGit(
   git.fetch.mockResolvedValue(undefined);
   git.raw.mockImplementation(async (args: string[]) => {
     if (args[0] === "rev-parse") return "commit-1\n";
-    if (args[0] === "ls-tree") return `${paths.join("\n")}\n`;
+    if (args[0] === "ls-tree") return `${paths.join("\0")}\0`;
     if (args[0] === "show") {
       const filePath = args[1]?.split(":")[1] ?? "";
       showCalls.push(filePath);
@@ -110,7 +110,7 @@ function configureControlledGit(
   git.fetch.mockResolvedValue(undefined);
   git.raw.mockImplementation(async (args: string[]) => {
     if (args[0] === "rev-parse") return "commit-1\n";
-    if (args[0] === "ls-tree") return `${paths.join("\n")}\n`;
+    if (args[0] === "ls-tree") return `${paths.join("\0")}\0`;
     if (args[0] === "show") {
       const filePath = args[1]?.split(":")[1] ?? "";
       showCalls.push(filePath);

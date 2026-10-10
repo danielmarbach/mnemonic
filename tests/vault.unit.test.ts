@@ -4,7 +4,7 @@ import {
   type MnemonicVaultAttachmentConfig,
   type ProjectAttachmentConfig,
 } from "../src/vault.js";
-import { Storage, type Note } from "../src/storage.js";
+import { Storage, type Note, type EmbeddingRecord } from "../src/storage.js";
 import type { MemoryId, ISO8601DateString } from "../src/brands.js";
 import * as fs from "fs/promises";
 import * as path from "path";
@@ -638,6 +638,54 @@ describe("VaultManager", () => {
       expect(attached).toHaveLength(1);
       expect(attached[0]!.provenance).toBe("project-attached");
       expect(attached[0]!.writable).toBe(false);
+    });
+
+    it("leaves a read-only attached repo's working tree untouched after load and embedding writes", async () => {
+      await vaultManager.getOrCreateProjectVault(projectDir);
+      const attachedPath = path.join(tempDir, "attached-readonly-clean");
+      await setupAttachedVault(attachedPath);
+      await fs.mkdir(path.join(attachedPath, ".mnemonic"), { recursive: true });
+      await fs.writeFile(path.join(attachedPath, ".mnemonic", ".gitignore"), "local-only/\n");
+      await execFileAsync("git", ["add", ".mnemonic/.gitignore"], { cwd: attachedPath });
+      await execFileAsync(
+        "git",
+        [
+          "-c",
+          "user.email=test@example.com",
+          "-c",
+          "user.name=Test",
+          "commit",
+          "-m",
+          "chore: add gitignore",
+        ],
+        { cwd: attachedPath },
+      );
+
+      const config = makeAttachmentConfig({
+        projectSlug: "attached-readonly-clean",
+        localPath: attachedPath,
+      });
+      vaultManager.setAttachmentConfigs("attach-project", [config]);
+      await vaultManager.loadAttachmentsForProject("attach-project");
+
+      const attached = vaultManager.getAttachmentsForProject("attach-project");
+      expect(attached).toHaveLength(1);
+      await attached[0]!.storage.writeEmbedding({
+        id: "emb-1" as MemoryId,
+        model: "test-model" as EmbeddingRecord["model"],
+        embedding: [0.1, 0.2],
+        updatedAt: new Date().toISOString() as ISO8601DateString,
+      });
+
+      const status = await execFileAsync("git", ["status", "--porcelain"], { cwd: attachedPath });
+      expect(status.stdout).toBe("");
+      await expect(fs.access(path.join(attachedPath, ".mnemonic", "embeddings"))).rejects.toThrow();
+      await expect(
+        fs.access(path.join(attachedPath, ".mnemonic", "projections")),
+      ).rejects.toThrow();
+      expect(await fs.readFile(path.join(attachedPath, ".mnemonic", ".gitignore"), "utf-8")).toBe(
+        "local-only/\n",
+      );
     });
 
     it("should have writable=true for project-local provenance", async () => {
