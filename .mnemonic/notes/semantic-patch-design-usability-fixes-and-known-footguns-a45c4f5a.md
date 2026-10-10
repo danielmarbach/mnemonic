@@ -8,11 +8,13 @@ tags:
   - update
 lifecycle: permanent
 createdAt: '2026-05-25T17:25:55.146Z'
-updatedAt: '2026-05-25T17:25:55.146Z'
+updatedAt: '2026-10-10T23:16:40.480Z'
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
   - id: mnemonic-key-design-decisions-3f2a6273
+    type: related-to
+  - id: decision-what-1-0-0-means-which-bugs-shipped-as-fixes-and-wh-e23739e3
     type: related-to
 memoryVersion: 1
 ---
