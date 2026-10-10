@@ -9,7 +9,7 @@ tags:
   - migration
 lifecycle: temporary
 createdAt: '2026-10-10T23:25:53.558Z'
-updatedAt: '2026-10-10T23:27:02.553Z'
+updatedAt: '2026-10-10T23:28:11.438Z'
 role: plan
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -32,8 +32,13 @@ Status: endorsed by the user (2026-10-11): "align the project identity for 1.0 a
 ## Steps
 
 - [ ] P1 Scout maps persistence points and the migration framework.
+
 - [ ] P2 Worker implements normalization, boundaries, migration, tests, docs.
+
 - [ ] P3 Fresh-context review, verify:release, migration dry-run on both vaults, execute on the project vault.
+
 - [ ] P4 Commits reordered so Prepare release 1.0.0 is last; decision and summary notes updated.
 
 - Authorization added (user, 2026-10-11): execute the migration on the global main vault at \~/mnemonic-vault as well, not only dry-run. Sequence per vault: dry-run, inspect, execute, verify (project frontmatter in notes, config keys, list_migrations shows nothing pending). The main vault is the user's live git-synced vault: do it through the built CLI from this branch, confirm the commit it creates, and do not push.
+
+- P1 done: scout map (artifact 28baefee) found a duplicate normalizeRemote in add-attachment.ts, config keys plus inner policy.projectId plus attachment projectSlug, attachment cache dirs named by the consuming project id, the document manifest storing projectId and a config hash, and the v011 and v014 migrations as templates. Lane G (worker) dispatched with G1 normalizer, G2 read-boundary canonicalizer, G3 migration normalize-project-ids with schema 1.5, G4 manifest check, G5 docs and changelog.
