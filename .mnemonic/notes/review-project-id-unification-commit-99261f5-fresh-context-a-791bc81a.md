@@ -8,11 +8,14 @@ tags:
   - v1
 lifecycle: temporary
 createdAt: '2026-10-10T23:43:38.736Z'
-updatedAt: '2026-10-10T23:43:38.736Z'
+updatedAt: '2026-10-10T23:43:39.234Z'
 role: review
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: plan-unify-project-ids-for-ssh-and-https-remotes-before-1-0--c5f75d68
+    type: derives-from
 memoryVersion: 1
 ---
 # Review: project id unification commit 99261f5 (fresh-context adversarial)
