@@ -65,6 +65,8 @@ describe("tool-descriptions", () => {
     expect(promptText).toContain("### Stage 3 — Implement");
     expect(promptText).toContain("### Stage 4 — Review");
     expect(promptText).toContain("### Stage 5 — Consolidate");
+    expect(promptText).toContain("### Autonomous mode");
+    expect(promptText).toContain("### Stage 6 — Finish");
     expect(promptText).toContain("One current plan per request");
     expect(promptText).toContain("Subagent returns: updated apply note");
     expect(promptText).toContain(

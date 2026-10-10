@@ -15,6 +15,13 @@ Treat all workflow output as advisory. Never blindly apply a plan, review findin
 
 Stop when the workflow is complete. Do not gold-plate: once review exits clean and consolidation is done, do not run extra cycles just to get a nicer closeout.
 
+## Autonomous mode
+
+Applies only when the user has explicitly authorized autonomous delivery. The Research → Plan and Plan → Implement handoffs become recorded checkpoints instead of stops for the user.
+
+- Write each checkpoint into the request root or plan note: findings, chosen direction, assumptions, open questions.
+- Still stop and ask for scope changes, authority changes (push, merge, tag, publish, destructive actions), and readings of the request that would lead to materially different work.
+
 ## Relationship Conventions
 
 Use `derives-from` for lineage and `follows` for sequence by default. Fall back to `related-to` only when direction is unclear. Keep relationships sparse — link only to immediate upstream artifacts.
@@ -33,6 +40,8 @@ Avoid these shortcuts; they are workflow violations, not harmless simplification
 - Do not reuse implementation verification during review. Review verification commands must be run fresh and recorded with command, result, and details.
 - Do not mix memory commits and work commits. Commit workflow artifacts and implementation changes separately.
 - Do not stage with `git add .` or `git add -A`. Run `git status --short`, then stage only intended paths; ask if dirty files may not belong together.
+- Do not treat autonomous authorization as permission to skip the checkpoint record or to widen scope or authority.
+- Do not treat a failing advisory or heuristic quality check (custom lint rule, scripted validator, scenario pack) as automatically a product bug. Classify it first (see Review D).
 
 ## Stage Checklists
 
@@ -56,6 +65,8 @@ Before creating a plan note:
 
 Only after confirmation: proceed to Plan checklist.
 
+In autonomous mode, record the checkpoint instead (see [Autonomous mode](#autonomous-mode)).
+
 ### 2. Plan
 
 - Create or update one current plan note: `role: plan`, `lifecycle: temporary`.
@@ -76,6 +87,8 @@ Before dispatching subagents or starting implementation:
 3. If scope, architecture, dependencies, assumptions, or constraints have changed materially since the plan was drafted, update the plan note first — do not proceed with a stale plan
 
 Only after confirmation: proceed to Implement checklist.
+
+In autonomous mode, record the checkpoint instead (see [Autonomous mode](#autonomous-mode)).
 
 ### 3. Implement
 
@@ -115,6 +128,11 @@ The implementer's own context is contaminated — they designed the code, so the
 **C. Fresh verification**
 - Every verification command must be run fresh during this review — do not reuse results from implementation
 - Record each command, result, and evidence
+
+**D. Quality-gate failures**
+- For each failing advisory or heuristic quality check, classify it as product regression or heuristic brittleness
+- For brittleness, fix the check logic and re-verify; do not bend product code to the check
+- Record the classification and evidence in the review note
 
 The review subagent must adopt an adversarial posture: assume violations exist and prove they don't. A review that only confirms what the apply note claims is not sufficient.
 
@@ -162,7 +180,15 @@ And a constraint checklist:
 - Connect consolidation to commit discipline: consolidation artifacts are **memory** commits and must not be mixed with **work** commits.
 - **Regression provenance** (when applicable): for findings that relate to a regression, keep roles separate — blamed code author, blamed PR author, PR merger/committer, current PR author, and PR/date. If no blamed PR is traceable, use the blamed commit SHA, date, and author.
 
-Use the templates in [closeout-templates.md](closeout-templates.md).
+Use the templates and run the Phase closeout checklist in [closeout-templates.md](closeout-templates.md).
+
+### 6. Finish (branch handshake)
+
+- `git status --short` must be clean before finishing.
+- List the commits made in this workflow, by class.
+- Offer the user the options: open PR, merge, keep branch, or discard.
+- Never push, merge, tag, or publish without explicit authorization.
+- Record the chosen option in the summary note.
 
 ## Subagent Handoff Template
 
@@ -208,6 +234,7 @@ Adversarial review mandate:
 4. For each plan deliverable: verify matching evidence exists
 5. Run all verification commands fresh — do not reuse implementation results
 6. If a constraint is not mentioned in the apply note, flag it as a potential violation — silent omission is a violation
+7. If an advisory or heuristic quality check fails, classify it as product regression or heuristic brittleness before recommending any product change (see Review D)
 
 > **Cardinal rule:** Silent omission is a violation. If a planned constraint is not mentioned in the apply note, treat it as a violation until proven otherwise.
 
@@ -223,6 +250,7 @@ request root (context, temporary)
   → apply/task (temporary; plan for steps, context for observations)
   → review (temporary)
   → outcome/decision/summary (permanent)
+  → finish (branch handshake)
 ```
 
 ## Commit Discipline
@@ -233,12 +261,32 @@ Three commit classes:
 2. **Work** — code/test/docs implementation
 3. **Memory** — consolidation of durable knowledge
 
-Never mix classes. Before every commit, run this sequence:
+Never mix classes.
+
+### Commit hygiene gate
+
+Before every commit, run this sequence:
 
 1. `git status --short`
-2. Stage only intended paths (never `git add .` or `git add -A`)
-3. If unsure whether dirty files belong together, ask before committing
-4. `git status --short` after commit to confirm
+2. `git diff -- <intended paths>`; confirm the diff is only this commit's change
+3. Stage exact paths only (never `git add .` or `git add -A`)
+4. `git diff --cached --stat` lists only intended paths
+5. Commit
+6. `git status --short` to confirm what remains
+
+### Dirty worktree safety rules
+
+- Never mix unrelated dirty files into a work commit.
+- Stage exact paths.
+- If unsure whether dirty files belong together, stop and ask. In autonomous mode, leave them unstaged and record them in the apply note.
+
+### Commit-class transitions
+
+| Class | Required artifacts | Exit gate |
+|---|---|---|
+| Memory (research/plan) | request root, research, plan notes committed | plan self-check done |
+| Work | apply note current with deviations recorded | verification evidence recorded |
+| Memory (consolidation) | review, decision, summary notes committed | temporary scaffolding retired, branch handshake done |
 
 Material plan changes during implementation: commit the memory update first.
 

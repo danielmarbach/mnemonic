@@ -17,3 +17,12 @@
 **Status:** complete | partial | blocked
 **Open items:** <remaining work or known gaps>
 ```
+
+## Phase closeout checklist
+
+- [ ] Decision note written
+- [ ] Summary note written with verification evidence
+- [ ] Temporary notes retired, or kept with a stated reason
+- [ ] Consolidation memory commit done
+- [ ] `git status --short` clean
+- [ ] Branch-finish option recorded

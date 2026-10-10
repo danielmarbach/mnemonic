@@ -95,6 +95,8 @@ export function registerPrompts(server: McpServer): void {
             "mnemonic is the artifact store, not the runtime. Store workflow artifacts with correct roles and lifecycle; do not build orchestration in core. Note creation is the attention filter: capture durable decisions, outcomes, corrections, constraints, and validated learnings; skip routine chatter.\n\n" +
             "### Request root note\n\n" +
             'For each RPIR workflow, create one request root note: `role: context`, `lifecycle: temporary`, `tags: ["workflow", "request"]`. All artifacts relate to it.\n\n' +
+            "### Autonomous mode\n\n" +
+            "Applies only when the user has explicitly authorized autonomous delivery: the research → plan and plan → implement handoffs become recorded checkpoints (findings, chosen direction, assumptions, open questions) in the request root or plan note instead of stops for the user. Still stop for scope changes, authority changes (push, merge, tag, publish, destructive actions), and readings of the request that would lead to materially different work.\n\n" +
             "### Stage 1 — Research\n\n" +
             "- Create or update request root note.\n" +
             "- Create research notes: `role: research`, `lifecycle: temporary`.\n" +
@@ -126,6 +128,9 @@ export function registerPrompts(server: McpServer): void {
             "- Promote reusable facts and patterns into permanent reference notes.\n" +
             "- Deduplicate overlap while preserving unique evidence; do not aggressively summarize away factual detail.\n" +
             "- Explicitly remove pure scaffolding and redundant checkpoints through consolidation choices when safe. mnemonic does not auto-expire notes.\n\n" +
+            "### Stage 6 — Finish\n\n" +
+            "- `git status --short` must be clean before finishing.\n" +
+            "- Offer the user the options: open PR, merge, keep branch, or discard. Never push, merge, tag, or publish without explicit authorization.\n\n" +
             "### Relationship conventions\n\n" +
             "Minimal set. Link to immediate upstream artifacts only. No dense cross-linking.\n" +
             "- research → request root\n" +
@@ -134,7 +139,7 @@ export function registerPrompts(server: McpServer): void {
             "- review → apply or plan\n" +
             "- outcome → plan (optionally request root)\n\n" +
             "### Commit discipline\n\n" +
-            "Three classes: memory (research/plan/review artifacts), work (code/test/docs), memory (consolidation/promotion). When plan changes materially: update notes, commit memory, then continue work.\n\n" +
+            "Three classes: memory (research/plan/review artifacts), work (code/test/docs), memory (consolidation/promotion). Before every commit run the hygiene gate: `git status --short`, `git diff` of intended paths, stage exact paths only, `git diff --cached --stat`, commit, `git status --short`. When plan changes materially: update notes, commit memory, then continue work.\n\n" +
             "### Iterate?\n\n" +
             "Only when review or checks warrant it. Not the default.",
         },
