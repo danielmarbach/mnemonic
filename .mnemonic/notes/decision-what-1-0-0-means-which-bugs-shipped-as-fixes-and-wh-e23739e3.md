@@ -10,7 +10,7 @@ tags:
   - orchestration
 lifecycle: permanent
 createdAt: '2026-10-10T23:16:37.091Z'
-updatedAt: '2026-10-10T23:16:39.682Z'
+updatedAt: '2026-10-10T23:16:40.083Z'
 role: decision
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -19,6 +19,8 @@ relatedTo:
   - id: plan-rpi-workflow-skill-improvements-and-1-0-0-release-prepa-1f9ed1ac
     type: derives-from
   - id: rpir-outcome-rpi-workflow-skill-revision-and-1-0-0-release-p-23037b96
+    type: related-to
+  - id: reference-mnemonic-rpi-workflow-skill-improvement-opportunit-1b944a63
     type: related-to
 memoryVersion: 1
 ---

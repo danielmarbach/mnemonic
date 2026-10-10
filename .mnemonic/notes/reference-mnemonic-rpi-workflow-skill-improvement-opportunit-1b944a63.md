@@ -10,13 +10,15 @@ tags:
   - phase2
 lifecycle: permanent
 createdAt: '2026-04-25T07:47:46.589Z'
-updatedAt: '2026-10-10T23:04:26.084Z'
+updatedAt: '2026-10-10T23:16:40.083Z'
 role: reference
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
   - id: rpir-workflow-design-for-mnemonic-research-plan-implement-re-80b00851
+    type: related-to
+  - id: decision-what-1-0-0-means-which-bugs-shipped-as-fixes-and-wh-e23739e3
     type: related-to
 memoryVersion: 1
 ---
