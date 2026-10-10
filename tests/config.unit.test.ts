@@ -189,6 +189,40 @@ describe("MnemonicConfigStore", () => {
     expect(parsed.projectMemoryPolicies["project-x"].projectId).toBe("project-x");
   });
 
+  it("returns defaults for an unparseable config but refuses to overwrite it", async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "mnemonic-config-"));
+    tempDirs.push(dir);
+    const configPath = path.join(dir, "config.json");
+    const corrupt = '{ "mutationPushMode": "none", ';
+    await fs.writeFile(configPath, corrupt, "utf-8");
+
+    const store = new MnemonicConfigStore(dir);
+    const loaded = await store.load();
+    expect(loaded.mutationPushMode).toBe("main-only");
+    expect(loaded.schemaVersion).toBe("1.4");
+
+    await expect(store.setMaxAttachmentsPerProject(7)).rejects.toThrow(configPath);
+    await expect(store.setMaxAttachmentsPerProject(7)).rejects.toThrow(/not valid JSON/);
+    await expect(store.setSchemaVersion("1.5")).rejects.toThrow(/not valid JSON/);
+
+    expect(await fs.readFile(configPath, "utf-8")).toBe(corrupt);
+  });
+
+  it("writes a valid config atomically and leaves no temp file behind", async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "mnemonic-config-"));
+    tempDirs.push(dir);
+    const configPath = path.join(dir, "config.json");
+    await fs.writeFile(configPath, JSON.stringify({ mutationPushMode: "none" }), "utf-8");
+
+    const store = new MnemonicConfigStore(dir);
+    await store.setMaxAttachmentsPerProject(9);
+
+    const parsed = JSON.parse(await fs.readFile(configPath, "utf-8"));
+    expect(parsed.maxAttachmentsPerProject).toBe(9);
+    expect(parsed.mutationPushMode).toBe("none");
+    await expect(fs.access(`${configPath}.tmp`)).rejects.toThrow();
+  });
+
   it("normalizes project memory policies loaded from config", async () => {
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), "mnemonic-config-"));
     tempDirs.push(dir);

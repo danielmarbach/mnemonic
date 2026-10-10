@@ -369,6 +369,52 @@ describe("embedding provider configuration", () => {
     expect(openai.model).toBe("text-embedding-3-small");
     expect(gemini.model).toBe("gemini-embedding-2");
   });
+
+  it("treats empty OLLAMA_URL and EMBED_MODEL as unset", () => {
+    const config = resolveEmbeddingProviderConfig({ OLLAMA_URL: "", EMBED_MODEL: "  " });
+
+    expect(config.baseUrl).toBe("http://localhost:11434");
+    expect(config.model).toBe("nomic-embed-text-v2-moe");
+  });
+
+  it("treats empty base URLs and API keys as unset for hosted providers", () => {
+    const openai = resolveEmbeddingProviderConfig({
+      EMBED_PROVIDER: "openai",
+      OPENAI_API_KEY: "secret",
+      OPENAI_BASE_URL: "",
+      EMBED_MODEL: "",
+    });
+    const compatible = resolveEmbeddingProviderConfig({
+      EMBED_PROVIDER: "openai-compatible",
+      EMBED_MODEL: "local-embedding-model",
+      EMBED_BASE_URL: "",
+      OPENAI_BASE_URL: "http://127.0.0.1:4000",
+      EMBED_API_KEY: "",
+      OPENAI_API_KEY: "fallback-key",
+    });
+    const gemini = resolveEmbeddingProviderConfig({
+      EMBED_PROVIDER: "gemini",
+      GEMINI_API_KEY: "secret",
+      GEMINI_BASE_URL: "",
+    });
+
+    expect(openai.baseUrl).toBe("https://api.openai.com");
+    expect(openai.model).toBe("text-embedding-3-small");
+    expect(compatible.baseUrl).toBe("http://127.0.0.1:4000");
+    expect(compatible.kind === "openai-compatible" ? compatible.apiKey : undefined).toBe(
+      "fallback-key",
+    );
+    expect(gemini.baseUrl).toBe("https://generativelanguage.googleapis.com");
+  });
+
+  it("still requires an API key when the key variable is empty", () => {
+    expect(() =>
+      resolveEmbeddingProviderConfig({ EMBED_PROVIDER: "openai", OPENAI_API_KEY: "" }),
+    ).toThrow(/OPENAI_API_KEY is required/);
+    expect(() =>
+      resolveEmbeddingProviderConfig({ EMBED_PROVIDER: "gemini", GEMINI_API_KEY: " " }),
+    ).toThrow(/GEMINI_API_KEY is required/);
+  });
 });
 
 describe("OpenAI-compatible embedding provider", () => {

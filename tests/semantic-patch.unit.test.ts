@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { applySemanticPatches, type SemanticPatch } from "../src/semantic-patch.js";
+import { SemanticPatchError } from "../src/domain-errors.js";
 
 describe("semantic-patch", () => {
   const sampleNote =
@@ -378,6 +379,45 @@ describe("semantic-patch", () => {
     await expect(applySemanticPatches(sampleNote, patches)).rejects.toThrow(
       "replaceSection requires a section selector",
     );
+  });
+
+  it("rejects section selectors combined with operations other than replaceSection", async () => {
+    const note = "# Note\n\n## A\n\nOld A.\n\n## B\n\nKeep B.\n";
+    const operations = [
+      { op: "remove" },
+      { op: "appendChild", value: "X" },
+    ] satisfies SemanticPatch["operation"][];
+
+    for (const operation of operations) {
+      const error = await applySemanticPatches(note, [
+        { selector: { section: "A" }, operation },
+      ]).catch((e: unknown) => e);
+      expect(error).toBeInstanceOf(SemanticPatchError);
+      expect((error as SemanticPatchError).message).toContain(
+        "Section selectors support only the replaceSection operation",
+      );
+      expect((error as SemanticPatchError).message).toContain("insertAfter");
+    }
+  });
+
+  it("selects headings with inline code and emphasis by plain text", async () => {
+    const note = "# Note\n\n## Using `code` and **bold**\n\nBody.\n";
+    const result = await applySemanticPatches(note, [
+      {
+        selector: { heading: "Using code and bold" },
+        operation: { op: "insertAfter", value: "Inserted." },
+      },
+    ]);
+    expect(result.content).toBe("# Note\n\n## Using `code` and **bold**\n\nInserted.\n\nBody.");
+  });
+
+  it("lists plain heading text in the available headings diagnostic", async () => {
+    const note = "# Note\n\n## Using `code` and **bold**\n\nBody.\n";
+    await expect(
+      applySemanticPatches(note, [
+        { selector: { heading: "Missing" }, operation: { op: "remove" } },
+      ]),
+    ).rejects.toThrow("  - Using code and bold");
   });
 
   it("rejects heading replace that looks like a section replacement", async () => {

@@ -9,7 +9,7 @@ import {
   type EmbeddingRecord,
 } from "./storage.js";
 import type { NoteProjection } from "./structured-content.js";
-import { attempt, debugLog, getErrorMessage } from "./error-utils.js";
+import { attempt, attemptSync, debugLog, getErrorMessage } from "./error-utils.js";
 import { InvalidBranchNameError, AttachedVaultReadOnlyError } from "./domain-errors.js";
 
 const VALID_BRANCH_PATTERN = /^[a-zA-Z0-9._/-]+$/;
@@ -122,9 +122,15 @@ export class AttachedStorage implements NoteStorage {
       return null;
     }
 
-    const note = this.baseStorage.parseNote(id, result.value.trim());
-    if (note) this.noteCache.set(id, note);
-    return note;
+    const parsed = attemptSync("attached-storage:read-note", () =>
+      this.baseStorage.parseNote(id, result.value.trim()),
+    );
+    if (!parsed.ok) {
+      debugLog("attached-storage:read-note", `malformed ${id}: ${getErrorMessage(parsed.error)}`);
+      return null;
+    }
+    this.noteCache.set(id, parsed.value);
+    return parsed.value;
   }
 
   async readNoteMetadata(id: MemoryId): Promise<NoteMetadata | null> {
@@ -149,8 +155,17 @@ export class AttachedStorage implements NoteStorage {
       return null;
     }
 
-    const note = this.baseStorage.parseNote(id, result.value.trim());
-    if (!note) return null;
+    const parsed = attemptSync("attached-storage:read-note-metadata", () =>
+      this.baseStorage.parseNote(id, result.value.trim()),
+    );
+    if (!parsed.ok) {
+      debugLog(
+        "attached-storage:read-note-metadata",
+        `malformed ${id}: ${getErrorMessage(parsed.error)}`,
+      );
+      return null;
+    }
+    const note = parsed.value;
     // The NoteMetadata contract must be uniform across storage implementations:
     // metadata notes carry no `content` field, exactly like the base Storage
     // path. Otherwise scoring that inspects content (role/importance/structure

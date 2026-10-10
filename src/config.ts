@@ -332,6 +332,7 @@ export async function writeVaultSchemaVersion(
 export class MnemonicConfigStore {
   readonly filePath: string;
   #cache: MnemonicConfig | null = null;
+  #unparseableReason: string | null = null;
 
   constructor(mainVaultPath: string) {
     this.filePath = path.join(path.resolve(mainVaultPath), "config.json");
@@ -409,9 +410,13 @@ export class MnemonicConfigStore {
     }
 
     let config: MnemonicConfig;
+    this.#unparseableReason = null;
     const readResult = await attempt("config:read", () => fs.readFile(this.filePath, "utf-8"));
     if (readResult.ok) {
       const jsonResult = attemptSync("config:parse", () => JSON.parse(readResult.value));
+      if (!jsonResult.ok) {
+        this.#unparseableReason = getErrorMessage(jsonResult.error);
+      }
       const parsed = jsonResult.ok
         ? MnemonicConfigRawSchema.safeParse(jsonResult.value)
         : { success: false as const, data: undefined };
@@ -435,7 +440,14 @@ export class MnemonicConfigStore {
   }
 
   private async writeAll(config: MnemonicConfig): Promise<void> {
-    await fs.writeFile(this.filePath, JSON.stringify(config, null, 2) + "\n", "utf-8");
+    if (this.#unparseableReason !== null) {
+      throw new Error(
+        `Refusing to write ${this.filePath}: the existing file is not valid JSON (${this.#unparseableReason}). Fix or remove it and retry.`,
+      );
+    }
+    const tmpPath = `${this.filePath}.tmp`;
+    await fs.writeFile(tmpPath, JSON.stringify(config, null, 2) + "\n", "utf-8");
+    await fs.rename(tmpPath, this.filePath);
     this.#cache = config;
   }
 }

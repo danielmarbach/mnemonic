@@ -145,6 +145,11 @@ function parseDimensions(value: string | undefined): EmbeddingDimensions | undef
   return embeddingDimensions(parsed);
 }
 
+function envValue(env: NodeJS.ProcessEnv, key: string): string | undefined {
+  const value = env[key];
+  return value === undefined || value.trim() === "" ? undefined : value;
+}
+
 function requireEnv(value: string | undefined, name: string, provider: string): string {
   if (value === undefined || value === "") {
     throw new EmbeddingConfigurationError(`${name} is required when EMBED_PROVIDER=${provider}`);
@@ -195,34 +200,37 @@ export function resolveEmbeddingProviderConfig(
     case "ollama":
       return {
         kind,
-        baseUrl: validateOllamaUrl(env["OLLAMA_URL"] ?? DEFAULT_OLLAMA_BASE_URL),
-        model: embeddingModelId(env["EMBED_MODEL"] ?? DEFAULT_OLLAMA_MODEL),
+        baseUrl: validateOllamaUrl(envValue(env, "OLLAMA_URL") ?? DEFAULT_OLLAMA_BASE_URL),
+        model: embeddingModelId(envValue(env, "EMBED_MODEL") ?? DEFAULT_OLLAMA_MODEL),
         metric: COSINE_METRIC,
       };
     case "openai-compatible":
       return {
         kind,
-        baseUrl: env["EMBED_BASE_URL"] ?? env["OPENAI_BASE_URL"] ?? DEFAULT_OPENAI_BASE_URL,
-        apiKey: env["EMBED_API_KEY"] ?? env["OPENAI_API_KEY"],
-        model: embeddingModelId(requireEnv(env["EMBED_MODEL"], "EMBED_MODEL", kind)),
+        baseUrl:
+          envValue(env, "EMBED_BASE_URL") ??
+          envValue(env, "OPENAI_BASE_URL") ??
+          DEFAULT_OPENAI_BASE_URL,
+        apiKey: envValue(env, "EMBED_API_KEY") ?? envValue(env, "OPENAI_API_KEY"),
+        model: embeddingModelId(requireEnv(envValue(env, "EMBED_MODEL"), "EMBED_MODEL", kind)),
         dimensions,
         metric: COSINE_METRIC,
       };
     case "openai":
       return {
         kind,
-        baseUrl: env["OPENAI_BASE_URL"] ?? DEFAULT_OPENAI_BASE_URL,
-        apiKey: requireEnv(env["OPENAI_API_KEY"], "OPENAI_API_KEY", kind),
-        model: embeddingModelId(env["EMBED_MODEL"] ?? DEFAULT_OPENAI_MODEL),
+        baseUrl: envValue(env, "OPENAI_BASE_URL") ?? DEFAULT_OPENAI_BASE_URL,
+        apiKey: requireEnv(envValue(env, "OPENAI_API_KEY"), "OPENAI_API_KEY", kind),
+        model: embeddingModelId(envValue(env, "EMBED_MODEL") ?? DEFAULT_OPENAI_MODEL),
         dimensions,
         metric: COSINE_METRIC,
       };
     case "gemini":
       return {
         kind,
-        baseUrl: env["GEMINI_BASE_URL"] ?? DEFAULT_GEMINI_BASE_URL,
-        apiKey: requireEnv(env["GEMINI_API_KEY"], "GEMINI_API_KEY", kind),
-        model: embeddingModelId(env["EMBED_MODEL"] ?? DEFAULT_GEMINI_MODEL),
+        baseUrl: envValue(env, "GEMINI_BASE_URL") ?? DEFAULT_GEMINI_BASE_URL,
+        apiKey: requireEnv(envValue(env, "GEMINI_API_KEY"), "GEMINI_API_KEY", kind),
+        model: embeddingModelId(envValue(env, "EMBED_MODEL") ?? DEFAULT_GEMINI_MODEL),
         dimensions,
         metric: COSINE_METRIC,
       };

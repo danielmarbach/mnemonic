@@ -311,6 +311,52 @@ Branch note body`;
       process.env.DISABLE_GIT = "true";
     });
 
+    it("readNote and readNoteMetadata return null for a note without frontmatter and listing still works", async () => {
+      await initGitRepoWithCommit(repoDir, "# Init");
+      delete process.env.DISABLE_GIT;
+
+      const notesDir = path.join(repoDir, ".mnemonic", "notes");
+      await fs.mkdir(notesDir, { recursive: true });
+      await fs.writeFile(path.join(notesDir, "README.md"), "# Not a note\n\nNo frontmatter.\n");
+      await fs.writeFile(
+        path.join(notesDir, "good-note.md"),
+        `---
+title: Good Note
+tags: []
+lifecycle: permanent
+createdAt: 2024-01-01T00:00:00.000Z
+updatedAt: 2024-01-01T00:00:00.000Z
+---
+
+Good body`,
+        "utf-8",
+      );
+
+      const git = simpleGit(repoDir);
+      await git.add(".mnemonic/notes");
+      await git.commit("add notes");
+
+      baseStorage = new Storage(path.join(tempDir, "vault"));
+      await baseStorage.init();
+      const attached = new AttachedStorage(
+        baseStorage,
+        baseStorage,
+        repoDir,
+        "main",
+        ".mnemonic/notes",
+      );
+
+      await expect(attached.readNote(memoryId("README"))).resolves.toBeNull();
+      await expect(attached.readNoteMetadata(memoryId("README"))).resolves.toBeNull();
+
+      const notes = await attached.listNotes();
+      expect(notes.map((n) => n.id)).toEqual([memoryId("good-note")]);
+      const metadata = await attached.listNotesMetadata();
+      expect(metadata.map((n) => n.id)).toEqual([memoryId("good-note")]);
+
+      process.env.DISABLE_GIT = "true";
+    });
+
     it("readNote returns null for missing note on branch", async () => {
       await initGitRepoWithCommit(repoDir, "# Init");
       delete process.env.DISABLE_GIT;

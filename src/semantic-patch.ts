@@ -1,4 +1,4 @@
-import type { Root, Content, Heading, Paragraph, Blockquote, List } from "mdast";
+import type { Root, Content, Heading, Paragraph, Blockquote, List, PhrasingContent } from "mdast";
 import { parseBody, serializeBody } from "./markdown-ast.js";
 import { attemptCleanMarkdown } from "./markdown.js";
 import { SemanticPatchError } from "./domain-errors.js";
@@ -25,11 +25,15 @@ export interface SemanticPatch {
   operation: SemanticOperation;
 }
 
+function getPhrasingText(node: PhrasingContent): string {
+  if ("value" in node) return node.value;
+  if ("children" in node) return node.children.map(getPhrasingText).join("");
+  if ("alt" in node) return node.alt ?? "";
+  return "";
+}
+
 function getHeadingText(node: Heading): string {
-  return node.children
-    .filter((c): c is { type: "text"; value: string } => c.type === "text")
-    .map((c) => c.value)
-    .join("");
+  return node.children.map(getPhrasingText).join("");
 }
 
 function isHeadingNode(node: Content): node is Heading {
@@ -160,6 +164,18 @@ function throwIfHeadingReplaceLooksLikeSectionReplace(
   );
 }
 
+function throwIfSectionSelectorMisused(
+  selector: SemanticSelector,
+  operation: SemanticOperation,
+): void {
+  if ("section" in selector && operation.op !== "replaceSection") {
+    throw new SemanticPatchError(
+      `Section selectors support only the replaceSection operation, not '${operation.op}'. ` +
+        'Use a heading selector instead, e.g. `{ selector: { heading: "..." }, operation: { op: "insertAfter", value: "..." } }` to add content below a heading.',
+    );
+  }
+}
+
 function collectAvailableHeadings(tree: Root): string[] {
   const headings: string[] = [];
   for (const child of tree.children) {
@@ -177,6 +193,7 @@ export async function applySemanticPatches(
   const tree = parseBody(body);
 
   for (const patch of patches) {
+    throwIfSectionSelectorMisused(patch.selector, patch.operation);
     const resolved = resolveSelector(tree, patch.selector);
     if (!resolved) {
       const headings = collectAvailableHeadings(tree);
