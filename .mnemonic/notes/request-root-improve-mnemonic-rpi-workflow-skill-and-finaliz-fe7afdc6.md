@@ -9,7 +9,7 @@ tags:
   - v1
 lifecycle: temporary
 createdAt: '2026-10-10T22:38:39.738Z'
-updatedAt: '2026-10-10T22:38:39.738Z'
+updatedAt: '2026-10-10T22:43:10.118Z'
 role: context
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
@@ -31,3 +31,5 @@ memoryVersion: 1
 **Autonomous-mode checkpoint:** the Research to Plan and Plan to Implement handoffs are recorded here instead of stopping for the user, per the explicit autonomy grant.
 
 **Status:** research done, planning.
+
+**Scope added (user, 2026-10-11):** check for glaring open bugs worth fixing before 1.0. Handled as read-only Lane C (fresh-context reviewer on claude-bridge/claude-sonnet-5-5); findings feed a fix decision before the release commit.
