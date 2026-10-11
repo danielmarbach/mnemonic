@@ -94,7 +94,7 @@ Published to the public npm registry. No authentication required.
 npm install @danielmarbach/mnemonic-mcp
 
 # Specific release
-npm install @danielmarbach/mnemonic-mcp@1.0.0
+npm install @danielmarbach/mnemonic-mcp@1.0.0-rc.1
 ```
 
 ### Install bundled skills (Claude/OpenCode)
