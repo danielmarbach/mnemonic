@@ -15,15 +15,17 @@ tags:
   - lessons
 lifecycle: permanent
 createdAt: '2026-03-08T19:26:40.116Z'
-updatedAt: '2026-03-08T19:26:40.116Z'
+updatedAt: '2026-10-11T06:43:36.230Z'
 project: github-com-danielmarbach-mnemonic
 projectName: mnemonic
 memoryVersion: 1
 ---
 Consolidates the migration robustness invariants with the later dogfooding lesson that some Kimi-authored tests drifted from those invariants, so there is one canonical memory covering both the intended behavior and how to validate future failing tests against it.
 
-## Consolidated from:
+## Consolidated from
+
 ### Migration infrastructure: robustness, ordering, idempotency, per-vault versioning
+
 *Source: `migration-and-consolidate-robustness-hardening-cb012cfc`*
 
 Migration hardening now has executable invariant coverage and explicit architecture guidance.
@@ -46,6 +48,7 @@ Migration hardening now has executable invariant coverage and explicit architect
 - If migration orchestration later gains concurrency, resumability, or distributed coordination, revisiting a small formal model could make sense.
 
 ### Kimi-added tests drifted from migration and vault invariants
+
 *Source: `kimi-added-tests-drifted-from-migration-and-vault-invariants-cc4a9d43`*
 
 Dogfooding lesson: several recent Kimi-authored tests in `tests/migration.test.ts`, `tests/storage.test.ts`, and `tests/vault.test.ts` drifted from the actual system invariants and created false failures.
@@ -58,3 +61,12 @@ What drifted:
 - Some migration tests wrote schema state to `schema-version.json`, but the real vault schema source of truth is `config.json`.
 
 Practical rule: when a new failing test comes from recent agent work, verify it against stored architecture decisions and current runtime behavior before changing production code. Fix stale tests when they contradict documented invariants; fix code only when the test exposes a real behavior bug.
+
+## Vaults without config.json, config rewrites, and writer enumeration
+
+- **A vault without `config.json` means "unknown", not "current".** `readVaultSchemaVersion` falls back to the default (latest) version for other callers, so pending-migration computation looked at config-less vaults and saw nothing to do. Project vaults never got a `config.json` unless a migration had already run, so the vaults that most needed a migration could never be selected. Pending computation now uses `readVaultSchemaVersionForMigration`, which returns `0.0` when the file is missing; all migrations are idempotent, so running everything is safe. New main and project vaults write and commit `config.json` with the current schema version at creation so fresh installs do not nag.
+- **Migrations may rewrite `config.json`** (attachment config, project id keys). Results report that separately through `configModified`; it is not a note count, and `config.json` is committed whenever it was rewritten, even if the schema version does not advance. The notes transaction does not cover config writes.
+- **Every writer of a file must honor its safety rule.** The first fix for "unparseable config.json gets clobbered" covered the setters but missed `writeVaultSchemaVersion`, which the migrator calls. A reviewer closing a data-loss path must enumerate every writer, not only the one named in the report.
+- **A migration rewriting a field must not move `updatedAt`** and must leave other frontmatter untouched; `writeNote` re-serialization drops unknown frontmatter keys, which is pre-existing behavior.
+- **Caveat:** `runMigration` by name on a config-less vault stamps the latest schema without running the older backfills (reads normalize those fields, so the effect is cosmetic). `runAllPending` is the safe path.
+- **Legacy data must be understood at the read boundary before the migration runs** (parseNote, config readAll), because other clones of a project vault migrate independently and attached vaults are not reached by the migrator.
