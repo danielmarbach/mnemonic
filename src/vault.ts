@@ -114,8 +114,29 @@ export class VaultManager {
     await this.main.storage.init();
     await this.main.git.init();
     await ensureGitignore(path.join(this.main.storage.vaultPath, ".gitignore"));
+    await this.stampNewMainVault();
     this.mainGitRoot =
       (await findGitRoot(this.main.storage.vaultPath)) ?? this.main.storage.vaultPath;
+  }
+
+  /** Record the schema version for a brand-new main vault (no config.json, no notes). */
+  private async stampNewMainVault(): Promise<void> {
+    const vaultPath = this.main.storage.vaultPath;
+    if (await pathExists(path.join(vaultPath, "config.json"))) return;
+    if ((await this.main.storage.listNotesMetadata()).length > 0) return;
+
+    await writeVaultSchemaVersion(vaultPath, defaultConfig.schemaVersion);
+    const commitResult = await attempt("vault:commit-main-schema-version", () =>
+      this.main.git.commit(
+        `config(init): record vault schema version ${defaultConfig.schemaVersion}`,
+        ["config.json"],
+      ),
+    );
+    if (!commitResult.ok) {
+      console.error(
+        `[vault] Could not commit config.json for the new main vault: ${getErrorMessage(commitResult.error)}`,
+      );
+    }
   }
 
   /**

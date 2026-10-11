@@ -78,6 +78,80 @@ describe("VaultManager", () => {
 
       expect(content).toContain("embeddings/");
     });
+
+    it("records the current schema version when creating a new main vault", async () => {
+      expect(await readVaultSchemaVersion(mainVaultPath)).toBe("1.5");
+      const raw = await fs.readFile(path.join(mainVaultPath, "config.json"), "utf-8");
+      expect(JSON.parse(raw)).toEqual({ schemaVersion: "1.5" });
+    });
+
+    it("reports no pending migrations on startup for a new main vault", async () => {
+      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+      try {
+        await warnAboutPendingMigrationsOnStartup({
+          vaultManager,
+          migrator: new Migrator(vaultManager),
+        } as unknown as ServerContext);
+
+        expect(errorSpy).not.toHaveBeenCalled();
+      } finally {
+        errorSpy.mockRestore();
+      }
+    });
+
+    it("leaves an existing main vault with notes but no config.json pending", async () => {
+      const legacyVaultPath = path.join(tempDir, "legacy-main-vault");
+      const legacyStorage = new Storage(legacyVaultPath);
+      await legacyStorage.init();
+      await legacyStorage.writeNote({
+        id: "legacy-main-note" as MemoryId,
+        title: "Legacy Main Note",
+        content: "Written before config.json existed",
+        tags: [],
+        lifecycle: "permanent",
+        createdAt: new Date().toISOString() as ISO8601DateString,
+        updatedAt: new Date().toISOString() as ISO8601DateString,
+      });
+
+      const legacyManager = new VaultManager(legacyVaultPath);
+      await legacyManager.initMain();
+
+      await expect(fs.access(path.join(legacyVaultPath, "config.json"))).rejects.toThrow();
+      expect(await readVaultSchemaVersionForMigration(legacyVaultPath)).toBe("0.0");
+      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      try {
+        await warnAboutPendingMigrationsOnStartup({
+          vaultManager: legacyManager,
+          migrator: new Migrator(legacyManager),
+        } as unknown as ServerContext);
+
+        expect(errorSpy).toHaveBeenCalled();
+      } finally {
+        errorSpy.mockRestore();
+      }
+    });
+
+    it("commits the schema version when creating a new main vault with git enabled", async () => {
+      delete process.env.DISABLE_GIT;
+      const gitMainPath = path.join(tempDir, "git-main-vault");
+      await fs.mkdir(gitMainPath, { recursive: true });
+      const git = simpleGit(gitMainPath);
+      await git.init();
+      await git.addConfig("user.email", "test@example.com");
+      await git.addConfig("user.name", "Test");
+      await git.addConfig("commit.gpgsign", "false");
+      const gitManager = new VaultManager(gitMainPath);
+      await gitManager.initMain();
+
+      const log = await git.log();
+      expect(log.all.map((entry) => entry.message)).toContain(
+        "config(init): record vault schema version 1.5",
+      );
+      expect((await git.status()).files.map((f) => f.path)).not.toContain("config.json");
+
+      process.env.DISABLE_GIT = "true";
+    });
   });
 
   describe("Project Vault Detection", () => {

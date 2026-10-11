@@ -152,6 +152,9 @@ export function registerExecuteMigrationTool(server: McpServer, ctx: ServerConte
           lines.push(`Vault: ${vaultPath}`);
           lines.push(`  Notes processed: ${result.notesProcessed}`);
           lines.push(`  Notes modified: ${result.notesModified}`);
+          if (result.configModified) {
+            lines.push("  Config modified: yes");
+          }
 
           const vaultResultErrors: Array<{ noteId: string; error: string }> = [];
           const vaultResultWarnings: string[] = [];

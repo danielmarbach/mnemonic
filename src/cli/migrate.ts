@@ -1,7 +1,41 @@
 import { resolveUserPath, defaultVaultPath } from "../paths.js";
 import { VaultManager } from "../vault.js";
-import { Migrator } from "../migration.js";
+import { Migrator, type MigrationResult } from "../migration.js";
 import { readVaultSchemaVersionForMigration } from "../config.js";
+
+const AUTO_COMMIT_FAILED_PREFIX = "Auto-commit failed";
+
+function hasAutoCommitFailure(result: MigrationResult): boolean {
+  return result.warnings.some((warning) => warning.startsWith(AUTO_COMMIT_FAILED_PREFIX));
+}
+
+export function describeAutoCommit(result: MigrationResult): string {
+  if (hasAutoCommitFailure(result)) return "✗ failed (changes written and staged, not committed)";
+  return result.warnings.length === 0 ? "✓" : "⚠ (see warnings)";
+}
+
+export function buildMigrationCompletionLines(
+  migrationResults: Map<string, { migration: string; result: MigrationResult }[]>,
+): string[] {
+  const failedVaults: string[] = [];
+  for (const [vaultPath, results] of migrationResults) {
+    if (results.some(({ result }) => hasAutoCommitFailure(result))) failedVaults.push(vaultPath);
+  }
+
+  if (failedVaults.length === 0) {
+    return [
+      "\n✓ Migration completed",
+      "Changes were committed and pushed when a remote is configured.",
+    ];
+  }
+
+  return [
+    "\n⚠ Migration completed, but changes were NOT committed",
+    "Changes were written and staged in these vaults but not committed or pushed:",
+    ...failedVaults.map((vaultPath) => `  - ${vaultPath}`),
+    "Commit them manually (fix the git error shown in the warnings, then commit and push).",
+  ];
+}
 
 export async function runMigrateCli(): Promise<void> {
   const VAULT_PATH = process.env["VAULT_PATH"]
@@ -97,9 +131,7 @@ Examples:
         console.log("    Config modified: yes");
       }
       if (!dryRun && (result.notesModified > 0 || result.configModified)) {
-        console.log(
-          `    Auto-committed: ${result.warnings.length === 0 ? "✓" : "⚠ (see warnings)"}`,
-        );
+        console.log(`    Auto-committed: ${describeAutoCommit(result)}`);
       }
       if (result.errors.length > 0) {
         console.log(`    Errors: ${result.errors.length}`);
@@ -113,8 +145,7 @@ Examples:
   }
 
   if (!dryRun && vaultsProcessed > 0) {
-    console.log("\n✓ Migration completed");
-    console.log("Changes have been automatically committed and pushed.");
+    buildMigrationCompletionLines(migrationResults).forEach((line) => console.log(line));
   } else if (dryRun) {
     console.log("\n✓ Dry-run completed - no changes made");
     if (vaultsProcessed > 0) {
