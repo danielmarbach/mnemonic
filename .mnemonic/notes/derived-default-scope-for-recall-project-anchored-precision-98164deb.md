@@ -11,7 +11,7 @@ createdAt: '2026-08-30T10:01:18.662Z'
 updatedAt: '2026-08-30T10:18:52.444Z'
 role: decision
 alwaysLoad: false
-project: https-github-com-danielmarbach-mnemonic
+project: github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
   - id: implementation-principles-for-mnemonic-mcp-2e178bba

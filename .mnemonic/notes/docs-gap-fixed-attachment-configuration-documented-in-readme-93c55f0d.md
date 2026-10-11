@@ -11,7 +11,7 @@ createdAt: '2026-08-01T09:25:34.726Z'
 updatedAt: '2026-08-01T09:25:44.019Z'
 role: summary
 alwaysLoad: false
-project: https-github-com-danielmarbach-mnemonic
+project: github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
   - id: docs-index-html-homepage-design-principles-and-ux-lessons-6bed8673

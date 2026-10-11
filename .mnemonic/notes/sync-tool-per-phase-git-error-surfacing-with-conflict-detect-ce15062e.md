@@ -11,7 +11,7 @@ tags:
 lifecycle: permanent
 createdAt: '2026-03-18T07:25:30.436Z'
 updatedAt: '2026-05-09T21:10:39.021Z'
-project: https-github-com-danielmarbach-mnemonic
+project: github-com-danielmarbach-mnemonic
 projectName: mnemonic
 memoryVersion: 1
 ---

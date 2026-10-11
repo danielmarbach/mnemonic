@@ -10,7 +10,7 @@ tags:
 lifecycle: permanent
 createdAt: '2026-03-14T22:14:46.759Z'
 updatedAt: '2026-08-06T04:42:02.005Z'
-project: https-github-com-danielmarbach-mnemonic
+project: github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
   - id: mnemonic-key-design-decisions-3f2a6273

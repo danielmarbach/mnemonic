@@ -7,7 +7,7 @@ tags:
 lifecycle: permanent
 createdAt: '2026-03-10T08:01:03.747Z'
 updatedAt: '2026-05-09T21:16:14.023Z'
-project: https-github-com-danielmarbach-mnemonic
+project: github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
   - id: project-memory-policy-defaults-storage-location-f563f634

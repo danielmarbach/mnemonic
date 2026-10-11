@@ -8,7 +8,7 @@ tags:
 lifecycle: permanent
 createdAt: '2026-03-07T20:28:59.910Z'
 updatedAt: '2026-03-07T20:29:20.819Z'
-project: https-github-com-danielmarbach-mnemonic
+project: github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
   - id: github-packages-publishing-and-ci-workflow-55495350

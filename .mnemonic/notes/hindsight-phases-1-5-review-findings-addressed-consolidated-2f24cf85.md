@@ -8,7 +8,7 @@ tags:
 lifecycle: permanent
 createdAt: '2026-04-25T21:42:49.274Z'
 updatedAt: '2026-05-09T21:09:07.363Z'
-project: https-github-com-danielmarbach-mnemonic
+project: github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
   - id: performance-principles-for-file-first-mcp-and-git-backed-wor-4e7d3bc8

@@ -8,7 +8,7 @@ tags:
 lifecycle: permanent
 createdAt: '2026-03-08T09:22:05.553Z'
 updatedAt: '2026-05-09T21:16:14.014Z'
-project: https-github-com-danielmarbach-mnemonic
+project: github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
   - id: changelog-writing-principles-87cdbc5b

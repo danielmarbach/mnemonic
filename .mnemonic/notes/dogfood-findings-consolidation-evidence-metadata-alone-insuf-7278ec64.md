@@ -12,7 +12,7 @@ createdAt: '2026-04-28T13:09:46.833Z'
 updatedAt: '2026-04-28T16:06:00.250Z'
 role: research
 alwaysLoad: false
-project: https-github-com-danielmarbach-mnemonic
+project: github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
   - id: theme-consolidation-evidence-discriminative-power-fix-proble-aa49ac2a

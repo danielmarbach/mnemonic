@@ -14,7 +14,7 @@ createdAt: '2026-04-28T15:58:57.877Z'
 updatedAt: '2026-04-28T16:06:00.252Z'
 role: reference
 alwaysLoad: false
-project: https-github-com-danielmarbach-mnemonic
+project: github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
   - id: dogfood-findings-consolidation-evidence-metadata-alone-insuf-7278ec64

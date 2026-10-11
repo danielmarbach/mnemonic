@@ -13,7 +13,7 @@ tags:
 lifecycle: permanent
 createdAt: '2026-03-14T23:38:26.947Z'
 updatedAt: '2026-05-02T04:36:39.931Z'
-project: https-github-com-danielmarbach-mnemonic
+project: github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
   - id: persistence-status-reporting-design-and-implementation-8a50b95a

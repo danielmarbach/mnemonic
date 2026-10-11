@@ -7,7 +7,7 @@ tags:
 lifecycle: permanent
 createdAt: '2026-03-26T11:28:51.171Z'
 updatedAt: '2026-05-09T21:16:14.012Z'
-project: https-github-com-danielmarbach-mnemonic
+project: github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
   - id: mnemonic-project-overview-and-purpose-763b7a51

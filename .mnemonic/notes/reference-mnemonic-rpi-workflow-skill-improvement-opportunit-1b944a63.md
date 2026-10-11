@@ -13,7 +13,7 @@ createdAt: '2026-04-25T07:47:46.589Z'
 updatedAt: '2026-10-10T23:16:40.083Z'
 role: reference
 alwaysLoad: false
-project: https-github-com-danielmarbach-mnemonic
+project: github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
   - id: rpir-workflow-design-for-mnemonic-research-plan-implement-re-80b00851

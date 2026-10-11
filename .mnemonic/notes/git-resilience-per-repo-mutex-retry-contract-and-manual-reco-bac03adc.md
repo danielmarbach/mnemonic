@@ -12,7 +12,7 @@ tags:
 lifecycle: permanent
 createdAt: '2026-09-27T20:54:38.034Z'
 updatedAt: '2026-09-27T20:54:38.034Z'
-project: https-github-com-danielmarbach-mnemonic
+project: github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
   - id: mnemonic-git-commit-protocol-standardization-f2ee3d5e

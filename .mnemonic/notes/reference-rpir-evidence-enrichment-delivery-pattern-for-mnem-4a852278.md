@@ -11,7 +11,7 @@ createdAt: '2026-04-26T19:01:36.389Z'
 updatedAt: '2026-04-26T19:01:43.790Z'
 role: reference
 alwaysLoad: false
-project: https-github-com-danielmarbach-mnemonic
+project: github-com-danielmarbach-mnemonic
 projectName: mnemonic
 memoryVersion: 1
 ---

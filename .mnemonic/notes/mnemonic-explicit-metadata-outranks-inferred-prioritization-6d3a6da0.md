@@ -8,7 +8,7 @@ tags:
 lifecycle: permanent
 createdAt: '2026-03-28T00:56:11.593Z'
 updatedAt: '2026-03-28T00:57:36.631Z'
-project: https-github-com-danielmarbach-mnemonic
+project: github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
   - id: mcp-workflow-ux-hint-prompt-tool-descriptions-and-session-st-e89a18fc

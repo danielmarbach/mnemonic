@@ -13,7 +13,7 @@ tags:
 lifecycle: permanent
 createdAt: '2026-08-30T11:24:20.488Z'
 updatedAt: '2026-08-30T11:24:34.566Z'
-project: https-github-com-danielmarbach-mnemonic
+project: github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
   - id: import-claude-memory-cli-command-design-and-implementation-dcdc5a05

@@ -9,7 +9,7 @@ tags:
 lifecycle: permanent
 createdAt: '2026-03-10T19:35:45.607Z'
 updatedAt: '2026-05-09T21:16:14.028Z'
-project: https-github-com-danielmarbach-mnemonic
+project: github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
   - id: mcp-stdio-communication-troubleshooting-401d3cd9

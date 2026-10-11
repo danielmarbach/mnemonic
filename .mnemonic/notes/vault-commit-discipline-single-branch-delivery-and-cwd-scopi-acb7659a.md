@@ -10,7 +10,7 @@ createdAt: '2026-08-30T11:24:24.264Z'
 updatedAt: '2026-08-30T11:24:30.794Z'
 role: decision
 alwaysLoad: false
-project: https-github-com-danielmarbach-mnemonic
+project: github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
   - id: mnemonic-git-commit-protocol-standardization-f2ee3d5e

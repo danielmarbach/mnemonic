@@ -11,7 +11,7 @@ createdAt: '2026-04-20T21:36:57.480Z'
 updatedAt: '2026-04-26T10:11:07.464Z'
 role: decision
 alwaysLoad: false
-project: https-github-com-danielmarbach-mnemonic
+project: github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
   - id: mcp-workflow-ux-hint-prompt-tool-descriptions-and-session-st-e89a18fc

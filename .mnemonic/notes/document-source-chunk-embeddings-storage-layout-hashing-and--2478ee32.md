@@ -15,7 +15,7 @@ tags:
 lifecycle: permanent
 createdAt: '2026-09-27T20:54:35.706Z'
 updatedAt: '2026-09-27T20:54:35.706Z'
-project: https-github-com-danielmarbach-mnemonic
+project: github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
   - id: vault-creation-audit-which-tools-can-create-mnemonic-and-whi-d0388691

@@ -14,7 +14,7 @@ createdAt: '2026-04-25T11:59:42.575Z'
 updatedAt: '2026-04-25T11:59:52.857Z'
 role: summary
 alwaysLoad: false
-project: https-github-com-danielmarbach-mnemonic
+project: github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
   - id: performance-principles-for-file-first-mcp-and-git-backed-wor-4e7d3bc8

@@ -12,7 +12,7 @@ tags:
 lifecycle: permanent
 createdAt: '2026-09-27T20:54:37.471Z'
 updatedAt: '2026-09-27T20:54:37.471Z'
-project: https-github-com-danielmarbach-mnemonic
+project: github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
   - id: docs-gap-fixed-attachment-configuration-documented-in-readme-93c55f0d

@@ -9,7 +9,7 @@ lifecycle: permanent
 createdAt: '2026-04-05T09:26:46.284Z'
 updatedAt: '2026-04-20T21:37:11.693Z'
 alwaysLoad: false
-project: https-github-com-danielmarbach-mnemonic
+project: github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
   - id: mcp-workflow-ux-hint-prompt-tool-descriptions-and-session-st-e89a18fc

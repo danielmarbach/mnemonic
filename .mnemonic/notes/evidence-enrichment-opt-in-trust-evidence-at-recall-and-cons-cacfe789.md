@@ -13,7 +13,7 @@ tags:
 lifecycle: permanent
 createdAt: '2026-09-27T20:54:36.312Z'
 updatedAt: '2026-09-27T20:54:36.312Z'
-project: https-github-com-danielmarbach-mnemonic
+project: github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
   - id: request-implement-evidence-enrichment-phases-from-explainabi-abe55a21

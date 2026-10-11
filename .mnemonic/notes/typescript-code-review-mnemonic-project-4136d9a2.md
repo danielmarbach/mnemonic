@@ -10,7 +10,7 @@ tags:
 lifecycle: permanent
 createdAt: '2026-05-25T17:29:36.356Z'
 updatedAt: '2026-08-06T04:42:02.934Z'
-project: https-github-com-danielmarbach-mnemonic
+project: github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
   - id: parallel-consolidate-operations-can-leave-staged-local-only--e8c33780

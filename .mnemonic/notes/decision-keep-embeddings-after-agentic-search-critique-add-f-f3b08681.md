@@ -14,7 +14,7 @@ createdAt: '2026-09-28T13:12:03.621Z'
 updatedAt: '2026-09-28T13:13:02.296Z'
 role: decision
 alwaysLoad: false
-project: https-github-com-danielmarbach-mnemonic
+project: github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
   - id: canonical-design-bounded-rrf-hybrid-recall-172a96ab

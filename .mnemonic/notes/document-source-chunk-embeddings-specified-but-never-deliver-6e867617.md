@@ -13,7 +13,7 @@ lifecycle: permanent
 createdAt: '2026-08-01T20:35:12.274Z'
 updatedAt: '2026-08-03T09:57:46.882Z'
 alwaysLoad: false
-project: https-github-com-danielmarbach-mnemonic
+project: github-com-danielmarbach-mnemonic
 projectName: mnemonic
 memoryVersion: 1
 ---

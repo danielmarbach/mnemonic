@@ -12,7 +12,7 @@ createdAt: '2026-08-30T10:18:48.087Z'
 updatedAt: '2026-08-30T10:18:52.444Z'
 role: summary
 alwaysLoad: false
-project: https-github-com-danielmarbach-mnemonic
+project: github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
   - id: derived-default-scope-for-recall-project-anchored-precision-98164deb

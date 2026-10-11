@@ -8,7 +8,7 @@ tags:
 lifecycle: permanent
 createdAt: '2026-05-25T17:24:09.244Z'
 updatedAt: '2026-05-25T17:24:09.244Z'
-project: https-github-com-danielmarbach-mnemonic
+project: github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
   - id: multi-repository-attachment-support-request-root-151ad76c

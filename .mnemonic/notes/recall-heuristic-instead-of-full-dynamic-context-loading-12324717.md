@@ -8,7 +8,7 @@ tags:
 lifecycle: permanent
 createdAt: '2026-03-08T08:36:41.517Z'
 updatedAt: '2026-09-05T21:32:00.860Z'
-project: https-github-com-danielmarbach-mnemonic
+project: github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
   - id: dynamic-project-context-loading-plan-9f2ed29c

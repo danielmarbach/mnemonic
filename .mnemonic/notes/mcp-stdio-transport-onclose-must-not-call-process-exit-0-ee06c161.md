@@ -9,7 +9,7 @@ tags:
 lifecycle: permanent
 createdAt: '2026-03-09T19:34:21.754Z'
 updatedAt: '2026-05-09T21:16:14.028Z'
-project: https-github-com-danielmarbach-mnemonic
+project: github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
   - id: mcp-stdio-protocol-each-json-rpc-message-must-be-one-line-7a4c9438

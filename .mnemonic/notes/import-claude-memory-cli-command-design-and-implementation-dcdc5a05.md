@@ -8,7 +8,7 @@ tags:
 lifecycle: permanent
 createdAt: '2026-03-09T21:24:01.304Z'
 updatedAt: '2026-08-30T11:24:34.566Z'
-project: https-github-com-danielmarbach-mnemonic
+project: github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
   - id: path-resolution-support-both-absolute-and-tilde-home-paths-e48a0280

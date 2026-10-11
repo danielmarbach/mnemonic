@@ -10,7 +10,7 @@ createdAt: '2026-08-02T08:40:21.855Z'
 updatedAt: '2026-08-02T08:40:21.855Z'
 role: context
 alwaysLoad: false
-project: https-github-com-danielmarbach-mnemonic
+project: github-com-danielmarbach-mnemonic
 projectName: mnemonic
 memoryVersion: 1
 ---

@@ -15,7 +15,7 @@ tags:
 lifecycle: permanent
 createdAt: '2026-09-27T20:54:39.145Z'
 updatedAt: '2026-09-27T20:54:39.145Z'
-project: https-github-com-danielmarbach-mnemonic
+project: github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
   - id: verbose-flag-must-not-gate-pipeline-inputs-only-output-filte-e65e1afc

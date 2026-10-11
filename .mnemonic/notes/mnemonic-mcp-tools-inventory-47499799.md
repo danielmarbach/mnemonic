@@ -7,7 +7,7 @@ tags:
 lifecycle: permanent
 createdAt: '2026-03-07T17:59:25.498Z'
 updatedAt: '2026-05-09T21:16:14.019Z'
-project: https-github-com-danielmarbach-mnemonic
+project: github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
   - id: mnemonic-relationship-graph-implementation-386be386

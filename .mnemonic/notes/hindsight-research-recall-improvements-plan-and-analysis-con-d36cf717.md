@@ -8,7 +8,7 @@ tags:
 lifecycle: permanent
 createdAt: '2026-05-21T21:17:30.201Z'
 updatedAt: '2026-05-21T21:17:30.201Z'
-project: https-github-com-danielmarbach-mnemonic
+project: github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
   - id: summary-performance-principles-compliance-audit-for-recall-p-b482b38b

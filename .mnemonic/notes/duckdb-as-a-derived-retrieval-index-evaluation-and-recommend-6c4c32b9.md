@@ -13,7 +13,7 @@ createdAt: '2026-08-03T10:42:54.827Z'
 updatedAt: '2026-09-28T13:12:11.984Z'
 role: decision
 alwaysLoad: false
-project: https-github-com-danielmarbach-mnemonic
+project: github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
   - id: mnemonic-key-design-decisions-3f2a6273

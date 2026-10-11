@@ -10,7 +10,7 @@ lifecycle: permanent
 createdAt: '2026-03-28T18:54:38.792Z'
 updatedAt: '2026-07-29T21:44:43.374Z'
 alwaysLoad: false
-project: https-github-com-danielmarbach-mnemonic
+project: github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
   - id: implementation-principles-for-mnemonic-mcp-2e178bba

@@ -9,7 +9,7 @@ tags:
 lifecycle: permanent
 createdAt: '2026-03-07T20:29:20.704Z'
 updatedAt: '2026-05-09T21:10:52.757Z'
-project: https-github-com-danielmarbach-mnemonic
+project: github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
   - id: local-mcp-dogfooding-helper-script-a34e7468

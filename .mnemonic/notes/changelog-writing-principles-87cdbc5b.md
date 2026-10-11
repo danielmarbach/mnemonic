@@ -7,7 +7,7 @@ tags:
 lifecycle: permanent
 createdAt: '2026-03-14T13:06:56.354Z'
 updatedAt: '2026-05-09T12:54:19.746Z'
-project: https-github-com-danielmarbach-mnemonic
+project: github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
   - id: documentation-split-for-readme-architecture-and-agent-4e20a50b

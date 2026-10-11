@@ -10,7 +10,7 @@ tags:
 lifecycle: permanent
 createdAt: '2026-05-09T21:03:06.420Z'
 updatedAt: '2026-05-09T21:03:51.515Z'
-project: https-github-com-danielmarbach-mnemonic
+project: github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
   - id: reference-mnemonic-ranking-signals-inventory-all-scoring-for-27ae79dc

@@ -9,7 +9,7 @@ tags:
 lifecycle: permanent
 createdAt: '2026-03-09T09:07:22.778Z'
 updatedAt: '2026-04-05T09:27:10.252Z'
-project: https-github-com-danielmarbach-mnemonic
+project: github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
   - id: phase-2-design-workflow-hint-first-working-state-continuity-07153fcb

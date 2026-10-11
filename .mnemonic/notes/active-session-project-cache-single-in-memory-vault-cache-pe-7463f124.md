@@ -9,7 +9,7 @@ tags:
 lifecycle: permanent
 createdAt: '2026-03-25T12:36:45.634Z'
 updatedAt: '2026-03-25T12:42:56.587Z'
-project: https-github-com-danielmarbach-mnemonic
+project: github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
   - id: enrichment-layer-design-provenance-temporal-recall-projectio-7af26f06

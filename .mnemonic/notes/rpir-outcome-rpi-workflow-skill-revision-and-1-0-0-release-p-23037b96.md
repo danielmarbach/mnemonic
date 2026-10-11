@@ -14,7 +14,7 @@ createdAt: '2026-10-10T23:16:38.451Z'
 updatedAt: '2026-10-10T23:16:39.682Z'
 role: summary
 alwaysLoad: false
-project: https-github-com-danielmarbach-mnemonic
+project: github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
   - id: decision-what-1-0-0-means-which-bugs-shipped-as-fixes-and-wh-e23739e3

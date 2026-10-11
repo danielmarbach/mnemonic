@@ -11,7 +11,7 @@ tags:
 lifecycle: permanent
 createdAt: '2026-08-30T11:24:05.989Z'
 updatedAt: '2026-08-30T11:24:09.382Z'
-project: https-github-com-danielmarbach-mnemonic
+project: github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
   - id: canonical-design-bounded-rrf-hybrid-recall-172a96ab

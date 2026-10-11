@@ -13,7 +13,7 @@ createdAt: '2026-10-10T23:16:37.091Z'
 updatedAt: '2026-10-10T23:16:40.480Z'
 role: decision
 alwaysLoad: false
-project: https-github-com-danielmarbach-mnemonic
+project: github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
   - id: rpir-outcome-rpi-workflow-skill-revision-and-1-0-0-release-p-23037b96
