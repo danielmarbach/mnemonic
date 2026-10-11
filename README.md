@@ -151,6 +151,12 @@ Or in a single step (direct formula URL):
 brew install --formula https://raw.githubusercontent.com/danielmarbach/mnemonic/main/Formula/mnemonic-mcp.rb
 ```
 
+To test a prerelease (release candidate or beta) before it becomes a stable release, install the `mnemonic-mcp-prerelease` formula instead. It always points at the newest prerelease tag and conflicts with the stable formula, so uninstall one before installing the other:
+
+```bash
+brew install mnemonic-mcp-prerelease
+```
+
 ### Docker Hub
 
 Pre-built images for `linux/amd64` and `linux/arm64`:
