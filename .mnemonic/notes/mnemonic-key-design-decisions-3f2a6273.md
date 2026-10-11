@@ -7,7 +7,7 @@ tags:
   - rationale
 lifecycle: permanent
 createdAt: '2026-03-07T17:59:12.124Z'
-updatedAt: '2026-08-30T10:18:38.571Z'
+updatedAt: '2026-10-11T06:43:30.262Z'
 role: summary
 project: github-com-danielmarbach-mnemonic
 projectName: mnemonic
@@ -52,7 +52,7 @@ memoryVersion: 1
 
 **Rebase on pull:** `git pull --rebase` keeps history linear. Don't switch to merge.
 
-**Project ID from git remote URL, not local path:** `project.ts` normalizes remote URLs to stable slugs (e.g. `github-com-acme-myapp`). This makes cross-machine consistency work — local paths differ, remote URLs don't.
+**Project ID from git remote URL, not local path:** `project.ts` normalizes the remote to a stable slug and is host-agnostic: scp (`git@host:org/repo.git`), https, http, `ssh://` with a port, and authenticated forms of one repository all yield the same id (`github-com-acme-myapp`, `gitlab-com-group-project`). Local paths differ across machines, remote URLs do not. Vaults written before the normalizer was fixed carry `https-` or `http-` prefixed ids; those two prefixes are canonicalized when notes and config are read, so un-migrated vaults keep working, and the `normalize-project-ids` migration rewrites them on disk. Only those two prefixes are stripped: `ssh-` and `git-` appear legitimately (Azure DevOps `ssh.dev.azure.com`, hosts named `git-...`), and every id the resolver produces must be a fixed point of the canonicalizer so `note.project === project.id` always holds.
 
 **Similarity boost, not hard filter:** `recall` gives project notes a bounded ranking prior (the old +0.15 additive figure was replaced by the RRF rework). Global memories (user prefs, cross-project patterns) remain accessible in project context: since 0.44.0 the derived default applies project-anchored precision — weakly-matching unassociated global semantic matches are held back unless curated (`alwaysLoad`), strongly matching, or admitted via lexical/graph evidence; an empty pool lifts back to everything and explicit `scope: "all"` is ungated. Decision note: `derived-default-scope-for-recall-project-anchored-precision-98164deb`.
 
