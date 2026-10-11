@@ -15,7 +15,7 @@ createdAt: '2026-10-11T06:43:37.771Z'
 updatedAt: '2026-10-11T06:43:39.049Z'
 role: reference
 alwaysLoad: false
-project: https-github-com-danielmarbach-mnemonic
+project: github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
   - id: reference-mnemonic-rpi-workflow-skill-improvement-opportunit-1b944a63

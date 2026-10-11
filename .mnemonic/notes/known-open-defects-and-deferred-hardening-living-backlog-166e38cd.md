@@ -10,7 +10,7 @@ createdAt: '2026-10-11T06:43:38.470Z'
 updatedAt: '2026-10-11T06:43:39.676Z'
 role: reference
 alwaysLoad: false
-project: https-github-com-danielmarbach-mnemonic
+project: github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
   - id: multi-repository-attachment-research-and-known-gaps-88d9e57e
@@ -47,6 +47,8 @@ Items found by review that were judged not data-loss paths and deferred. Remove 
 
 - Host labels that begin with `http-` or `https.` collapse with their unprefixed form because legacy canonicalization strips by prefix alone (`https.example.com` and `example.com` share an id).
 - A trailing slash after `.git` yields an id ending in `-git`.
+
+- A vault already at the latest schema cannot re-run `normalize-project-ids` through `runAllPending`; notes written afterwards by a pre-upgrade server process keep legacy ids until `execute_migration` is called by name or the files are fixed by hand. Restart every MCP server after upgrading.
 
 ## Semantic patch
 
