@@ -11,7 +11,7 @@ tags:
   - workflow
 lifecycle: permanent
 createdAt: '2026-10-10T23:16:38.451Z'
-updatedAt: '2026-10-10T23:16:39.682Z'
+updatedAt: '2026-10-11T00:18:18.842Z'
 role: summary
 alwaysLoad: false
 project: github-com-danielmarbach-mnemonic
@@ -39,3 +39,12 @@ memoryVersion: 1
 **Branch handshake:** options open PR, merge, keep branch, or discard; the user decides. Recommended: open a PR from improve/rpi-skill-and-release-1.0.0, merge, then tag v1.0.0 on main.
 
 **Open items:** project id unification (user decision, 1.1 candidate with migration); deferred findings listed in the decision note; renovate PR #390 untouched.
+
+## Final state (2026-10-11, after the project id work)
+
+- Additional work commits: 99261f5 feat(project) one id for every remote form plus migration; 7a705ae fix(project) stable resolver ids and config-less vault migration; 0e2f252 migrate(v0.1.5) rewrite of this repo's 106 notes; 411a769 fix(migrate) main vault stamping, config reporting, truthful CLI summary.
+- Main vault: migration committed as 1f13f30 (118 notes, 7 policy keys, 2 attachment keys, schema 1.5), one unpushed commit, push URL restored.
+- Final gate: npm run verify:release passed with 101 files and 1654 tests; dogfood required checks pass; one pre-existing advisory.
+- Reviews: three fresh-context adversarial reviews on the id work (block, then continue, then continue for the follow-ups).
+- History: the Prepare release 1.0.0 commit (294aa25) is not last; later commits extend its changelog section. Tag v1.0.0 on the final merged commit.
+- Status: complete locally. Not done by design: tag, push, merge, publish.
