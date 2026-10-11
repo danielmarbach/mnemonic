@@ -9,7 +9,7 @@ tags:
   - documentation
 lifecycle: permanent
 createdAt: '2026-05-09T12:54:02.094Z'
-updatedAt: '2026-08-30T10:18:31.162Z'
+updatedAt: '2026-10-11T06:43:37.036Z'
 role: summary
 alwaysLoad: true
 project: github-com-danielmarbach-mnemonic
@@ -86,3 +86,10 @@ This framing explains several design decisions: no access counters (would requir
 
 - **Performance constraints in a plan ("no new I/O", "fail-soft", "session-cache only") are requirements, not suggestions.** If implementation violates them, the review catches it, but the implementation should have caught it first.
 - **Test coverage specified in a plan is the minimum, not the ceiling.** "Unit tests for the limit heuristic" means at least that — not "no tests at all."
+
+### Durable file and environment safety
+
+- **Never overwrite a file you could not parse.** A hand-edited or truncated `config.json` reads as defaults so the server starts, but every writer refuses with the parse error until the file is fixed, a refused write must not linger in the in-process cache, and writes go through a temp file plus rename. Missing files are not the same as unparseable files: a missing file may be created.
+- **Empty environment values are unset.** MCP clients template unset variables as `""`; `OLLAMA_URL=""` must give the default, not a startup crash, and `EMBED_MODEL=""` must not select an empty model.
+- **Tool and CLI output must be truthful about persistence.** When an auto-commit or push fails, say that changes are staged and not committed, name the vaults, and give the manual command. Never print "committed and pushed" from a code path that cannot know it. Push results are statuses, not exceptions; commit failures are.
+- **Normalization must be host-agnostic and idempotent.** Identity derivations (remote URLs, legacy ids) must not special-case github, and every producer of an id must return a value the canonicalizer leaves unchanged.
