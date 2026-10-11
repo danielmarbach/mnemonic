@@ -10,7 +10,7 @@ tags:
   - orchestration
 lifecycle: permanent
 createdAt: '2026-10-10T23:16:37.091Z'
-updatedAt: '2026-10-10T23:16:40.480Z'
+updatedAt: '2026-10-11T00:18:18.191Z'
 role: decision
 alwaysLoad: false
 project: github-com-danielmarbach-mnemonic
@@ -64,3 +64,21 @@ memoryVersion: 1
 **Alternatives considered:** fixing the project id now with a migration (rejected for 1.0 timing and the pending product call); isolating fix lanes in worktrees (rejected: sequential single-writer lanes were simpler and fast enough); skipping repoStorage.init only without the exclude file (rejected: embeddings would dirty the attached repo later).
 
 **Consequences:** 1.0 ships with accurate docs and a tracked follow-up list; the next minor can take the id unification with a migration.
+
+## Amendment (2026-10-11, later the same day)
+
+The user chose to align project identity in 1.0 instead of deferring it. Shipped in commits 99261f5, 7a705ae and 411a769:
+
+- normalizeRemoteUrl is host-agnostic and shared by project detection and add_attachment; every remote form of a repo (scp, https, http, ssh with port, authenticated, any host) yields one id; scp remotes keep a numeric first path segment.
+- canonicalProjectId strips only https- and http- legacy prefixes (ssh- and git- were dropped because Azure DevOps ssh hosts and folder names like http-server produce such ids legitimately); every id producer is a fixed point of it; it runs at note parse and config read so un-migrated vaults keep working.
+- Migration v0.1.5-normalize-project-ids (schema 1.5) rewrites note frontmatter and config keys, keeps updatedAt and attachment ids, reports config rewrites separately, commits config.json even without a schema advance.
+- A vault without config.json counts as schema 0.0 for pending computation (before, it looked fully migrated and could never be migrated); new main and project vaults record their schema version at creation.
+- Document manifests written under a legacy id still load.
+- Executed on both real vaults: project vault 106 notes (0e2f252), main vault 118 notes plus 9 config keys (1f13f30, unpushed).
+
+Additional lessons:
+
+- Worker verification lists must include npm run typecheck (tests), not only npm run build (src only); the pre-commit hook caught a missed test type error.
+- Commit signing through 1Password blocks every git commit on the machine while 1Password is locked: the migrator's auto-commits failed, and the CLI claimed success anyway (fixed). Tests that commit hang in that state; run them with a HOME override or unlock 1Password.
+- After upgrading to 1.0.0 and migrating, restart MCP servers: an old server keeps resolving legacy ids and caches the pre-migration config.
+- Known 1.0 caveats recorded for follow-up: host labels starting with http- or https. collapse with their unprefixed form; runMigration by name on a config-less vault stamps the latest version without running older backfills; writeNote re-serialization drops unknown frontmatter keys during migrations (pre-existing).
