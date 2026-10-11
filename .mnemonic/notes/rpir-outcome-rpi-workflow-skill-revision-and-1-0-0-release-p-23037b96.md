@@ -16,9 +16,6 @@ role: summary
 alwaysLoad: false
 project: github-com-danielmarbach-mnemonic
 projectName: mnemonic
-relatedTo:
-  - id: decision-what-1-0-0-means-which-bugs-shipped-as-fixes-and-wh-e23739e3
-    type: related-to
 memoryVersion: 1
 ---
 # RPIR outcome: rpi-workflow skill revision and 1.0.0 release prepared

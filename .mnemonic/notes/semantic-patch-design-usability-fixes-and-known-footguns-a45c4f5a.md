@@ -14,8 +14,6 @@ projectName: mnemonic
 relatedTo:
   - id: mnemonic-key-design-decisions-3f2a6273
     type: related-to
-  - id: decision-what-1-0-0-means-which-bugs-shipped-as-fixes-and-wh-e23739e3
-    type: related-to
 memoryVersion: 1
 ---
 Consolidate semantic patch design, LLM-usability improvements, heading semantics, and known section replacement footguns into one canonical note.

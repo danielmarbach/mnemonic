@@ -18,8 +18,6 @@ projectName: mnemonic
 relatedTo:
   - id: rpir-workflow-design-for-mnemonic-research-plan-implement-re-80b00851
     type: related-to
-  - id: decision-what-1-0-0-means-which-bugs-shipped-as-fixes-and-wh-e23739e3
-    type: related-to
   - id: delegated-delivery-lessons-running-pi-subagents-workers-and--dab061f9
     type: related-to
 memoryVersion: 1
