@@ -9,7 +9,7 @@ tags:
   - migration
 lifecycle: temporary
 createdAt: '2026-10-10T23:25:53.558Z'
-updatedAt: '2026-10-10T23:51:26.349Z'
+updatedAt: '2026-10-11T00:14:32.140Z'
 role: plan
 alwaysLoad: false
 project: github-com-danielmarbach-mnemonic
@@ -50,3 +50,5 @@ Status: endorsed by the user (2026-10-11): "align the project identity for 1.0 a
 - Review of 99261f5: block. Lane H dispatched for P1-a (only https- and http- prefixes, fixed-point producers), P1-b (port rule only after a scheme), P1-c (missing config.json counts as 0.0 everywhere; new project vaults write and commit config.json at creation), P2-a and P2-d (configModified flag, committed and printed), P2-b (canonical fixtures plus one legacy note), P2-c (loop until stable), docs. Execution on real vaults waits for Lane H and its review.
 
 - Lane H committed as 7a705ae after the orchestrator fixed one test typecheck error the worker missed (workers ran npm run build, which typechecks src only; the pre-commit hook caught tests/migration.unit.test.ts). Lesson: worker verification lists must include npm run typecheck. Re-review dispatched; migration execution on both vaults and verify:release follow a continue outcome.
+
+- P3 execution done (2026-10-11): project vault 106 notes plus config.json 1.5 committed as 0e2f252; main vault 118 notes, 7 policy keys and 2 attachment keys canonical, schema 1.5, committed as 1f13f30 with the push URL disabled during the run and restored afterwards (one unpushed commit, user pushes). The migrator's own auto-commits failed because 1Password commit signing was locked; the CLI still printed committed and pushed, fixed in Lane I. Lane I (main vault stamp, truthful CLI summary, execute_migration config line, docs) implemented and under fresh review.
