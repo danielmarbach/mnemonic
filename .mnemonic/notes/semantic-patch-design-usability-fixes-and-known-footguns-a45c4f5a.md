@@ -8,7 +8,7 @@ tags:
   - update
 lifecycle: permanent
 createdAt: '2026-05-25T17:25:55.146Z'
-updatedAt: '2026-10-10T23:16:40.480Z'
+updatedAt: '2026-10-11T06:43:34.778Z'
 project: github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
@@ -102,3 +102,10 @@ The section operation should replace the selected heading plus all following nod
 ## Current Guidance
 
 Prefer `semanticPatch` for targeted edits. Use section-aware operations for replacing sections. Do not use heading-level `replace` or `insertAfter` when the intent is to replace the whole section body.
+
+## Later hardening (list merge, section guard, heading text)
+
+- **Adjacent lists merge.** Inserting a list value next to an existing list used to create a second list node. The serializer forces `-` bullets, so `- a\n- b\n\n- c` re-parsed as one loose list and every later patch spread all items with blank lines (seen on this vault's own plan notes). A list inserted via insertAfter, insertBefore, appendChild or prependChild next to a list with the same `ordered` value now merges into it and keeps that list's tightness. A paragraph next to a list still stays a separate block.
+- **Section selectors accept only replaceSection.** `{ section }` with remove, replace, insertAfter or child operations used to act on the heading node alone (orphaned body, misleading "cannot appendChild to heading" error). The combination is rejected before any mutation with a message pointing to heading selectors plus insertAfter.
+- **Heading text is the flattened plain text.** Headings containing inline code, emphasis or image alt text are selectable by their plain text, and the "Available headings" diagnostic lists the same string. Previously only direct text children counted, so such headings were unselectable and the diagnostic showed a broken string.
+- Of the earlier "mitigations to consider", duplicate-section detection and dry-run diagnostics are still open.
