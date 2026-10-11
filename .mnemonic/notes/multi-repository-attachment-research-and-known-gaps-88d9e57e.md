@@ -7,7 +7,7 @@ tags:
   - known-gaps
 lifecycle: permanent
 createdAt: '2026-05-25T17:24:09.244Z'
-updatedAt: '2026-05-25T17:24:09.244Z'
+updatedAt: '2026-10-11T06:43:35.542Z'
 project: github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
@@ -124,3 +124,13 @@ Some of these may have been completed later; verify current test files before tr
 ## Current Interpretation
 
 This note is the canonical research and gap tracker for multi-repository attachment support. Use it before planning new attachment work, validating write-through behavior, or deciding whether older phase-specific attachment notes can be pruned.
+
+## Hardening lessons (attachments)
+
+- **Read-only attachments must not touch the attached repository's working tree.** Loading one used to run `Storage.init` inside the attached repo and append ignore lines to its tracked `.mnemonic/.gitignore`. Now non-writable attachments skip the init and put their cache patterns into the repository's `git rev-parse --git-path info/exclude` (best effort, idempotent, CRLF-safe). Writable attachments keep the tracked `.gitignore` path.
+- **Attachment-side caches live inside the attached repository** under `<vaultFolder>/attachments/<consuming project id>`. That is why the exclude file matters and why a project id change leaves an orphaned cache directory behind (harmless). Moving these caches out of the attached repo is an open design follow-up.
+- **pushBranch pushes `HEAD:refs/heads/<branch>`.** A pushBranch different from the checked-out branch failed with "src refspec does not match" before. Branch names that git would parse as flags (leading dash) are rejected in validateBranch, add_attachment (branch and pushBranch) and set_attachment_branch.
+- **Git path listings use NUL separation.** With the default `core.quotePath`, `ls-tree --name-only` and `log --name-only` quote non-ASCII paths, so such documents were silently dropped from document sources, lazy loads and attached note listings. Every listing now passes `-z` through one shared splitter (`git log -z --name-only --format=%cI` prints `<date>\0\n` then `<path>\0` per entry).
+- **A malformed note in an attached vault returns null** (MalformedNoteError only) instead of throwing out of list and dropping the whole attachment from recall.
+- **Document manifests store the consuming project id**; loading canonicalizes it so manifests written under a legacy id still load. The attachment config hash does not include the id.
+- Still open: `updateAttachedBranchTipHash` persists under the attached repo's own project id instead of the consuming project (in-memory ref is correct, so the only effect is a redundant reload); lazy-loaded document chunks skip the embedding compatibility check until the next sync.
