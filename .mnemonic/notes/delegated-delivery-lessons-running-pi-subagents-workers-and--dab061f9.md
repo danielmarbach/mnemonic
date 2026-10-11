@@ -12,11 +12,14 @@ tags:
   - workflow
 lifecycle: permanent
 createdAt: '2026-10-11T06:43:37.771Z'
-updatedAt: '2026-10-11T06:43:37.771Z'
+updatedAt: '2026-10-11T06:43:39.049Z'
 role: reference
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: reference-mnemonic-rpi-workflow-skill-improvement-opportunit-1b944a63
+    type: related-to
 memoryVersion: 1
 ---
 # Delegated delivery lessons: running pi-subagents workers and reviewers on mnemonic

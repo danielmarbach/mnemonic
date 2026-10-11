@@ -10,7 +10,7 @@ tags:
   - phase2
 lifecycle: permanent
 createdAt: '2026-04-25T07:47:46.589Z'
-updatedAt: '2026-10-10T23:16:40.083Z'
+updatedAt: '2026-10-11T06:43:39.049Z'
 role: reference
 alwaysLoad: false
 project: github-com-danielmarbach-mnemonic
@@ -19,6 +19,8 @@ relatedTo:
   - id: rpir-workflow-design-for-mnemonic-research-plan-implement-re-80b00851
     type: related-to
   - id: decision-what-1-0-0-means-which-bugs-shipped-as-fixes-and-wh-e23739e3
+    type: related-to
+  - id: delegated-delivery-lessons-running-pi-subagents-workers-and--dab061f9
     type: related-to
 memoryVersion: 1
 ---
