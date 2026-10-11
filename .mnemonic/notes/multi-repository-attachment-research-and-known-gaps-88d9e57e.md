@@ -7,7 +7,7 @@ tags:
   - known-gaps
 lifecycle: permanent
 createdAt: '2026-05-25T17:24:09.244Z'
-updatedAt: '2026-10-11T06:43:35.542Z'
+updatedAt: '2026-10-11T06:43:39.676Z'
 project: github-com-danielmarbach-mnemonic
 projectName: mnemonic
 relatedTo:
@@ -15,6 +15,8 @@ relatedTo:
     type: derives-from
   - id: apply-multi-repo-attachment-phase-2-integration-tests-and-p0-f16c0bf8
     type: follows
+  - id: known-open-defects-and-deferred-hardening-living-backlog-166e38cd
+    type: related-to
 memoryVersion: 1
 ---
 Consolidate multi-repository attachment research, review evidence, design decisions, implementation status, and known gaps into one canonical note.

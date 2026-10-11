@@ -7,11 +7,14 @@ tags:
   - follow-up
 lifecycle: permanent
 createdAt: '2026-10-11T06:43:38.470Z'
-updatedAt: '2026-10-11T06:43:38.470Z'
+updatedAt: '2026-10-11T06:43:39.676Z'
 role: reference
 alwaysLoad: false
 project: https-github-com-danielmarbach-mnemonic
 projectName: mnemonic
+relatedTo:
+  - id: multi-repository-attachment-research-and-known-gaps-88d9e57e
+    type: related-to
 memoryVersion: 1
 ---
 # Known open defects and deferred hardening (living backlog)
