@@ -6,11 +6,22 @@ The format is loosely based on Keep a Changelog and uses semver-style version he
 
 ## [1.0.0-rc.1] - 2026-10-11
 
+### Upgrading
+
+This release changes how project ids are derived, so existing vaults need the `normalize-project-ids` migration. After installing:
+
+1. Restart every MCP server that uses mnemonic. A server started before the upgrade keeps writing the old ids.
+2. Preview: `mnemonic migrate --dry-run` for the main vault and `mnemonic migrate --dry-run --cwd=<repo>` for each project vault.
+3. Apply: `mnemonic migrate` and `mnemonic migrate --cwd=<repo>`, or call `execute_migration` from an MCP client. Changes are committed to the vault; push them yourself if auto-push is off.
+
+Until the migration runs, reads already understand the old ids, so recall keeps working.
+
 ### Changed
 
-- Release candidate for 1.0: the note format, vault layout, MCP tool surface and `mnemonic` CLI are considered stable. From 1.0 on, breaking changes to any of them bump the major version and ship with a migration that `list_migrations` reports per vault. Nothing changes for existing vaults when upgrading from 0.47.x.
+- Release candidate for 1.0: the note format, vault layout, MCP tool surface and `mnemonic` CLI are considered stable. From 1.0 on, breaking changes to any of them bump the major version and ship with a migration that `list_migrations` reports per vault.
 - The `mnemonic-rpi-workflow` skill and prompt gain an autonomous mode (user handoffs become recorded checkpoints when autonomy was granted), a commit hygiene gate with dirty-worktree rules, a review step that classifies failing heuristic checks before touching product code, a phase closeout checklist, and a finish stage that ends with a branch handshake instead of an unauthorized push or merge.
-- A repository now has the same project id whether it is cloned over SSH or HTTPS (`github-com-acme-myapp`), so its memories, policies, and attachments no longer split by remote form. Vaults from before 1.0, including project vaults without a `config.json`, are rewritten by the `normalize-project-ids` migration, which only strips `https-`/`http-` prefixes (`list_migrations` and the startup warning show it as pending for the project vaults loaded in the session; `execute_migration` runs it, and `mnemonic migrate --cwd=<repo>` runs it for a specific repository); reads already understand the old ids, and new main and project vaults record their schema version at creation.
+- A repository now has the same project id whether it is cloned over SSH, HTTPS, or any other remote form on any host (`github-com-acme-myapp`), so its memories, policies, and attachments no longer split by clone method. The `normalize-project-ids` migration rewrites the old `https-`/`http-` prefixed ids in notes and config, including in project vaults that never had a `config.json`; see Upgrading above.
+- New main and project vaults record their schema version at creation, so a fresh install no longer reports pending migrations it does not need.
 - `add_attachment` and `set_attachment_branch` reject branch names that git would read as flags, such as `-x` or `--force`, and `add_attachment` now validates `pushBranch` the same way as `branch`.
 
 ### Fixed
