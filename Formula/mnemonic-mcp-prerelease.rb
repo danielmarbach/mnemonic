@@ -1,8 +1,8 @@
 class MnemonicMcpPrerelease < Formula
   desc "Prerelease channel of mnemonic, the git-backed markdown MCP memory server"
   homepage "https://github.com/danielmarbach/mnemonic"
-  url "https://registry.npmjs.org/@danielmarbach/mnemonic-mcp/-/mnemonic-mcp-1.0.0-rc.1.tgz"
-  sha256 "0ce01ba112b3f15ac0887ed0fb3890c2f3ba44d3b1f3ae967ffee588af113f7a"
+  url "https://registry.npmjs.org/@danielmarbach/mnemonic-mcp/-/mnemonic-mcp-1.0.0.tgz"
+  sha256 "6406130b9f8199c5cab7c2b1f7702a62eed582accaa81fb1315837ff01dc64ad"
   license "Apache-2.0"
 
   depends_on "node"
