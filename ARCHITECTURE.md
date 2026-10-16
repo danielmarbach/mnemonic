@@ -28,15 +28,19 @@
 ### Project identity
 
 - Project identity comes from the `origin` git remote URL when available.
+- The URL is normalized to a host-qualified slug (`github-com-acme-myapp`), so SSH, HTTPS, and other remote forms of the same repository resolve to one project id on any host.
 - Forked repos can opt into a different canonical remote such as `upstream` via a saved identity override.
-- This produces a stable slug that survives different local clone paths across machines.
+- The slug survives different local clone paths across machines.
 - If no remote exists, mnemonic falls back to the git root folder, then finally the directory name.
+- Vaults from before 1.0 may hold `https-`/`http-` prefixed ids. Reads map them to the canonical id, and the `normalize-project-ids` migration rewrites them in notes and `config.json`.
 
 ### MCP-first operations
 
-- `src/index.ts` registers the MCP tools and coordinates requests. It uses `@modelcontextprotocol/server` v2 (MCP 2026-07-28 spec).
+- `src/index.ts` dispatches CLI commands, builds the MCP server on `@modelcontextprotocol/server` v2 (MCP 2026-07-28 spec), and registers tools and prompts. Each tool lives in its own module under `src/tools/`.
 - The server entry point uses `serveStdio()` from `@modelcontextprotocol/server/stdio` which auto-negotiates protocol era with clients.
 - Most user-visible behavior is exposed through tools like `remember`, `recall`, `update`, `forget`, `sync`, `consolidate`, and migration commands.
+- `MNEMONIC_TOOLSET=core` registers only the nine everyday tools (`src/toolset.ts`). The server `instructions` sent at initialize adapt to the active toolset (`src/server-instructions.ts`).
+- The CLI (`mnemonic migrate`, `mnemonic import-claude-memory`) shares the vault, migration, and storage code with the server (`src/cli/`).
 - The local helper `scripts/mcp-local.sh` rebuilds and launches the current server for dogfooding and CI-safe integration tests.
 - `tools/list` responses carry cache hints (`ttlMs`, `cacheScope`) to reduce redundant tool catalog re-fetches by clients.
 
@@ -155,7 +159,13 @@ flowchart TD
 
 | Path                           | Responsibility                                                                                |
 | ------------------------------ | --------------------------------------------------------------------------------------------- |
-| `src/index.ts`                 | MCP server entry point, tool registration, orchestration, CLI migration command, cache hints for tools/list |
+| `src/index.ts`                 | Entry point: CLI dispatch, MCP server construction, cache hints for tools/list               |
+| `src/tools/`                   | One module per MCP tool, registered in `src/tools/index.ts` according to the active toolset  |
+| `src/toolset.ts`               | `full` and `core` toolset definitions resolved from `MNEMONIC_TOOLSET`                        |
+| `src/server-instructions.ts`   | MCP `instructions` protocol sent at initialize                                                |
+| `src/cli/`                     | `mnemonic migrate` and `mnemonic import-claude-memory` commands and dispatch                  |
+| `src/helpers/`                 | Shared tool helpers: embedding, vault resolution, git commit with protected-branch handling, persistence, client elicitation |
+| `src/projections.ts`           | Compact note projections used as embedding input and lexical corpus                          |
 | `src/startup.ts`               | Server startup via `serveStdio()` from `@modelcontextprotocol/server/stdio`, migration warnings            |
 | `src/storage.ts`               | Markdown note persistence, embedding JSON persistence, core types                             |
 | `src/vault.ts`                 | Main/project vault lifecycle, search order, vault routing                                     |
@@ -217,6 +227,7 @@ Main-vault `config.json` stores machine-local operational settings rather than m
 - **Project recall is biased, not exclusive**: project memory should be preferred without making global memory disappear.
 - **Recall enrichment is opt-in**: evidence and temporal details are available when needed, while default recall stays compact.
 - **Migrations are explicit**: schema changes should go through `src/migration.ts`, tests, and dry-run-first workflows.
+- **1.0 stability contract**: the note format, vault layout, MCP tool surface, and CLI are stable. Breaking changes to any of them bump the major version and ship with a migration that `list_migrations` reports per vault.
 - **Temporary-only consolidation defaults to cleanup**: when every source note is `temporary`, consolidation prefers `delete`, and the merged note becomes `permanent`.
 
 ## Document-source attachments

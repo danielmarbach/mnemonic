@@ -94,7 +94,7 @@ Published to the public npm registry. No authentication required.
 npm install @danielmarbach/mnemonic-mcp
 
 # Specific release
-npm install @danielmarbach/mnemonic-mcp@1.0.0-rc.1
+npm install @danielmarbach/mnemonic-mcp@1.0.0
 ```
 
 ### Install bundled skills (Claude/OpenCode)
@@ -151,7 +151,7 @@ Or in a single step (direct formula URL):
 brew install --formula https://raw.githubusercontent.com/danielmarbach/mnemonic/main/Formula/mnemonic-mcp.rb
 ```
 
-To test a prerelease (release candidate or beta) before it becomes a stable release, install the `mnemonic-mcp-prerelease` formula instead. It always points at the newest prerelease tag and conflicts with the stable formula, so uninstall one before installing the other:
+To test a prerelease (release candidate or beta) before it becomes a stable release, install the `mnemonic-mcp-prerelease` formula instead. It points at the newest prerelease tag (after a stable release it stays on the last prerelease until the next one ships) and conflicts with the stable formula, so uninstall one before installing the other:
 
 ```bash
 brew install mnemonic-mcp-prerelease
@@ -165,7 +165,7 @@ Pre-built images for `linux/amd64` and `linux/arm64`:
 docker pull danielmarbach/mnemonic-mcp:latest
 
 # Or a specific version
-docker pull danielmarbach/mnemonic-mcp:0.5.0
+docker pull danielmarbach/mnemonic-mcp:1.0.0
 ```
 
 ## MCP client config
@@ -389,7 +389,7 @@ Every result carries structured quality signals to help agents decide what to tr
 - **`diversity`:** the theme count, role mix, and lifecycle mix across selected results.
 - **`retrievalCoverage`:** the fraction of high-priority anchors (alwaysLoad and summary notes) represented in results.
 
-**Hybrid recall** combines semantic similarity, exact wording, and relationship context on every query. It can now find exact names, identifiers, phrases, error codes, and version strings even when they are not semantically similar. Code-like identifiers match wherever they appear in a note body, `SCREAMING_SNAKE`, `camelCase` and `kebab-case` spellings of the same name match each other, and notes containing the exact identifier from the query get an extra rank in fusion (shown as the `identifier` channel in `evidence: "compact"`). Words deep in a note body count too: notes containing nearly all of the query's distinctive words anywhere get a `full-text` rank in fusion, even when their title and summary don't match. All of this still favors conceptually relevant and well-connected notes. The ranking remains bounded and fail-soft, uses compact projections without new infrastructure, and preserves canonical explanation promotion and temporal recency hints.
+**Hybrid recall** combines semantic similarity, exact wording, and relationship context on every query. It also finds exact names, identifiers, phrases, error codes, and version strings even when they are not semantically similar. Code-like identifiers match wherever they appear in a note body, `SCREAMING_SNAKE`, `camelCase` and `kebab-case` spellings of the same name match each other, and notes containing the exact identifier from the query get an extra rank in fusion (shown as the `identifier` channel in `evidence: "compact"`). Words deep in a note body count too: notes containing nearly all of the query's distinctive words anywhere get a `full-text` rank in fusion, even when their title and summary don't match. All of this still favors conceptually relevant and well-connected notes. The ranking remains bounded and fail-soft, uses compact projections without new infrastructure, and preserves canonical explanation promotion and temporal recency hints.
 
 Recall modes:
 

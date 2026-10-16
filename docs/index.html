@@ -1628,7 +1628,7 @@
       <div>
         <div class="tool-category-header">Project Context</div>
         <div class="tool-category-grid">
-          <div class="tool-card" data-tip="Uses the git remote URL to give every project a stable identity across your laptop, a colleague's machine, and CI.">
+          <div class="tool-card" data-tip="Uses the git remote URL to give every project a stable identity across your laptop, a colleague's machine, and CI, whether it was cloned over SSH or HTTPS.">
             <div class="tool-card-name">detect_project</div>
             <div class="tool-card-purpose">Check which project this folder belongs to</div>
           </div>
@@ -1798,6 +1798,7 @@
           <pre><span class="cmd">docker pull danielmarbach/mnemonic-mcp:latest</span></pre>
         </div>
         <p>Pre-built for <code>linux/amd64</code> and <code>linux/arm64</code>. Tagged with the release version and <code>latest</code>.</p>
+        <p>Stable since 1.0: the note format, vault layout, tool surface, and CLI follow semantic versioning. Breaking changes bump the major version and ship with a migration; <code>mnemonic migrate --dry-run</code> previews it.</p>
 
         <div class="install-or">or build from source</div>
 

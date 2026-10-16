@@ -4,6 +4,29 @@ All notable changes to `mnemonic` will be documented in this file.
 
 The format is loosely based on Keep a Changelog and uses semver-style version headings.
 
+## [1.0.0] - 2026-10-16
+
+First stable release. It includes everything from 1.0.0-rc.1 below.
+
+### Upgrading
+
+Coming from 0.x or an earlier release candidate? This release changes how project ids are derived, so existing vaults need the `normalize-project-ids` migration. After installing:
+
+1. Restart every MCP server that uses mnemonic. A server started before the upgrade keeps writing the old ids.
+2. Preview: `mnemonic migrate --dry-run` for the main vault and `mnemonic migrate --dry-run --cwd=<repo>` for each project vault.
+3. Apply: `mnemonic migrate` and `mnemonic migrate --cwd=<repo>`, or call `execute_migration` from an MCP client. Changes are committed to the vault; push them yourself if auto-push is off.
+
+Until the migration runs, reads already understand the old ids, so recall keeps working.
+
+### Added
+
+- Homebrew testers can install release candidates with `brew install mnemonic-mcp-prerelease`. It tracks the newest prerelease tag, conflicts with the stable `mnemonic-mcp` formula, and never moves stable users.
+
+### Changed
+
+- The note format, vault layout, MCP tool surface and `mnemonic` CLI are now stable. Breaking changes to any of them bump the major version and ship with a migration that `list_migrations` reports per vault.
+- Updated `markdownlint` to 0.42 and `zod` to 4.6.7.
+
 ## [1.0.0-rc.1] - 2026-10-11
 
 ### Upgrading
